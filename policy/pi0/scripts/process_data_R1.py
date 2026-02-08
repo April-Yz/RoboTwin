@@ -1,15 +1,18 @@
 """
-# 默认使用 eepose 模式和默认路径
-python process_data_R1.py task_name setting 50
+# 默认使用 eepose 模式、手腕相机和默认路径
+python process_data_R1.py task_name "pour water into the cup" 50
+
+# 禁用手腕相机
+python process_data_R1.py task_name "pour water into the cup" 50 --no-wrist
 
 # 使用自定义数据路径
-python process_data_R1.py task_name setting 50 --load-dir /custom/path
+python process_data_R1.py task_name "pour water into the cup" 50 --load-dir /custom/path
 
 # 切换到 qpos 模式
-python process_data_R1.py task_name setting 50 --use-qpos
+python process_data_R1.py task_name "pour water into the cup" 50 --use-qpos
 
 # 同时指定自定义路径和 qpos 模式
-python process_data_R1.py task_name setting 50 --load-dir /custom/path --use-qpos
+python process_data_R1.py task_name "pour water into the cup" 50 --load-dir /custom/path --use-qpos
 """
 
 import sys
@@ -171,7 +174,7 @@ def get_task_config(task_name):
     return args
 
 
-def data_transform(path, episode_num, save_path, task_name, use_wrist=False):
+def data_transform(path, episode_num, save_path, task_name, instructions, use_wrist=False):
     begin = 0
     h5_files = sorted([f for f in os.listdir(path) if f.endswith('.h5')])
 
@@ -184,9 +187,8 @@ def data_transform(path, episode_num, save_path, task_name, use_wrist=False):
 
         print(f"Processing file: {h5_file}")
         
-        # 使用 task_name 作为指令
-        instructions = [task_name]
-        save_instructions_json = {"instructions": instructions}
+        # 使用传入的 instructions
+        save_instructions_json = {"instructions": [instructions]}
 
         episode_save_path = os.path.join(save_path, f"episode_{i}")
         os.makedirs(episode_save_path, exist_ok=True)
@@ -276,7 +278,11 @@ if __name__ == "__main__":
         default="beat_block_hammer",
         help="The name of the task (e.g., beat_block_hammer)",
     )
-    parser.add_argument("setting", type=str)
+    parser.add_argument(
+        "instructions",
+        type=str,
+        help="The instruction text for the task (e.g., 'pour water into the cup')",
+    )
     parser.add_argument(
         "expert_data_num",
         type=int,
@@ -297,30 +303,37 @@ if __name__ == "__main__":
              "By default, end effector pose (ee_pose) is used.",
     )
     parser.add_argument(
-        "--use-wrist",
+        "--no-wrist",
         action="store_true",
-        help="Include wrist camera data (cam_left_wrist and cam_right_wrist). "
-             "Default is False (only use cam_high).",
+        help="Exclude wrist camera data (cam_left_wrist and cam_right_wrist). "
+             "By default, wrist cameras are included.",
     )
     args = parser.parse_args()
 
     task_name = args.task_name
-    setting = args.setting
+    instructions = args.instructions
     expert_data_num = args.expert_data_num
     load_dir = args.load_dir
 
     # 默认使用 ee_pose（end effector pose），除非用户明确指定 --use-qpos
     use_end_pose = not args.use_qpos
+    
+    # 默认使用手腕相机，除非用户明确指定 --no-wrist
+    use_wrist = not args.no_wrist
 
     begin = 0
     print(f'read data from path:{load_dir}')
+    print(f'Task: {task_name}')
+    print(f'Instructions: {instructions}')
     print(f'Using {"end pose (ee_pose)" if use_end_pose else "joint angles (qpos)"}')
+    print(f'Wrist cameras: {"enabled" if use_wrist else "disabled"}')
 
-    target_dir = f"processed_data/{task_name}-{setting}-{expert_data_num}"
+    target_dir = f"processed_data/{task_name}-{expert_data_num}"
     begin = data_transform(
         load_dir,
         expert_data_num,
         target_dir,
         task_name,
-        use_wrist=args.use_wrist,
+        instructions,
+        use_wrist=use_wrist,
     )

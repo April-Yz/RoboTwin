@@ -378,6 +378,88 @@ _CONFIGS = [
     ###
     ### finetune config for robotwin
     ###
+
+   # ===  R1 真机 LoRa===
+    TrainConfig(
+        # 1. 给它一个新的名字，避免覆盖旧的实验日志
+        name="R1_FT_pour_35_0130",
+        num_train_steps=15000,
+        save_interval= 1000, # 5000 # 5000
+        keep_period= 1000, # 5000 # 1000
+        batch_size=32,  # 从32降低到16，减少显存占用 还是超出
+        fsdp_devices=2,  # refer line 359
+        # 2. 保持模型架构完全一致
+        model=pi0.Pi0Config(paligemma_variant="gemma_2b_lora", action_expert_variant="gemma_300m_lora"),
+        # model=pi0.Pi0Config(),
+        # 3. [核心步骤] 修改 Weight Loader
+        # 不要用 S3 链接，而是指向你本地之前训练好的 checkpoint 路径
+        # 注意：这里需要填入绝对路径或相对路径
+        # weight_loader=weight_loaders.CheckpointWeightLoader("./checkpoints//pi0_base_aloha_robotwin_lora_pour_ego_wrist_wxyz_0124/demo_clean/30000/params"), # 这里的路径示例： ./checkpoints/{旧config名}/{旧exp名}/checkpoints/step_{N}/params
+        weight_loader=weight_loaders.CheckpointWeightLoader("s3://openpi-assets/checkpoints/pi0_base/params"),
+        
+        # 4. 修改数据配置为你的新数据集
+        data=LeRobotAlohaDataConfig(
+            repo_id="R1_pick_0207_59_repo",  # <--- 替换为新数据的 repo_id
+            adapt_to_pi=False,
+            repack_transforms=_transforms.Group(inputs=[
+                _transforms.RepackTransform({
+                    "images": {
+                        "cam_high": "observation.images.cam_high",
+                        "cam_left_wrist": "observation.images.cam_left_wrist",
+                        "cam_right_wrist": "observation.images.cam_right_wrist",
+                    },
+                    "state": "observation.state",
+                    "actions": "action",
+                    "prompt": "prompt",
+                })
+            ]),
+            base_config=DataConfig(
+                local_files_only=True,
+                prompt_from_task=True,
+            ),
+        ),
+    ),
+
+
+
+    # pi0_base by lora
+    TrainConfig(
+        name="R1_FT_pour_35_0208_lora",
+        model=pi0.Pi0Config(paligemma_variant="gemma_2b_lora", action_expert_variant="gemma_300m_lora"),
+        data=LeRobotAlohaDataConfig(
+            repo_id="R1_pick_0207_59_repo",  # your datasets repo_id
+            adapt_to_pi=False,
+            repack_transforms=_transforms.Group(inputs=[
+                _transforms.RepackTransform({
+                    "images": {
+                        "cam_high": "observation.images.cam_high",
+                        "cam_left_wrist": "observation.images.cam_left_wrist",
+                        "cam_right_wrist": "observation.images.cam_right_wrist",
+                    },
+                    "state": "observation.state",
+                    "actions": "action",
+                    "prompt": "prompt",
+                })
+            ]),
+            base_config=DataConfig(
+                local_files_only=True,  # Set to True for local-only datasets.
+                prompt_from_task=True,  # Set to True for prompt by task_name
+            ),
+        ),
+        freeze_filter=pi0.Pi0Config(paligemma_variant="gemma_2b_lora",
+                                    action_expert_variant="gemma_300m_lora").get_freeze_filter(),
+        # batch_size=32,  # the total batch_size not pre_gpu batch_size
+        weight_loader=weight_loaders.CheckpointWeightLoader("s3://openpi-assets/checkpoints/pi0_base/params"),
+        # num_train_steps=30000,
+        # fsdp_devices=1,  # refer line 359
+        num_train_steps=15000,
+        save_interval= 1000, # 5000 # 5000
+        keep_period= 1000, # 5000 # 1000
+        batch_size=32,  # 从32降低到16，减少显存占用 还是超出
+        fsdp_devices=1,  # refer line 359
+    ),
+
+
     # pi0_base by lora
     TrainConfig(
         name="pi0_base_aloha_robotwin_lora",
