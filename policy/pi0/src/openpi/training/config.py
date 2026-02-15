@@ -459,6 +459,153 @@ _CONFIGS = [
         fsdp_devices=1,  # refer line 359
     ),
 
+   # pi0_base by lora 倒水 50条就近方向
+    TrainConfig(
+        name="R1_FT_pour_0212_48_lora_2", #"R1_FT_pour_112_0209_lora",  R1_FT_pour_0212_50_lora R1_FT_pour_0212_48_lora
+        model=pi0.Pi0Config(paligemma_variant="gemma_2b_lora", action_expert_variant="gemma_300m_lora"),
+        data=LeRobotAlohaDataConfig(
+            repo_id="R1_pour_0212_48_repo",  # R1_pour_0212_50_repo
+            adapt_to_pi=False,
+            repack_transforms=_transforms.Group(inputs=[
+                _transforms.RepackTransform({
+                    "images": {
+                        "cam_high": "observation.images.cam_high",
+                        "cam_left_wrist": "observation.images.cam_left_wrist",
+                        "cam_right_wrist": "observation.images.cam_right_wrist",
+                    },
+                    "state": "observation.state",
+                    "actions": "action",
+                    "prompt": "prompt",
+                })
+            ]),
+            base_config=DataConfig(
+                local_files_only=True,  # Set to True for local-only datasets.
+                prompt_from_task=True,  # Set to True for prompt by task_name
+            ),
+        ),
+        freeze_filter=pi0.Pi0Config(paligemma_variant="gemma_2b_lora",
+                                    action_expert_variant="gemma_300m_lora").get_freeze_filter(),
+        # batch_size=32,  # the total batch_size not pre_gpu batch_size
+        weight_loader=weight_loaders.CheckpointWeightLoader("s3://openpi-assets/checkpoints/pi0_base/params"),
+        # num_train_steps=30000,
+        # fsdp_devices=1,  # refer line 359
+        num_train_steps=30000,
+        save_interval= 2500, # 5000 # 5000
+        keep_period= 2500, # 5000 # 1000
+        batch_size=32,  
+        fsdp_devices=2,  # refer line 359
+    ),
+
+   # pi0_base by lora pnp 55
+    TrainConfig(
+        name="R1_FT_pnp_0212_55_lora_2", #"R1_FT_pour_112_0209_lora", "R1_FT_pnp_0212_59_lora" R1_FT_pnp_0212_55_lora
+        model=pi0.Pi0Config(paligemma_variant="gemma_2b_lora", action_expert_variant="gemma_300m_lora"),
+        data=LeRobotAlohaDataConfig(
+            repo_id="R1_pnp_0212_55_repo",  # "R1_pnp_0212_59_repo"
+            adapt_to_pi=False,
+            repack_transforms=_transforms.Group(inputs=[
+                _transforms.RepackTransform({
+                    "images": {
+                        "cam_high": "observation.images.cam_high",
+                        "cam_left_wrist": "observation.images.cam_left_wrist",
+                        "cam_right_wrist": "observation.images.cam_right_wrist",
+                    },
+                    "state": "observation.state",
+                    "actions": "action",
+                    "prompt": "prompt",
+                })
+            ]),
+            base_config=DataConfig(
+                local_files_only=True,  # Set to True for local-only datasets.
+                prompt_from_task=True,  # Set to True for prompt by task_name
+            ),
+        ),
+        freeze_filter=pi0.Pi0Config(paligemma_variant="gemma_2b_lora",
+                                    action_expert_variant="gemma_300m_lora").get_freeze_filter(),
+        # batch_size=32,  # the total batch_size not pre_gpu batch_size
+        weight_loader=weight_loaders.CheckpointWeightLoader("s3://openpi-assets/checkpoints/pi0_base/params"),
+        # num_train_steps=30000,
+        # fsdp_devices=1,  # refer line 359
+        num_train_steps=30000,
+        save_interval= 5000, # 5000 # 5000
+        keep_period= 5000, # 5000 # 1000
+        batch_size=32,  
+        fsdp_devices=2,  # refer line 359
+    ),
+
+   # pi0_base by lora
+    TrainConfig(
+        name="R1_FT_stack_cup_0215_48_lora_2", # R1_FT_stack_cup_0210_48_lora
+        model=pi0.Pi0Config(paligemma_variant="gemma_2b_lora", action_expert_variant="gemma_300m_lora"),
+        data=LeRobotAlohaDataConfig(
+            repo_id="R1_stack_cup_0210_48_repo",  # your datasets repo_id
+            adapt_to_pi=False,
+            repack_transforms=_transforms.Group(inputs=[
+                _transforms.RepackTransform({
+                    "images": {
+                        "cam_high": "observation.images.cam_high",
+                        "cam_left_wrist": "observation.images.cam_left_wrist",
+                        "cam_right_wrist": "observation.images.cam_right_wrist",
+                    },
+                    "state": "observation.state",
+                    "actions": "action",
+                    "prompt": "prompt",
+                })
+            ]),
+            base_config=DataConfig(
+                local_files_only=True,  # Set to True for local-only datasets.
+                prompt_from_task=True,  # Set to True for prompt by task_name
+            ),
+        ),
+        freeze_filter=pi0.Pi0Config(paligemma_variant="gemma_2b_lora",
+                                    action_expert_variant="gemma_300m_lora").get_freeze_filter(),
+        # batch_size=32,  # the total batch_size not pre_gpu batch_size
+        weight_loader=weight_loaders.CheckpointWeightLoader("s3://openpi-assets/checkpoints/pi0_base/params"),
+        # num_train_steps=30000,
+        # fsdp_devices=1,  # refer line 359
+        num_train_steps=30000,
+        save_interval= 5000, # 1000, # 5000 # 5000
+        keep_period= 5000, # 1000, # 5000 # 1000
+        batch_size=32,  # 从32降低到16，减少显存占用 还是超出
+        fsdp_devices=2, # 1,  # refer line 359
+    ),
+
+   # pi0_base by FULL 倒水 48条就近方向
+    TrainConfig(
+        name="R1_Full-FT_pour_0213_48_lora", #"R1_FT_pour_112_0209_lora",
+        model=pi0.Pi0Config(),
+        data=LeRobotAlohaDataConfig(
+            repo_id="R1_pour_0212_48_repo",  # your datasets repo_id
+            adapt_to_pi=False,
+            repack_transforms=_transforms.Group(inputs=[
+                _transforms.RepackTransform({
+                    "images": {
+                        "cam_high": "observation.images.cam_high",
+                        "cam_left_wrist": "observation.images.cam_left_wrist",
+                        "cam_right_wrist": "observation.images.cam_right_wrist",
+                    },
+                    "state": "observation.state",
+                    "actions": "action",
+                    "prompt": "prompt",
+                })
+            ]),
+            base_config=DataConfig(
+                local_files_only=True,  # Set to True for local-only datasets.
+                prompt_from_task=True,  # Set to True for prompt by task_name
+            ),
+        ),
+        freeze_filter=pi0.Pi0Config().get_freeze_filter(),
+        # batch_size=32,  # the total batch_size not pre_gpu batch_size
+        weight_loader=weight_loaders.CheckpointWeightLoader("s3://openpi-assets/checkpoints/pi0_base/params"),
+        # num_train_steps=30000,
+        # fsdp_devices=1,  # refer line 359
+        num_train_steps=20000,
+        save_interval= 2500, # 5000 # 5000
+        keep_period= 2500, # 5000 # 1000
+        batch_size=16, # 32,  
+        fsdp_devices=2,  # refer line 359
+    ),
+
 
     # pi0_base by lora
     TrainConfig(
