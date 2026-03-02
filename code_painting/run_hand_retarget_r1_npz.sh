@@ -10,6 +10,10 @@ if [[ "${CONDA_DEFAULT_ENV:-}" != "RoboTwin_bw" ]]; then
   set -u
 fi
 
+if [[ -f /etc/vulkan/icd.d/nvidia_icd.json ]]; then
+  export VK_ICD_FILENAMES=/etc/vulkan/icd.d/nvidia_icd.json
+fi
+
 input_npz=${1:-"/home/zaijia001/ssd/data/R1/hand_vis/hand_detections_0.npz"}
 output_dir=${2:-"/home/zaijia001/ssd/RoboTwin/code_painting/output_hand_retarget"}
 fps=${3:-"5"}
