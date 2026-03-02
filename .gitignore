@@ -31,3 +31,4 @@ envs/curobo/*
 /*.json*
 /*.txt
 policy/pi0/checkpoints
+galaxea_sim/*
