@@ -175,6 +175,13 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_hand_retarget_r1_npz_urdfik.
   --viewer_wait_at_end 1
 ```
 
+当前代码默认已经是：
+
+- `--orientation_remap_label identity`
+- `--stored_orientation_post_rot_xyz_deg 0 0 0`
+
+也就是默认不做额外 remap，也不做额外后旋转。
+
 ### 用机器人当前 TCP 做朝向基准，再扫欧拉角
 
 ```bash
@@ -206,12 +213,12 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_hand_retarget_r1_npz.sh \
 
 ### 固定一个常量 remap
 
-当前建议的基线是：
+当前默认基线是：
 
 - `--orientation_remap_label identity`
-- `--stored_orientation_post_rot_xyz_deg 0 180 0`
+- `--stored_orientation_post_rot_xyz_deg 0 0 0`
 
-也就是不做额外 remap，但会对读取到的 NPZ 朝向默认做一次局部 `Y=180deg`。
+也就是不做额外 remap，也不做额外 post rotation。
 当前这个参数会同时作用到左手和右手。
 
 如果你已经从 sweep 里挑出了一个更合理的 label，可以直接固定：
@@ -394,3 +401,45 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_hand_retarget_r1_npz_urdfik.
   --debug_frame_limit 100 \
   --enable_viewer 1 \
   --viewer_wait_at_end 1
+
+# 直接npz位资
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_hand_retarget_r1_npz_urdfik.sh \
+  /home/zaijia001/ssd/data/R1/hand_vis/hand_detections_0.npz \
+  /home/zaijia001/ssd/RoboTwin/code_painting/output_hand_retarget_from_npz_gripper \
+  5 \
+  --require_stored_gripper_pose 1 \
+  --pose_source gripper \
+  --orientation_remap_label identity \
+  --stored_orientation_post_rot_xyz_deg 0 0 0 \
+  --debug_force_orientation none \
+  --enable_viewer 1 \
+  --right_target_world_offset_xyz 0.0 0 0.2 \
+  --viewer_wait_at_end 1
+
+# forward
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_hand_retarget_r1_npz_urdfik.sh \
+  /home/zaijia001/ssd/data/R1/hand_vis/hand_detections_0.npz \
+  /home/zaijia001/ssd/RoboTwin/code_painting/output_hand_retarget_forward_no_remap \
+  5 \
+  --require_stored_gripper_pose 1 \
+  --orientation_remap_label identity \
+  --debug_force_orientation wrist_forward \
+  --right_target_world_offset_xyz 0.0 0 0.2 \
+  --enable_viewer 1 \
+  --viewer_wait_at_end 1
+
+# 交换detect得到结果的红色和蓝色轴
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_hand_retarget_r1_npz_urdfik.sh \
+  /home/zaijia001/ssd/data/R1/hand_vis/hand_detections_0.npz \
+  /home/zaijia001/ssd/RoboTwin/code_painting/output_hand_retarget_swap_red_blue \
+  5 \
+  --require_stored_gripper_pose 1 \
+  --pose_source gripper \
+  --orientation_remap_label swap_red_blue \
+  --stored_orientation_post_rot_xyz_deg 0 0 0 \
+  --right_target_world_offset_xyz 0.0 0 0.2 \
+  --debug_force_orientation none \
+  --enable_viewer 1 \
+  --viewer_wait_at_end 1
+
+

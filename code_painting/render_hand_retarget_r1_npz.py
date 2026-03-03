@@ -247,6 +247,15 @@ def resolve_orientation_remap(label: str) -> Tuple[str, np.ndarray]:
     candidates = build_orientation_remap_candidates()
     if normalized in ("", "robot_default", "default", "neg_blue_forward", "robot_neg_blue_forward"):
         return DEFAULT_ROBOT_ORIENTATION_REMAP_LABEL, DEFAULT_ROBOT_ORIENTATION_REMAP.copy()
+    if normalized in ("swap_red_blue", "swap_x_z", "swap_xz"):
+        return "x_from_zp_y_from_ym_z_from_xp", np.array(
+            [
+                [0.0, 0.0, 1.0],
+                [0.0, -1.0, 0.0],
+                [1.0, 0.0, 0.0],
+            ],
+            dtype=np.float64,
+        )
     if normalized in ("identity", "none"):
         return "identity", np.eye(3, dtype=np.float64)
     for cand_label, cand_mat in candidates:
@@ -1551,19 +1560,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--orientation_remap_label",
         type=str,
-        default="robot_default",
+        default="identity",
         help="Constant local-axis remap applied to human gripper rotation before converting to world. "
-        "Current default resolves to identity; the main robot-specific forward correction is handled by "
-        "--stored_orientation_post_rot_xyz_deg (default local Y=180deg).",
+        "Default is identity (no remap).",
     )
     parser.add_argument(
         "--stored_orientation_post_rot_xyz_deg",
         type=float,
         nargs=3,
-        default=[0.0, 180.0, 0.0],
+        default=[0.0, 0.0, 0.0],
         metavar=("RX_DEG", "RY_DEG", "RZ_DEG"),
         help="Extra local xyz rotation applied directly to the stored/read NPZ gripper orientation before remap. "
-        "Default is local Y=180deg.",
+        "Default is 0 0 0.",
     )
     parser.add_argument("--orientation_remap_sweep_enable", type=int, default=0)
     parser.add_argument("--orientation_remap_sweep_execute", type=int, default=1)
