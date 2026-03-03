@@ -1553,7 +1553,8 @@ def parse_args() -> argparse.Namespace:
         type=str,
         default="robot_default",
         help="Constant local-axis remap applied to human gripper rotation before converting to world. "
-        "Default uses the robot-specific neg-blue-forward conversion; use identity to disable.",
+        "Current default resolves to identity; the main robot-specific forward correction is handled by "
+        "--stored_orientation_post_rot_xyz_deg (default local Y=180deg).",
     )
     parser.add_argument(
         "--stored_orientation_post_rot_xyz_deg",

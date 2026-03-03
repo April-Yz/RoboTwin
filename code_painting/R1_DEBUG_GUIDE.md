@@ -145,6 +145,36 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_hand_retarget_r1_npz.sh \
   5
 ```
 
+### 直接定义机器人朝前，无 remap
+
+这条是“不要人手朝向，不做 remap，直接把夹爪朝向固定成机器人朝前”的最直接命令。
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_hand_retarget_r1_npz_urdfik.sh \
+  /home/zaijia001/ssd/data/R1/hand_vis/hand_detections_0.npz \
+  /home/zaijia001/ssd/RoboTwin/code_painting/output_hand_retarget_forward_no_remap \
+  5 \
+  --require_stored_gripper_pose 1 \
+  --orientation_remap_label identity \
+  --debug_force_orientation wrist_forward \
+  --enable_viewer 1 \
+  --viewer_wait_at_end 1
+```
+
+如果你想“仍然使用 NPZ 朝向，但不做 remap，只保留当前默认的前向修正”，用这条：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_hand_retarget_r1_npz_urdfik.sh \
+  /home/zaijia001/ssd/data/R1/hand_vis/hand_detections_0.npz \
+  /home/zaijia001/ssd/RoboTwin/code_painting/output_hand_retarget_npz_no_remap \
+  5 \
+  --require_stored_gripper_pose 1 \
+  --orientation_remap_label identity \
+  --stored_orientation_post_rot_xyz_deg 0 180 0 \
+  --enable_viewer 1 \
+  --viewer_wait_at_end 1
+```
+
 ### 用机器人当前 TCP 做朝向基准，再扫欧拉角
 
 ```bash
@@ -176,11 +206,13 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_hand_retarget_r1_npz.sh \
 
 ### 固定一个常量 remap
 
-默认是：
+当前建议的基线是：
 
 - `--orientation_remap_label identity`
+- `--stored_orientation_post_rot_xyz_deg 0 180 0`
 
-也就是不 remap。当前这个参数会同时作用到左手和右手。
+也就是不做额外 remap，但会对读取到的 NPZ 朝向默认做一次局部 `Y=180deg`。
+当前这个参数会同时作用到左手和右手。
 
 如果你已经从 sweep 里挑出了一个更合理的 label，可以直接固定：
 
@@ -318,6 +350,13 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_hand_retarget_r1_npz.sh \
   整体平移目标位置
 - `--target_world_z_offset Z`
   只改目标 z
+
+## URDF IK Note
+
+当前 `URDF IK` 脚本使用的是 `R1 pro` 这套本地 URDF：
+
+- [urdfik.py](/home/zaijia001/ssd/RoboTwin/code_painting/urdfik.py)
+- 默认路径：`/home/zaijia001/ssd/RoboTwin/galaxea_sim/assets/r1_pro/robot.urdf`
 
 ## Recommended Workflow
 
