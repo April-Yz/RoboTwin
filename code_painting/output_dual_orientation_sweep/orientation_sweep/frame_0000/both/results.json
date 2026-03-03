@@ -9,12 +9,12 @@
     "left_position_world": [
       -0.18598008253066997,
       -0.04101650173804666,
-      1.0881356304576626
+      0.9381356304576626
     ],
     "right_position_world": [
       0.02776313175709315,
       -0.0178555930438572,
-      1.1169533902163276
+      0.9669533902163276
     ],
     "left_quat_world_wxyz": [
       0.29854428971336666,
@@ -40,17 +40,17 @@
     "case_idx": 1,
     "left_label": "rx-90_ry-90_rz+00",
     "right_label": "rx-90_ry-90_rz+00",
-    "left_status": "Fail",
+    "left_status": "Success",
     "right_status": "Fail",
     "left_position_world": [
       -0.18598008253066997,
       -0.04101650173804666,
-      1.0881356304576626
+      0.9381356304576626
     ],
     "right_position_world": [
       0.02776313175709315,
       -0.0178555930438572,
-      1.1169533902163276
+      0.9669533902163276
     ],
     "left_quat_world_wxyz": [
       0.6643295819979815,
@@ -68,8 +68,15 @@
     "right_rot_err_vs_current_tcp_deg": 119.99999999999999,
     "left_rot_err_vs_target_deg": 90.95189433427042,
     "right_rot_err_vs_target_deg": 147.0366051314451,
-    "executed_left_status": "Skipped",
-    "executed_right_status": "Skipped"
+    "executed_left_status": "Success",
+    "executed_right_status": "Fail",
+    "left_pos_err_after_execute_m": 0.3782080982762869,
+    "left_rot_err_after_execute_deg": 40.141449266208554,
+    "left_axis_err_after_execute_deg": {
+      "x": 40.14144418079682,
+      "y": 40.1411088339323,
+      "z": 0.1597650842001061
+    }
   },
   {
     "frame_idx": 0,
@@ -81,12 +88,12 @@
     "left_position_world": [
       -0.18598008253066997,
       -0.04101650173804666,
-      1.0881356304576626
+      0.9381356304576626
     ],
     "right_position_world": [
       0.02776313175709315,
       -0.0178555930438572,
-      1.1169533902163276
+      0.9669533902163276
     ],
     "left_quat_world_wxyz": [
       0.640959615033828,
@@ -117,12 +124,12 @@
     "left_position_world": [
       -0.18598008253066997,
       -0.04101650173804666,
-      1.0881356304576626
+      0.9381356304576626
     ],
     "right_position_world": [
       0.02776313175709315,
       -0.0178555930438572,
-      1.1169533902163276
+      0.9669533902163276
     ],
     "left_quat_world_wxyz": [
       0.4217833069261211,
@@ -153,12 +160,12 @@
     "left_position_world": [
       -0.18598008253066997,
       -0.04101650173804666,
-      1.0881356304576626
+      0.9381356304576626
     ],
     "right_position_world": [
       0.02776313175709315,
       -0.0178555930438572,
-      1.1169533902163276
+      0.9669533902163276
     ],
     "left_quat_world_wxyz": [
       0.2980741838232001,
@@ -178,25 +185,30 @@
     "right_rot_err_vs_target_deg": 141.2353003214501,
     "executed_left_status": "Success",
     "executed_right_status": "Fail",
-    "left_pos_err_after_execute_m": 0.2778400339901029,
-    "left_rot_err_after_execute_deg": 47.86036652347465
+    "left_pos_err_after_execute_m": 0.2557149319010768,
+    "left_rot_err_after_execute_deg": 40.400474136790145,
+    "left_axis_err_after_execute_deg": {
+      "x": 40.400447449825776,
+      "y": 40.39995276106147,
+      "z": 0.20175315795196258
+    }
   },
   {
     "frame_idx": 0,
     "case_idx": 5,
     "left_label": "rx-90_ry+00_rz+90",
     "right_label": "rx-90_ry+00_rz+90",
-    "left_status": "Fail",
+    "left_status": "Success",
     "right_status": "Fail",
     "left_position_world": [
       -0.18598008253066997,
       -0.04101650173804666,
-      1.0881356304576626
+      0.9381356304576626
     ],
     "right_position_world": [
       0.02776313175709315,
       -0.0178555930438572,
-      1.1169533902163276
+      0.9669533902163276
     ],
     "left_quat_world_wxyz": [
       -0.00024275357006042775,
@@ -214,8 +226,15 @@
     "right_rot_err_vs_current_tcp_deg": 119.99999999999999,
     "left_rot_err_vs_target_deg": 70.3138724795053,
     "right_rot_err_vs_target_deg": 100.59756251492561,
-    "executed_left_status": "Skipped",
-    "executed_right_status": "Skipped"
+    "executed_left_status": "Success",
+    "executed_right_status": "Fail",
+    "left_pos_err_after_execute_m": 0.284080309061507,
+    "left_rot_err_after_execute_deg": 40.25450193334238,
+    "left_axis_err_after_execute_deg": {
+      "x": 0.2509127664061114,
+      "y": 40.254413611576155,
+      "z": 40.25374001981746
+    }
   },
   {
     "frame_idx": 0,
@@ -227,12 +246,12 @@
     "left_position_world": [
       -0.18598008253066997,
       -0.04101650173804666,
-      1.0881356304576626
+      0.9381356304576626
     ],
     "right_position_world": [
       0.02776313175709315,
       -0.0178555930438572,
-      1.1169533902163276
+      0.9669533902163276
     ],
     "left_quat_world_wxyz": [
       0.29794738332412773,
@@ -263,12 +282,12 @@
     "left_position_world": [
       -0.18598008253066997,
       -0.04101650173804666,
-      1.0881356304576626
+      0.9381356304576626
     ],
     "right_position_world": [
       0.02776313175709315,
       -0.0178555930438572,
-      1.1169533902163276
+      0.9669533902163276
     ],
     "left_quat_world_wxyz": [
       -0.2427890286419208,
@@ -288,25 +307,30 @@
     "right_rot_err_vs_target_deg": 82.29034424058392,
     "executed_left_status": "Success",
     "executed_right_status": "Fail",
-    "left_pos_err_after_execute_m": 0.28851891532381946,
-    "left_rot_err_after_execute_deg": 40.600804822163354
+    "left_pos_err_after_execute_m": 0.33947578235254,
+    "left_rot_err_after_execute_deg": 40.50949197298961,
+    "left_axis_err_after_execute_deg": {
+      "x": 40.50752612212311,
+      "y": 40.50912215861595,
+      "z": 0.41695875030098234
+    }
   },
   {
     "frame_idx": 0,
     "case_idx": 8,
     "left_label": "rx-90_ry+90_rz+90",
     "right_label": "rx-90_ry+90_rz+90",
-    "left_status": "Fail",
+    "left_status": "Success",
     "right_status": "Fail",
     "left_position_world": [
       -0.18598008253066997,
       -0.04101650173804666,
-      1.0881356304576626
+      0.9381356304576626
     ],
     "right_position_world": [
       0.02776313175709315,
       -0.0178555930438572,
-      1.1169533902163276
+      0.9669533902163276
     ],
     "left_quat_world_wxyz": [
       -0.641302920424922,
@@ -324,8 +348,15 @@
     "right_rot_err_vs_current_tcp_deg": 179.99999999999997,
     "left_rot_err_vs_target_deg": 147.95539320284848,
     "right_rot_err_vs_target_deg": 84.89350401535553,
-    "executed_left_status": "Skipped",
-    "executed_right_status": "Skipped"
+    "executed_left_status": "Success",
+    "executed_right_status": "Fail",
+    "left_pos_err_after_execute_m": 0.337631491729975,
+    "left_rot_err_after_execute_deg": 40.225161730932534,
+    "left_axis_err_after_execute_deg": {
+      "x": 40.225128126772496,
+      "y": 0.33573060166174956,
+      "z": 40.223672190439515
+    }
   },
   {
     "frame_idx": 0,
@@ -337,12 +368,12 @@
     "left_position_world": [
       -0.18598008253066997,
       -0.04101650173804666,
-      1.0881356304576626
+      0.9381356304576626
     ],
     "right_position_world": [
       0.02776313175709315,
       -0.0178555930438572,
-      1.1169533902163276
+      0.9669533902163276
     ],
     "left_quat_world_wxyz": [
       0.24212419851629607,
@@ -373,12 +404,12 @@
     "left_position_world": [
       -0.18598008253066997,
       -0.04101650173804666,
-      1.0881356304576626
+      0.9381356304576626
     ],
     "right_position_world": [
       0.02776313175709315,
       -0.0178555930438572,
-      1.1169533902163276
+      0.9669533902163276
     ],
     "left_quat_world_wxyz": [
       0.9393771042481222,
@@ -409,12 +440,12 @@
     "left_position_world": [
       -0.18598008253066997,
       -0.04101650173804666,
-      1.0881356304576626
+      0.9381356304576626
     ],
     "right_position_world": [
       0.02776313175709315,
       -0.0178555930438572,
-      1.1169533902163276
+      0.9669533902163276
     ],
     "left_quat_world_wxyz": [
       0.6639075054424171,
@@ -445,12 +476,12 @@
     "left_position_world": [
       -0.18598008253066997,
       -0.04101650173804666,
-      1.0881356304576626
+      0.9381356304576626
     ],
     "right_position_world": [
       0.02776313175709315,
       -0.0178555930438572,
-      1.1169533902163276
+      0.9669533902163276
     ],
     "left_quat_world_wxyz": [
       -0.00047010589016638354,
@@ -477,16 +508,16 @@
     "left_label": "rx+00_ry+90_rz-90",
     "right_label": "rx+00_ry+90_rz-90",
     "left_status": "Fail",
-    "right_status": "Fail",
+    "right_status": "Success",
     "left_position_world": [
       -0.18598008253066997,
       -0.04101650173804666,
-      1.0881356304576626
+      0.9381356304576626
     ],
     "right_position_world": [
       0.02776313175709315,
       -0.0178555930438572,
-      1.1169533902163276
+      0.9669533902163276
     ],
     "left_quat_world_wxyz": [
       0.6641502590124775,
@@ -504,8 +535,15 @@
     "right_rot_err_vs_current_tcp_deg": 119.99999999999999,
     "left_rot_err_vs_target_deg": 125.67365413431476,
     "right_rot_err_vs_target_deg": 146.22299233582208,
-    "executed_left_status": "Skipped",
-    "executed_right_status": "Skipped"
+    "executed_left_status": "Fail",
+    "executed_right_status": "Success",
+    "right_pos_err_after_execute_m": 0.2744016716161357,
+    "right_rot_err_after_execute_deg": 44.27988236606319,
+    "right_axis_err_after_execute_deg": {
+      "x": 44.02238313616209,
+      "y": 44.221648915312535,
+      "z": 5.022545357410701
+    }
   },
   {
     "frame_idx": 0,
@@ -517,12 +555,12 @@
     "left_position_world": [
       -0.18598008253066997,
       -0.04101650173804666,
-      1.0881356304576626
+      0.9381356304576626
     ],
     "right_position_world": [
       0.02776313175709315,
       -0.0178555930438572,
-      1.1169533902163276
+      0.9669533902163276
     ],
     "left_quat_world_wxyz": [
       -0.29854428971336644,
@@ -548,17 +586,17 @@
     "case_idx": 15,
     "left_label": "rx+90_ry+00_rz-90",
     "right_label": "rx+90_ry+00_rz-90",
-    "left_status": "Fail",
+    "left_status": "Success",
     "right_status": "Fail",
     "left_position_world": [
       -0.18598008253066997,
       -0.04101650173804666,
-      1.0881356304576626
+      0.9381356304576626
     ],
     "right_position_world": [
       0.02776313175709315,
       -0.0178555930438572,
-      1.1169533902163276
+      0.9669533902163276
     ],
     "left_quat_world_wxyz": [
       0.906696534084338,
@@ -576,8 +614,15 @@
     "right_rot_err_vs_current_tcp_deg": 119.99999999999999,
     "left_rot_err_vs_target_deg": 129.41510625577928,
     "right_rot_err_vs_target_deg": 132.2464565800802,
-    "executed_left_status": "Skipped",
-    "executed_right_status": "Skipped"
+    "executed_left_status": "Success",
+    "executed_right_status": "Fail",
+    "left_pos_err_after_execute_m": 0.3960539178343291,
+    "left_rot_err_after_execute_deg": 49.02610845765195,
+    "left_axis_err_after_execute_deg": {
+      "x": 4.429528276450695,
+      "y": 48.97294237066849,
+      "z": 48.85235395504404
+    }
   },
   {
     "frame_idx": 0,
@@ -585,16 +630,16 @@
     "left_label": "rx+90_ry+00_rz+00",
     "right_label": "rx+90_ry+00_rz+00",
     "left_status": "Fail",
-    "right_status": "Fail",
+    "right_status": "Success",
     "left_position_world": [
       -0.18598008253066997,
       -0.04101650173804666,
-      1.0881356304576626
+      0.9381356304576626
     ],
     "right_position_world": [
       0.02776313175709315,
       -0.0178555930438572,
-      1.1169533902163276
+      0.9669533902163276
     ],
     "left_quat_world_wxyz": [
       0.6408328145347556,
@@ -612,8 +657,15 @@
     "right_rot_err_vs_current_tcp_deg": 90.0,
     "left_rot_err_vs_target_deg": 172.93942760323532,
     "right_rot_err_vs_target_deg": 161.50921117933856,
-    "executed_left_status": "Skipped",
-    "executed_right_status": "Skipped"
+    "executed_left_status": "Fail",
+    "executed_right_status": "Success",
+    "right_pos_err_after_execute_m": 0.22400008237565858,
+    "right_rot_err_after_execute_deg": 42.160053135083494,
+    "right_axis_err_after_execute_deg": {
+      "x": 42.141065451269505,
+      "y": 42.08570749893798,
+      "z": 2.6787325936593724
+    }
   },
   {
     "frame_idx": 0,
@@ -625,12 +677,12 @@
     "left_position_world": [
       -0.18598008253066997,
       -0.04101650173804666,
-      1.0881356304576626
+      0.9381356304576626
     ],
     "right_position_world": [
       0.02776313175709315,
       -0.0178555930438572,
-      1.1169533902163276
+      0.9669533902163276
     ],
     "left_quat_world_wxyz": [
       -0.00042207655556436574,
@@ -656,17 +708,17 @@
     "case_idx": 18,
     "left_label": "rx+90_ry+90_rz-90",
     "right_label": "rx+90_ry+90_rz-90",
-    "left_status": "Fail",
+    "left_status": "Success",
     "right_status": "Fail",
     "left_position_world": [
       -0.18598008253066997,
       -0.04101650173804666,
-      1.0881356304576626
+      0.9381356304576626
     ],
     "right_position_world": [
       0.02776313175709315,
       -0.0178555930438572,
-      1.1169533902163276
+      0.9669533902163276
     ],
     "left_quat_world_wxyz": [
       0.6413029204249222,
@@ -684,7 +736,14 @@
     "right_rot_err_vs_current_tcp_deg": 179.99999999999997,
     "left_rot_err_vs_target_deg": 147.9553932028485,
     "right_rot_err_vs_target_deg": 84.89350401535555,
-    "executed_left_status": "Skipped",
-    "executed_right_status": "Skipped"
+    "executed_left_status": "Success",
+    "executed_right_status": "Fail",
+    "left_pos_err_after_execute_m": 0.3100565533649485,
+    "left_rot_err_after_execute_deg": 43.48811977614726,
+    "left_axis_err_after_execute_deg": {
+      "x": 43.44121262566374,
+      "y": 2.097925075617724,
+      "z": 43.47920243893604
+    }
   }
 ]

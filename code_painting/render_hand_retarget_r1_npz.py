@@ -130,9 +130,34 @@ def quat_angle_deg_wxyz(quat_a_wxyz: Sequence[float], quat_b_wxyz: Sequence[floa
     return float(np.rad2deg(delta.magnitude()))
 
 
+def axis_angle_errors_deg_wxyz(quat_actual_wxyz: Sequence[float], quat_target_wxyz: Sequence[float]) -> Dict[str, float]:
+    rot_actual = R.from_quat(quat_wxyz_to_xyzw(quat_actual_wxyz)).as_matrix()
+    rot_target = R.from_quat(quat_wxyz_to_xyzw(quat_target_wxyz)).as_matrix()
+    errors: Dict[str, float] = {}
+    for idx, axis_name in enumerate(("x", "y", "z")):
+        v_actual = rot_actual[:, idx]
+        v_target = rot_target[:, idx]
+        dot = float(np.clip(np.dot(v_actual, v_target), -1.0, 1.0))
+        errors[axis_name] = float(np.rad2deg(np.arccos(dot)))
+    return errors
+
+
 def format_vec3(vec: Sequence[float]) -> str:
     arr = np.asarray(vec, dtype=np.float64).reshape(3)
     return f"[{arr[0]:+.3f}, {arr[1]:+.3f}, {arr[2]:+.3f}]"
+
+
+def short_status(status: str) -> str:
+    s = str(status).strip().lower()
+    if s == "success":
+        return "succ"
+    if s == "fail":
+        return "fail"
+    if s == "skipped":
+        return "skip"
+    if s == "missing":
+        return "miss"
+    return s[:4] if s else "unk"
 
 
 def make_json_safe(obj):
@@ -213,6 +238,16 @@ class HandRetargetTrajectory:
         self.index_tip_idx = int(index_tip_idx)
         self.index_joint_idx = int(index_joint_idx)
         self.length = self._infer_length()
+
+    def has_stored_gripper_pose(self, side: str, pose_source: str) -> bool:
+        pos_key = f"{side}_{'gripper_position' if pose_source == 'gripper' else 'wrist_position_retreat'}"
+        rot_key = f"{side}_gripper_rotation_matrix"
+        return pos_key in self.data.files and rot_key in self.data.files
+
+    def describe_pose_source(self, side: str, pose_source: str) -> str:
+        if self.has_stored_gripper_pose(side, pose_source):
+            return f"{side}: stored_npz"
+        return f"{side}: recompute_from_keypoints"
 
     def _infer_length(self) -> int:
         candidates = [
@@ -332,6 +367,7 @@ class HandRetargetR1Renderer:
         debug_target_axis_length: float,
         debug_target_axis_thickness: float,
         target_world_z_offset: float,
+        disable_table: bool,
         camera_sweep_enable: bool,
         camera_sweep_steps_deg: Sequence[float],
     ):
@@ -362,6 +398,7 @@ class HandRetargetR1Renderer:
         self.debug_target_axis_length = max(float(debug_target_axis_length), 0.01)
         self.debug_target_axis_thickness = max(float(debug_target_axis_thickness), 0.001)
         self.target_world_z_offset = float(target_world_z_offset)
+        self.disable_table = bool(disable_table)
         self.camera_sweep_enable = bool(camera_sweep_enable)
         self.camera_sweep_steps_deg = tuple(float(v) for v in camera_sweep_steps_deg)
 
@@ -376,7 +413,8 @@ class HandRetargetR1Renderer:
 
         self._setup_scene()
         self._setup_cameras()
-        self._create_table()
+        if not self.disable_table:
+            self._create_table()
         self._load_robot()
 
     def _setup_scene(self) -> None:
@@ -939,10 +977,16 @@ class HandRetargetR1Renderer:
                 item["actual_tcp_pose_world"] = actual_tcp.copy()
                 item["pos_err_after_execute_m"] = float(np.linalg.norm(actual_tcp[:3] - pose_world[:3]))
                 item["rot_err_after_execute_deg"] = float(quat_angle_deg_wxyz(actual_tcp[3:], pose_world[3:]))
+                item["axis_err_after_execute_deg"] = axis_angle_errors_deg_wxyz(actual_tcp[3:], pose_world[3:])
                 print(
                     f"[orientation-sweep-exec] frame={frame_idx:04d} arm={arm} case={label} "
                     f"executed={item['executed_status']} pos_err={item['pos_err_after_execute_m']:.3f}m "
                     f"rot_err={item['rot_err_after_execute_deg']:.1f}deg"
+                )
+                ae = item["axis_err_after_execute_deg"]
+                print(
+                    f"[orientation-sweep-exec-axis] frame={frame_idx:04d} arm={arm} "
+                    f"x={ae['x']:.1f}deg y={ae['y']:.1f}deg z={ae['z']:.1f}deg"
                 )
             else:
                 item["executed_status"] = "Skipped"
@@ -953,6 +997,7 @@ class HandRetargetR1Renderer:
             )
             if save_images:
                 self.update_robot_link_cameras()
+                status_suffix = f"{arm[0].upper()}{short_status(status)}"
                 overlay_lines = [
                     f"Frame {frame_idx} arm={arm}",
                     f"case={label}",
@@ -963,17 +1008,20 @@ class HandRetargetR1Renderer:
                 ]
                 if "pos_err_after_execute_m" in item:
                     overlay_lines.append(f"pos_err_exec={item['pos_err_after_execute_m']:.3f}m")
+                if "axis_err_after_execute_deg" in item:
+                    ae = item["axis_err_after_execute_deg"]
+                    overlay_lines.append(f"axis x={ae['x']:.1f} y={ae['y']:.1f} z={ae['z']:.1f}")
                 zed_rgb, _ = self.capture_camera(self.zed_camera)
-                cv2.imwrite(str(output_dir / f"{case_idx:03d}_{label}_zed.png"), overlay_text(zed_rgb, overlay_lines))
+                cv2.imwrite(str(output_dir / f"{case_idx:03d}_{label}_{status_suffix}_zed.png"), overlay_text(zed_rgb, overlay_lines))
                 if self._left_wrist_camera_link is not None:
                     left_rgb, _ = self.capture_camera(self.left_wrist_camera)
-                    cv2.imwrite(str(output_dir / f"{case_idx:03d}_{label}_left_wrist.png"), overlay_text(left_rgb, overlay_lines))
+                    cv2.imwrite(str(output_dir / f"{case_idx:03d}_{label}_{status_suffix}_left_wrist.png"), overlay_text(left_rgb, overlay_lines))
                 if self._right_wrist_camera_link is not None:
                     right_rgb, _ = self.capture_camera(self.right_wrist_camera)
-                    cv2.imwrite(str(output_dir / f"{case_idx:03d}_{label}_right_wrist.png"), overlay_text(right_rgb, overlay_lines))
+                    cv2.imwrite(str(output_dir / f"{case_idx:03d}_{label}_{status_suffix}_right_wrist.png"), overlay_text(right_rgb, overlay_lines))
                 if self.third_person_view:
                     third_rgb, _ = self.capture_camera(self.third_camera)
-                    cv2.imwrite(str(output_dir / f"{case_idx:03d}_{label}_third.png"), overlay_text(third_rgb, overlay_lines))
+                    cv2.imwrite(str(output_dir / f"{case_idx:03d}_{label}_{status_suffix}_third.png"), overlay_text(third_rgb, overlay_lines))
 
         with (output_dir / "results.json").open("w", encoding="utf-8") as f:
             json.dump(make_json_safe(results), f, ensure_ascii=False, indent=2)
@@ -1062,15 +1110,29 @@ class HandRetargetR1Renderer:
                 if left_status == "Success":
                     item["left_pos_err_after_execute_m"] = float(np.linalg.norm(actual_left_tcp[:3] - left_pose_world[:3]))
                     item["left_rot_err_after_execute_deg"] = float(quat_angle_deg_wxyz(actual_left_tcp[3:], left_pose_world[3:]))
+                    item["left_axis_err_after_execute_deg"] = axis_angle_errors_deg_wxyz(actual_left_tcp[3:], left_pose_world[3:])
                 if right_status == "Success":
                     item["right_pos_err_after_execute_m"] = float(np.linalg.norm(actual_right_tcp[:3] - right_pose_world[:3]))
                     item["right_rot_err_after_execute_deg"] = float(quat_angle_deg_wxyz(actual_right_tcp[3:], right_pose_world[3:]))
+                    item["right_axis_err_after_execute_deg"] = axis_angle_errors_deg_wxyz(actual_right_tcp[3:], right_pose_world[3:])
                 print(
                     f"[orientation-sweep-exec] frame={frame_idx:04d} both case={case_idx:03d} "
                     f"left={exec_left_status} right={exec_right_status} "
                     f"left_pos_err={item.get('left_pos_err_after_execute_m', float('nan')):.3f}m "
                     f"right_pos_err={item.get('right_pos_err_after_execute_m', float('nan')):.3f}m"
                 )
+                if "left_axis_err_after_execute_deg" in item:
+                    la = item["left_axis_err_after_execute_deg"]
+                    print(
+                        f"[orientation-sweep-exec-axis] frame={frame_idx:04d} left "
+                        f"x={la['x']:.1f}deg y={la['y']:.1f}deg z={la['z']:.1f}deg"
+                    )
+                if "right_axis_err_after_execute_deg" in item:
+                    ra = item["right_axis_err_after_execute_deg"]
+                    print(
+                        f"[orientation-sweep-exec-axis] frame={frame_idx:04d} right "
+                        f"x={ra['x']:.1f}deg y={ra['y']:.1f}deg z={ra['z']:.1f}deg"
+                    )
             else:
                 item["executed_left_status"] = "Skipped"
                 item["executed_right_status"] = "Skipped"
@@ -1083,6 +1145,7 @@ class HandRetargetR1Renderer:
 
             if save_images:
                 self.update_robot_link_cameras()
+                status_suffix = f"L{short_status(left_status)}_R{short_status(right_status)}"
                 overlay_lines = [
                     f"Frame {frame_idx} both case={case_idx:03d}",
                     f"L {left_label}: {left_status}",
@@ -1093,17 +1156,23 @@ class HandRetargetR1Renderer:
                     left_err = item.get("left_pos_err_after_execute_m", float("nan"))
                     right_err = item.get("right_pos_err_after_execute_m", float("nan"))
                     overlay_lines.append(f"exec err L={left_err:.3f}m R={right_err:.3f}m")
+                if "left_axis_err_after_execute_deg" in item:
+                    la = item["left_axis_err_after_execute_deg"]
+                    overlay_lines.append(f"L axis x={la['x']:.1f} y={la['y']:.1f} z={la['z']:.1f}")
+                if "right_axis_err_after_execute_deg" in item:
+                    ra = item["right_axis_err_after_execute_deg"]
+                    overlay_lines.append(f"R axis x={ra['x']:.1f} y={ra['y']:.1f} z={ra['z']:.1f}")
                 zed_rgb, _ = self.capture_camera(self.zed_camera)
-                cv2.imwrite(str(output_dir / f"{case_idx:03d}_zed.png"), overlay_text(zed_rgb, overlay_lines))
+                cv2.imwrite(str(output_dir / f"{case_idx:03d}_{status_suffix}_zed.png"), overlay_text(zed_rgb, overlay_lines))
                 if self._left_wrist_camera_link is not None:
                     left_rgb, _ = self.capture_camera(self.left_wrist_camera)
-                    cv2.imwrite(str(output_dir / f"{case_idx:03d}_left_wrist.png"), overlay_text(left_rgb, overlay_lines))
+                    cv2.imwrite(str(output_dir / f"{case_idx:03d}_{status_suffix}_left_wrist.png"), overlay_text(left_rgb, overlay_lines))
                 if self._right_wrist_camera_link is not None:
                     right_rgb, _ = self.capture_camera(self.right_wrist_camera)
-                    cv2.imwrite(str(output_dir / f"{case_idx:03d}_right_wrist.png"), overlay_text(right_rgb, overlay_lines))
+                    cv2.imwrite(str(output_dir / f"{case_idx:03d}_{status_suffix}_right_wrist.png"), overlay_text(right_rgb, overlay_lines))
                 if self.third_person_view:
                     third_rgb, _ = self.capture_camera(self.third_camera)
-                    cv2.imwrite(str(output_dir / f"{case_idx:03d}_third.png"), overlay_text(third_rgb, overlay_lines))
+                    cv2.imwrite(str(output_dir / f"{case_idx:03d}_{status_suffix}_third.png"), overlay_text(third_rgb, overlay_lines))
 
         with (output_dir / "results.json").open("w", encoding="utf-8") as f:
             json.dump(make_json_safe(results), f, ensure_ascii=False, indent=2)
@@ -1265,6 +1334,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--debug_target_axis_length", type=float, default=0.08)
     parser.add_argument("--debug_target_axis_thickness", type=float, default=0.004)
     parser.add_argument("--target_world_z_offset", type=float, default=0.0, help="Meters to add to every world-space target z position")
+    parser.add_argument("--disable_table", type=int, default=1)
     parser.add_argument("--camera_sweep_enable", type=int, default=0)
     parser.add_argument("--camera_sweep_steps_deg", type=float, nargs="+", default=[-180.0, -90.0, 0.0, 90.0])
     parser.add_argument("--orientation_sweep_enable", type=int, default=0)
@@ -1292,6 +1362,16 @@ def main() -> None:
         index_tip_idx=args.index_tip_idx,
         index_joint_idx=args.index_joint_idx,
     )
+    print(
+        "[pose-source] "
+        f"{trajectory.describe_pose_source('left', args.pose_source)}, "
+        f"{trajectory.describe_pose_source('right', args.pose_source)}"
+    )
+    if not trajectory.has_stored_gripper_pose("left", args.pose_source) or not trajectory.has_stored_gripper_pose("right", args.pose_source):
+        print(
+            "[pose-source] missing stored gripper pose fields in input npz; "
+            "recomputing from hand keypoints with the same formula used in compute_gripper_pose_from_npz.py"
+        )
 
     fixed_left, left_range = build_gripper_mapper(
         trajectory.build_gripper_series("left"),
@@ -1342,6 +1422,7 @@ def main() -> None:
         debug_target_axis_length=args.debug_target_axis_length,
         debug_target_axis_thickness=args.debug_target_axis_thickness,
         target_world_z_offset=args.target_world_z_offset,
+        disable_table=bool(args.disable_table),
         camera_sweep_enable=bool(args.camera_sweep_enable),
         camera_sweep_steps_deg=args.camera_sweep_steps_deg,
     )
