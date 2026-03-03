@@ -256,6 +256,15 @@ def resolve_orientation_remap(label: str) -> Tuple[str, np.ndarray]:
             ],
             dtype=np.float64,
         )
+    if normalized in ("swap_red_blue_keep_green", "swap_xz_keep_y", "swap_x_z_keep_y"):
+        return "x_from_zp_y_from_yp_z_from_xm", np.array(
+            [
+                [0.0, 0.0, -1.0],
+                [0.0, 1.0, 0.0],
+                [1.0, 0.0, 0.0],
+            ],
+            dtype=np.float64,
+        )
     if normalized in ("identity", "none"):
         return "identity", np.eye(3, dtype=np.float64)
     for cand_label, cand_mat in candidates:
