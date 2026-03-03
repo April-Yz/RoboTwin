@@ -17,7 +17,8 @@
       -0.29794738332412757
     ],
     "rot_err_vs_current_tcp_deg": 180.0,
-    "rot_err_vs_target_deg": 167.20327921370148
+    "rot_err_vs_target_deg": 167.20327921370148,
+    "executed_status": "Skipped"
   },
   {
     "frame_idx": 0,
@@ -37,7 +38,19 @@
       0.24278902864192103
     ],
     "rot_err_vs_current_tcp_deg": 119.99999999999999,
-    "rot_err_vs_target_deg": 90.95189433427042
+    "rot_err_vs_target_deg": 90.95189433427042,
+    "executed_status": "Success",
+    "actual_tcp_pose_world": [
+      0.014484429875058007,
+      0.09183888182840692,
+      1.2242532285825014,
+      0.5425577219779529,
+      -0.4547664617392957,
+      -0.536639041595657,
+      0.4591700367342259
+    ],
+    "pos_err_after_execute_m": 0.37376443602004533,
+    "rot_err_after_execute_deg": 40.418416799743035
   },
   {
     "frame_idx": 0,
@@ -57,7 +70,8 @@
       0.6413029204249221
     ],
     "rot_err_vs_current_tcp_deg": 90.0,
-    "rot_err_vs_target_deg": 56.6625948367142
+    "rot_err_vs_target_deg": 56.6625948367142,
+    "executed_status": "Skipped"
   },
   {
     "frame_idx": 0,
@@ -77,7 +91,8 @@
       0.0004220765555645045
     ],
     "rot_err_vs_current_tcp_deg": 119.99999999999999,
-    "rot_err_vs_target_deg": 158.9626254855124
+    "rot_err_vs_target_deg": 158.9626254855124,
+    "executed_status": "Skipped"
   },
   {
     "frame_idx": 0,
@@ -97,7 +112,19 @@
       0.6414297209239945
     ],
     "rot_err_vs_current_tcp_deg": 89.99999999999999,
-    "rot_err_vs_target_deg": 126.63730294457177
+    "rot_err_vs_target_deg": 126.63730294457177,
+    "executed_status": "Success",
+    "actual_tcp_pose_world": [
+      0.02221136936049314,
+      -0.012694089895707519,
+      1.0937735648200526,
+      0.027072566221092262,
+      -0.7294238967631625,
+      -0.04410254817231685,
+      0.6821017667721998
+    ],
+    "pos_err_after_execute_m": 0.2614746761461025,
+    "rot_err_after_execute_deg": 44.30311246927965
   },
   {
     "frame_idx": 0,
@@ -117,7 +144,19 @@
       0.906696534084338
     ],
     "rot_err_vs_current_tcp_deg": 119.99999999999999,
-    "rot_err_vs_target_deg": 70.3138724795053
+    "rot_err_vs_target_deg": 70.3138724795053,
+    "executed_status": "Success",
+    "actual_tcp_pose_world": [
+      -0.10707543958644544,
+      -0.025685758076376564,
+      1.2100272210978547,
+      0.002640624928591834,
+      -9.05282619778548e-05,
+      0.08456605454334432,
+      -0.9964143722987902
+    ],
+    "pos_err_after_execute_m": 0.28352426957886545,
+    "rot_err_after_execute_deg": 40.19318545041902
   },
   {
     "frame_idx": 0,
@@ -137,7 +176,8 @@
       0.2985442897133665
     ],
     "rot_err_vs_current_tcp_deg": 90.0,
-    "rot_err_vs_target_deg": 136.61637766993772
+    "rot_err_vs_target_deg": 136.61637766993772,
+    "executed_status": "Skipped"
   },
   {
     "frame_idx": 0,
@@ -157,7 +197,19 @@
       0.6643295819979815
     ],
     "rot_err_vs_current_tcp_deg": 119.99999999999999,
-    "rot_err_vs_target_deg": 172.40998940541698
+    "rot_err_vs_target_deg": 172.40998940541698,
+    "executed_status": "Success",
+    "actual_tcp_pose_world": [
+      0.013931889005974848,
+      -0.14469278189701312,
+      1.1822518229232697,
+      0.4605086506312855,
+      0.5337400135657319,
+      -0.4479798467851155,
+      -0.5498794754189223
+    ],
+    "pos_err_after_execute_m": 0.33212389684449706,
+    "rot_err_after_execute_deg": 39.87740877671102
   },
   {
     "frame_idx": 0,
@@ -177,7 +229,19 @@
       0.6409596150338281
     ],
     "rot_err_vs_current_tcp_deg": 180.0,
-    "rot_err_vs_target_deg": 147.95539320284848
+    "rot_err_vs_target_deg": 147.95539320284848,
+    "executed_status": "Success",
+    "actual_tcp_pose_world": [
+      0.013575505622608586,
+      -0.14335877872011626,
+      1.1899843739892895,
+      0.7073637144316358,
+      0.059304021112333155,
+      0.05983729310219621,
+      -0.7018113043686235
+    ],
+    "pos_err_after_execute_m": 0.33723013512960964,
+    "rot_err_after_execute_deg": 40.23118972862457
   },
   {
     "frame_idx": 0,
@@ -197,7 +261,8 @@
       0.6641502590124777
     ],
     "rot_err_vs_current_tcp_deg": 119.99999999999999,
-    "rot_err_vs_target_deg": 114.14082345721229
+    "rot_err_vs_target_deg": 114.14082345721229,
+    "executed_status": "Skipped"
   },
   {
     "frame_idx": 0,
@@ -217,7 +282,8 @@
       0.0004701058901665501
     ],
     "rot_err_vs_current_tcp_deg": 89.99999999999999,
-    "rot_err_vs_target_deg": 160.07348197057075
+    "rot_err_vs_target_deg": 160.07348197057075,
+    "executed_status": "Skipped"
   },
   {
     "frame_idx": 0,
@@ -237,7 +303,8 @@
       0.664572335568042
     ],
     "rot_err_vs_current_tcp_deg": 0.0,
-    "rot_err_vs_target_deg": 137.67039555366264
+    "rot_err_vs_target_deg": 137.67039555366264,
+    "executed_status": "Skipped"
   },
   {
     "frame_idx": 0,
@@ -257,7 +324,8 @@
       0.9393771042481222
     ],
     "rot_err_vs_current_tcp_deg": 89.99999999999999,
-    "rot_err_vs_target_deg": 140.5400612341781
+    "rot_err_vs_target_deg": 140.5400612341781,
+    "executed_status": "Skipped"
   },
   {
     "frame_idx": 0,
@@ -277,7 +345,8 @@
       -0.24212419851629594
     ],
     "rot_err_vs_current_tcp_deg": 120.00000000000001,
-    "rot_err_vs_target_deg": 125.67365413431476
+    "rot_err_vs_target_deg": 125.67365413431476,
+    "executed_status": "Skipped"
   },
   {
     "frame_idx": 0,
@@ -297,7 +366,8 @@
       0.2979473833241278
     ],
     "rot_err_vs_current_tcp_deg": 180.0,
-    "rot_err_vs_target_deg": 167.20327921370148
+    "rot_err_vs_target_deg": 167.20327921370148,
+    "executed_status": "Skipped"
   },
   {
     "frame_idx": 0,
@@ -317,7 +387,19 @@
       0.00024275357006051101
     ],
     "rot_err_vs_current_tcp_deg": 119.99999999999999,
-    "rot_err_vs_target_deg": 129.41510625577928
+    "rot_err_vs_target_deg": 129.41510625577928,
+    "executed_status": "Success",
+    "actual_tcp_pose_world": [
+      0.1330415841753817,
+      -0.024820350122487574,
+      1.2102718558310352,
+      0.9964861985377342,
+      0.0837214988759536,
+      2.4689451896486858e-05,
+      0.0024425683634255453
+    ],
+    "pos_err_after_execute_m": 0.41963706260949873,
+    "rot_err_after_execute_deg": 40.29017844066938
   },
   {
     "frame_idx": 0,
@@ -337,7 +419,8 @@
       0.2984174892142942
     ],
     "rot_err_vs_current_tcp_deg": 90.0,
-    "rot_err_vs_target_deg": 172.93942760323532
+    "rot_err_vs_target_deg": 172.93942760323532,
+    "executed_status": "Skipped"
   },
   {
     "frame_idx": 0,
@@ -357,7 +440,8 @@
       0.4217833069261212
     ],
     "rot_err_vs_current_tcp_deg": 119.99999999999999,
-    "rot_err_vs_target_deg": 140.22713698766586
+    "rot_err_vs_target_deg": 140.22713698766586,
+    "executed_status": "Skipped"
   },
   {
     "frame_idx": 0,
@@ -377,6 +461,18 @@
       -0.6409596150338279
     ],
     "rot_err_vs_current_tcp_deg": 180.0,
-    "rot_err_vs_target_deg": 147.9553932028485
+    "rot_err_vs_target_deg": 147.9553932028485,
+    "executed_status": "Success",
+    "actual_tcp_pose_world": [
+      0.013597046029902264,
+      -0.14343657038454793,
+      1.1900183405587552,
+      0.7073580497894365,
+      0.05925307688418613,
+      0.05973584955469302,
+      -0.7018299584342497
+    ],
+    "pos_err_after_execute_m": 0.3372918622705094,
+    "rot_err_after_execute_deg": 40.24356295656773
   }
 ]

@@ -586,6 +586,10 @@ class HandRetargetR1Renderer:
         up = rot[:, 1]
         back = rot[:, 2]
         forward = -back
+        base_rot = R.from_quat(quat_wxyz_to_xyzw(self._base_pose.q)).as_matrix()
+        base_forward = base_rot @ np.array([1.0, 0.0, 0.0], dtype=np.float64)
+        base_left = base_rot @ np.array([0.0, 1.0, 0.0], dtype=np.float64)
+        base_up = base_rot @ np.array([0.0, 0.0, 1.0], dtype=np.float64)
         print(
             "[camera-debug] "
             f"head_link={self._head_camera_link.get_name() if self._head_camera_link is not None else 'None'} "
@@ -598,6 +602,13 @@ class HandRetargetR1Renderer:
             f"forward={format_vec3(forward)} right={format_vec3(right)} up={format_vec3(up)} "
             f"base_q_wxyz={np.asarray(self._base_pose.q, dtype=np.float64).round(6).tolist()} "
             f"head_local_q_wxyz={self.head_camera_local_quat_wxyz.round(6).tolist()}"
+        )
+        print(
+            "[camera-debug] "
+            f"robot_base_p={format_vec3(self._base_pose.p)} "
+            f"robot_forward={format_vec3(base_forward)} "
+            f"robot_left={format_vec3(base_left)} "
+            f"robot_up={format_vec3(base_up)}"
         )
 
     def print_wrist_camera_summary(self, side: str) -> None:
@@ -688,10 +699,10 @@ class HandRetargetR1Renderer:
             self.third_camera.set_entity_pose(self._build_third_camera_pose(head_pose))
 
     def _build_third_camera_pose(self, head_pose: sapien.Pose) -> sapien.Pose:
-        head_rot = R.from_quat(quat_wxyz_to_xyzw(head_pose.q)).as_matrix()
-        head_forward = -head_rot[:, 2]
+        base_rot = R.from_quat(quat_wxyz_to_xyzw(self._base_pose.q)).as_matrix()
+        robot_forward = base_rot @ np.array([1.0, 0.0, 0.0], dtype=np.float64)
         world_up = np.array([0.0, 0.0, 1.0], dtype=np.float64)
-        eye = np.asarray(head_pose.p, dtype=np.float64) + 1.0 * head_forward + 0.18 * world_up
+        eye = np.asarray(head_pose.p, dtype=np.float64) + 1.0 * robot_forward
         target = np.asarray(head_pose.p, dtype=np.float64)
         return look_at_pose(eye=eye, target=target, up=world_up)
 
