@@ -979,6 +979,136 @@ class HandRetargetR1Renderer:
             json.dump(make_json_safe(results), f, ensure_ascii=False, indent=2)
         return results
 
+    def run_dual_orientation_sweep(
+        self,
+        output_dir: Path,
+        frame_idx: int,
+        left_position_world: np.ndarray,
+        right_position_world: np.ndarray,
+        left_target_quat_wxyz: np.ndarray,
+        right_target_quat_wxyz: np.ndarray,
+        left_base_quat_wxyz: np.ndarray,
+        right_base_quat_wxyz: np.ndarray,
+        steps_deg: Sequence[float],
+        pair_mode: str = "paired",
+        execute_success: bool = False,
+        reset_each_case: bool = True,
+        save_images: bool = True,
+    ) -> List[Dict]:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        results: List[Dict] = []
+        initial_state = self.snapshot_robot_state()
+        left_current_tcp = self.get_current_tcp_pose("left")
+        right_current_tcp = self.get_current_tcp_pose("right")
+        left_candidates = self.build_orientation_candidates(left_base_quat_wxyz, steps_deg)
+        right_candidates = self.build_orientation_candidates(right_base_quat_wxyz, steps_deg)
+
+        if pair_mode == "paired":
+            case_pairs = []
+            max_len = min(len(left_candidates), len(right_candidates))
+            for idx in range(max_len):
+                case_pairs.append((idx, left_candidates[idx], right_candidates[idx]))
+        elif pair_mode == "cartesian":
+            case_pairs = []
+            idx = 0
+            for left_case in left_candidates:
+                for right_case in right_candidates:
+                    case_pairs.append((idx, left_case, right_case))
+                    idx += 1
+        else:
+            raise ValueError(f"Unsupported dual orientation sweep pair mode: {pair_mode}")
+
+        for case_idx, left_case, right_case in case_pairs:
+            if reset_each_case:
+                self.restore_robot_state(initial_state)
+                self.update_robot_link_cameras()
+                self.step_scene(steps=1)
+
+            left_label, left_quat = left_case
+            right_label, right_quat = right_case
+            left_pose_world = np.concatenate([np.asarray(left_position_world, dtype=np.float64), normalize_quat_wxyz(left_quat)])
+            right_pose_world = np.concatenate([np.asarray(right_position_world, dtype=np.float64), normalize_quat_wxyz(right_quat)])
+
+            self.update_target_axis_visuals(left_pose_world, right_pose_world)
+            self.update_robot_link_cameras()
+            self.step_scene(steps=1)
+
+            left_plan = self.plan_path("left", left_pose_world)
+            right_plan = self.plan_path("right", right_pose_world)
+            left_status = self._plan_status(left_plan)
+            right_status = self._plan_status(right_plan)
+            item = {
+                "frame_idx": int(frame_idx),
+                "case_idx": int(case_idx),
+                "left_label": left_label,
+                "right_label": right_label,
+                "left_status": left_status,
+                "right_status": right_status,
+                "left_position_world": np.asarray(left_position_world, dtype=np.float64),
+                "right_position_world": np.asarray(right_position_world, dtype=np.float64),
+                "left_quat_world_wxyz": np.asarray(left_pose_world[3:], dtype=np.float64),
+                "right_quat_world_wxyz": np.asarray(right_pose_world[3:], dtype=np.float64),
+                "left_rot_err_vs_current_tcp_deg": float(quat_angle_deg_wxyz(left_current_tcp[3:], left_pose_world[3:])),
+                "right_rot_err_vs_current_tcp_deg": float(quat_angle_deg_wxyz(right_current_tcp[3:], right_pose_world[3:])),
+                "left_rot_err_vs_target_deg": float(quat_angle_deg_wxyz(left_target_quat_wxyz, left_pose_world[3:])),
+                "right_rot_err_vs_target_deg": float(quat_angle_deg_wxyz(right_target_quat_wxyz, right_pose_world[3:])),
+            }
+            if execute_success and (left_status == "Success" or right_status == "Success"):
+                exec_left_status, exec_right_status = self.execute_plans(left_plan, right_plan)
+                item["executed_left_status"] = exec_left_status
+                item["executed_right_status"] = exec_right_status
+                actual_left_tcp = self.get_current_tcp_pose("left")
+                actual_right_tcp = self.get_current_tcp_pose("right")
+                if left_status == "Success":
+                    item["left_pos_err_after_execute_m"] = float(np.linalg.norm(actual_left_tcp[:3] - left_pose_world[:3]))
+                    item["left_rot_err_after_execute_deg"] = float(quat_angle_deg_wxyz(actual_left_tcp[3:], left_pose_world[3:]))
+                if right_status == "Success":
+                    item["right_pos_err_after_execute_m"] = float(np.linalg.norm(actual_right_tcp[:3] - right_pose_world[:3]))
+                    item["right_rot_err_after_execute_deg"] = float(quat_angle_deg_wxyz(actual_right_tcp[3:], right_pose_world[3:]))
+                print(
+                    f"[orientation-sweep-exec] frame={frame_idx:04d} both case={case_idx:03d} "
+                    f"left={exec_left_status} right={exec_right_status} "
+                    f"left_pos_err={item.get('left_pos_err_after_execute_m', float('nan')):.3f}m "
+                    f"right_pos_err={item.get('right_pos_err_after_execute_m', float('nan')):.3f}m"
+                )
+            else:
+                item["executed_left_status"] = "Skipped"
+                item["executed_right_status"] = "Skipped"
+
+            results.append(item)
+            print(
+                f"[orientation-sweep] frame={frame_idx:04d} both case={case_idx:03d} "
+                f"left={left_label}:{left_status} right={right_label}:{right_status}"
+            )
+
+            if save_images:
+                self.update_robot_link_cameras()
+                overlay_lines = [
+                    f"Frame {frame_idx} both case={case_idx:03d}",
+                    f"L {left_label}: {left_status}",
+                    f"R {right_label}: {right_status}",
+                    f"exec L={item['executed_left_status']} R={item['executed_right_status']}",
+                ]
+                if "left_pos_err_after_execute_m" in item or "right_pos_err_after_execute_m" in item:
+                    left_err = item.get("left_pos_err_after_execute_m", float("nan"))
+                    right_err = item.get("right_pos_err_after_execute_m", float("nan"))
+                    overlay_lines.append(f"exec err L={left_err:.3f}m R={right_err:.3f}m")
+                zed_rgb, _ = self.capture_camera(self.zed_camera)
+                cv2.imwrite(str(output_dir / f"{case_idx:03d}_zed.png"), overlay_text(zed_rgb, overlay_lines))
+                if self._left_wrist_camera_link is not None:
+                    left_rgb, _ = self.capture_camera(self.left_wrist_camera)
+                    cv2.imwrite(str(output_dir / f"{case_idx:03d}_left_wrist.png"), overlay_text(left_rgb, overlay_lines))
+                if self._right_wrist_camera_link is not None:
+                    right_rgb, _ = self.capture_camera(self.right_wrist_camera)
+                    cv2.imwrite(str(output_dir / f"{case_idx:03d}_right_wrist.png"), overlay_text(right_rgb, overlay_lines))
+                if self.third_person_view:
+                    third_rgb, _ = self.capture_camera(self.third_camera)
+                    cv2.imwrite(str(output_dir / f"{case_idx:03d}_third.png"), overlay_text(third_rgb, overlay_lines))
+
+        with (output_dir / "results.json").open("w", encoding="utf-8") as f:
+            json.dump(make_json_safe(results), f, ensure_ascii=False, indent=2)
+        return results
+
     @staticmethod
     def _plan_status(plan: Optional[Dict]) -> str:
         if not isinstance(plan, dict):
@@ -1141,6 +1271,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--orientation_sweep_arm", choices=["left", "right", "both"], default="both")
     parser.add_argument("--orientation_sweep_base", choices=["current_tcp", "base", "target"], default="current_tcp")
     parser.add_argument("--orientation_sweep_steps_deg", type=float, nargs="+", default=[-180.0, -90.0, 0.0, 90.0])
+    parser.add_argument("--orientation_sweep_both_mode", choices=["paired", "cartesian"], default="paired")
     parser.add_argument("--orientation_sweep_execute", type=int, default=0)
     parser.add_argument("--orientation_sweep_reset_each_case", type=int, default=1)
     parser.add_argument("--orientation_sweep_save_images", type=int, default=1)
@@ -1277,6 +1408,45 @@ def main() -> None:
             renderer.update_target_axis_visuals(world_targets["left"], world_targets["right"])
             renderer.update_robot_link_cameras()
             renderer.step_scene(steps=1)
+            if args.orientation_sweep_arm == "both":
+                if world_targets["left"] is None or world_targets["right"] is None:
+                    print(f"[orientation-sweep] frame={frame_idx:04d} both skipped: one or both targets invalid")
+                    continue
+                if args.orientation_sweep_base == "current_tcp":
+                    left_base_quat = renderer.get_current_tcp_pose("left")[3:]
+                    right_base_quat = renderer.get_current_tcp_pose("right")[3:]
+                elif args.orientation_sweep_base == "base":
+                    left_base_quat = renderer._base_pose.q
+                    right_base_quat = renderer._base_pose.q
+                elif args.orientation_sweep_base == "target":
+                    left_base_quat = world_targets["left"][3:]
+                    right_base_quat = world_targets["right"][3:]
+                else:
+                    raise ValueError(f"Unsupported orientation sweep base: {args.orientation_sweep_base}")
+                both_dir = frame_dir / "both"
+                results = renderer.run_dual_orientation_sweep(
+                    output_dir=both_dir,
+                    frame_idx=frame_idx,
+                    left_position_world=world_targets["left"][:3],
+                    right_position_world=world_targets["right"][:3],
+                    left_target_quat_wxyz=world_targets["left"][3:],
+                    right_target_quat_wxyz=world_targets["right"][3:],
+                    left_base_quat_wxyz=left_base_quat,
+                    right_base_quat_wxyz=right_base_quat,
+                    steps_deg=args.orientation_sweep_steps_deg,
+                    pair_mode=args.orientation_sweep_both_mode,
+                    execute_success=bool(args.orientation_sweep_execute),
+                    reset_each_case=bool(args.orientation_sweep_reset_each_case),
+                    save_images=bool(args.orientation_sweep_save_images),
+                )
+                both_success = sum(1 for item in results if item["left_status"] == "Success" and item["right_status"] == "Success")
+                any_success = sum(1 for item in results if item["left_status"] == "Success" or item["right_status"] == "Success")
+                print(
+                    f"[orientation-sweep] frame={frame_idx:04d} both "
+                    f"any_success={any_success}/{len(results)} "
+                    f"dual_success={both_success}/{len(results)} saved_to={both_dir}"
+                )
+                continue
             for arm in selected_arms:
                 pose_world = world_targets[arm]
                 if pose_world is None:
