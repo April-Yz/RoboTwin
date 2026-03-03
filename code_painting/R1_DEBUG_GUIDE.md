@@ -2,63 +2,39 @@
 
 ## Core Concepts
 
-当前脚本里，“位置”和“朝向”是两条独立链路，不一定来自同一个来源。
+当前脚本里，“位置”和“朝向”是两条独立链路。
 
-### 位置来源
+- 位置：
+  来自输入 `npz` 里的 `left/right_gripper_position` 或 `left/right_wrist_position_retreat`
+- 朝向：
+  来自输入 `npz` 里的 `left/right_gripper_rotation_matrix`
+  如果 `npz` 没有这些字段，就现场调用
+  [calc_gripper_pose_from_keypoints](/home/zaijia001/ssd/RoboTwin/code_painting/render_hand_retarget_r1_npz.py)
+  重算
 
-默认位置来自：
+启动时如果打印：
 
-- 输入 `npz` 里的 `left/right_gripper_position`
-- 或 `left/right_wrist_position_retreat`
+- `left: stored_npz`
+- `right: stored_npz`
 
-如果输入 `npz` 没有这些字段，就会现场调用和
-[compute_gripper_pose_from_npz.py](/home/zaijia001/ssd/hamer_r1/compute_gripper_pose_from_npz.py)
-一致的逻辑重算，函数是：
+说明直接用了 `*_with_gripper.npz` 里的结果。否则就是现场从 keypoints 重算。
 
-- [calc_gripper_pose_from_keypoints](/home/zaijia001/ssd/RoboTwin/code_painting/render_hand_retarget_r1_npz.py#L150)
+## Robot Gripper Convention
 
-### 朝向来源
+RoboTwin 这套 `robot.py` 里，planner 期待的是“夹爪中心 pose”，而不是任意手部坐标系。
 
-朝向有三种常见来源：
-
-1. `npz` 里存好的 `left/right_gripper_rotation_matrix`
-2. 如果 `npz` 没有这些字段，则现场用 `calc_gripper_pose_from_keypoints(...)` 重算
-3. 调试时直接忽略人手朝向，改成“机器人当前夹爪朝向 + sweep”
-
-所以：
-
-- 普通 replay：
-  默认用“人手/npz 计算出来的朝向”
-- `orientation_sweep`：
-  位置仍然来自人手/npz
-  但朝向会被 sweep 覆盖
-
-## Robot Gripper Pose Convention
-
-在 RoboTwin 当前这套 `robot.py` 里，planner 接收的是“夹爪中心位姿”。
-
-关键规律：
+关键点：
 
 - pose 格式是 `[x, y, z, qw, qx, qy, qz]`
-- 世界坐标系里机器人 base 当前“朝前”是 `+Y`
-- 机器人夹爪局部 `+X` 基本是“朝前/接近方向”
-  依据是 [robot.py](/home/zaijia001/ssd/RoboTwin/envs/robot/robot.py) 里会沿局部 `+X` 做 gripper bias 到 end-link 的换算
+- 机器人 base 当前朝前是世界 `+Y`
+- 机器人夹爪局部 `+X` 才更接近“前向/接近方向”
+- [robot.py](/home/zaijia001/ssd/RoboTwin/envs/robot/robot.py) 里会先把 gripper pose 转成 end-link pose，再喂给 planner
 
-所以如果某个 case 看起来“夹爪朝右”，本质上通常是在说：
+所以“人手 gripper 旋转矩阵”和“机器人 TCP 旋转矩阵”不是天然同一套轴定义。
 
-- 这个 gripper pose 的局部 `+X` 没有朝向任务物体
-- 或者人手坐标系 remap 到机器人 gripper 坐标系后，前向轴和你预期不一致
+## Camera Debug
 
-## Debug Modes
-
-### 1. Head Camera Orientation Sweep
-
-用途：
-
-- 调 `zed/head` 相机朝向
-- 保存 `zed / third / wrist` 图片
-
-命令：
+### Head Camera Sweep
 
 ```bash
 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_hand_retarget_r1_npz.sh \
@@ -74,12 +50,7 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_hand_retarget_r1_npz.sh \
   --viewer_wait_at_end 1
 ```
 
-### 2. Wrist Camera Orientation Sweep
-
-用途：
-
-- 调 `left/right wrist camera` 朝向
-- 看 wrist 相机视野框是否合理
+### Wrist Camera Sweep
 
 左手：
 
@@ -97,49 +68,13 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_hand_retarget_r1_npz.sh \
   --viewer_wait_at_end 1
 ```
 
-右手：
+右手把 `left_wrist` 改成 `right_wrist`。
 
-```bash
-... --camera_debug_target right_wrist
-```
+## Position Debug
 
-### 3. Use Human-Computed Orientation Directly
+### 只保留人手位置，朝向固定成当前 TCP
 
-用途：
-
-- 使用 `compute_gripper_pose_from_npz.py` 已经写好的朝向
-- 不在 replay 里现场重算
-
-要求：
-
-- 输入文件必须是 `*_with_gripper.npz`
-- 文件里要有 `left/right_gripper_rotation_matrix`
-
-命令示例：
-
-```bash
-bash /home/zaijia001/ssd/RoboTwin/code_painting/run_hand_retarget_r1_npz.sh \
-  /path/to/hand_detections_0_with_gripper.npz \
-  /home/zaijia001/ssd/RoboTwin/code_painting/output_replay_from_stored_pose \
-  5
-```
-
-启动时如果日志打印：
-
-- `left: stored_npz`
-- `right: stored_npz`
-
-就说明确实在直接使用 `npz` 里的朝向。
-
-### 4. Ignore Human Orientation, Keep Human Position Only
-
-用途：
-
-- 位置继续用人手/npz
-- 朝向直接换成机器人当前夹爪朝向
-- 用来验证“是不是主要卡在朝向”
-
-命令：
+这条最适合先判断“主要是位置错了，还是朝向错了”。
 
 ```bash
 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_hand_retarget_r1_npz.sh \
@@ -153,82 +88,17 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_hand_retarget_r1_npz.sh \
   --viewer_wait_at_end 1
 ```
 
-### 5. Orientation Sweep With Robot-Based Orientation
+日志会打印：
 
-用途：
+- `world_dxyz`
+- `base_dxyz`
+- `axis_err[x/y/z]`
+- `target_axes x/y/z`
+- `current_axes x/y/z`
 
-- 固定人手算出来的位置
-- 不直接使用人手朝向
-- 改成“机器人当前夹爪朝向 + sweep”
-
-这是目前最接近你最近想要的模式。
-
-双手一起 sweep：
+### 手动整体平移目标位置
 
 ```bash
-bash /home/zaijia001/ssd/RoboTwin/code_painting/run_hand_retarget_r1_npz.sh \
-  /home/zaijia001/ssd/data/R1/hand_vis/hand_detections_0.npz \
-  /home/zaijia001/ssd/RoboTwin/code_painting/output_dual_orientation_sweep \
-  5 \
-  --orientation_sweep_enable 1 \
-  --orientation_sweep_arm both \
-  --orientation_sweep_both_mode paired \
-  --orientation_sweep_base current_tcp \
-  --orientation_sweep_steps_deg -90 0 90 \
-  --orientation_sweep_execute 1 \
-  --orientation_sweep_reset_each_case 1 \
-  --target_world_z_offset 0.0 \
-  --debug_mode 1 \
-  --debug_frame_limit 1 \
-  --enable_viewer 1 \
-  --viewer_wait_at_end 1
-```
-
-说明：
-
-- 位置：来自人手 / `npz`
-- 朝向：来自机器人当前 TCP 朝向，再叠加 `rx/ry/rz`
-- 双手是同一个 case 同时规划
-- 只要一只手 `Success` 就执行；两只都成功就一起执行
-
-### 6. Dual Orientation Sweep Pair Modes
-
-`--orientation_sweep_both_mode paired`
-
-- 左右手使用同一组 `rx/ry/rz`
-- case 数少，适合先找规律
-
-`--orientation_sweep_both_mode cartesian`
-
-- 左右手所有 case 两两组合
-- 搜索最全，但非常慢
-
-## Useful Extra Flags
-
-`--viewer_wait_at_end 1`
-
-- 跑完后 viewer 不会自动关
-
-`--viewer_frame_delay 0.005`
-
-- 每帧停一下，便于观察
-
-`--target_world_z_offset 0.15`
-
-- 所有目标世界坐标整体上抬 15cm
-
-`--disable_table 1`
-
-- 不加载桌子
-
-## Current Recommended Workflow
-
-1. 先用 camera sweep 确认 `head / wrist` 相机朝向。
-2. 再用 `*_with_gripper.npz` 确认“直接使用人手计算朝向”效果。
-3. 如果仍然经常 fail，就切到 `orientation_sweep_base current_tcp`。
-4. 如果只有单手 success，优先看位置是否太低，再调 `--target_world_z_offset`。
-
-
 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_hand_retarget_r1_npz.sh \
   /home/zaijia001/ssd/data/R1/hand_vis/hand_detections_0.npz \
   /home/zaijia001/ssd/RoboTwin/code_painting/output_pos_debug \
@@ -239,9 +109,13 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_hand_retarget_r1_npz.sh \
   --debug_frame_limit 5 \
   --enable_viewer 1 \
   --viewer_wait_at_end 1
-
-# 遍历一下z从-0.1到+0.5（5cm一档
 ```
+
+### Z Offset Sweep
+
+从 `-0.1m` 到 `+0.5m`，每 `0.05m` 一档：
+
+```bash
 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_hand_retarget_r1_npz.sh \
   /home/zaijia001/ssd/data/R1/hand_vis/hand_detections_0.npz \
   /home/zaijia001/ssd/RoboTwin/code_painting/output_pos_debug_z_sweep \
@@ -256,5 +130,215 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_hand_retarget_r1_npz.sh \
   --debug_frame_limit 5 \
   --enable_viewer 1 \
   --viewer_wait_at_end 1
-
 ```
+
+## Orientation Debug
+
+### 直接使用人手朝向
+
+要求输入是 `*_with_gripper.npz`：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_hand_retarget_r1_npz.sh \
+  /path/to/hand_detections_0_with_gripper.npz \
+  /home/zaijia001/ssd/RoboTwin/code_painting/output_replay_from_stored_pose \
+  5
+```
+
+### 用机器人当前 TCP 做朝向基准，再扫欧拉角
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_hand_retarget_r1_npz.sh \
+  /home/zaijia001/ssd/data/R1/hand_vis/hand_detections_0.npz \
+  /home/zaijia001/ssd/RoboTwin/code_painting/output_dual_orientation_sweep \
+  5 \
+  --orientation_sweep_enable 1 \
+  --orientation_sweep_arm both \
+  --orientation_sweep_both_mode paired \
+  --orientation_sweep_base current_tcp \
+  --orientation_sweep_steps_deg -90 0 90 \
+  --orientation_sweep_execute 1 \
+  --orientation_sweep_reset_each_case 1 \
+  --debug_mode 1 \
+  --debug_frame_limit 1 \
+  --enable_viewer 1 \
+  --viewer_wait_at_end 1
+```
+
+## Orientation Remap Debug
+
+这是新加的模式，专门用于排查：
+
+- 人手 gripper 旋转矩阵的轴定义
+- 机器人 TCP 的轴定义
+
+是不是差了一个固定坐标系 remap。
+
+### 固定一个常量 remap
+
+默认是：
+
+- `--orientation_remap_label identity`
+
+也就是不 remap。当前这个参数会同时作用到左手和右手。
+
+如果你已经从 sweep 里挑出了一个更合理的 label，可以直接固定：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_hand_retarget_r1_npz.sh \
+  /home/zaijia001/ssd/data/R1/hand_vis/hand_detections_0.npz \
+  /home/zaijia001/ssd/RoboTwin/code_painting/output_remap_fixed \
+  5 \
+  --orientation_remap_label x_from_yp_y_from_xm_z_from_zp \
+  --debug_mode 1 \
+  --debug_frame_limit 5 \
+  --enable_viewer 1 \
+  --viewer_wait_at_end 1
+```
+
+如果你现在想验证“左右手使用同一个定义，应该大致平行”，直接把 `label` 换成你这次挑出来的候选之一，比如：
+
+```bash
+--orientation_remap_label x_from_xm_y_from_zp_z_from_yp
+```
+
+或者：
+
+```bash
+--orientation_remap_label x_from_xp_y_from_zm_z_from_yp
+```
+
+### 自动 Sweep 24 个合法轴重排
+
+这条会枚举所有右手系合法轴 remap：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_hand_retarget_r1_npz.sh \
+  /home/zaijia001/ssd/data/R1/hand_vis/hand_detections_0.npz \
+  /home/zaijia001/ssd/RoboTwin/code_painting/output_orientation_remap_sweep \
+  5 \
+  --orientation_remap_sweep_enable 1 \
+  --orientation_remap_sweep_execute 1 \
+  --debug_mode 1 \
+  --debug_frame_limit 5 \
+  --enable_viewer 1 \
+  --viewer_wait_at_end 1
+```
+
+输出目录：
+
+- `output_orientation_remap_sweep/orientation_remap_sweep/`
+
+每个 remap 一个子目录，里面有：
+
+- `frame_XXXX_Lsucc_Rfail_zed.png`
+- `frame_XXXX_Lsucc_Rfail_third.png`
+- `summary.json`
+
+根目录也会有一个总的 `summary.json`。
+
+## Right-Hand X Sweep
+
+这个模式适合你现在这个目标：
+
+- 先固定一个你认为定义正确的 `orientation remap`
+- 左右手都共享这个 remap
+- 只扫描右手的世界坐标 `x` 偏移
+
+例如，把右手 `x` 从 `+0.50m` 扫到 `-0.30m`，每 `0.05m` 一档：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_hand_retarget_r1_npz.sh \
+  /home/zaijia001/ssd/data/R1/hand_vis/hand_detections_0.npz \
+  /home/zaijia001/ssd/RoboTwin/code_painting/output_right_x_sweep \
+  5 \
+  --orientation_remap_label x_from_xm_y_from_zp_z_from_yp \
+  --right_target_world_offset_x_sweep_enable 1 \
+  --right_target_world_offset_x_sweep_start +0.50 \
+  --right_target_world_offset_x_sweep_end -0.30 \
+  --right_target_world_offset_x_sweep_step 0.05 \
+  --debug_mode 1 \
+  --debug_frame_limit 5 \
+  --enable_viewer 1 \
+  --viewer_wait_at_end 1
+```
+
+输出目录：
+
+- `output_right_x_sweep/right_target_world_offset_x_sweep/`
+
+每个偏移一层子目录，例如：
+
+- `right_x_m0p10`
+- `right_x_m0p15`
+- `right_x_m0p20`
+
+里面会有：
+
+- `frame_XXXX_Lsucc_Rfail_zed.png`
+- `frame_XXXX_Lsucc_Rfail_third.png`
+- `summary.json`
+
+如果你已经知道左手还需要额外位置补偿，也可以继续叠加：
+
+```bash
+--left_target_world_offset_xyz DX DY DZ
+```
+
+或者右手固定再加额外整体补偿：
+
+```bash
+--right_target_world_offset_xyz DX DY DZ
+```
+
+如果你已经确认“右手需要先往 `+X` 推一点再看”，最直接的固定 debug 命令是：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_hand_retarget_r1_npz.sh \
+  /home/zaijia001/ssd/data/R1/hand_vis/hand_detections_0.npz \
+  /home/zaijia001/ssd/RoboTwin/code_painting/output_right_x_fixed \
+  5 \
+  --orientation_remap_label x_from_xm_y_from_zp_z_from_yp \
+  --right_target_world_offset_xyz 0.20 0 0 \
+  --debug_mode 1 \
+  --debug_frame_limit 5 \
+  --enable_viewer 1 \
+  --viewer_wait_at_end 1
+```
+
+## Useful Flags
+
+- `--viewer_wait_at_end 1`
+  跑完后不自动关 viewer
+- `--viewer_frame_delay 0.005`
+  放慢可视化
+- `--disable_table 1`
+  不加载桌子
+- `--target_world_offset_xyz DX DY DZ`
+  整体平移目标位置
+- `--target_world_z_offset Z`
+  只改目标 z
+
+## Recommended Workflow
+
+1. 先用 camera sweep 确认 `head / wrist` 相机朝向。
+2. 用 `--debug_force_orientation current_tcp` 判断位置是不是已经大致对了。
+3. 如果位置对了但人手朝向看起来明显不对，跑 `orientation_remap_sweep`。
+4. 从 remap sweep 里挑一个成功率高、视觉也合理的 label。
+5. 再把这个 label 固定到正常 replay、或者配合 `right_target_world_offset_x_sweep` 继续只调右手位置。
+
+
+
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_hand_retarget_r1_npz.sh \
+  /home/zaijia001/ssd/data/R1/hand_vis/hand_detections_0.npz \
+  /home/zaijia001/ssd/RoboTwin/code_painting/output_right_x_sweep \
+  5 \
+  --orientation_remap_label x_from_xm_y_from_zp_z_from_yp \
+  --right_target_world_offset_x_sweep_enable 1 \
+  --right_target_world_offset_x_sweep_start +0.50 \
+  --right_target_world_offset_x_sweep_end -0.30 \
+  --right_target_world_offset_x_sweep_step 0.05 \
+  --debug_mode 1 \
+  --debug_frame_limit 3 \
+  --enable_viewer 1 \
+  --viewer_wait_at_end 1
