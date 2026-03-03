@@ -147,6 +147,17 @@ def format_vec3(vec: Sequence[float]) -> str:
     return f"[{arr[0]:+.3f}, {arr[1]:+.3f}, {arr[2]:+.3f}]"
 
 
+def position_axis_errors(actual_pos: Sequence[float], target_pos: Sequence[float]) -> Dict[str, float]:
+    actual = np.asarray(actual_pos, dtype=np.float64).reshape(3)
+    target = np.asarray(target_pos, dtype=np.float64).reshape(3)
+    delta = actual - target
+    return {
+        "x": float(delta[0]),
+        "y": float(delta[1]),
+        "z": float(delta[2]),
+    }
+
+
 def short_status(status: str) -> str:
     s = str(status).strip().lower()
     if s == "success":
@@ -722,7 +733,7 @@ class HandRetargetR1Renderer:
         if mode == "current_tcp":
             target[3:] = normalize_quat_wxyz(self.get_current_tcp_pose(arm)[3:])
             return target
-        if mode == "base":
+        if mode in ("base", "robot_forward_y"):
             target[3:] = normalize_quat_wxyz(self._base_pose.q)
             return target
         raise ValueError(f"Unsupported debug force orientation mode: {mode}")
@@ -976,12 +987,18 @@ class HandRetargetR1Renderer:
                 actual_tcp = self.get_current_tcp_pose(arm)
                 item["actual_tcp_pose_world"] = actual_tcp.copy()
                 item["pos_err_after_execute_m"] = float(np.linalg.norm(actual_tcp[:3] - pose_world[:3]))
+                item["pos_axis_err_after_execute_m"] = position_axis_errors(actual_tcp[:3], pose_world[:3])
                 item["rot_err_after_execute_deg"] = float(quat_angle_deg_wxyz(actual_tcp[3:], pose_world[3:]))
                 item["axis_err_after_execute_deg"] = axis_angle_errors_deg_wxyz(actual_tcp[3:], pose_world[3:])
                 print(
                     f"[orientation-sweep-exec] frame={frame_idx:04d} arm={arm} case={label} "
                     f"executed={item['executed_status']} pos_err={item['pos_err_after_execute_m']:.3f}m "
                     f"rot_err={item['rot_err_after_execute_deg']:.1f}deg"
+                )
+                pe = item["pos_axis_err_after_execute_m"]
+                print(
+                    f"[orientation-sweep-exec-pos-axis] frame={frame_idx:04d} arm={arm} "
+                    f"dx={pe['x']:+.3f}m dy={pe['y']:+.3f}m dz={pe['z']:+.3f}m"
                 )
                 ae = item["axis_err_after_execute_deg"]
                 print(
@@ -1008,6 +1025,9 @@ class HandRetargetR1Renderer:
                 ]
                 if "pos_err_after_execute_m" in item:
                     overlay_lines.append(f"pos_err_exec={item['pos_err_after_execute_m']:.3f}m")
+                if "pos_axis_err_after_execute_m" in item:
+                    pe = item["pos_axis_err_after_execute_m"]
+                    overlay_lines.append(f"pos dx={pe['x']:+.3f} dy={pe['y']:+.3f} dz={pe['z']:+.3f}")
                 if "axis_err_after_execute_deg" in item:
                     ae = item["axis_err_after_execute_deg"]
                     overlay_lines.append(f"axis x={ae['x']:.1f} y={ae['y']:.1f} z={ae['z']:.1f}")
@@ -1109,10 +1129,12 @@ class HandRetargetR1Renderer:
                 actual_right_tcp = self.get_current_tcp_pose("right")
                 if left_status == "Success":
                     item["left_pos_err_after_execute_m"] = float(np.linalg.norm(actual_left_tcp[:3] - left_pose_world[:3]))
+                    item["left_pos_axis_err_after_execute_m"] = position_axis_errors(actual_left_tcp[:3], left_pose_world[:3])
                     item["left_rot_err_after_execute_deg"] = float(quat_angle_deg_wxyz(actual_left_tcp[3:], left_pose_world[3:]))
                     item["left_axis_err_after_execute_deg"] = axis_angle_errors_deg_wxyz(actual_left_tcp[3:], left_pose_world[3:])
                 if right_status == "Success":
                     item["right_pos_err_after_execute_m"] = float(np.linalg.norm(actual_right_tcp[:3] - right_pose_world[:3]))
+                    item["right_pos_axis_err_after_execute_m"] = position_axis_errors(actual_right_tcp[:3], right_pose_world[:3])
                     item["right_rot_err_after_execute_deg"] = float(quat_angle_deg_wxyz(actual_right_tcp[3:], right_pose_world[3:]))
                     item["right_axis_err_after_execute_deg"] = axis_angle_errors_deg_wxyz(actual_right_tcp[3:], right_pose_world[3:])
                 print(
@@ -1121,6 +1143,18 @@ class HandRetargetR1Renderer:
                     f"left_pos_err={item.get('left_pos_err_after_execute_m', float('nan')):.3f}m "
                     f"right_pos_err={item.get('right_pos_err_after_execute_m', float('nan')):.3f}m"
                 )
+                if "left_pos_axis_err_after_execute_m" in item:
+                    lpe = item["left_pos_axis_err_after_execute_m"]
+                    print(
+                        f"[orientation-sweep-exec-pos-axis] frame={frame_idx:04d} left "
+                        f"dx={lpe['x']:+.3f}m dy={lpe['y']:+.3f}m dz={lpe['z']:+.3f}m"
+                    )
+                if "right_pos_axis_err_after_execute_m" in item:
+                    rpe = item["right_pos_axis_err_after_execute_m"]
+                    print(
+                        f"[orientation-sweep-exec-pos-axis] frame={frame_idx:04d} right "
+                        f"dx={rpe['x']:+.3f}m dy={rpe['y']:+.3f}m dz={rpe['z']:+.3f}m"
+                    )
                 if "left_axis_err_after_execute_deg" in item:
                     la = item["left_axis_err_after_execute_deg"]
                     print(
@@ -1156,6 +1190,12 @@ class HandRetargetR1Renderer:
                     left_err = item.get("left_pos_err_after_execute_m", float("nan"))
                     right_err = item.get("right_pos_err_after_execute_m", float("nan"))
                     overlay_lines.append(f"exec err L={left_err:.3f}m R={right_err:.3f}m")
+                if "left_pos_axis_err_after_execute_m" in item:
+                    lpe = item["left_pos_axis_err_after_execute_m"]
+                    overlay_lines.append(f"L pos dx={lpe['x']:+.3f} dy={lpe['y']:+.3f} dz={lpe['z']:+.3f}")
+                if "right_pos_axis_err_after_execute_m" in item:
+                    rpe = item["right_pos_axis_err_after_execute_m"]
+                    overlay_lines.append(f"R pos dx={rpe['x']:+.3f} dy={rpe['y']:+.3f} dz={rpe['z']:+.3f}")
                 if "left_axis_err_after_execute_deg" in item:
                     la = item["left_axis_err_after_execute_deg"]
                     overlay_lines.append(f"L axis x={la['x']:.1f} y={la['y']:.1f} z={la['z']:.1f}")
@@ -1329,7 +1369,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--link_cam_debug_up", type=float, default=0.0)
     parser.add_argument("--debug_mode", type=int, default=0)
     parser.add_argument("--debug_frame_limit", type=int, default=5)
-    parser.add_argument("--debug_force_orientation", choices=["none", "current_tcp", "base"], default="none")
+    parser.add_argument("--debug_force_orientation", choices=["none", "current_tcp", "base", "robot_forward_y"], default="none")
     parser.add_argument("--debug_visualize_targets", type=int, default=1)
     parser.add_argument("--debug_target_axis_length", type=float, default=0.08)
     parser.add_argument("--debug_target_axis_thickness", type=float, default=0.004)
