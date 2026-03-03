@@ -35,6 +35,8 @@ CV_TO_WORLD_CAMERA_PRESETS = {
 }
 DEFAULT_HEAD_CAMERA_LOCAL_POS = np.array([0.0, 0.0, 0.0], dtype=np.float64)
 DEFAULT_HEAD_CAMERA_LOCAL_QUAT_WXYZ = np.array([1.0, 1.0, -1.0, 1.0], dtype=np.float64)
+DEFAULT_WRIST_CAMERA_LOCAL_POS = np.array([0.0, 0.0, 0.0], dtype=np.float64)
+DEFAULT_WRIST_CAMERA_LOCAL_QUAT_WXYZ = None
 TORSO_JOINT_NAMES = ("torso_joint1", "torso_joint2", "torso_joint3", "torso_joint4")
 DEFAULT_TORSO_QPOS = np.array([0.25, -0.4, -0.85, 0.0], dtype=np.float64)
 HIDDEN_DEBUG_POSE = sapien.Pose([0.0, 0.0, -10.0], [1.0, 0.0, 0.0, 0.0])
@@ -64,6 +66,22 @@ def quat_xyzw_to_wxyz(quat_xyzw: Sequence[float]) -> np.ndarray:
         raise ValueError("Zero-norm quaternion.")
     quat = quat / norm
     return np.array([quat[3], quat[0], quat[1], quat[2]], dtype=np.float64)
+
+
+def quat_multiply_wxyz(quat_a_wxyz: Sequence[float], quat_b_wxyz: Sequence[float]) -> np.ndarray:
+    rot_a = R.from_quat(quat_wxyz_to_xyzw(quat_a_wxyz))
+    rot_b = R.from_quat(quat_wxyz_to_xyzw(quat_b_wxyz))
+    return quat_xyzw_to_wxyz((rot_a * rot_b).as_quat())
+
+
+def quat_from_euler_wxyz(seq: str, angles, degrees: bool = False) -> np.ndarray:
+    return quat_xyzw_to_wxyz(R.from_euler(seq, angles, degrees=degrees).as_quat())
+
+
+DEFAULT_WRIST_CAMERA_LOCAL_QUAT_WXYZ = quat_multiply_wxyz(
+    quat_from_euler_wxyz("xyz", [math.radians(-10.0), 0.0, -math.pi / 2], degrees=False),
+    [0.5, 0.5, -0.5, 0.5],
+)
 
 
 def pose_to_matrix(pose: sapien.Pose) -> np.ndarray:
@@ -100,6 +118,18 @@ def quat_angle_deg_wxyz(quat_a_wxyz: Sequence[float], quat_b_wxyz: Sequence[floa
 def format_vec3(vec: Sequence[float]) -> str:
     arr = np.asarray(vec, dtype=np.float64).reshape(3)
     return f"[{arr[0]:+.3f}, {arr[1]:+.3f}, {arr[2]:+.3f}]"
+
+
+def make_json_safe(obj):
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    if isinstance(obj, (np.floating, np.integer)):
+        return obj.item()
+    if isinstance(obj, (list, tuple)):
+        return [make_json_safe(v) for v in obj]
+    if isinstance(obj, dict):
+        return {str(k): make_json_safe(v) for k, v in obj.items()}
+    return obj
 
 
 def calc_gripper_pose_from_keypoints(
@@ -275,6 +305,9 @@ class HandRetargetR1Renderer:
         camera_cv_axis_mode: str,
         head_camera_local_pos: Sequence[float],
         head_camera_local_quat_wxyz: Sequence[float],
+        wrist_camera_local_pos: Sequence[float],
+        wrist_camera_local_quat_wxyz: Sequence[float],
+        camera_debug_target: str,
         enable_viewer: bool,
         viewer_frame_delay: float,
         viewer_wait_at_end: bool,
@@ -301,6 +334,9 @@ class HandRetargetR1Renderer:
         self.camera_cv_axis_mode = str(camera_cv_axis_mode).strip().lower()
         self.head_camera_local_pos = np.asarray(head_camera_local_pos, dtype=np.float64).reshape(3)
         self.head_camera_local_quat_wxyz = normalize_quat_wxyz(head_camera_local_quat_wxyz)
+        self.wrist_camera_local_pos = np.asarray(wrist_camera_local_pos, dtype=np.float64).reshape(3)
+        self.wrist_camera_local_quat_wxyz = normalize_quat_wxyz(wrist_camera_local_quat_wxyz)
+        self.camera_debug_target = str(camera_debug_target).strip().lower()
         self.enable_viewer = bool(enable_viewer)
         self.viewer_frame_delay = max(float(viewer_frame_delay), 0.0)
         self.viewer_wait_at_end = bool(viewer_wait_at_end)
@@ -314,6 +350,8 @@ class HandRetargetR1Renderer:
 
         self.robot: Optional["Robot"] = None
         self._head_camera_link = None
+        self._left_wrist_camera_link = None
+        self._right_wrist_camera_link = None
         self._table = None
         self._base_pose = None
         self._left_target_axis_actor = None
@@ -368,9 +406,27 @@ class HandRetargetR1Renderer:
             near=0.01,
             far=100.0,
         )
+        self.left_wrist_camera = self.scene.add_camera(
+            name="left_wrist_camera",
+            width=self.image_width,
+            height=self.image_height,
+            fovy=np.deg2rad(43.973014784873506),
+            near=0.01,
+            far=100.0,
+        )
+        self.right_wrist_camera = self.scene.add_camera(
+            name="right_wrist_camera",
+            width=self.image_width,
+            height=self.image_height,
+            fovy=np.deg2rad(44.5846756133851),
+            near=0.01,
+            far=100.0,
+        )
         identity_pose = sapien.Pose([0.0, 0.0, 1.5], [1.0, 0.0, 0.0, 0.0])
         self.zed_camera.set_entity_pose(identity_pose)
         self.third_camera.set_entity_pose(identity_pose)
+        self.left_wrist_camera.set_entity_pose(identity_pose)
+        self.right_wrist_camera.set_entity_pose(identity_pose)
 
     def _create_table(self) -> None:
         builder = self.scene.create_actor_builder()
@@ -421,6 +477,8 @@ class HandRetargetR1Renderer:
         self._head_camera_link = self._find_robot_link(["zed_link", "head_camera", "head", "camera_link"])
         if self._head_camera_link is None:
             raise RuntimeError("Could not find zed/head camera link on R1.")
+        self._left_wrist_camera_link = self._find_robot_link(["left_realsense_link", "left_D405_link", "left_camera"])
+        self._right_wrist_camera_link = self._find_robot_link(["right_realsense_link", "right_D405_link", "right_camera"])
 
         if self.debug_visualize_targets:
             self._left_target_axis_actor = self._create_debug_axis_actor("left_target_axis")
@@ -430,6 +488,8 @@ class HandRetargetR1Renderer:
         self.update_robot_link_cameras()
         if self.debug_mode:
             self.print_head_camera_summary()
+            self.print_wrist_camera_summary("left")
+            self.print_wrist_camera_summary("right")
 
     def _find_robot_link(self, names: Sequence[str]):
         if self.robot is None:
@@ -480,8 +540,13 @@ class HandRetargetR1Renderer:
         }
         return presets.get(self.link_cam_axis_mode, presets["none"])
 
-    def _apply_head_camera_debug(self, pose: sapien.Pose) -> sapien.Pose:
+    def _should_apply_camera_debug(self, target: str) -> bool:
         if not self.link_cam_debug_enable:
+            return False
+        return self.camera_debug_target in ("all", target)
+
+    def _apply_camera_debug(self, pose: sapien.Pose, target: str) -> sapien.Pose:
+        if not self._should_apply_camera_debug(target):
             return pose
         rot_base = R.from_quat(quat_wxyz_to_xyzw(pose.q)).as_matrix()
         rot_axis = self._camera_axis_mode_rotation()
@@ -498,7 +563,18 @@ class HandRetargetR1Renderer:
         link_pose = self._head_camera_link.get_entity_pose()
         local_pose = sapien.Pose(self.head_camera_local_pos, self.head_camera_local_quat_wxyz)
         head_pose = matrix_to_pose(pose_to_matrix(link_pose) @ pose_to_matrix(local_pose))
-        return self._apply_head_camera_debug(head_pose)
+        return self._apply_camera_debug(head_pose, "head")
+
+    def get_wrist_camera_pose(self, side: str) -> sapien.Pose:
+        if side not in ("left", "right"):
+            raise ValueError(f"Unsupported side: {side}")
+        link = self._left_wrist_camera_link if side == "left" else self._right_wrist_camera_link
+        if link is None:
+            raise RuntimeError(f"{side} wrist camera link is unavailable.")
+        link_pose = link.get_entity_pose()
+        local_pose = sapien.Pose(self.wrist_camera_local_pos, self.wrist_camera_local_quat_wxyz)
+        pose = matrix_to_pose(pose_to_matrix(link_pose) @ pose_to_matrix(local_pose))
+        return self._apply_camera_debug(pose, f"{side}_wrist")
 
     def _camera_cv_rotation(self) -> np.ndarray:
         return CV_TO_WORLD_CAMERA_PRESETS.get(self.camera_cv_axis_mode, CV_TO_WORLD_CAMERA_PRESETS["legacy_r1"])
@@ -522,6 +598,28 @@ class HandRetargetR1Renderer:
             f"forward={format_vec3(forward)} right={format_vec3(right)} up={format_vec3(up)} "
             f"base_q_wxyz={np.asarray(self._base_pose.q, dtype=np.float64).round(6).tolist()} "
             f"head_local_q_wxyz={self.head_camera_local_quat_wxyz.round(6).tolist()}"
+        )
+
+    def print_wrist_camera_summary(self, side: str) -> None:
+        link = self._left_wrist_camera_link if side == "left" else self._right_wrist_camera_link
+        if link is None:
+            print(f"[camera-debug] {side}_wrist_link=None")
+            return
+        pose = self.get_wrist_camera_pose(side)
+        rot = R.from_quat(quat_wxyz_to_xyzw(pose.q)).as_matrix()
+        right = rot[:, 0]
+        up = rot[:, 1]
+        back = rot[:, 2]
+        forward = -back
+        print(
+            "[camera-debug] "
+            f"{side}_wrist_link={link.get_name()} pose_p={format_vec3(pose.p)} "
+            f"pose_q_wxyz={np.asarray(pose.q, dtype=np.float64).round(6).tolist()}"
+        )
+        print(
+            "[camera-debug] "
+            f"{side}_wrist_forward={format_vec3(forward)} right={format_vec3(right)} up={format_vec3(up)} "
+            f"wrist_local_q_wxyz={self.wrist_camera_local_quat_wxyz.round(6).tolist()}"
         )
 
     def get_current_tcp_pose(self, arm: str) -> np.ndarray:
@@ -562,16 +660,24 @@ class HandRetargetR1Renderer:
     def update_robot_link_cameras(self) -> None:
         head_pose = self.get_head_camera_pose()
         self.zed_camera.set_entity_pose(head_pose)
+        if self._left_wrist_camera_link is not None:
+            self.left_wrist_camera.set_entity_pose(self.get_wrist_camera_pose("left"))
+        if self._right_wrist_camera_link is not None:
+            self.right_wrist_camera.set_entity_pose(self.get_wrist_camera_pose("right"))
         if self.third_person_view:
             self.third_camera.set_entity_pose(self._build_third_camera_pose(head_pose))
 
     def _build_third_camera_pose(self, head_pose: sapien.Pose) -> sapien.Pose:
-        base_rot = R.from_quat(quat_wxyz_to_xyzw(self._base_pose.q)).as_matrix()
-        forward = base_rot @ np.array([1.0, 0.0, 0.0], dtype=np.float64)
-        left = base_rot @ np.array([0.0, 1.0, 0.0], dtype=np.float64)
-        eye = np.asarray(head_pose.p, dtype=np.float64) + 1.0 * forward + 0.25 * left + np.array([0.0, 0.0, 0.1])
-        target = np.asarray(head_pose.p, dtype=np.float64) + 0.1 * forward
-        return look_at_pose(eye=eye, target=target, up=np.array([0.0, 0.0, 1.0], dtype=np.float64))
+        head_rot = R.from_quat(quat_wxyz_to_xyzw(head_pose.q)).as_matrix()
+        head_right = head_rot[:, 0]
+        head_up = head_rot[:, 1]
+        head_forward = -head_rot[:, 2]
+        eye = np.asarray(head_pose.p, dtype=np.float64) - 1.0 * head_forward + 0.08 * head_up
+        target = np.asarray(head_pose.p, dtype=np.float64) + 0.2 * head_forward
+        up = head_up if abs(np.dot(head_up, head_forward)) < 0.98 else np.array([0.0, 0.0, 1.0], dtype=np.float64)
+        if np.dot(np.cross(target - eye, up), head_right) < 0:
+            up = -up
+        return look_at_pose(eye=eye, target=target, up=up)
 
     def step_scene(self, steps: int = 1) -> None:
         for _ in range(int(steps)):
@@ -682,6 +788,14 @@ class HandRetargetR1Renderer:
                 zed_rgb, _ = self.capture_camera(self.zed_camera)
                 zed_img = overlay_text(zed_rgb, list(overlay_lines) + [case_name, pose_line])
                 cv2.imwrite(str(output_dir / f"{case_name}_zed.png"), zed_img)
+                if self._left_wrist_camera_link is not None:
+                    left_rgb, _ = self.capture_camera(self.left_wrist_camera)
+                    left_img = overlay_text(left_rgb, list(overlay_lines) + [case_name, "left_wrist"])
+                    cv2.imwrite(str(output_dir / f"{case_name}_left_wrist.png"), left_img)
+                if self._right_wrist_camera_link is not None:
+                    right_rgb, _ = self.capture_camera(self.right_wrist_camera)
+                    right_img = overlay_text(right_rgb, list(overlay_lines) + [case_name, "right_wrist"])
+                    cv2.imwrite(str(output_dir / f"{case_name}_right_wrist.png"), right_img)
                 if self.third_person_view:
                     third_rgb, _ = self.capture_camera(self.third_camera)
                     third_img = overlay_text(third_rgb, list(overlay_lines) + [case_name, pose_line])
@@ -692,6 +806,94 @@ class HandRetargetR1Renderer:
             self.link_cam_debug_rot_xyz_deg = base_rot
             self.update_robot_link_cameras()
             self.step_scene(steps=1)
+
+    def build_orientation_candidates(
+        self,
+        base_quat_wxyz: Sequence[float],
+        steps_deg: Sequence[float],
+    ) -> List[Tuple[str, np.ndarray]]:
+        base_rot = R.from_quat(quat_wxyz_to_xyzw(base_quat_wxyz))
+        cases: List[Tuple[str, np.ndarray]] = []
+        seen = set()
+        for rx in steps_deg:
+            for ry in steps_deg:
+                for rz in steps_deg:
+                    delta = R.from_euler("xyz", [float(rx), float(ry), float(rz)], degrees=True)
+                    quat = quat_xyzw_to_wxyz((base_rot * delta).as_quat())
+                    key = tuple(np.round(quat, 6).tolist())
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    label = f"rx{int(rx):+03d}_ry{int(ry):+03d}_rz{int(rz):+03d}"
+                    cases.append((label, quat))
+        return cases
+
+    def run_orientation_sweep(
+        self,
+        output_dir: Path,
+        frame_idx: int,
+        arm: str,
+        position_world: np.ndarray,
+        target_quat_wxyz: np.ndarray,
+        base_quat_wxyz: np.ndarray,
+        steps_deg: Sequence[float],
+        save_images: bool = True,
+    ) -> List[Dict]:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        results: List[Dict] = []
+        current_tcp = self.get_current_tcp_pose(arm)
+        candidates = self.build_orientation_candidates(base_quat_wxyz, steps_deg)
+        for case_idx, (label, quat_wxyz) in enumerate(candidates):
+            pose_world = np.concatenate([np.asarray(position_world, dtype=np.float64), normalize_quat_wxyz(quat_wxyz)])
+            if arm == "left":
+                self.update_target_axis_visuals(pose_world, None)
+            else:
+                self.update_target_axis_visuals(None, pose_world)
+            self.update_robot_link_cameras()
+            self.step_scene(steps=1)
+            plan = self.plan_path(arm, pose_world)
+            status = self._plan_status(plan)
+            rot_err_current_deg = quat_angle_deg_wxyz(current_tcp[3:], pose_world[3:])
+            rot_err_target_deg = quat_angle_deg_wxyz(target_quat_wxyz, pose_world[3:])
+            item = {
+                "frame_idx": int(frame_idx),
+                "arm": arm,
+                "case_idx": int(case_idx),
+                "label": label,
+                "status": status,
+                "position_world": np.asarray(position_world, dtype=np.float64),
+                "quat_world_wxyz": np.asarray(pose_world[3:], dtype=np.float64),
+                "rot_err_vs_current_tcp_deg": float(rot_err_current_deg),
+                "rot_err_vs_target_deg": float(rot_err_target_deg),
+            }
+            results.append(item)
+            print(
+                f"[orientation-sweep] frame={frame_idx:04d} arm={arm} case={label} "
+                f"status={status} rot_vs_current={rot_err_current_deg:.1f}deg rot_vs_target={rot_err_target_deg:.1f}deg"
+            )
+            if save_images:
+                overlay_lines = [
+                    f"Frame {frame_idx} arm={arm}",
+                    f"case={label}",
+                    f"status={status}",
+                    f"rot_vs_current={rot_err_current_deg:.1f}deg",
+                    f"rot_vs_target={rot_err_target_deg:.1f}deg",
+                ]
+                zed_rgb, _ = self.capture_camera(self.zed_camera)
+                cv2.imwrite(str(output_dir / f"{case_idx:03d}_{label}_zed.png"), overlay_text(zed_rgb, overlay_lines))
+                if self._left_wrist_camera_link is not None:
+                    left_rgb, _ = self.capture_camera(self.left_wrist_camera)
+                    cv2.imwrite(str(output_dir / f"{case_idx:03d}_{label}_left_wrist.png"), overlay_text(left_rgb, overlay_lines))
+                if self._right_wrist_camera_link is not None:
+                    right_rgb, _ = self.capture_camera(self.right_wrist_camera)
+                    cv2.imwrite(str(output_dir / f"{case_idx:03d}_{label}_right_wrist.png"), overlay_text(right_rgb, overlay_lines))
+                if self.third_person_view:
+                    third_rgb, _ = self.capture_camera(self.third_camera)
+                    cv2.imwrite(str(output_dir / f"{case_idx:03d}_{label}_third.png"), overlay_text(third_rgb, overlay_lines))
+
+        with (output_dir / "results.json").open("w", encoding="utf-8") as f:
+            json.dump(make_json_safe(results), f, ensure_ascii=False, indent=2)
+        return results
 
     @staticmethod
     def _plan_status(plan: Optional[Dict]) -> str:
@@ -828,10 +1030,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--camera_cv_axis_mode", choices=sorted(CV_TO_WORLD_CAMERA_PRESETS.keys()), default="legacy_r1")
     parser.add_argument("--head_camera_local_pos", type=float, nargs=3, default=DEFAULT_HEAD_CAMERA_LOCAL_POS.tolist())
     parser.add_argument("--head_camera_local_quat_wxyz", type=float, nargs=4, default=DEFAULT_HEAD_CAMERA_LOCAL_QUAT_WXYZ.tolist())
+    parser.add_argument("--wrist_camera_local_pos", type=float, nargs=3, default=DEFAULT_WRIST_CAMERA_LOCAL_POS.tolist())
+    parser.add_argument("--wrist_camera_local_quat_wxyz", type=float, nargs=4, default=DEFAULT_WRIST_CAMERA_LOCAL_QUAT_WXYZ.tolist())
     parser.add_argument("--enable_viewer", type=int, default=0)
     parser.add_argument("--viewer_frame_delay", type=float, default=0.0, help="Seconds to sleep after each viewer render for slow-motion debugging")
     parser.add_argument("--viewer_wait_at_end", type=int, default=0, help="Keep the viewer open after replay finishes until the window is closed")
     parser.add_argument("--link_cam_debug_enable", type=int, default=0)
+    parser.add_argument("--camera_debug_target", choices=["head", "left_wrist", "right_wrist", "all"], default="head")
     parser.add_argument("--link_cam_axis_mode", type=str, default="none")
     parser.add_argument("--link_cam_debug_rot_x_deg", type=float, default=0.0)
     parser.add_argument("--link_cam_debug_rot_y_deg", type=float, default=0.0)
@@ -847,6 +1052,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--debug_target_axis_thickness", type=float, default=0.004)
     parser.add_argument("--camera_sweep_enable", type=int, default=0)
     parser.add_argument("--camera_sweep_steps_deg", type=float, nargs="+", default=[-180.0, -90.0, 0.0, 90.0])
+    parser.add_argument("--orientation_sweep_enable", type=int, default=0)
+    parser.add_argument("--orientation_sweep_arm", choices=["left", "right", "both"], default="both")
+    parser.add_argument("--orientation_sweep_base", choices=["current_tcp", "base", "target"], default="current_tcp")
+    parser.add_argument("--orientation_sweep_steps_deg", type=float, nargs="+", default=[-180.0, -90.0, 0.0, 90.0])
+    parser.add_argument("--orientation_sweep_save_images", type=int, default=1)
     return parser.parse_args()
 
 
@@ -902,6 +1112,9 @@ def main() -> None:
         camera_cv_axis_mode=args.camera_cv_axis_mode,
         head_camera_local_pos=args.head_camera_local_pos,
         head_camera_local_quat_wxyz=args.head_camera_local_quat_wxyz,
+        wrist_camera_local_pos=args.wrist_camera_local_pos,
+        wrist_camera_local_quat_wxyz=args.wrist_camera_local_quat_wxyz,
+        camera_debug_target=args.camera_debug_target,
         enable_viewer=bool(args.enable_viewer),
         viewer_frame_delay=args.viewer_frame_delay,
         viewer_wait_at_end=bool(args.viewer_wait_at_end),
@@ -949,6 +1162,59 @@ def main() -> None:
             ],
         )
         print(f"Saved camera sweep images to: {sweep_dir}")
+        renderer.hold_viewer()
+        return
+
+    if args.orientation_sweep_enable:
+        sweep_root = args.output_dir / "orientation_sweep"
+        sweep_root.mkdir(parents=True, exist_ok=True)
+        selected_arms = ("left", "right") if args.orientation_sweep_arm == "both" else (args.orientation_sweep_arm,)
+        for frame_idx in indices:
+            frame_dir = sweep_root / f"frame_{frame_idx:04d}"
+            frame_dir.mkdir(parents=True, exist_ok=True)
+            left_target = trajectory.get_side_target("left", frame_idx, args.pose_source)
+            right_target = trajectory.get_side_target("right", frame_idx, args.pose_source)
+            raw_targets = {"left": left_target, "right": right_target}
+            world_targets: Dict[str, Optional[np.ndarray]] = {"left": None, "right": None}
+            for arm in selected_arms:
+                target = raw_targets[arm]
+                if not target.valid:
+                    print(f"[orientation-sweep] frame={frame_idx:04d} arm={arm} skipped: invalid target")
+                    continue
+                pose_world = renderer.camera_to_world_pose(target.position_cam, target.rotation_cam)
+                world_targets[arm] = pose_world
+            renderer.update_target_axis_visuals(world_targets["left"], world_targets["right"])
+            renderer.update_robot_link_cameras()
+            renderer.step_scene(steps=1)
+            for arm in selected_arms:
+                pose_world = world_targets[arm]
+                if pose_world is None:
+                    continue
+                if args.orientation_sweep_base == "current_tcp":
+                    base_quat = renderer.get_current_tcp_pose(arm)[3:]
+                elif args.orientation_sweep_base == "base":
+                    base_quat = renderer._base_pose.q
+                elif args.orientation_sweep_base == "target":
+                    base_quat = pose_world[3:]
+                else:
+                    raise ValueError(f"Unsupported orientation sweep base: {args.orientation_sweep_base}")
+                arm_dir = frame_dir / arm
+                results = renderer.run_orientation_sweep(
+                    output_dir=arm_dir,
+                    frame_idx=frame_idx,
+                    arm=arm,
+                    position_world=pose_world[:3],
+                    target_quat_wxyz=pose_world[3:],
+                    base_quat_wxyz=base_quat,
+                    steps_deg=args.orientation_sweep_steps_deg,
+                    save_images=bool(args.orientation_sweep_save_images),
+                )
+                success_count = sum(1 for item in results if item["status"] == "Success")
+                print(
+                    f"[orientation-sweep] frame={frame_idx:04d} arm={arm} "
+                    f"success={success_count}/{len(results)} saved_to={arm_dir}"
+                )
+        print(f"Saved orientation sweep results to: {sweep_root}")
         renderer.hold_viewer()
         return
 
