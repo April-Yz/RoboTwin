@@ -98,6 +98,21 @@ def matrix_to_pose(mat: np.ndarray) -> sapien.Pose:
     return sapien.Pose(mat[:3, 3], quat)
 
 
+def camera_pose_from_forward_left(position: np.ndarray, forward: np.ndarray, left: np.ndarray) -> sapien.Pose:
+    position = np.asarray(position, dtype=np.float64).reshape(3)
+    forward = np.asarray(forward, dtype=np.float64).reshape(3)
+    left = np.asarray(left, dtype=np.float64).reshape(3)
+    forward = forward / max(np.linalg.norm(forward), 1e-12)
+    left = left - forward * float(np.dot(left, forward))
+    left = left / max(np.linalg.norm(left), 1e-12)
+    up = np.cross(forward, left)
+    up = up / max(np.linalg.norm(up), 1e-12)
+    mat = np.eye(4, dtype=np.float64)
+    mat[:3, :3] = np.column_stack([forward, left, up])
+    mat[:3, 3] = position
+    return sapien.Pose(mat)
+
+
 def orthonormalize_rotation(rot: np.ndarray) -> np.ndarray:
     rot = np.asarray(rot, dtype=np.float64).reshape(3, 3)
     u, _, vh = np.linalg.svd(rot)
@@ -316,6 +331,7 @@ class HandRetargetR1Renderer:
         debug_visualize_targets: bool,
         debug_target_axis_length: float,
         debug_target_axis_thickness: float,
+        target_world_z_offset: float,
         camera_sweep_enable: bool,
         camera_sweep_steps_deg: Sequence[float],
     ):
@@ -345,6 +361,7 @@ class HandRetargetR1Renderer:
         self.debug_visualize_targets = bool(debug_visualize_targets)
         self.debug_target_axis_length = max(float(debug_target_axis_length), 0.01)
         self.debug_target_axis_thickness = max(float(debug_target_axis_thickness), 0.001)
+        self.target_world_z_offset = float(target_world_z_offset)
         self.camera_sweep_enable = bool(camera_sweep_enable)
         self.camera_sweep_steps_deg = tuple(float(v) for v in camera_sweep_steps_deg)
 
@@ -672,6 +689,11 @@ class HandRetargetR1Renderer:
             return target
         raise ValueError(f"Unsupported debug force orientation mode: {mode}")
 
+    def apply_target_world_offset(self, target_pose_world: np.ndarray) -> np.ndarray:
+        target = np.asarray(target_pose_world, dtype=np.float64).reshape(7).copy()
+        target[2] += self.target_world_z_offset
+        return target
+
     def _set_axis_actor_pose(self, actor, pose_world: Optional[np.ndarray]) -> None:
         if actor is None:
             return
@@ -703,8 +725,15 @@ class HandRetargetR1Renderer:
         robot_forward = base_rot @ np.array([1.0, 0.0, 0.0], dtype=np.float64)
         world_up = np.array([0.0, 0.0, 1.0], dtype=np.float64)
         eye = np.asarray(head_pose.p, dtype=np.float64) + 1.0 * robot_forward
+        eye = eye + 0.18 * world_up
         target = np.asarray(head_pose.p, dtype=np.float64)
-        return look_at_pose(eye=eye, target=target, up=world_up)
+        forward = target - eye
+        if np.linalg.norm(forward) < 1e-12:
+            forward = -robot_forward
+        left = np.cross(world_up, forward)
+        if np.linalg.norm(left) < 1e-12:
+            left = base_rot @ np.array([0.0, 1.0, 0.0], dtype=np.float64)
+        return camera_pose_from_forward_left(eye, forward, left)
 
     def step_scene(self, steps: int = 1) -> None:
         for _ in range(int(steps)):
@@ -910,6 +939,11 @@ class HandRetargetR1Renderer:
                 item["actual_tcp_pose_world"] = actual_tcp.copy()
                 item["pos_err_after_execute_m"] = float(np.linalg.norm(actual_tcp[:3] - pose_world[:3]))
                 item["rot_err_after_execute_deg"] = float(quat_angle_deg_wxyz(actual_tcp[3:], pose_world[3:]))
+                print(
+                    f"[orientation-sweep-exec] frame={frame_idx:04d} arm={arm} case={label} "
+                    f"executed={item['executed_status']} pos_err={item['pos_err_after_execute_m']:.3f}m "
+                    f"rot_err={item['rot_err_after_execute_deg']:.1f}deg"
+                )
             else:
                 item["executed_status"] = "Skipped"
             results.append(item)
@@ -1100,6 +1134,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--debug_visualize_targets", type=int, default=1)
     parser.add_argument("--debug_target_axis_length", type=float, default=0.08)
     parser.add_argument("--debug_target_axis_thickness", type=float, default=0.004)
+    parser.add_argument("--target_world_z_offset", type=float, default=0.0, help="Meters to add to every world-space target z position")
     parser.add_argument("--camera_sweep_enable", type=int, default=0)
     parser.add_argument("--camera_sweep_steps_deg", type=float, nargs="+", default=[-180.0, -90.0, 0.0, 90.0])
     parser.add_argument("--orientation_sweep_enable", type=int, default=0)
@@ -1175,6 +1210,7 @@ def main() -> None:
         debug_visualize_targets=bool(args.debug_visualize_targets),
         debug_target_axis_length=args.debug_target_axis_length,
         debug_target_axis_thickness=args.debug_target_axis_thickness,
+        target_world_z_offset=args.target_world_z_offset,
         camera_sweep_enable=bool(args.camera_sweep_enable),
         camera_sweep_steps_deg=args.camera_sweep_steps_deg,
     )
@@ -1197,9 +1233,11 @@ def main() -> None:
         right_world = None
         if left_target.valid:
             left_world = renderer.camera_to_world_pose(left_target.position_cam, left_target.rotation_cam)
+            left_world = renderer.apply_target_world_offset(left_world)
             left_world = renderer.align_target_orientation("left", left_world)
         if right_target.valid:
             right_world = renderer.camera_to_world_pose(right_target.position_cam, right_target.rotation_cam)
+            right_world = renderer.apply_target_world_offset(right_world)
             right_world = renderer.align_target_orientation("right", right_world)
         renderer.update_target_axis_visuals(left_world, right_world)
         renderer.update_robot_link_cameras()
@@ -1234,6 +1272,7 @@ def main() -> None:
                     print(f"[orientation-sweep] frame={frame_idx:04d} arm={arm} skipped: invalid target")
                     continue
                 pose_world = renderer.camera_to_world_pose(target.position_cam, target.rotation_cam)
+                pose_world = renderer.apply_target_world_offset(pose_world)
                 world_targets[arm] = pose_world
             renderer.update_target_axis_visuals(world_targets["left"], world_targets["right"])
             renderer.update_robot_link_cameras()
@@ -1305,10 +1344,12 @@ def main() -> None:
             right_world = None
             if left_target.valid:
                 left_world = renderer.camera_to_world_pose(left_target.position_cam, left_target.rotation_cam)
+                left_world = renderer.apply_target_world_offset(left_world)
                 left_world = renderer.align_target_orientation("left", left_world)
                 left_world_targets[frame_idx] = left_world
             if right_target.valid:
                 right_world = renderer.camera_to_world_pose(right_target.position_cam, right_target.rotation_cam)
+                right_world = renderer.apply_target_world_offset(right_world)
                 right_world = renderer.align_target_orientation("right", right_world)
                 right_world_targets[frame_idx] = right_world
 
