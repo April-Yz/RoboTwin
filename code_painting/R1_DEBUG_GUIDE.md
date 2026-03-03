@@ -227,3 +227,34 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_hand_retarget_r1_npz.sh \
 2. 再用 `*_with_gripper.npz` 确认“直接使用人手计算朝向”效果。
 3. 如果仍然经常 fail，就切到 `orientation_sweep_base current_tcp`。
 4. 如果只有单手 success，优先看位置是否太低，再调 `--target_world_z_offset`。
+
+
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_hand_retarget_r1_npz.sh \
+  /home/zaijia001/ssd/data/R1/hand_vis/hand_detections_0.npz \
+  /home/zaijia001/ssd/RoboTwin/code_painting/output_pos_debug \
+  5 \
+  --debug_force_orientation current_tcp \
+  --target_world_offset_xyz 0 -0.75 -0.24 \
+  --debug_mode 1 \
+  --debug_frame_limit 5 \
+  --enable_viewer 1 \
+  --viewer_wait_at_end 1
+
+# 遍历一下z从-0.1到+0.5（5cm一档
+```
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_hand_retarget_r1_npz.sh \
+  /home/zaijia001/ssd/data/R1/hand_vis/hand_detections_0.npz \
+  /home/zaijia001/ssd/RoboTwin/code_painting/output_pos_debug_z_sweep \
+  5 \
+  --debug_force_orientation current_tcp \
+  --target_world_offset_xyz 0 0 0 \
+  --target_world_offset_z_sweep_enable 1 \
+  --target_world_offset_z_sweep_start -0.1 \
+  --target_world_offset_z_sweep_end 0.5 \
+  --target_world_offset_z_sweep_step 0.05 \
+  --debug_mode 1 \
+  --debug_frame_limit 5 \
+  --enable_viewer 1 \
+  --viewer_wait_at_end 1
+
+```

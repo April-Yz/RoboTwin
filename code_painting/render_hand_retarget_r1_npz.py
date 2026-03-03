@@ -113,6 +113,15 @@ def camera_pose_from_forward_left(position: np.ndarray, forward: np.ndarray, lef
     return sapien.Pose(mat)
 
 
+def invert_pose_matrix(mat: np.ndarray) -> np.ndarray:
+    inv = np.eye(4, dtype=np.float64)
+    rot = mat[:3, :3]
+    trans = mat[:3, 3]
+    inv[:3, :3] = rot.T
+    inv[:3, 3] = -(rot.T @ trans)
+    return inv
+
+
 def orthonormalize_rotation(rot: np.ndarray) -> np.ndarray:
     rot = np.asarray(rot, dtype=np.float64).reshape(3, 3)
     u, _, vh = np.linalg.svd(rot)
@@ -158,6 +167,15 @@ def position_axis_errors(actual_pos: Sequence[float], target_pos: Sequence[float
     }
 
 
+def rotation_axes_world_wxyz(quat_wxyz: Sequence[float]) -> Dict[str, np.ndarray]:
+    rot = R.from_quat(quat_wxyz_to_xyzw(quat_wxyz)).as_matrix()
+    return {
+        "x": rot[:, 0].copy(),
+        "y": rot[:, 1].copy(),
+        "z": rot[:, 2].copy(),
+    }
+
+
 def short_status(status: str) -> str:
     s = str(status).strip().lower()
     if s == "success":
@@ -181,6 +199,12 @@ def make_json_safe(obj):
     if isinstance(obj, dict):
         return {str(k): make_json_safe(v) for k, v in obj.items()}
     return obj
+
+
+def format_offset_label(prefix: str, value: float) -> str:
+    text = f"{float(value):+0.2f}"
+    text = text.replace("+", "p").replace("-", "m").replace(".", "p")
+    return f"{prefix}_{text}"
 
 
 def calc_gripper_pose_from_keypoints(
@@ -377,6 +401,7 @@ class HandRetargetR1Renderer:
         debug_visualize_targets: bool,
         debug_target_axis_length: float,
         debug_target_axis_thickness: float,
+        target_world_offset_xyz: Sequence[float],
         target_world_z_offset: float,
         disable_table: bool,
         camera_sweep_enable: bool,
@@ -408,6 +433,7 @@ class HandRetargetR1Renderer:
         self.debug_visualize_targets = bool(debug_visualize_targets)
         self.debug_target_axis_length = max(float(debug_target_axis_length), 0.01)
         self.debug_target_axis_thickness = max(float(debug_target_axis_thickness), 0.001)
+        self.target_world_offset_xyz = np.asarray(target_world_offset_xyz, dtype=np.float64).reshape(3)
         self.target_world_z_offset = float(target_world_z_offset)
         self.disable_table = bool(disable_table)
         self.camera_sweep_enable = bool(camera_sweep_enable)
@@ -740,8 +766,15 @@ class HandRetargetR1Renderer:
 
     def apply_target_world_offset(self, target_pose_world: np.ndarray) -> np.ndarray:
         target = np.asarray(target_pose_world, dtype=np.float64).reshape(7).copy()
+        target[:3] += self.target_world_offset_xyz
         target[2] += self.target_world_z_offset
         return target
+
+    def world_pose_to_base_pose(self, pose_world: np.ndarray) -> np.ndarray:
+        pose_world = np.asarray(pose_world, dtype=np.float64).reshape(7)
+        base_inv = invert_pose_matrix(pose_to_matrix(self._base_pose))
+        pose_base = base_inv @ pose_to_matrix(sapien.Pose(pose_world[:3], normalize_quat_wxyz(pose_world[3:])))
+        return np.concatenate([pose_base[:3, 3], quat_xyzw_to_wxyz(R.from_matrix(orthonormalize_rotation(pose_base[:3, :3])).as_quat())])
 
     def _set_axis_actor_pose(self, actor, pose_world: Optional[np.ndarray]) -> None:
         if actor is None:
@@ -1237,8 +1270,15 @@ class HandRetargetR1Renderer:
             print(f"[debug frame {frame_idx:04d}] {arm}: invalid target, status={status}")
             return
         current_tcp = self.get_current_tcp_pose(arm)
+        target_base = self.world_pose_to_base_pose(target_world)
+        current_base = self.world_pose_to_base_pose(current_tcp)
         pos_err = float(np.linalg.norm(target_world[:3] - current_tcp[:3]))
+        pos_axis_err = position_axis_errors(current_tcp[:3], target_world[:3])
+        base_pos_axis_err = position_axis_errors(current_base[:3], target_base[:3])
         rot_err_deg = quat_angle_deg_wxyz(current_tcp[3:], target_world[3:])
+        axis_err_deg = axis_angle_errors_deg_wxyz(current_tcp[3:], target_world[3:])
+        target_axes = rotation_axes_world_wxyz(target_world[3:])
+        current_axes = rotation_axes_world_wxyz(current_tcp[3:])
         print(
             f"[debug frame {frame_idx:04d}] {arm}: "
             f"cam_pos={format_vec3(target_cam.position_cam)} "
@@ -1251,6 +1291,25 @@ class HandRetargetR1Renderer:
             f"[debug frame {frame_idx:04d}] {arm}: "
             f"target_q_wxyz={np.asarray(target_world[3:], dtype=np.float64).round(6).tolist()} "
             f"current_q_wxyz={np.asarray(current_tcp[3:], dtype=np.float64).round(6).tolist()}"
+        )
+        print(
+            f"[debug frame {frame_idx:04d}] {arm}: "
+            f"world_dxyz=[{pos_axis_err['x']:+.3f}, {pos_axis_err['y']:+.3f}, {pos_axis_err['z']:+.3f}]m "
+            f"axis_err=[x={axis_err_deg['x']:.1f}, y={axis_err_deg['y']:.1f}, z={axis_err_deg['z']:.1f}]deg"
+        )
+        print(
+            f"[debug frame {frame_idx:04d}] {arm}: "
+            f"target_base={format_vec3(target_base[:3])} "
+            f"current_base={format_vec3(current_base[:3])} "
+            f"base_dxyz=[{base_pos_axis_err['x']:+.3f}, {base_pos_axis_err['y']:+.3f}, {base_pos_axis_err['z']:+.3f}]m"
+        )
+        print(
+            f"[debug frame {frame_idx:04d}] {arm}: "
+            f"target_axes x={format_vec3(target_axes['x'])} y={format_vec3(target_axes['y'])} z={format_vec3(target_axes['z'])}"
+        )
+        print(
+            f"[debug frame {frame_idx:04d}] {arm}: "
+            f"current_axes x={format_vec3(current_axes['x'])} y={format_vec3(current_axes['y'])} z={format_vec3(current_axes['z'])}"
         )
 
 
@@ -1373,7 +1432,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--debug_visualize_targets", type=int, default=1)
     parser.add_argument("--debug_target_axis_length", type=float, default=0.08)
     parser.add_argument("--debug_target_axis_thickness", type=float, default=0.004)
+    parser.add_argument("--target_world_offset_xyz", type=float, nargs=3, default=[0.0, 0.0, 0.0], metavar=("DX", "DY", "DZ"), help="Meters to add to every world-space target position before planning")
     parser.add_argument("--target_world_z_offset", type=float, default=0.0, help="Meters to add to every world-space target z position")
+    parser.add_argument("--target_world_offset_z_sweep_enable", type=int, default=0)
+    parser.add_argument("--target_world_offset_z_sweep_start", type=float, default=-0.1)
+    parser.add_argument("--target_world_offset_z_sweep_end", type=float, default=0.5)
+    parser.add_argument("--target_world_offset_z_sweep_step", type=float, default=0.05)
     parser.add_argument("--disable_table", type=int, default=1)
     parser.add_argument("--camera_sweep_enable", type=int, default=0)
     parser.add_argument("--camera_sweep_steps_deg", type=float, nargs="+", default=[-180.0, -90.0, 0.0, 90.0])
@@ -1461,6 +1525,7 @@ def main() -> None:
         debug_visualize_targets=bool(args.debug_visualize_targets),
         debug_target_axis_length=args.debug_target_axis_length,
         debug_target_axis_thickness=args.debug_target_axis_thickness,
+        target_world_offset_xyz=args.target_world_offset_xyz,
         target_world_z_offset=args.target_world_z_offset,
         disable_table=bool(args.disable_table),
         camera_sweep_enable=bool(args.camera_sweep_enable),
@@ -1599,6 +1664,117 @@ def main() -> None:
                     f"success={success_count}/{len(results)} saved_to={arm_dir}"
                 )
         print(f"Saved orientation sweep results to: {sweep_root}")
+        renderer.hold_viewer()
+        return
+
+    if args.target_world_offset_z_sweep_enable:
+        if args.target_world_offset_z_sweep_step <= 0.0:
+            raise ValueError("--target_world_offset_z_sweep_step must be > 0")
+        sweep_root = args.output_dir / "target_world_offset_z_sweep"
+        sweep_root.mkdir(parents=True, exist_ok=True)
+        original_offset = renderer.target_world_offset_xyz.copy()
+        initial_state = renderer.snapshot_robot_state()
+        z_values: List[float] = []
+        z_value = float(args.target_world_offset_z_sweep_start)
+        z_end = float(args.target_world_offset_z_sweep_end)
+        z_step = float(args.target_world_offset_z_sweep_step)
+        while z_value <= z_end + 1e-9:
+            z_values.append(round(z_value, 10))
+            z_value += z_step
+
+        use_left = args.arms in ("left", "both")
+        use_right = args.arms in ("right", "both")
+        sweep_summary: List[Dict] = []
+        for z_value in z_values:
+            renderer.restore_robot_state(initial_state)
+            renderer.target_world_offset_xyz = original_offset.copy()
+            renderer.target_world_offset_xyz[2] = float(z_value)
+            z_dir = sweep_root / format_offset_label("z", z_value)
+            z_dir.mkdir(parents=True, exist_ok=True)
+            frame_results: List[Dict] = []
+            success_left = 0
+            success_right = 0
+            for frame_idx in indices:
+                renderer.update_robot_link_cameras()
+                left_target = trajectory.get_side_target("left", frame_idx, args.pose_source) if use_left else SideFrameTarget(False, np.full(3, np.nan), np.full((3, 3), np.nan), None)
+                right_target = trajectory.get_side_target("right", frame_idx, args.pose_source) if use_right else SideFrameTarget(False, np.full(3, np.nan), np.full((3, 3), np.nan), None)
+
+                left_world = None
+                right_world = None
+                if left_target.valid:
+                    left_world = renderer.camera_to_world_pose(left_target.position_cam, left_target.rotation_cam)
+                    left_world = renderer.apply_target_world_offset(left_world)
+                    left_world = renderer.align_target_orientation("left", left_world)
+                if right_target.valid:
+                    right_world = renderer.camera_to_world_pose(right_target.position_cam, right_target.rotation_cam)
+                    right_world = renderer.apply_target_world_offset(right_world)
+                    right_world = renderer.align_target_orientation("right", right_world)
+
+                renderer.update_target_axis_visuals(left_world, right_world)
+                renderer.step_scene(steps=1)
+
+                left_plan = renderer.plan_path("left", left_world) if left_world is not None else None
+                right_plan = renderer.plan_path("right", right_world) if right_world is not None else None
+
+                if args.debug_mode:
+                    if use_left:
+                        renderer.print_frame_debug(frame_idx, "left", left_target, left_world, left_plan)
+                    if use_right:
+                        renderer.print_frame_debug(frame_idx, "right", right_target, right_world, right_plan)
+
+                left_status, right_status = renderer.execute_plans(left_plan, right_plan)
+                if left_status == "Success":
+                    success_left += 1
+                if right_status == "Success":
+                    success_right += 1
+
+                left_gripper = map_gripper_value(left_target.finger_distance, fixed_left, left_range) if use_left else None
+                right_gripper = map_gripper_value(right_target.finger_distance, fixed_right, right_range) if use_right else None
+                renderer.set_grippers(left_gripper, right_gripper)
+                renderer.update_robot_link_cameras()
+
+                overlay_lines = [
+                    f"z_offset={z_value:+.2f}m",
+                    f"frame={frame_idx}",
+                    f"left={left_status}",
+                    f"right={right_status}",
+                ]
+                zed_rgb, _ = renderer.capture_camera(renderer.zed_camera)
+                cv2.imwrite(str(z_dir / f"frame_{frame_idx:04d}_zed.png"), overlay_text(zed_rgb, overlay_lines))
+                if renderer.third_person_view:
+                    third_rgb, _ = renderer.capture_camera(renderer.third_camera)
+                    cv2.imwrite(str(z_dir / f"frame_{frame_idx:04d}_third.png"), overlay_text(third_rgb, overlay_lines))
+
+                frame_results.append(
+                    {
+                        "frame_idx": int(frame_idx),
+                        "left_status": left_status,
+                        "right_status": right_status,
+                        "left_target_world": None if left_world is None else left_world.copy(),
+                        "right_target_world": None if right_world is None else right_world.copy(),
+                    }
+                )
+
+            summary_item = {
+                "z_offset_m": float(z_value),
+                "num_frames": int(len(indices)),
+                "left_success_count": int(success_left),
+                "right_success_count": int(success_right),
+                "frame_results": frame_results,
+            }
+            sweep_summary.append(summary_item)
+            with (z_dir / "summary.json").open("w", encoding="utf-8") as f:
+                json.dump(make_json_safe(summary_item), f, ensure_ascii=False, indent=2)
+            print(
+                f"[z-sweep] z={z_value:+.2f}m "
+                f"left_success={success_left}/{len(indices)} "
+                f"right_success={success_right}/{len(indices)} saved_to={z_dir}"
+            )
+
+        renderer.target_world_offset_xyz = original_offset
+        with (sweep_root / "summary.json").open("w", encoding="utf-8") as f:
+            json.dump(make_json_safe(sweep_summary), f, ensure_ascii=False, indent=2)
+        print(f"Saved z-offset sweep results to: {sweep_root}")
         renderer.hold_viewer()
         return
 
