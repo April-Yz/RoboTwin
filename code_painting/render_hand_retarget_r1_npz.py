@@ -628,6 +628,26 @@ class HandRetargetR1Renderer:
         pose = self.robot.get_left_tcp_pose() if arm == "left" else self.robot.get_right_tcp_pose()
         return np.asarray(pose, dtype=np.float64)
 
+    def snapshot_robot_state(self) -> Dict[str, np.ndarray]:
+        if self.robot is None:
+            raise RuntimeError("Robot is unavailable.")
+        entity = self.robot.left_entity
+        return {
+            "qpos": np.asarray(entity.get_qpos(), dtype=np.float64).copy(),
+            "qvel": np.asarray(entity.get_qvel(), dtype=np.float64).copy(),
+        }
+
+    def restore_robot_state(self, state: Dict[str, np.ndarray]) -> None:
+        if self.robot is None:
+            raise RuntimeError("Robot is unavailable.")
+        entity = self.robot.left_entity
+        qpos = np.asarray(state["qpos"], dtype=np.float64).copy()
+        qvel = np.asarray(state["qvel"], dtype=np.float64).copy()
+        entity.set_qpos(qpos)
+        entity.set_qvel(qvel)
+        self._set_fixed_torso()
+        self.scene.update_render()
+
     def align_target_orientation(self, arm: str, target_pose_world: np.ndarray) -> np.ndarray:
         target = np.asarray(target_pose_world, dtype=np.float64).reshape(7).copy()
         mode = self.debug_force_orientation
@@ -669,15 +689,11 @@ class HandRetargetR1Renderer:
 
     def _build_third_camera_pose(self, head_pose: sapien.Pose) -> sapien.Pose:
         head_rot = R.from_quat(quat_wxyz_to_xyzw(head_pose.q)).as_matrix()
-        head_right = head_rot[:, 0]
-        head_up = head_rot[:, 1]
         head_forward = -head_rot[:, 2]
-        eye = np.asarray(head_pose.p, dtype=np.float64) - 1.0 * head_forward + 0.08 * head_up
-        target = np.asarray(head_pose.p, dtype=np.float64) + 0.2 * head_forward
-        up = head_up if abs(np.dot(head_up, head_forward)) < 0.98 else np.array([0.0, 0.0, 1.0], dtype=np.float64)
-        if np.dot(np.cross(target - eye, up), head_right) < 0:
-            up = -up
-        return look_at_pose(eye=eye, target=target, up=up)
+        world_up = np.array([0.0, 0.0, 1.0], dtype=np.float64)
+        eye = np.asarray(head_pose.p, dtype=np.float64) + 1.0 * head_forward + 0.18 * world_up
+        target = np.asarray(head_pose.p, dtype=np.float64)
+        return look_at_pose(eye=eye, target=target, up=world_up)
 
     def step_scene(self, steps: int = 1) -> None:
         for _ in range(int(steps)):
@@ -837,13 +853,20 @@ class HandRetargetR1Renderer:
         target_quat_wxyz: np.ndarray,
         base_quat_wxyz: np.ndarray,
         steps_deg: Sequence[float],
+        execute_success: bool = False,
+        reset_each_case: bool = True,
         save_images: bool = True,
     ) -> List[Dict]:
         output_dir.mkdir(parents=True, exist_ok=True)
         results: List[Dict] = []
         current_tcp = self.get_current_tcp_pose(arm)
+        initial_state = self.snapshot_robot_state()
         candidates = self.build_orientation_candidates(base_quat_wxyz, steps_deg)
         for case_idx, (label, quat_wxyz) in enumerate(candidates):
+            if reset_each_case:
+                self.restore_robot_state(initial_state)
+                self.update_robot_link_cameras()
+                self.step_scene(steps=1)
             pose_world = np.concatenate([np.asarray(position_world, dtype=np.float64), normalize_quat_wxyz(quat_wxyz)])
             if arm == "left":
                 self.update_target_axis_visuals(pose_world, None)
@@ -866,19 +889,35 @@ class HandRetargetR1Renderer:
                 "rot_err_vs_current_tcp_deg": float(rot_err_current_deg),
                 "rot_err_vs_target_deg": float(rot_err_target_deg),
             }
+            if execute_success and status == "Success":
+                if arm == "left":
+                    left_status, right_status = self.execute_plans(plan, None)
+                else:
+                    left_status, right_status = self.execute_plans(None, plan)
+                item["executed_status"] = left_status if arm == "left" else right_status
+                actual_tcp = self.get_current_tcp_pose(arm)
+                item["actual_tcp_pose_world"] = actual_tcp.copy()
+                item["pos_err_after_execute_m"] = float(np.linalg.norm(actual_tcp[:3] - pose_world[:3]))
+                item["rot_err_after_execute_deg"] = float(quat_angle_deg_wxyz(actual_tcp[3:], pose_world[3:]))
+            else:
+                item["executed_status"] = "Skipped"
             results.append(item)
             print(
                 f"[orientation-sweep] frame={frame_idx:04d} arm={arm} case={label} "
                 f"status={status} rot_vs_current={rot_err_current_deg:.1f}deg rot_vs_target={rot_err_target_deg:.1f}deg"
             )
             if save_images:
+                self.update_robot_link_cameras()
                 overlay_lines = [
                     f"Frame {frame_idx} arm={arm}",
                     f"case={label}",
                     f"status={status}",
+                    f"executed={item['executed_status']}",
                     f"rot_vs_current={rot_err_current_deg:.1f}deg",
                     f"rot_vs_target={rot_err_target_deg:.1f}deg",
                 ]
+                if "pos_err_after_execute_m" in item:
+                    overlay_lines.append(f"pos_err_exec={item['pos_err_after_execute_m']:.3f}m")
                 zed_rgb, _ = self.capture_camera(self.zed_camera)
                 cv2.imwrite(str(output_dir / f"{case_idx:03d}_{label}_zed.png"), overlay_text(zed_rgb, overlay_lines))
                 if self._left_wrist_camera_link is not None:
@@ -1056,6 +1095,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--orientation_sweep_arm", choices=["left", "right", "both"], default="both")
     parser.add_argument("--orientation_sweep_base", choices=["current_tcp", "base", "target"], default="current_tcp")
     parser.add_argument("--orientation_sweep_steps_deg", type=float, nargs="+", default=[-180.0, -90.0, 0.0, 90.0])
+    parser.add_argument("--orientation_sweep_execute", type=int, default=0)
+    parser.add_argument("--orientation_sweep_reset_each_case", type=int, default=1)
     parser.add_argument("--orientation_sweep_save_images", type=int, default=1)
     return parser.parse_args()
 
@@ -1207,6 +1248,8 @@ def main() -> None:
                     target_quat_wxyz=pose_world[3:],
                     base_quat_wxyz=base_quat,
                     steps_deg=args.orientation_sweep_steps_deg,
+                    execute_success=bool(args.orientation_sweep_execute),
+                    reset_each_case=bool(args.orientation_sweep_reset_each_case),
                     save_images=bool(args.orientation_sweep_save_images),
                 )
                 success_count = sum(1 for item in results if item["status"] == "Success")
