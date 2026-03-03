@@ -455,3 +455,17 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_hand_retarget_r1_npz_urdfik.
   --debug_force_orientation none \
   --enable_viewer 1 \
   --viewer_wait_at_end 1
+
+# 批处理文件夹
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_hand_retarget_r1_npz_urdfik.sh \
+  /home/zaijia001/ssd/data/R1/hand_vis \
+  /home/zaijia001/ssd/RoboTwin/code_painting/output_hand_retarget_swap_red_blue_keep_green \
+  5 \
+  --require_stored_gripper_pose 1 \
+  --pose_source gripper \
+  --orientation_remap_label swap_red_blue_keep_green \
+  --stored_orientation_post_rot_xyz_deg 0 0 0 \
+  --right_target_world_offset_xyz 0.0 -0.1 0.2 \
+  --debug_force_orientation none \
+  --enable_viewer 1 \
+  --viewer_wait_at_end 1
