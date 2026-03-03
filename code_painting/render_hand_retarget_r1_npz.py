@@ -46,15 +46,8 @@ LOCAL_X_TO_NEG_Z_ROT = np.array(
     ],
     dtype=np.float64,
 )
-DEFAULT_ROBOT_ORIENTATION_REMAP_LABEL = "x_from_zm_y_from_yp_z_from_xp"
-DEFAULT_ROBOT_ORIENTATION_REMAP = np.array(
-    [
-        [0.0, 0.0, 1.0],
-        [0.0, 1.0, 0.0],
-        [-1.0, 0.0, 0.0],
-    ],
-    dtype=np.float64,
-)
+DEFAULT_ROBOT_ORIENTATION_REMAP_LABEL = "identity"
+DEFAULT_ROBOT_ORIENTATION_REMAP = np.eye(3, dtype=np.float64)
 TORSO_JOINT_NAMES = ("torso_joint1", "torso_joint2", "torso_joint3", "torso_joint4")
 DEFAULT_TORSO_QPOS = np.array([0.25, -0.4, -0.85, 0.0], dtype=np.float64)
 HIDDEN_DEBUG_POSE = sapien.Pose([0.0, 0.0, -10.0], [1.0, 0.0, 0.0, 0.0])
@@ -466,6 +459,7 @@ class HandRetargetR1Renderer:
         debug_target_axis_thickness: float,
         orientation_remap_label: str,
         orientation_remap_matrix: Sequence[Sequence[float]],
+        stored_orientation_post_rot_xyz_deg: Sequence[float],
         target_world_offset_xyz: Sequence[float],
         left_target_world_offset_xyz: Sequence[float],
         right_target_world_offset_xyz: Sequence[float],
@@ -502,6 +496,10 @@ class HandRetargetR1Renderer:
         self.debug_target_axis_thickness = max(float(debug_target_axis_thickness), 0.001)
         self.orientation_remap_label = str(orientation_remap_label).strip()
         self.orientation_remap_matrix = orthonormalize_rotation(np.asarray(orientation_remap_matrix, dtype=np.float64).reshape(3, 3))
+        self.stored_orientation_post_rot_xyz_deg = np.asarray(stored_orientation_post_rot_xyz_deg, dtype=np.float64).reshape(3)
+        self.stored_orientation_post_rot_matrix = orthonormalize_rotation(
+            R.from_euler("xyz", self.stored_orientation_post_rot_xyz_deg, degrees=True).as_matrix()
+        )
         self.target_world_offset_xyz = np.asarray(target_world_offset_xyz, dtype=np.float64).reshape(3)
         self.left_target_world_offset_xyz = np.asarray(left_target_world_offset_xyz, dtype=np.float64).reshape(3)
         self.right_target_world_offset_xyz = np.asarray(right_target_world_offset_xyz, dtype=np.float64).reshape(3)
@@ -858,7 +856,9 @@ class HandRetargetR1Renderer:
 
     def remap_target_rotation(self, rotation_cam: np.ndarray) -> np.ndarray:
         rotation_cam = orthonormalize_rotation(rotation_cam)
-        return orthonormalize_rotation(rotation_cam @ self.orientation_remap_matrix)
+        return orthonormalize_rotation(
+            rotation_cam @ self.stored_orientation_post_rot_matrix @ self.orientation_remap_matrix
+        )
 
     def world_pose_to_base_pose(self, pose_world: np.ndarray) -> np.ndarray:
         pose_world = np.asarray(pose_world, dtype=np.float64).reshape(7)
@@ -1555,6 +1555,15 @@ def parse_args() -> argparse.Namespace:
         help="Constant local-axis remap applied to human gripper rotation before converting to world. "
         "Default uses the robot-specific neg-blue-forward conversion; use identity to disable.",
     )
+    parser.add_argument(
+        "--stored_orientation_post_rot_xyz_deg",
+        type=float,
+        nargs=3,
+        default=[0.0, 180.0, 0.0],
+        metavar=("RX_DEG", "RY_DEG", "RZ_DEG"),
+        help="Extra local xyz rotation applied directly to the stored/read NPZ gripper orientation before remap. "
+        "Default is local Y=180deg.",
+    )
     parser.add_argument("--orientation_remap_sweep_enable", type=int, default=0)
     parser.add_argument("--orientation_remap_sweep_execute", type=int, default=1)
     parser.add_argument("--orientation_remap_sweep_save_images", type=int, default=1)
@@ -1670,6 +1679,7 @@ def main() -> None:
         debug_target_axis_thickness=args.debug_target_axis_thickness,
         orientation_remap_label=orientation_remap_label,
         orientation_remap_matrix=orientation_remap_matrix,
+        stored_orientation_post_rot_xyz_deg=args.stored_orientation_post_rot_xyz_deg,
         target_world_offset_xyz=args.target_world_offset_xyz,
         left_target_world_offset_xyz=args.left_target_world_offset_xyz,
         right_target_world_offset_xyz=args.right_target_world_offset_xyz,
@@ -1679,6 +1689,10 @@ def main() -> None:
         camera_sweep_steps_deg=args.camera_sweep_steps_deg,
     )
     print(f"[orientation-remap] label={renderer.orientation_remap_label} (shared_by_left_and_right)")
+    print(
+        "[orientation-post-rot] "
+        f"local_xyz_deg={np.round(renderer.stored_orientation_post_rot_xyz_deg, 4).tolist()}"
+    )
     print(
         "[target-offset] "
         f"global_xyz={np.round(renderer.target_world_offset_xyz, 4).tolist()} "
