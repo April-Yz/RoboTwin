@@ -38,6 +38,23 @@ DEFAULT_HEAD_CAMERA_LOCAL_POS = np.array([0.0, 0.0, 0.0], dtype=np.float64)
 DEFAULT_HEAD_CAMERA_LOCAL_QUAT_WXYZ = np.array([1.0, 1.0, -1.0, 1.0], dtype=np.float64)
 DEFAULT_WRIST_CAMERA_LOCAL_POS = np.array([0.0, 0.0, 0.0], dtype=np.float64)
 DEFAULT_WRIST_CAMERA_LOCAL_QUAT_WXYZ = None
+LOCAL_X_TO_NEG_Z_ROT = np.array(
+    [
+        [0.0, 0.0, -1.0],
+        [0.0, 1.0, 0.0],
+        [1.0, 0.0, 0.0],
+    ],
+    dtype=np.float64,
+)
+DEFAULT_ROBOT_ORIENTATION_REMAP_LABEL = "x_from_zm_y_from_yp_z_from_xp"
+DEFAULT_ROBOT_ORIENTATION_REMAP = np.array(
+    [
+        [0.0, 0.0, 1.0],
+        [0.0, 1.0, 0.0],
+        [-1.0, 0.0, 0.0],
+    ],
+    dtype=np.float64,
+)
 TORSO_JOINT_NAMES = ("torso_joint1", "torso_joint2", "torso_joint3", "torso_joint4")
 DEFAULT_TORSO_QPOS = np.array([0.25, -0.4, -0.85, 0.0], dtype=np.float64)
 HIDDEN_DEBUG_POSE = sapien.Pose([0.0, 0.0, -10.0], [1.0, 0.0, 0.0, 0.0])
@@ -77,6 +94,9 @@ def quat_multiply_wxyz(quat_a_wxyz: Sequence[float], quat_b_wxyz: Sequence[float
 
 def quat_from_euler_wxyz(seq: str, angles, degrees: bool = False) -> np.ndarray:
     return quat_xyzw_to_wxyz(R.from_euler(seq, angles, degrees=degrees).as_quat())
+
+
+DEFAULT_WRIST_FORWARD_NEG_Z_LOCAL_QUAT_WXYZ = quat_xyzw_to_wxyz(R.from_matrix(LOCAL_X_TO_NEG_Z_ROT).as_quat())
 
 
 DEFAULT_WRIST_CAMERA_LOCAL_QUAT_WXYZ = quat_multiply_wxyz(
@@ -232,7 +252,9 @@ def build_orientation_remap_candidates() -> List[Tuple[str, np.ndarray]]:
 def resolve_orientation_remap(label: str) -> Tuple[str, np.ndarray]:
     normalized = str(label).strip().lower()
     candidates = build_orientation_remap_candidates()
-    if normalized in ("", "identity", "none"):
+    if normalized in ("", "robot_default", "default", "neg_blue_forward", "robot_neg_blue_forward"):
+        return DEFAULT_ROBOT_ORIENTATION_REMAP_LABEL, DEFAULT_ROBOT_ORIENTATION_REMAP.copy()
+    if normalized in ("identity", "none"):
         return "identity", np.eye(3, dtype=np.float64)
     for cand_label, cand_mat in candidates:
         if cand_label.lower() == normalized:
@@ -277,7 +299,7 @@ def calc_gripper_pose_from_keypoints(
     rz_90 = np.array([[0, -1, 0], [1, 0, 0], [0, 0, 1]], dtype=np.float64)
     rx_90 = np.array([[1, 0, 0], [0, 0, -1], [0, 1, 0]], dtype=np.float64)
     rz_270 = np.array([[0, 1, 0], [-1, 0, 0], [0, 0, 1]], dtype=np.float64)
-    rotation_matrix = rz_90 @ rotation_matrix @ rx_90.T @ rz_270.T
+    # rotation_matrix = rz_90 @ rotation_matrix @ rx_90.T @ rz_270.T
 
     retreat_position = gripper_position - retreat_distance * z_axis
     return gripper_position, retreat_position, rotation_matrix
@@ -312,6 +334,13 @@ class HandRetargetTrajectory:
         pos_key = f"{side}_{'gripper_position' if pose_source == 'gripper' else 'wrist_position_retreat'}"
         rot_key = f"{side}_gripper_rotation_matrix"
         return pos_key in self.data.files and rot_key in self.data.files
+
+    def missing_stored_gripper_keys(self, side: str, pose_source: str) -> List[str]:
+        keys = [
+            f"{side}_{'gripper_position' if pose_source == 'gripper' else 'wrist_position_retreat'}",
+            f"{side}_gripper_rotation_matrix",
+        ]
+        return [key for key in keys if key not in self.data.files]
 
     def describe_pose_source(self, side: str, pose_source: str) -> str:
         if self.has_stored_gripper_pose(side, pose_source):
@@ -518,10 +547,14 @@ class HandRetargetR1Renderer:
         if self.enable_viewer:
             from sapien.utils.viewer import Viewer
 
-            self.viewer = Viewer(self.renderer)
-            self.viewer.set_scene(self.scene)
-            self.viewer.set_camera_xyz(x=0.55, y=0.2, z=1.45)
-            self.viewer.set_camera_rpy(r=0.0, p=-0.6, y=2.6)
+            try:
+                self.viewer = Viewer(self.renderer)
+                self.viewer.set_scene(self.scene)
+                self.viewer.set_camera_xyz(x=0.55, y=0.2, z=1.45)
+                self.viewer.set_camera_rpy(r=0.0, p=-0.6, y=2.6)
+            except RuntimeError as exc:
+                self.viewer = None
+                print(f"[viewer-warning] failed to create interactive viewer, falling back to offscreen only: {exc}")
 
     def _setup_cameras(self) -> None:
         self.zed_camera = self.scene.add_camera(
@@ -801,8 +834,13 @@ class HandRetargetR1Renderer:
         if mode == "current_tcp":
             target[3:] = normalize_quat_wxyz(self.get_current_tcp_pose(arm)[3:])
             return target
-        if mode in ("base", "robot_forward_y"):
+        if mode in ("base", "robot_forward_y", "wrist_forward"):
             target[3:] = normalize_quat_wxyz(self._base_pose.q)
+            return target
+        if mode == "wrist_forward_neg_z":
+            target[3:] = normalize_quat_wxyz(
+                quat_multiply_wxyz(self._base_pose.q, DEFAULT_WRIST_FORWARD_NEG_Z_LOCAL_QUAT_WXYZ)
+            )
             return target
         raise ValueError(f"Unsupported debug force orientation mode: {mode}")
 
@@ -1464,6 +1502,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max_frames", type=int, default=-1)
     parser.add_argument("--arms", choices=["left", "right", "both"], default="both")
     parser.add_argument("--pose_source", choices=["gripper", "retreat"], default="gripper")
+    parser.add_argument(
+        "--require_stored_gripper_pose",
+        type=int,
+        default=1,
+        help="Require input NPZ to already contain gripper pose fields; if missing, raise an error instead of recomputing.",
+    )
     parser.add_argument("--retreat_distance", type=float, default=0.11)
     parser.add_argument("--thumb_tip_idx", type=int, default=4)
     parser.add_argument("--index_tip_idx", type=int, default=8)
@@ -1496,11 +1540,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--link_cam_debug_up", type=float, default=0.0)
     parser.add_argument("--debug_mode", type=int, default=0)
     parser.add_argument("--debug_frame_limit", type=int, default=5)
-    parser.add_argument("--debug_force_orientation", choices=["none", "current_tcp", "base", "robot_forward_y"], default="none")
+    parser.add_argument(
+        "--debug_force_orientation",
+        choices=["none", "current_tcp", "base", "robot_forward_y", "wrist_forward", "wrist_forward_neg_z"],
+        default="none",
+    )
     parser.add_argument("--debug_visualize_targets", type=int, default=1)
     parser.add_argument("--debug_target_axis_length", type=float, default=0.08)
     parser.add_argument("--debug_target_axis_thickness", type=float, default=0.004)
-    parser.add_argument("--orientation_remap_label", type=str, default="identity", help="Constant local-axis remap applied to human gripper rotation before converting to world")
+    parser.add_argument(
+        "--orientation_remap_label",
+        type=str,
+        default="robot_default",
+        help="Constant local-axis remap applied to human gripper rotation before converting to world. "
+        "Default uses the robot-specific neg-blue-forward conversion; use identity to disable.",
+    )
     parser.add_argument("--orientation_remap_sweep_enable", type=int, default=0)
     parser.add_argument("--orientation_remap_sweep_execute", type=int, default=1)
     parser.add_argument("--orientation_remap_sweep_save_images", type=int, default=1)
@@ -1550,7 +1604,17 @@ def main() -> None:
         f"{trajectory.describe_pose_source('left', args.pose_source)}, "
         f"{trajectory.describe_pose_source('right', args.pose_source)}"
     )
-    if not trajectory.has_stored_gripper_pose("left", args.pose_source) or not trajectory.has_stored_gripper_pose("right", args.pose_source):
+    missing_pose_keys: List[str] = []
+    for side in ("left", "right"):
+        missing_pose_keys.extend(trajectory.missing_stored_gripper_keys(side, args.pose_source))
+    if missing_pose_keys:
+        if bool(args.require_stored_gripper_pose):
+            missing_text = ", ".join(sorted(missing_pose_keys))
+            raise ValueError(
+                "Input NPZ is missing stored gripper pose fields required by --require_stored_gripper_pose=1: "
+                f"{missing_text}. Re-run detect_hands_realr1.py to generate gripper_* fields, or set "
+                "--require_stored_gripper_pose 0 to allow fallback recompute."
+            )
         print(
             "[pose-source] missing stored gripper pose fields in input npz; "
             "recomputing from hand keypoints with the same formula used in compute_gripper_pose_from_npz.py"

@@ -342,3 +342,16 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_hand_retarget_r1_npz.sh \
   --debug_frame_limit 3 \
   --enable_viewer 1 \
   --viewer_wait_at_end 1
+
+
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_hand_retarget_r1_npz_urdfik.sh \
+  /home/zaijia001/ssd/data/R1/hand_vis/hand_detections_0.npz \
+  /home/zaijia001/ssd/RoboTwin/code_painting/output_hand_retarget_urdfik_forward \
+  5 \
+  --orientation_remap_label x_from_xm_y_from_zp_z_from_yp \
+  --right_target_world_offset_xyz 0.20 0 0 \
+  --debug_force_orientation wrist_forward \
+  --debug_mode 1 \
+  --debug_frame_limit 100 \
+  --enable_viewer 1 \
+  --viewer_wait_at_end 1
