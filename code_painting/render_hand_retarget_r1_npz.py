@@ -485,6 +485,9 @@ class HandRetargetR1Renderer:
         disable_table: bool,
         camera_sweep_enable: bool,
         camera_sweep_steps_deg: Sequence[float],
+        init_left_arm_joints: Optional[Sequence[float]],
+        init_right_arm_joints: Optional[Sequence[float]],
+        init_gripper_open: Optional[float],
     ):
         self.robot_config_path = robot_config_path
         self.image_width = int(image_width)
@@ -525,6 +528,9 @@ class HandRetargetR1Renderer:
         self.disable_table = bool(disable_table)
         self.camera_sweep_enable = bool(camera_sweep_enable)
         self.camera_sweep_steps_deg = tuple(float(v) for v in camera_sweep_steps_deg)
+        self.init_left_arm_joints = None if init_left_arm_joints is None else np.asarray(init_left_arm_joints, dtype=np.float64).reshape(6)
+        self.init_right_arm_joints = None if init_right_arm_joints is None else np.asarray(init_right_arm_joints, dtype=np.float64).reshape(6)
+        self.init_gripper_open = None if init_gripper_open is None else float(init_gripper_open)
 
         self.robot: Optional["Robot"] = None
         self._head_camera_link = None
@@ -656,6 +662,7 @@ class HandRetargetR1Renderer:
         self.robot.left_gripper_val = 0.8
         self.robot.right_gripper_val = 0.8
         self.robot.set_planner(self.scene)
+        self._apply_initial_joint_targets()
 
         self._head_camera_link = self._find_robot_link(["zed_link", "head_camera", "head", "camera_link"])
         if self._head_camera_link is None:
@@ -673,6 +680,21 @@ class HandRetargetR1Renderer:
             self.print_head_camera_summary()
             self.print_wrist_camera_summary("left")
             self.print_wrist_camera_summary("right")
+
+    def _apply_initial_joint_targets(self) -> None:
+        if self.robot is None:
+            return
+        vel = np.zeros(6, dtype=np.float64)
+        if self.init_left_arm_joints is not None:
+            self.robot.set_arm_joints(self.init_left_arm_joints, vel, "left")
+        if self.init_right_arm_joints is not None:
+            self.robot.set_arm_joints(self.init_right_arm_joints, vel, "right")
+        if self.init_left_arm_joints is not None or self.init_right_arm_joints is not None:
+            self.step_scene(steps=20)
+        if self.init_gripper_open is not None:
+            self.robot.set_gripper(self.init_gripper_open, "left", gripper_eps=0.0)
+            self.robot.set_gripper(self.init_gripper_open, "right", gripper_eps=0.0)
+            self.step_scene(steps=4)
 
     def _find_robot_link(self, names: Sequence[str]):
         if self.robot is None:
@@ -1600,6 +1622,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--disable_table", type=int, default=1)
     parser.add_argument("--camera_sweep_enable", type=int, default=0)
     parser.add_argument("--camera_sweep_steps_deg", type=float, nargs="+", default=[-180.0, -90.0, 0.0, 90.0])
+    parser.add_argument("--init_left_arm_joints", type=float, nargs=6, default=None, metavar=("J1", "J2", "J3", "J4", "J5", "J6"))
+    parser.add_argument("--init_right_arm_joints", type=float, nargs=6, default=None, metavar=("J1", "J2", "J3", "J4", "J5", "J6"))
+    parser.add_argument("--init_gripper_open", type=float, default=None, help="Initial normalized gripper opening in [0,1] applied before replay")
     parser.add_argument("--orientation_sweep_enable", type=int, default=0)
     parser.add_argument("--orientation_sweep_arm", choices=["left", "right", "both"], default="both")
     parser.add_argument("--orientation_sweep_base", choices=["current_tcp", "base", "target"], default="current_tcp")
@@ -1705,6 +1730,9 @@ def main() -> None:
         disable_table=bool(args.disable_table),
         camera_sweep_enable=bool(args.camera_sweep_enable),
         camera_sweep_steps_deg=args.camera_sweep_steps_deg,
+        init_left_arm_joints=args.init_left_arm_joints,
+        init_right_arm_joints=args.init_right_arm_joints,
+        init_gripper_open=args.init_gripper_open,
     )
     print(f"[orientation-remap] label={renderer.orientation_remap_label} (shared_by_left_and_right)")
     print(

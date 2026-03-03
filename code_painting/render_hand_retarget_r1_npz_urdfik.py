@@ -30,11 +30,26 @@ from urdfik import URDFInverseKinematics
 R1_URDF = PROJECT_ROOT / "galaxea_sim" / "assets" / "r1" / "robot.urdf"
 R1_CONFIG = PROJECT_ROOT / "robot_config_R1.json"
 base.DEFAULT_ROBOT_CONFIG = R1_CONFIG
+DEFAULT_INIT_LEFT_ARM_JOINTS = np.array(
+    [-0.16744680851063828, 2.0108510638297874, -0.6593617021276595, 2.002127659574468, 0.39382978723404255, -1.7193617021276595],
+    dtype=np.float64,
+)
+DEFAULT_INIT_RIGHT_ARM_JOINTS = np.array(
+    [0.19234042553191488, 1.8925531914893616, -0.6874468085106383, -1.6057446808510638, -0.10148936170212766, 1.3085106382978724],
+    dtype=np.float64,
+)
+DEFAULT_INIT_GRIPPER_OPEN = 1.0
 
 
 class HandRetargetR1URDFIKRenderer(ReplayRenderer):
     def __init__(self, *args, **kwargs) -> None:
         kwargs["attach_planner"] = False
+        if kwargs.get("init_left_arm_joints") is None:
+            kwargs["init_left_arm_joints"] = DEFAULT_INIT_LEFT_ARM_JOINTS.copy()
+        if kwargs.get("init_right_arm_joints") is None:
+            kwargs["init_right_arm_joints"] = DEFAULT_INIT_RIGHT_ARM_JOINTS.copy()
+        if kwargs.get("init_gripper_open") is None:
+            kwargs["init_gripper_open"] = DEFAULT_INIT_GRIPPER_OPEN
         super().__init__(*args, **kwargs)
         self.ik_urdf_path = R1_URDF
         self.left_ik_solver = URDFInverseKinematics(
@@ -48,6 +63,12 @@ class HandRetargetR1URDFIKRenderer(ReplayRenderer):
             ee_link="right_gripper_link",
         )
         print(f"[ik-mode] robot=r1 solver=urdfik urdf={self.ik_urdf_path}")
+        print(
+            "[ik-init] "
+            f"left_joints={np.round(self.init_left_arm_joints, 6).tolist()} "
+            f"right_joints={np.round(self.init_right_arm_joints, 6).tolist()} "
+            f"gripper_open={self.init_gripper_open:.3f}"
+        )
 
     def _current_arm_joints(self, arm: str) -> np.ndarray:
         if self.robot is None:
