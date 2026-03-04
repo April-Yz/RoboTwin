@@ -96,6 +96,7 @@ class ReplayRenderer(base.HandRetargetR1Renderer):
             self.robot.set_planner(self.scene)
         else:
             print("[init] skipping planner for joint replay")
+        self._apply_initial_joint_targets()
 
         self._head_camera_link = self._find_robot_link(["zed_link", "head_camera", "head", "camera_link"])
         if self._head_camera_link is None:
@@ -271,6 +272,9 @@ def build_renderer(args: argparse.Namespace) -> ReplayRenderer:
         disable_table=bool(args.disable_table),
         camera_sweep_enable=False,
         camera_sweep_steps_deg=[0.0],
+        init_left_arm_joints=args.init_left_arm_joints,
+        init_right_arm_joints=args.init_right_arm_joints,
+        init_gripper_open=args.init_gripper_open,
         attach_planner=(args.control_mode == "eepose"),
     )
 
@@ -307,6 +311,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--left_target_world_offset_xyz", type=float, nargs=3, default=[0.0, 0.0, 0.0], metavar=("DX", "DY", "DZ"))
     parser.add_argument("--right_target_world_offset_xyz", type=float, nargs=3, default=[0.0, 0.0, 0.0], metavar=("DX", "DY", "DZ"))
     parser.add_argument("--target_world_z_offset", type=float, default=0.0)
+    parser.add_argument("--init_left_arm_joints", type=float, nargs=6, default=None, metavar=("J1", "J2", "J3", "J4", "J5", "J6"))
+    parser.add_argument("--init_right_arm_joints", type=float, nargs=6, default=None, metavar=("J1", "J2", "J3", "J4", "J5", "J6"))
+    parser.add_argument("--init_gripper_open", type=float, default=None)
     return parser.parse_args()
 
 

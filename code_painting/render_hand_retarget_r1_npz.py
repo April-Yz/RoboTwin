@@ -1442,6 +1442,42 @@ class HandRetargetR1Renderer:
             f"current_axes x={format_vec3(current_axes['x'])} y={format_vec3(current_axes['y'])} z={format_vec3(current_axes['z'])}"
         )
 
+    def print_post_execute_debug(
+        self,
+        frame_idx: int,
+        arm: str,
+        target_world: Optional[np.ndarray],
+        status: str,
+    ) -> None:
+        if target_world is None:
+            return
+        actual_tcp = self.get_current_tcp_pose(arm)
+        target_base = self.world_pose_to_base_pose(target_world)
+        actual_base = self.world_pose_to_base_pose(actual_tcp)
+        pos_err = float(np.linalg.norm(target_world[:3] - actual_tcp[:3]))
+        pos_axis_err = position_axis_errors(actual_tcp[:3], target_world[:3])
+        base_pos_axis_err = position_axis_errors(actual_base[:3], target_base[:3])
+        rot_err_deg = quat_angle_deg_wxyz(actual_tcp[3:], target_world[3:])
+        axis_err_deg = axis_angle_errors_deg_wxyz(actual_tcp[3:], target_world[3:])
+        print(
+            f"[post frame {frame_idx:04d}] {arm}: "
+            f"actual_tcp={format_vec3(actual_tcp[:3])} "
+            f"target_world={format_vec3(target_world[:3])} "
+            f"pos_err={pos_err:.3f}m rot_err={rot_err_deg:.1f}deg "
+            f"status={status}"
+        )
+        print(
+            f"[post frame {frame_idx:04d}] {arm}: "
+            f"world_dxyz=[{pos_axis_err['x']:+.3f}, {pos_axis_err['y']:+.3f}, {pos_axis_err['z']:+.3f}]m "
+            f"axis_err=[x={axis_err_deg['x']:.1f}, y={axis_err_deg['y']:.1f}, z={axis_err_deg['z']:.1f}]deg"
+        )
+        print(
+            f"[post frame {frame_idx:04d}] {arm}: "
+            f"target_base={format_vec3(target_base[:3])} "
+            f"actual_base={format_vec3(actual_base[:3])} "
+            f"base_dxyz=[{base_pos_axis_err['x']:+.3f}, {base_pos_axis_err['y']:+.3f}, {base_pos_axis_err['z']:+.3f}]m"
+        )
+
 
 def look_at_pose(eye: np.ndarray, target: np.ndarray, up: np.ndarray) -> sapien.Pose:
     eye = np.asarray(eye, dtype=np.float64)
@@ -1626,6 +1662,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--init_right_arm_joints", type=float, nargs=6, default=None, metavar=("J1", "J2", "J3", "J4", "J5", "J6"))
     parser.add_argument("--init_gripper_open", type=float, default=None, help="Initial normalized gripper opening in [0,1] applied before replay")
     parser.add_argument("--orientation_sweep_enable", type=int, default=0)
+    parser.add_argument(
+        "--frame_plan_mode",
+        choices=["replan_after_execute"],
+        default="replan_after_execute",
+        help="Per-frame planning mode. replan_after_execute means each next frame is planned from the actual robot state after the previous frame finished executing.",
+    )
+    parser.add_argument(
+        "--debug_post_execute",
+        type=int,
+        default=1,
+        help="Print post-execution TCP error after each frame when debug_mode is enabled.",
+    )
     parser.add_argument("--orientation_sweep_arm", choices=["left", "right", "both"], default="both")
     parser.add_argument("--orientation_sweep_base", choices=["current_tcp", "base", "target"], default="current_tcp")
     parser.add_argument("--orientation_sweep_steps_deg", type=float, nargs="+", default=[-180.0, -90.0, 0.0, 90.0])
@@ -1746,6 +1794,7 @@ def main() -> None:
         f"right_xyz={np.round(renderer.right_target_world_offset_xyz, 4).tolist()} "
         f"z_extra={renderer.target_world_z_offset:+.4f}"
     )
+    print(f"[frame-plan-mode] {args.frame_plan_mode}")
 
     indices = list(range(max(args.frame_start, 0), trajectory.length if args.frame_end < 0 else min(args.frame_end + 1, trajectory.length), max(args.frame_stride, 1)))
     if args.debug_mode and args.debug_frame_limit > 0:
@@ -2247,6 +2296,8 @@ def main() -> None:
             if args.debug_mode:
                 renderer.step_scene(steps=1)
 
+            if args.frame_plan_mode != "replan_after_execute":
+                raise ValueError(f"Unsupported frame plan mode: {args.frame_plan_mode}")
             left_plan = renderer.plan_path("left", left_world) if left_world is not None else None
             right_plan = renderer.plan_path("right", right_world) if right_world is not None else None
 
@@ -2259,6 +2310,12 @@ def main() -> None:
             left_status, right_status = renderer.execute_plans(left_plan, right_plan)
             left_statuses[frame_idx] = left_status
             right_statuses[frame_idx] = right_status
+
+            if args.debug_mode and bool(args.debug_post_execute):
+                if use_left:
+                    renderer.print_post_execute_debug(frame_idx, "left", left_world, left_status)
+                if use_right:
+                    renderer.print_post_execute_debug(frame_idx, "right", right_world, right_status)
 
             left_gripper = map_gripper_value(left_target.finger_distance, fixed_left, left_range)
             right_gripper = map_gripper_value(right_target.finger_distance, fixed_right, right_range)
