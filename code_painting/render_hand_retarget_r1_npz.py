@@ -1681,11 +1681,23 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--orientation_sweep_execute", type=int, default=0)
     parser.add_argument("--orientation_sweep_reset_each_case", type=int, default=1)
     parser.add_argument("--orientation_sweep_save_images", type=int, default=1)
+    parser.add_argument("--overlay_text_enable", type=int, default=1, help="Overlay status text on output RGB frames")
+    parser.add_argument("--save_world_targets", type=int, default=1, help="Save world_targets_and_status.npz")
+    parser.add_argument(
+        "--clean_output",
+        type=int,
+        default=0,
+        help="Disable text overlay, hide target-axis visuals, and skip world target npz output",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
+    if bool(args.clean_output):
+        args.overlay_text_enable = 0
+        args.save_world_targets = 0
+        args.debug_visualize_targets = 0
     args.output_dir.mkdir(parents=True, exist_ok=True)
     frames_dir = args.output_dir / "frames"
     if args.save_png_frames:
@@ -2336,7 +2348,10 @@ def main() -> None:
                 f"Left plan: {left_statuses[frame_idx] or 'Skipped'}",
                 f"Right plan: {right_statuses[frame_idx] or 'Skipped'}",
             ]
-            main_bgr = overlay_text(rgb, overlay_lines)
+            if bool(args.overlay_text_enable):
+                main_bgr = overlay_text(rgb, overlay_lines)
+            else:
+                main_bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
             main_writer.write(main_bgr)
 
             depth_safe = np.nan_to_num(depth, nan=0.0, posinf=0.0, neginf=0.0)
@@ -2348,7 +2363,10 @@ def main() -> None:
 
             if third_writer is not None:
                 third_rgb, _ = renderer.capture_camera(renderer.third_camera)
-                third_bgr = overlay_text(third_rgb, overlay_lines)
+                if bool(args.overlay_text_enable):
+                    third_bgr = overlay_text(third_rgb, overlay_lines)
+                else:
+                    third_bgr = cv2.cvtColor(third_rgb, cv2.COLOR_RGB2BGR)
                 third_writer.write(third_bgr)
 
             if args.save_png_frames:
@@ -2370,27 +2388,29 @@ def main() -> None:
         if third_writer is not None:
             third_writer.release()
 
-    np.savez_compressed(
-        str(args.output_dir / "world_targets_and_status.npz"),
-        source_npz=str(args.input_npz),
-        selected_indices=np.asarray(indices, dtype=np.int32),
-        left_world_targets=left_world_targets,
-        right_world_targets=right_world_targets,
-        left_plan_status=left_statuses,
-        right_plan_status=right_statuses,
-        left_gripper_value=left_values,
-        right_gripper_value=right_values,
-        pose_source=np.array(args.pose_source),
-        robot_base_pose=np.asarray(args.robot_base_pose if args.robot_base_pose is not None else [], dtype=np.float64),
-        torso_qpos=np.asarray(args.torso_qpos, dtype=np.float64),
-        camera_axis_conversion=np.array(f"world = zed_link_pose * {renderer.camera_cv_axis_mode} * camera_cv", dtype=object),
-    )
+    if bool(args.save_world_targets):
+        np.savez_compressed(
+            str(args.output_dir / "world_targets_and_status.npz"),
+            source_npz=str(args.input_npz),
+            selected_indices=np.asarray(indices, dtype=np.int32),
+            left_world_targets=left_world_targets,
+            right_world_targets=right_world_targets,
+            left_plan_status=left_statuses,
+            right_plan_status=right_statuses,
+            left_gripper_value=left_values,
+            right_gripper_value=right_values,
+            pose_source=np.array(args.pose_source),
+            robot_base_pose=np.asarray(args.robot_base_pose if args.robot_base_pose is not None else [], dtype=np.float64),
+            torso_qpos=np.asarray(args.torso_qpos, dtype=np.float64),
+            camera_axis_conversion=np.array(f"world = zed_link_pose * {renderer.camera_cv_axis_mode} * camera_cv", dtype=object),
+        )
 
     print(f"Saved zed replay video to: {main_video_path}")
     print(f"Saved depth replay video to: {depth_video_path}")
     if args.third_person_view:
         print(f"Saved third-person replay video to: {third_video_path}")
-    print(f"Saved world-space targets to: {args.output_dir / 'world_targets_and_status.npz'}")
+    if bool(args.save_world_targets):
+        print(f"Saved world-space targets to: {args.output_dir / 'world_targets_and_status.npz'}")
     renderer.hold_viewer()
 
 

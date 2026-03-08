@@ -4,13 +4,15 @@ set -euo pipefail
 ROOT_DIR=/home/zaijia001/ssd/RoboTwin
 RUNNER=${ROOT_DIR}/code_painting/run_hand_retarget_r1_npz_urdfik.sh
 
-# Output root for all datasets.
-OUT_ROOT=${ROOT_DIR}/code_painting/output_hand_retarget_swap_red_blue_keep_green_no_offset_pool
-LOG_ROOT=${OUT_ROOT}/logs
+# Output root for all datasets (actual out dir suffix is controlled by VARIANT).
+OUT_ROOT_BASE=${ROOT_DIR}/code_painting/output_hand_retarget_swap_red_blue_keep_green_no_offset_pool
 FPS=5
 
-# Worker pool (GPU IDs). 4 workers: GPU2 x2, GPU3 x2.
+# Worker pool (GPU IDs). Default: GPU2 x2, GPU3 x2.
+# Can be overridden by: --workers 2,2,3,3  or --workers 2,2,2,2,2,2
 WORKERS=(2 2 3 3)
+VARIANT=clean
+OUT_ROOT=""
 
 # Common args forwarded to render_hand_retarget_r1_npz_urdfik.py.
 COMMON_ARGS=(
@@ -19,12 +21,10 @@ COMMON_ARGS=(
   --orientation_remap_label swap_red_blue_keep_green
   --stored_orientation_post_rot_xyz_deg 0 0 0
   --debug_force_orientation none
-  --enable_viewer 0
-  --viewer_wait_at_end 0
 )
 
 # Default dataset list. If script has positional args, they replace this list.
-DATASETS=(
+DEFAULT_DATASETS=(
   /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis
   /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pnp_banana_low/hand_vis
   /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pnp_pear_apple/hand_vis
@@ -33,8 +33,89 @@ DATASETS=(
   /home/zaijia001/ssd/data/R1/gt_depth_vis/d_stack_cup/hand_vis
 )
 
-if [[ $# -gt 0 ]]; then
-  DATASETS=("$@")
+usage() {
+  cat <<EOF
+Usage:
+  $(basename "$0") [--workers W] [--variant clean|debug] [--out_root DIR] [hand_vis_dir ...]
+
+Options:
+  --workers   Comma-separated GPU worker list (default: 2,2,3,3)
+              Example: --workers 2,2,2,2,2,2
+  --variant   clean (default) or debug
+  --out_root  Custom output root; defaults to \${OUT_ROOT_BASE}_<variant>
+EOF
+}
+
+DATASETS=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --workers)
+      if [[ $# -lt 2 ]]; then
+        echo "[error] --workers requires a value" >&2
+        exit 1
+      fi
+      IFS=',' read -r -a WORKERS <<< "$2"
+      shift 2
+      ;;
+    --variant)
+      if [[ $# -lt 2 ]]; then
+        echo "[error] --variant requires a value" >&2
+        exit 1
+      fi
+      VARIANT="$2"
+      shift 2
+      ;;
+    --out_root)
+      if [[ $# -lt 2 ]]; then
+        echo "[error] --out_root requires a value" >&2
+        exit 1
+      fi
+      OUT_ROOT="$2"
+      shift 2
+      ;;
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    *)
+      DATASETS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if [[ ${#WORKERS[@]} -eq 0 ]]; then
+  echo "[error] workers list is empty" >&2
+  exit 1
+fi
+
+if [[ "${VARIANT}" != "clean" && "${VARIANT}" != "debug" ]]; then
+  echo "[error] --variant must be clean or debug" >&2
+  exit 1
+fi
+
+if [[ -z "${OUT_ROOT}" ]]; then
+  OUT_ROOT="${OUT_ROOT_BASE}_${VARIANT}"
+fi
+LOG_ROOT=${OUT_ROOT}/logs
+
+if [[ ${#DATASETS[@]} -eq 0 ]]; then
+  DATASETS=("${DEFAULT_DATASETS[@]}")
+fi
+
+if [[ "${VARIANT}" == "clean" ]]; then
+  COMMON_ARGS+=(
+    --clean_output 1
+    --debug_visualize_targets 0
+    --enable_viewer 0
+    --viewer_wait_at_end 0
+  )
+else
+  COMMON_ARGS+=(
+    --clean_output 0
+    --enable_viewer 0
+    --viewer_wait_at_end 0
+  )
 fi
 
 mkdir -p "${OUT_ROOT}" "${LOG_ROOT}"
@@ -83,4 +164,4 @@ for worker_idx in "${!WORKERS[@]}"; do
 done
 
 wait
-echo "[all done] outputs=${OUT_ROOT}"
+echo "[all done] variant=${VARIANT} outputs=${OUT_ROOT}"
