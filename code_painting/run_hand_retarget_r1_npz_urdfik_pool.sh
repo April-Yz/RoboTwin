@@ -13,6 +13,7 @@ FPS=5
 WORKERS=(2 2 3 3)
 VARIANT=clean
 OUT_ROOT=""
+LIGHTING_MODE=front_no_shadow
 
 # Common args forwarded to render_hand_retarget_r1_npz_urdfik.py.
 COMMON_ARGS=(
@@ -20,6 +21,7 @@ COMMON_ARGS=(
   --pose_source gripper
   --orientation_remap_label swap_red_blue_keep_green
   --stored_orientation_post_rot_xyz_deg 0 0 0
+  --lighting_mode "${LIGHTING_MODE}"
   --debug_force_orientation none
 )
 
@@ -36,12 +38,13 @@ DEFAULT_DATASETS=(
 usage() {
   cat <<EOF
 Usage:
-  $(basename "$0") [--workers W] [--variant clean|debug] [--out_root DIR] [hand_vis_dir ...]
+  $(basename "$0") [--workers W] [--variant clean|debug] [--lighting_mode MODE] [--out_root DIR] [hand_vis_dir ...]
 
 Options:
   --workers   Comma-separated GPU worker list (default: 2,2,3,3)
               Example: --workers 2,2,2,2,2,2
   --variant   clean (default) or debug
+  --lighting_mode  default|front|front_no_shadow (default: front_no_shadow)
   --out_root  Custom output root; defaults to \${OUT_ROOT_BASE}_<variant>
 EOF
 }
@@ -73,6 +76,14 @@ while [[ $# -gt 0 ]]; do
       OUT_ROOT="$2"
       shift 2
       ;;
+    --lighting_mode)
+      if [[ $# -lt 2 ]]; then
+        echo "[error] --lighting_mode requires a value" >&2
+        exit 1
+      fi
+      LIGHTING_MODE="$2"
+      shift 2
+      ;;
     --help|-h)
       usage
       exit 0
@@ -93,6 +104,19 @@ if [[ "${VARIANT}" != "clean" && "${VARIANT}" != "debug" ]]; then
   echo "[error] --variant must be clean or debug" >&2
   exit 1
 fi
+
+if [[ "${LIGHTING_MODE}" != "default" && "${LIGHTING_MODE}" != "front" && "${LIGHTING_MODE}" != "front_no_shadow" ]]; then
+  echo "[error] --lighting_mode must be one of: default, front, front_no_shadow" >&2
+  exit 1
+fi
+
+# Ensure COMMON_ARGS uses the final CLI-selected lighting mode.
+for i in "${!COMMON_ARGS[@]}"; do
+  if [[ "${COMMON_ARGS[$i]}" == "--lighting_mode" ]]; then
+    COMMON_ARGS[$((i + 1))]="${LIGHTING_MODE}"
+    break
+  fi
+done
 
 if [[ -z "${OUT_ROOT}" ]]; then
   OUT_ROOT="${OUT_ROOT_BASE}_${VARIANT}"

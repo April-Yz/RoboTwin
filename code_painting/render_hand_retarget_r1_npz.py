@@ -488,6 +488,7 @@ class HandRetargetR1Renderer:
         init_left_arm_joints: Optional[Sequence[float]],
         init_right_arm_joints: Optional[Sequence[float]],
         init_gripper_open: Optional[float],
+        lighting_mode: str = "default",
     ):
         self.robot_config_path = robot_config_path
         self.image_width = int(image_width)
@@ -531,6 +532,7 @@ class HandRetargetR1Renderer:
         self.init_left_arm_joints = None if init_left_arm_joints is None else np.asarray(init_left_arm_joints, dtype=np.float64).reshape(6)
         self.init_right_arm_joints = None if init_right_arm_joints is None else np.asarray(init_right_arm_joints, dtype=np.float64).reshape(6)
         self.init_gripper_open = None if init_gripper_open is None else float(init_gripper_open)
+        self.lighting_mode = str(lighting_mode).strip().lower()
 
         self.robot: Optional["Robot"] = None
         self._head_camera_link = None
@@ -560,10 +562,28 @@ class HandRetargetR1Renderer:
             dynamic_friction=0.5,
             restitution=0.0,
         )
-        self.scene.set_ambient_light([0.45, 0.45, 0.45])
-        self.scene.add_directional_light([0.0, 0.5, -1.0], [0.7, 0.7, 0.7], shadow=True)
-        self.scene.add_point_light([1.0, -0.5, 1.8], [1.0, 1.0, 1.0], shadow=True)
-        self.scene.add_point_light([-1.0, -0.5, 1.8], [1.0, 1.0, 1.0], shadow=True)
+        mode = self.lighting_mode
+        if mode == "default":
+            self.scene.set_ambient_light([0.45, 0.45, 0.45])
+            self.scene.add_directional_light([0.0, 0.5, -1.0], [0.7, 0.7, 0.7], shadow=True)
+            self.scene.add_point_light([1.0, -0.5, 1.8], [1.0, 1.0, 1.0], shadow=True)
+            self.scene.add_point_light([-1.0, -0.5, 1.8], [1.0, 1.0, 1.0], shadow=True)
+        elif mode == "front":
+            # Front light source (in +Y) shining toward robot back (toward -Y), with shadows.
+            self.scene.set_ambient_light([0.55, 0.55, 0.55])
+            self.scene.add_directional_light([0.0, -0.45, -1.0], [0.8, 0.8, 0.8], shadow=True)
+            self.scene.add_point_light([1.0, 0.9, 1.8], [1.0, 1.0, 1.0], shadow=True)
+            self.scene.add_point_light([-1.0, 0.9, 1.8], [1.0, 1.0, 1.0], shadow=True)
+        elif mode == "front_no_shadow":
+            # Use only non-shadow lights to suppress visible cast shadows in rendered videos.
+            self.scene.set_ambient_light([0.92, 0.92, 0.92])
+            self.scene.add_directional_light([0.0, -0.45, -1.0], [0.45, 0.45, 0.45], shadow=False)
+            self.scene.add_point_light([1.0, 0.9, 1.8], [1.0, 1.0, 1.0], shadow=False)
+            self.scene.add_point_light([-1.0, 0.9, 1.8], [1.0, 1.0, 1.0], shadow=False)
+            self.scene.add_point_light([0.0, 0.6, 2.2], [0.8, 0.8, 0.8], shadow=False)
+        else:
+            raise ValueError(f"Unsupported lighting_mode: {self.lighting_mode}")
+        print(f"[lighting] mode={self.lighting_mode}")
 
         self.viewer = None
         if self.enable_viewer:
@@ -1658,6 +1678,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--disable_table", type=int, default=1)
     parser.add_argument("--camera_sweep_enable", type=int, default=0)
     parser.add_argument("--camera_sweep_steps_deg", type=float, nargs="+", default=[-180.0, -90.0, 0.0, 90.0])
+    parser.add_argument(
+        "--lighting_mode",
+        choices=["default", "front", "front_no_shadow"],
+        default="front_no_shadow",
+        help="Scene lighting preset. front_no_shadow minimizes visible shadows in output videos.",
+    )
     parser.add_argument("--init_left_arm_joints", type=float, nargs=6, default=None, metavar=("J1", "J2", "J3", "J4", "J5", "J6"))
     parser.add_argument("--init_right_arm_joints", type=float, nargs=6, default=None, metavar=("J1", "J2", "J3", "J4", "J5", "J6"))
     parser.add_argument("--init_gripper_open", type=float, default=None, help="Initial normalized gripper opening in [0,1] applied before replay")
@@ -1793,6 +1819,7 @@ def main() -> None:
         init_left_arm_joints=args.init_left_arm_joints,
         init_right_arm_joints=args.init_right_arm_joints,
         init_gripper_open=args.init_gripper_open,
+        lighting_mode=args.lighting_mode,
     )
     print(f"[orientation-remap] label={renderer.orientation_remap_label} (shared_by_left_and_right)")
     print(
