@@ -34,3 +34,5 @@ policy/pi0/checkpoints
 galaxea_sim/*
 *.mp4
 *.npz
+*.png
+*.log
