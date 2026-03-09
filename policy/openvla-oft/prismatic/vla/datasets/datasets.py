@@ -106,9 +106,20 @@ class RLDSBatchTransform:
             return_dict["proprio"] = torch.as_tensor(proprio, dtype=torch.float32)
         if self.use_privileged_distill:
             future_images = []
-            future_obs = rlds_batch["observation"]["image_primary"][1 : self.future_horizon + 1]
-            for future_img in future_obs:
-                future_images.append(self.image_transform(Image.fromarray(future_img)))
+            future_primary = rlds_batch["observation"]["image_primary"][1 : self.future_horizon + 1]
+            wrist_keys = []
+            if self.use_wrist_image:
+                wrist_keys = sorted(k for k in rlds_batch["observation"].keys() if "wrist" in k)
+
+            for future_idx, future_img in enumerate(future_primary, start=1):
+                future_pixel_values = self.image_transform(Image.fromarray(future_img))
+                if wrist_keys:
+                    future_wrist_pixels = []
+                    for wrist_key in wrist_keys:
+                        wrist_img = rlds_batch["observation"][wrist_key][future_idx]
+                        future_wrist_pixels.append(self.image_transform(Image.fromarray(wrist_img)))
+                    future_pixel_values = torch.cat([future_pixel_values, *future_wrist_pixels], dim=0)
+                future_images.append(future_pixel_values)
             if future_images:
                 return_dict["future_pixel_values"] = torch.stack(future_images)
             future_mask = rlds_batch["observation"].get("future_pad_mask")

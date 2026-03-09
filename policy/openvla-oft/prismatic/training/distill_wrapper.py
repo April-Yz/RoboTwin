@@ -88,6 +88,17 @@ class PrivilegedDistillWrapper(nn.Module):
         )
         return unwrap_module(self.action_head).predict_action(actions_hidden_states)
 
+    def _get_language_embeddings(self, batch: Dict[str, torch.Tensor]) -> torch.Tensor:
+        vla = unwrap_module(self.vla)
+        device = self._model_device()
+        input_ids = batch["input_ids"].to(device)
+        labels = batch["labels"].to(device)
+        input_embeddings = vla.get_input_embeddings()(input_ids)
+        all_actions_mask = get_current_action_mask(labels) | get_next_actions_mask(labels)
+        return input_embeddings[~all_actions_mask].reshape(
+            input_embeddings.shape[0], -1, input_embeddings.shape[2]
+        )
+
     def _encode_future_token(self, batch: Dict[str, torch.Tensor]) -> torch.Tensor:
         if "future_pixel_values" not in batch:
             raise ValueError("Privileged distillation requires `future_pixel_values` in the batch.")
@@ -100,20 +111,29 @@ class PrivilegedDistillWrapper(nn.Module):
         flattened_future_pixels = future_pixel_values.reshape(batch_size * future_horizon, *future_pixel_values.shape[2:])
         flattened_future_pixels = flattened_future_pixels.to(torch.bfloat16).to(device)
 
-        # TODO: v1 keeps the future-only encoder path language-agnostic for a smaller integration surface.
-        future_patch_embeddings = vla._process_vision_features(flattened_future_pixels, use_film=False)
-        future_patch_embeddings = future_patch_embeddings.reshape(
-            batch_size,
-            future_horizon,
-            future_patch_embeddings.shape[1],
-            future_patch_embeddings.shape[2],
-        )
+        language_embeddings = None
+        if self.use_film:
+            language_embeddings = self._get_language_embeddings(batch)
+            language_embeddings = language_embeddings.repeat_interleave(future_horizon, dim=0)
 
-        future_mask = batch.get("future_mask")
-        if future_mask is not None:
-            future_mask = future_mask.to(device)
+        with torch.autocast("cuda", dtype=torch.bfloat16):
+            future_patch_embeddings = vla._process_vision_features(
+                flattened_future_pixels,
+                language_embeddings=language_embeddings,
+                use_film=self.use_film,
+            )
+            future_patch_embeddings = future_patch_embeddings.reshape(
+                batch_size,
+                future_horizon,
+                future_patch_embeddings.shape[1],
+                future_patch_embeddings.shape[2],
+            )
 
-        return unwrap_module(self.future_projector)(future_patch_embeddings, future_mask=future_mask)
+            future_mask = batch.get("future_mask")
+            if future_mask is not None:
+                future_mask = future_mask.to(device)
+
+            return unwrap_module(self.future_projector)(future_patch_embeddings, future_mask=future_mask)
 
     def forward_student(self, batch: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         output = self._run_vla(batch)
