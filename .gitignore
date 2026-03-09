@@ -28,7 +28,7 @@ envs/curobo/*
 .vscode
 /config.json
 
-/*.json*
+# /*.json*
 /*.txt
 policy/pi0/checkpoints
 galaxea_sim/*

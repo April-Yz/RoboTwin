@@ -328,6 +328,7 @@ class Robot:
             print("Update world pointcloud wrong!")
 
     def _trans_from_gripper_to_endlink(self, target_pose, arm_tag=None):
+        # Incoming pose is fingertip TCP; shift/orient to wrist endlink frame.
         gripper_bias = (self.left_gripper_bias if arm_tag == "left" else self.right_gripper_bias)
         inv_delta_matrix = (self.left_inv_delta_matrix if arm_tag == "left" else self.right_inv_delta_matrix)
         target_pose_arr = np.array(target_pose)
