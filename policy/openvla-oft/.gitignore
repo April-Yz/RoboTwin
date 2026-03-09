@@ -159,6 +159,7 @@ aloha_ckpts_and_logs
 eval_*.share
 
 finetune_*.sh
+!finetune_beat_block_hammer_v1.sh
 
 log.txt
 

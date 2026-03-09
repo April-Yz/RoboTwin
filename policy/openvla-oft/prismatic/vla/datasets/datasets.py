@@ -102,8 +102,8 @@ class RLDSBatchTransform:
                     all_wrist_pixels.append(pixel_values_wrist)
             return_dict["pixel_values_wrist"] = torch.cat(all_wrist_pixels, dim=0)
         if self.use_proprio and "proprio" in rlds_batch["observation"]:
-            proprio = rlds_batch["observation"]["proprio"]
-            return_dict["proprio"] = proprio
+            proprio = np.array(rlds_batch["observation"]["proprio"][0], copy=True)
+            return_dict["proprio"] = torch.as_tensor(proprio, dtype=torch.float32)
         if self.use_privileged_distill:
             future_images = []
             future_obs = rlds_batch["observation"]["image_primary"][1 : self.future_horizon + 1]
@@ -114,7 +114,7 @@ class RLDSBatchTransform:
             future_mask = rlds_batch["observation"].get("future_pad_mask")
             if future_mask is not None:
                 return_dict["future_mask"] = torch.as_tensor(
-                    future_mask[1 : self.future_horizon + 1], dtype=torch.bool
+                    np.array(future_mask[1 : self.future_horizon + 1], copy=True), dtype=torch.bool
                 )
 
         return return_dict
