@@ -200,6 +200,17 @@ bash finetune_beat_block_hammer_v1.sh 1
 - 默认使用 `WANDB_ENTITY=yangzaijia`
 - 默认使用 `WANDB_PROJECT=openvla-oft`
 
+如果你想让训练脱离当前终端持续运行，直接用：
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin/policy/openvla-oft
+bash finetune_beat_block_hammer_v1_tmux.sh 1
+```
+
+这会创建一个 `tmux` session，并把日志写到：
+
+- `/home/zaijia001/ssd/RoboTwin/data/beat_block_hammer/tmux_logs`
+
 如果你想改卡号，可以把最后那个位置参数换成别的 GPU id，例如：
 
 ```bash
@@ -346,3 +357,29 @@ export WANDB_MODE=offline
 - `future_projector--XXX_checkpoint.pt`
 
 和原有模块一起由 [`finetune.py`](/home/zaijia001/ssd/RoboTwin/policy/openvla-oft/vla-scripts/finetune.py) 管理。
+
+当前 `beat_block_hammer` 的专用辅助脚本有：
+
+- [finetune_beat_block_hammer_v1.sh](/home/zaijia001/ssd/RoboTwin/policy/openvla-oft/finetune_beat_block_hammer_v1.sh)
+- [finetune_beat_block_hammer_v1_tmux.sh](/home/zaijia001/ssd/RoboTwin/policy/openvla-oft/finetune_beat_block_hammer_v1_tmux.sh)
+- [merge_lora_beat_block_hammer_v1.sh](/home/zaijia001/ssd/RoboTwin/policy/openvla-oft/merge_lora_beat_block_hammer_v1.sh)
+- [eval_beat_block_hammer_v1.sh](/home/zaijia001/ssd/RoboTwin/policy/openvla-oft/eval_beat_block_hammer_v1.sh)
+
+典型流程：
+
+```bash
+# 1. 训练
+bash finetune_beat_block_hammer_v1_tmux.sh 1
+
+# 2. merge 最近一次 checkpoint
+bash merge_lora_beat_block_hammer_v1.sh
+
+# 3. eval 最近一次 checkpoint
+bash eval_beat_block_hammer_v1.sh
+```
+
+说明：
+
+- `merge_lora_beat_block_hammer_v1.sh` 不传参数时，会自动选 `runs_openvla_v1` 下最新的 `*chkpt` 目录
+- `eval_beat_block_hammer_v1.sh` 不传参数时，也会默认评估最新的 `*chkpt` 目录
+- 如果你要指定 checkpoint，可以把目录路径作为第一个参数传进去
