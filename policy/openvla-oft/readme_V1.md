@@ -326,8 +326,8 @@ export WANDB_MODE=offline
 - 目前只支持 `use_l1_regression=True`
 - 暂不支持和 `use_diffusion=True` 同时启用
 - 暂不支持特征蒸馏、attention 蒸馏、EMA teacher
-- 未来分支当前不走 FiLM 条件化，这是有意保持最小侵入式修改，代码中留了 TODO
-- 还没有在当前会话里做完整多 step GPU 训练验证
+- 当前实现已经支持 `use_film=True` 时的 future teacher 分支
+- 已经在当前会话里完成了多 step GPU 启动验证，训练可以进入实际 step 迭代
 
 ## 9. 训练时可观测指标
 
