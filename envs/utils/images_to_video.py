@@ -6,6 +6,15 @@ import pickle
 import pdb
 
 
+def _ffmpeg_env() -> dict:
+    env = os.environ.copy()
+    ld_library_path = env.get("LD_LIBRARY_PATH", "")
+    if ld_library_path:
+        filtered = [p for p in ld_library_path.split(":") if p and "/ssd/local_install/lib" not in p]
+        env["LD_LIBRARY_PATH"] = ":".join(filtered)
+    return env
+
+
 def images_to_video(imgs: np.ndarray, out_path: str, fps: float = 30.0, is_rgb: bool = True) -> None:
     if (not isinstance(imgs, np.ndarray) or imgs.ndim != 4 or imgs.shape[3] not in (3, 4)):
         raise ValueError("imgs must be a numpy.ndarray of shape (N, H, W, C), with C equal to 3 or 4.")
@@ -40,11 +49,20 @@ def images_to_video(imgs: np.ndarray, out_path: str, fps: float = 30.0, is_rgb: 
             f"{out_path}",
         ],
         stdin=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=_ffmpeg_env(),
     )
-    ffmpeg.stdin.write(imgs.tobytes())
-    ffmpeg.stdin.close()
+    try:
+        ffmpeg.stdin.write(imgs.tobytes())
+        ffmpeg.stdin.close()
+    except BrokenPipeError:
+        stderr = ffmpeg.stderr.read().decode("utf-8", errors="replace").strip()
+        ffmpeg.wait()
+        raise IOError(f"ffmpeg pipe failed: {stderr}")
+
+    stderr = ffmpeg.stderr.read().decode("utf-8", errors="replace").strip()
     if ffmpeg.wait() != 0:
-        raise IOError(f"Cannot open ffmpeg. Please check the output path and ensure ffmpeg is supported.")
+        raise IOError(f"Cannot open ffmpeg. {stderr}")
 
     print(
         f"🎬 Video is saved to `{out_path}`, containing \033[94m{n_frames}\033[0m frames at {W}×{H} resolution and {fps} FPS."

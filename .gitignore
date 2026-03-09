@@ -1,6 +1,8 @@
 **/training_data/*
 *.hdf5
 models/
+!policy/openvla-oft/prismatic/models/
+!policy/openvla-oft/prismatic/models/future_projector.py
 data/*
 !data/process_stuck.py
 __pycache__/

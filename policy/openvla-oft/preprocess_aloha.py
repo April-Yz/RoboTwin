@@ -9,6 +9,13 @@ from glob import glob
 import random
 from tqdm import tqdm
 
+
+def extract_episode_id(path: str) -> int:
+    stem = os.path.splitext(os.path.basename(path))[0]
+    if not stem.startswith("episode"):
+        raise ValueError(f"Unexpected episode filename: {path}")
+    return int(stem[len("episode"):])
+
 def decode_and_resize_images(image_bytes_array, size=256):
     resized = []
     for img_bytes in image_bytes_array:
@@ -17,17 +24,7 @@ def decode_and_resize_images(image_bytes_array, size=256):
         resized.append(np.array(img_resized))
     return np.stack(resized)
 
-def load_instruction(instruction_dir, episode_idx):
-    json_path = os.path.join(instruction_dir, f"episode_{episode_idx}.json")
-    if not os.path.exists(json_path):
-        raise FileNotFoundError(f"Instruction file not found: {json_path}")
-    with open(json_path, "r") as f:
-        data = json.load(f)
-    candidates = data.get("seen", []) + data.get("unseen", [])
-    if not candidates:
-        raise ValueError(f"No instructions found in {json_path}")
-    return random.choice(candidates)
-def process_one_episode(input_path, output_path, episode_idx, instruction_dir, resize_size=256):
+def process_one_episode(input_path, output_path, source_episode_idx, instruction_dir, resize_size=256):
     with h5py.File(input_path, "r") as f:
         action = f["joint_action/vector"][()]
         rel_action = np.zeros_like(action)
@@ -39,8 +36,8 @@ def process_one_episode(input_path, output_path, episode_idx, instruction_dir, r
         right = decode_and_resize_images(f["observation/right_camera/rgb"][()], size=resize_size)
         front = decode_and_resize_images(f["observation/front_camera/rgb"][()], size=resize_size)
 
-    # 读取 instruction JSON
-    json_path = os.path.join(instruction_dir, f"episode{episode_idx}.json")
+    # Read per-episode instructions aligned with the original RoboTwin episode id.
+    json_path = os.path.join(instruction_dir, f"episode{source_episode_idx}.json")
     with open(json_path, "r") as f:
         inst_data = json.load(f)
     seen_list = inst_data.get("seen", [])
@@ -82,7 +79,13 @@ def main(args):
             ep_name = f"episode_{i}.hdf5"
             out_path = os.path.join(out_dir, ep_name)
             try:
-                process_one_episode(ep, out_path, i, instruction_dir, resize_size=resize_size)
+                process_one_episode(
+                    ep,
+                    out_path,
+                    extract_episode_id(ep),
+                    instruction_dir,
+                    resize_size=resize_size,
+                )
             except Exception as e:
                 print(f"[ERROR] Failed to process {ep}: {e}")
 

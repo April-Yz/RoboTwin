@@ -933,6 +933,7 @@ OXE_STANDARDIZATION_TRANSFORMS = {
     "aloha_place_object_scale_builder":aloha_dataset_transform,
     "aloha_move_can_pot_builder":aloha_dataset_transform,
     "aloha_move_can_pot":aloha_dataset_transform,
+    "aloha_beat_block_hammer_builder":aloha_dataset_transform,
     "aloha_put_object_cabinet":aloha_dataset_transform,
     "aloha_stack_bowls_three":aloha_dataset_transform,
     "aloha_blocks_ranking_rgb":aloha_dataset_transform,

@@ -34,6 +34,8 @@ class RLDSBatchTransform:
     predict_stop_token: bool = True
     use_wrist_image: bool = False
     use_proprio: bool = False
+    use_privileged_distill: bool = False
+    future_horizon: int = 0
 
     def __call__(self, rlds_batch: Dict[str, Any]) -> Dict[str, Any]:
         """Converts a RLDS batch to the format expected by the OpenVLA collator/models."""
@@ -102,6 +104,18 @@ class RLDSBatchTransform:
         if self.use_proprio and "proprio" in rlds_batch["observation"]:
             proprio = rlds_batch["observation"]["proprio"]
             return_dict["proprio"] = proprio
+        if self.use_privileged_distill:
+            future_images = []
+            future_obs = rlds_batch["observation"]["image_primary"][1 : self.future_horizon + 1]
+            for future_img in future_obs:
+                future_images.append(self.image_transform(Image.fromarray(future_img)))
+            if future_images:
+                return_dict["future_pixel_values"] = torch.stack(future_images)
+            future_mask = rlds_batch["observation"].get("future_pad_mask")
+            if future_mask is not None:
+                return_dict["future_mask"] = torch.as_tensor(
+                    future_mask[1 : self.future_horizon + 1], dtype=torch.bool
+                )
 
         return return_dict
 
@@ -116,6 +130,7 @@ class RLDSDataset(IterableDataset):
         shuffle_buffer_size: int = 256_000,
         train: bool = True,
         image_aug: bool = False,
+        future_horizon: int = 0,
     ) -> None:
         """Lightweight wrapper around RLDS TFDS Pipeline for use with PyTorch/OpenVLA Data Loaders."""
         self.data_root_dir, self.data_mix, self.batch_transform = data_root_dir, data_mix, batch_transform
@@ -146,6 +161,7 @@ class RLDSDataset(IterableDataset):
             traj_transform_kwargs=dict(
                 window_size=1,                                      # If we wanted to feed / predict more than one step
                 future_action_window_size=NUM_ACTIONS_CHUNK-1,      # For action chunking
+                future_observation_window_size=future_horizon,
                 skip_unlabeled=True,                                # Skip trajectories without language labels
                 goal_relabeling_strategy="uniform",                 # Goals are currently unused
             ),

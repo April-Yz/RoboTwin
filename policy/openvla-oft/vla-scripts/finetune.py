@@ -48,10 +48,13 @@ from prismatic.extern.hf.processing_prismatic import (
 from prismatic.models.action_heads import DiffusionActionHead, L1RegressionActionHead
 from prismatic.models.backbones.llm.prompting import PurePromptBuilder
 from prismatic.models.film_vit_wrapper import FiLMedPrismaticVisionBackbone
+from prismatic.models.future_projector import FutureObservationProjector
 from prismatic.models.projectors import (
     NoisyActionProjector,
     ProprioProjector,
 )
+from prismatic.training.distill_losses import compute_action_distill_loss
+from prismatic.training.distill_wrapper import PrivilegedDistillWrapper
 from prismatic.training.train_utils import (
     compute_actions_l1_loss,
     compute_token_accuracy,
@@ -91,11 +94,19 @@ class FinetuneConfig:
     use_film: bool = False                           # If True, uses FiLM to infuse language inputs into visual features
     num_images_in_input: int = 1                     # Number of images in the VLA input (default: 1)
     use_proprio: bool = False                        # If True, includes robot proprioceptive state in input
+    use_privileged_distill: bool = False            # If True, enable offline privileged self-distillation
+    future_horizon: int = 4                         # Number of future frames available only to teacher
+    future_mode: str = "image_latent"               # First version supports image_latent only
+    distill_target: str = "action"                  # First version supports action distillation only
+    distill_loss_type: str = "mse"                  # First version supports mse only
+    distill_weight: float = 0.5                     # Distillation loss weight
+    bc_weight: float = 1.0                          # Behavior cloning loss weight
+    teacher_detach: bool = True                     # Run teacher under no_grad by default
 
     # Training configuration
     batch_size: int = 8                              # Batch size per device (total batch size = batch_size * num GPUs)
     learning_rate: float = 5e-4                      # Learning rate
-    lr_warmup_steps: int = 0                         # Number of steps to warm up learning rate (from 10% to 100%)
+    lr_warmup_steps: int = 0                         # Number of steps to warm up learning rate (from 10 pct to 100 pct)
     num_steps_before_decay: int = 100_000            # Number of steps before LR decays by 10x
     grad_accumulation_steps: int = 1                 # Number of gradient accumulation steps
     max_steps: int = 200_000                         # Max number of training steps
@@ -183,6 +194,8 @@ def get_run_id(cfg) -> str:
             run_id += f"+lora-r{cfg.lora_rank}+dropout-{cfg.lora_dropout}"
         if cfg.image_aug:
             run_id += "--image_aug"
+        if cfg.use_privileged_distill:
+            run_id += f"--pd-k{cfg.future_horizon}-dw{cfg.distill_weight}"
         if cfg.run_id_note is not None:
             run_id += f"--{cfg.run_id_note}"
     return run_id
@@ -316,6 +329,7 @@ def run_forward_pass(
     action_head,
     noisy_action_projector,
     proprio_projector,
+    distill_wrapper,
     batch,
     action_tokenizer,
     device_id,
@@ -324,6 +338,10 @@ def run_forward_pass(
     use_proprio,
     use_film,
     num_patches,
+    use_privileged_distill=False,
+    distill_loss_type="mse",
+    distill_weight=0.5,
+    bc_weight=1.0,
     compute_diffusion_l1=False,
     num_diffusion_steps_train=None,
 ) -> Tuple[torch.Tensor, Dict[str, float]]:
@@ -356,6 +374,41 @@ def run_forward_pass(
 
     # Get ground-truth action labels
     ground_truth_actions = batch["actions"].to(device_id).to(torch.bfloat16)
+
+    if use_privileged_distill:
+        if distill_wrapper is None:
+            raise ValueError("`distill_wrapper` must be provided when privileged distillation is enabled.")
+        student_dict = distill_wrapper.forward_student(batch)
+        student_actions = student_dict["predicted_actions"]
+        loss_bc = torch.nn.L1Loss()(ground_truth_actions, student_actions)
+
+        teacher_dict = distill_wrapper.forward_teacher(batch)
+        teacher_actions = teacher_dict["predicted_actions"]
+        loss_distill = compute_action_distill_loss(
+            student_actions=student_actions,
+            teacher_actions=teacher_actions,
+            loss_type=distill_loss_type,
+        )
+        loss = bc_weight * loss_bc + distill_weight * loss_distill
+
+        ground_truth_curr_action = ground_truth_actions[:, 0]
+        predicted_curr_action = student_actions[:, 0]
+        ground_truth_next_actions = ground_truth_actions[:, 1:]
+        predicted_next_actions = student_actions[:, 1:]
+        curr_action_l1_loss = torch.nn.L1Loss()(ground_truth_curr_action, predicted_curr_action)
+        next_actions_l1_loss = torch.nn.L1Loss()(ground_truth_next_actions, predicted_next_actions)
+
+        metrics.update(
+            {
+                "loss_value": loss.item(),
+                "loss_total": loss.item(),
+                "loss_bc": loss_bc.item(),
+                "loss_distill": loss_distill.item(),
+                "curr_action_l1_loss": curr_action_l1_loss.item(),
+                "next_actions_l1_loss": next_actions_l1_loss.item(),
+            }
+        )
+        return loss, metrics
 
     # [Only for diffusion] Sample noisy actions used as input for noise predictor network
     if use_diffusion:
@@ -763,6 +816,7 @@ def save_training_checkpoint(
     proprio_projector,
     noisy_action_projector,
     action_head,
+    future_projector,
     train_dataset,
     distributed_state,
     optimizer,
@@ -834,6 +888,12 @@ def save_training_checkpoint(
                 checkpoint_dir / f"noisy_action_projector--{checkpoint_name_suffix}",
             )
 
+        if cfg.use_privileged_distill and future_projector is not None:
+            torch.save(
+                future_projector.state_dict(),
+                checkpoint_dir / f"future_projector--{checkpoint_name_suffix}",
+            )
+
         if (cfg.use_l1_regression or cfg.use_diffusion) and action_head is not None:
             torch.save(
                 action_head.state_dict(),
@@ -872,6 +932,7 @@ def run_validation(
     action_head,
     noisy_action_projector,
     proprio_projector,
+    distill_wrapper,
     val_dataloader,
     action_tokenizer,
     device_id,
@@ -916,6 +977,7 @@ def run_validation(
                 action_head=action_head,
                 noisy_action_projector=noisy_action_projector,
                 proprio_projector=proprio_projector,
+                distill_wrapper=distill_wrapper,
                 batch=batch,
                 action_tokenizer=action_tokenizer,
                 device_id=device_id,
@@ -924,6 +986,10 @@ def run_validation(
                 use_proprio=cfg.use_proprio,
                 use_film=cfg.use_film,
                 num_patches=num_patches,
+                use_privileged_distill=cfg.use_privileged_distill,
+                distill_loss_type=cfg.distill_loss_type,
+                distill_weight=cfg.distill_weight,
+                bc_weight=cfg.bc_weight,
                 compute_diffusion_l1=True,
                 num_diffusion_steps_train=cfg.num_diffusion_steps_train
                 if cfg.use_diffusion
@@ -980,6 +1046,13 @@ def finetune(cfg: FinetuneConfig) -> None:
     assert not (
         cfg.use_l1_regression and cfg.use_diffusion
     ), "Cannot do both L1 regression and diffusion. Please pick one of them!"
+    if cfg.use_privileged_distill:
+        assert cfg.use_l1_regression and not cfg.use_diffusion, (
+            "Privileged distillation v1 currently supports only the L1 regression action head."
+        )
+        assert cfg.future_horizon > 0, "Privileged distillation requires `future_horizon > 0`."
+        assert cfg.future_mode == "image_latent", "Privileged distillation v1 only supports future_mode=image_latent."
+        assert cfg.distill_target == "action", "Privileged distillation v1 only supports distill_target=action."
 
     # Trim trailing forward slash ('/') in VLA path if it exists
     cfg.vla_path = cfg.vla_path.rstrip("/")
@@ -1113,6 +1186,7 @@ def finetune(cfg: FinetuneConfig) -> None:
     vla = wrap_ddp(vla, device_id, find_unused=True)
 
     # If applicable, instantiate proprio projector
+    proprio_projector = None
     if cfg.use_proprio:
         proprio_projector = init_module(
             ProprioProjector,
@@ -1123,6 +1197,7 @@ def finetune(cfg: FinetuneConfig) -> None:
         )
 
     # If applicable, instantiate continuous action head for L1 regression
+    action_head = None
     if cfg.use_l1_regression:
         action_head = init_module(
             L1RegressionActionHead,
@@ -1138,6 +1213,7 @@ def finetune(cfg: FinetuneConfig) -> None:
         )
 
     # If applicable, instantiate diffusion action head and noisy action projector
+    noisy_action_projector = None
     if cfg.use_diffusion:
         action_head = init_module(
             DiffusionActionHead,
@@ -1158,6 +1234,27 @@ def finetune(cfg: FinetuneConfig) -> None:
             cfg,
             device_id,
             {"llm_dim": vla.module.llm_dim},
+        )
+
+    future_projector = None
+    distill_wrapper = None
+    if cfg.use_privileged_distill:
+        future_projector = init_module(
+            FutureObservationProjector,
+            "future_projector",
+            cfg,
+            device_id,
+            {"llm_dim": vla.module.llm_dim, "hidden_dim": vla.module.llm_dim},
+            to_bf16=True,
+        )
+        distill_wrapper = PrivilegedDistillWrapper(
+            vla=vla,
+            action_head=action_head,
+            future_projector=future_projector,
+            proprio_projector=proprio_projector if cfg.use_proprio else None,
+            teacher_detach=cfg.teacher_detach,
+            use_proprio=cfg.use_proprio,
+            use_film=cfg.use_film,
         )
 
     # Get number of vision patches
@@ -1187,6 +1284,10 @@ def finetune(cfg: FinetuneConfig) -> None:
     if cfg.use_proprio:
         trainable_params += [
             param for param in proprio_projector.parameters() if param.requires_grad
+        ]
+    if cfg.use_privileged_distill:
+        trainable_params += [
+            param for param in future_projector.parameters() if param.requires_grad
         ]
     print(f"# total trainable params: {sum(p.numel() for p in trainable_params)}")
 
@@ -1254,6 +1355,8 @@ def finetune(cfg: FinetuneConfig) -> None:
         prompt_builder_fn=PurePromptBuilder,
         use_wrist_image=use_wrist_image,
         use_proprio=cfg.use_proprio,
+        use_privileged_distill=cfg.use_privileged_distill,
+        future_horizon=cfg.future_horizon,
     )
     train_dataset = RLDSDataset(
         cfg.data_root_dir,
@@ -1262,6 +1365,7 @@ def finetune(cfg: FinetuneConfig) -> None:
         resize_resolution=tuple(vla.module.config.image_sizes),
         shuffle_buffer_size=cfg.shuffle_buffer_size,
         image_aug=cfg.image_aug,
+        future_horizon=cfg.future_horizon if cfg.use_privileged_distill else 0,
     )
     if cfg.use_val_set:
         val_dataset = RLDSDataset(
@@ -1272,6 +1376,7 @@ def finetune(cfg: FinetuneConfig) -> None:
             shuffle_buffer_size=cfg.shuffle_buffer_size // 10,
             image_aug=cfg.image_aug,
             train=False,
+            future_horizon=cfg.future_horizon if cfg.use_privileged_distill else 0,
         )
 
     # [Important] Save dataset statistics so that we can unnormalize actions during inference
@@ -1304,6 +1409,9 @@ def finetune(cfg: FinetuneConfig) -> None:
     # Deque to store recent train metrics (used for computing smoothened metrics for gradient accumulation)
     recent_metrics = {
         "loss_value": deque(maxlen=cfg.grad_accumulation_steps),
+        "loss_total": deque(maxlen=cfg.grad_accumulation_steps),
+        "loss_bc": deque(maxlen=cfg.grad_accumulation_steps),
+        "loss_distill": deque(maxlen=cfg.grad_accumulation_steps),
         "curr_action_accuracy": deque(maxlen=cfg.grad_accumulation_steps),
         "curr_action_l1_loss": deque(maxlen=cfg.grad_accumulation_steps),
         "next_actions_accuracy": deque(maxlen=cfg.grad_accumulation_steps),
@@ -1326,6 +1434,7 @@ def finetune(cfg: FinetuneConfig) -> None:
                 if cfg.use_diffusion
                 else None,
                 proprio_projector=proprio_projector if cfg.use_proprio else None,
+                distill_wrapper=distill_wrapper,
                 batch=batch,
                 action_tokenizer=action_tokenizer,
                 device_id=device_id,
@@ -1334,6 +1443,10 @@ def finetune(cfg: FinetuneConfig) -> None:
                 use_proprio=cfg.use_proprio,
                 use_film=cfg.use_film,
                 num_patches=NUM_PATCHES,
+                use_privileged_distill=cfg.use_privileged_distill,
+                distill_loss_type=cfg.distill_loss_type,
+                distill_weight=cfg.distill_weight,
+                bc_weight=cfg.bc_weight,
                 compute_diffusion_l1=compute_diffusion_l1,
                 num_diffusion_steps_train=cfg.num_diffusion_steps_train
                 if cfg.use_diffusion
@@ -1410,6 +1523,7 @@ def finetune(cfg: FinetuneConfig) -> None:
                     action_head=action_head
                     if (cfg.use_l1_regression or cfg.use_diffusion)
                     else None,
+                    future_projector=future_projector if cfg.use_privileged_distill else None,
                     train_dataset=train_dataset,
                     distributed_state=distributed_state,
                     optimizer=optimizer,
@@ -1425,6 +1539,7 @@ def finetune(cfg: FinetuneConfig) -> None:
                     if cfg.use_diffusion
                     else None,
                     proprio_projector=proprio_projector if cfg.use_proprio else None,
+                    distill_wrapper=distill_wrapper,
                     val_dataloader=val_dataloader,
                     action_tokenizer=action_tokenizer,
                     device_id=device_id,

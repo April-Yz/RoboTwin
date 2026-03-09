@@ -458,6 +458,12 @@ class PrismaticForConditionalGeneration(PrismaticPreTrainedModel):
             return torch.cat((projected_patch_embeddings, proprio_features), dim=1)
         return projected_patch_embeddings
 
+    def _append_additional_patch_embeddings(self, projected_patch_embeddings, additional_patch_embeddings):
+        """Appends extra conditioning tokens in the same embedding space as projected vision patches."""
+        if additional_patch_embeddings is None:
+            return projected_patch_embeddings
+        return torch.cat((projected_patch_embeddings, additional_patch_embeddings), dim=1)
+
     def _build_multimodal_attention(self, input_embeddings, projected_patch_embeddings, attention_mask):
         """Build multimodal embeddings and attention mask"""
         # Update attention mask
@@ -515,6 +521,7 @@ class PrismaticForConditionalGeneration(PrismaticPreTrainedModel):
         noisy_action_projector=None,
         diffusion_timestep_embeddings=None,
         use_film: bool = False,
+        additional_patch_embeddings: Optional[torch.FloatTensor] = None,
     ) -> Union[Tuple, PrismaticCausalLMOutputWithPast]:
         """Run a forward pass through the VLM, returning a PrismaticCausalLMOutputWithPast instance."""
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
@@ -588,6 +595,11 @@ class PrismaticForConditionalGeneration(PrismaticPreTrainedModel):
             # Add proprioceptive state if provided
             projected_patch_embeddings = self._process_proprio_features(
                 projected_patch_embeddings, proprio, proprio_projector
+            )
+
+            # Append any extra conditioning tokens in patch embedding space.
+            projected_patch_embeddings = self._append_additional_patch_embeddings(
+                projected_patch_embeddings, additional_patch_embeddings
             )
 
             # [Diffusion] Add diffusion timestep embedding if provided

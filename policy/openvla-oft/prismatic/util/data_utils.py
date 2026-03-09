@@ -143,6 +143,18 @@ class PaddedCollatorForActionPrediction:
         else:
             proprio = None
 
+        if "future_pixel_values" in instances[0]:
+            future_pixel_values = [instance["future_pixel_values"] for instance in instances]
+            future_pixel_values = torch.stack(future_pixel_values)
+        else:
+            future_pixel_values = None
+
+        if "future_mask" in instances[0]:
+            future_mask = [instance["future_mask"] for instance in instances]
+            future_mask = torch.stack(future_mask)
+        else:
+            future_mask = None
+
         output = dict(
             pixel_values=pixel_values,
             proprio=proprio,
@@ -151,6 +163,10 @@ class PaddedCollatorForActionPrediction:
             labels=labels,
             actions=actions,
         )
+        if future_pixel_values is not None:
+            output["future_pixel_values"] = future_pixel_values
+        if future_mask is not None:
+            output["future_mask"] = future_mask
         if dataset_names is not None:
             output["dataset_names"] = dataset_names
         return output
