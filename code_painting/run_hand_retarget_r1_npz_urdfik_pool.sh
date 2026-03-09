@@ -14,6 +14,8 @@ WORKERS=(2 2 3 3)
 VARIANT=clean
 OUT_ROOT=""
 LIGHTING_MODE=front_no_shadow
+SMOOTH_MODE=0
+SMOOTH_INTERP_FRAMES=1
 
 # Common args forwarded to render_hand_retarget_r1_npz_urdfik.py.
 COMMON_ARGS=(
@@ -38,13 +40,15 @@ DEFAULT_DATASETS=(
 usage() {
   cat <<EOF
 Usage:
-  $(basename "$0") [--workers W] [--variant clean|debug] [--lighting_mode MODE] [--out_root DIR] [hand_vis_dir ...]
+  $(basename "$0") [--workers W] [--variant clean|debug] [--lighting_mode MODE] [--smooth_mode 0|1] [--smooth_interp_frames N] [--out_root DIR] [hand_vis_dir ...]
 
 Options:
   --workers   Comma-separated GPU worker list (default: 2,2,3,3)
               Example: --workers 2,2,2,2,2,2
   --variant   clean (default) or debug
   --lighting_mode  default|front|front_no_shadow (default: front_no_shadow)
+  --smooth_mode  Enable slow/smooth replay (default: 0)
+  --smooth_interp_frames  Interpolated frames between NPZ frames when smooth mode is on (default: 1)
   --out_root  Custom output root; defaults to \${OUT_ROOT_BASE}_<variant>
 EOF
 }
@@ -84,6 +88,22 @@ while [[ $# -gt 0 ]]; do
       LIGHTING_MODE="$2"
       shift 2
       ;;
+    --smooth_mode)
+      if [[ $# -lt 2 ]]; then
+        echo "[error] --smooth_mode requires a value" >&2
+        exit 1
+      fi
+      SMOOTH_MODE="$2"
+      shift 2
+      ;;
+    --smooth_interp_frames)
+      if [[ $# -lt 2 ]]; then
+        echo "[error] --smooth_interp_frames requires a value" >&2
+        exit 1
+      fi
+      SMOOTH_INTERP_FRAMES="$2"
+      shift 2
+      ;;
     --help|-h)
       usage
       exit 0
@@ -110,6 +130,15 @@ if [[ "${LIGHTING_MODE}" != "default" && "${LIGHTING_MODE}" != "front" && "${LIG
   exit 1
 fi
 
+if ! [[ "${SMOOTH_MODE}" =~ ^[0-9]+$ ]]; then
+  echo "[error] --smooth_mode must be integer 0/1" >&2
+  exit 1
+fi
+if ! [[ "${SMOOTH_INTERP_FRAMES}" =~ ^[0-9]+$ ]]; then
+  echo "[error] --smooth_interp_frames must be integer >=0" >&2
+  exit 1
+fi
+
 # Ensure COMMON_ARGS uses the final CLI-selected lighting mode.
 for i in "${!COMMON_ARGS[@]}"; do
   if [[ "${COMMON_ARGS[$i]}" == "--lighting_mode" ]]; then
@@ -117,6 +146,13 @@ for i in "${!COMMON_ARGS[@]}"; do
     break
   fi
 done
+
+if [[ "${SMOOTH_MODE}" -gt 0 ]]; then
+  COMMON_ARGS+=(
+    --smooth_mode 1
+    --smooth_interp_frames "${SMOOTH_INTERP_FRAMES}"
+  )
+fi
 
 if [[ -z "${OUT_ROOT}" ]]; then
   OUT_ROOT="${OUT_ROOT_BASE}_${VARIANT}"

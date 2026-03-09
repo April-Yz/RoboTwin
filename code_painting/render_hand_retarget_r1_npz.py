@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Sequence, Tupl
 import cv2
 import numpy as np
 import sapien.core as sapien
-from scipy.spatial.transform import Rotation as R
+from scipy.spatial.transform import Rotation as R, Slerp
 
 THIS_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = THIS_DIR.parent
@@ -324,6 +324,14 @@ class SideFrameTarget:
     finger_distance: Optional[float]
 
 
+@dataclass
+class PlaybackFrameSpec:
+    base_idx: int
+    next_idx: Optional[int]
+    interp_ratio: float
+    is_original: bool
+
+
 class HandRetargetTrajectory:
     def __init__(
         self,
@@ -444,6 +452,32 @@ class HandRetargetTrajectory:
             if target.valid and target.finger_distance is not None and math.isfinite(target.finger_distance):
                 values.append(float(target.finger_distance))
         return np.asarray(values, dtype=np.float64)
+
+    def interpolate_side_target(
+        self,
+        side: str,
+        idx_a: int,
+        idx_b: int,
+        ratio: float,
+        pose_source: str,
+    ) -> SideFrameTarget:
+        ratio = float(np.clip(ratio, 0.0, 1.0))
+        target_a = self.get_side_target(side, idx_a, pose_source)
+        target_b = self.get_side_target(side, idx_b, pose_source)
+        if target_a.valid and target_b.valid:
+            pos = (1.0 - ratio) * target_a.position_cam + ratio * target_b.position_cam
+            rotations = R.from_matrix(np.stack([target_a.rotation_cam, target_b.rotation_cam], axis=0))
+            slerp = Slerp([0.0, 1.0], rotations)
+            interp_rot = slerp(ratio).as_matrix()
+            finger = None
+            if target_a.finger_distance is not None and target_b.finger_distance is not None:
+                finger = float((1.0 - ratio) * target_a.finger_distance + ratio * target_b.finger_distance)
+            return SideFrameTarget(True, pos, interp_rot, finger)
+        if target_a.valid:
+            return target_a
+        if target_b.valid:
+            return target_b
+        return SideFrameTarget(False, np.full(3, np.nan), np.full((3, 3), np.nan), None)
 
 
 class HandRetargetR1Renderer:
@@ -1575,6 +1609,26 @@ def build_world_target_pose(
     return pose_world
 
 
+def build_playback_sequence(
+    indices: Sequence[int],
+    smooth_enabled: bool,
+    interp_frames: int,
+) -> List[PlaybackFrameSpec]:
+    if not smooth_enabled or interp_frames <= 0:
+        return [PlaybackFrameSpec(int(idx), None, 0.0, True) for idx in indices]
+    specs: List[PlaybackFrameSpec] = []
+    interp_frames = max(int(interp_frames), 1)
+    for i, idx in enumerate(indices):
+        specs.append(PlaybackFrameSpec(int(idx), None, 0.0, True))
+        if i == len(indices) - 1:
+            continue
+        next_idx = int(indices[i + 1])
+        for step in range(1, interp_frames + 1):
+            ratio = step / float(interp_frames + 1)
+            specs.append(PlaybackFrameSpec(int(idx), next_idx, ratio, False))
+    return specs
+
+
 def parse_optional_base_pose(values: Optional[Sequence[float]]) -> Optional[List[float]]:
     if values is None:
         return None
@@ -1693,6 +1747,18 @@ def parse_args() -> argparse.Namespace:
         choices=["replan_after_execute"],
         default="replan_after_execute",
         help="Per-frame planning mode. replan_after_execute means each next frame is planned from the actual robot state after the previous frame finished executing.",
+    )
+    parser.add_argument(
+        "--smooth_mode",
+        type=int,
+        default=0,
+        help="Enable frame interpolation smoothing to reduce robot motion speed.",
+    )
+    parser.add_argument(
+        "--smooth_interp_frames",
+        type=int,
+        default=1,
+        help="Number of interpolated frames inserted between consecutive NPZ frames when --smooth_mode=1.",
     )
     parser.add_argument(
         "--debug_post_execute",
@@ -2293,12 +2359,21 @@ def main() -> None:
         renderer.hold_viewer()
         return
 
+    smooth_enabled = bool(args.smooth_mode) and int(args.smooth_interp_frames) > 0
+    interp_frames = max(int(args.smooth_interp_frames), 0)
+    playback_specs = build_playback_sequence(indices, smooth_enabled, interp_frames)
+
     main_video_path = args.output_dir / "zed_replay.mp4"
     third_video_path = args.output_dir / "third_replay.mp4"
     depth_video_path = args.output_dir / "zed_depth.mp4"
 
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     main_writer = cv2.VideoWriter(str(main_video_path), fourcc, args.fps, (args.image_width, args.image_height))
+    smooth_writer = None
+    smooth_video_path = None
+    if smooth_enabled:
+        smooth_video_path = args.output_dir / "zed_replay_smooth.mp4"
+        smooth_writer = cv2.VideoWriter(str(smooth_video_path), fourcc, args.fps, (args.image_width, args.image_height))
     third_writer = None
     if args.third_person_view:
         third_writer = cv2.VideoWriter(str(third_video_path), fourcc, args.fps, (args.image_width, args.image_height))
@@ -2316,20 +2391,40 @@ def main() -> None:
     use_right = args.arms in ("right", "both")
 
     try:
-        for out_idx, frame_idx in enumerate(indices):
+        total_playback = len(playback_specs)
+        total_original = len(indices)
+        original_counter = 0
+        for smooth_idx, spec in enumerate(playback_specs):
+            frame_idx = spec.base_idx
             renderer.update_robot_link_cameras()
 
-            left_target = trajectory.get_side_target("left", frame_idx, args.pose_source) if use_left else SideFrameTarget(False, np.full(3, np.nan), np.full((3, 3), np.nan), None)
-            right_target = trajectory.get_side_target("right", frame_idx, args.pose_source) if use_right else SideFrameTarget(False, np.full(3, np.nan), np.full((3, 3), np.nan), None)
+            use_interp = smooth_enabled and (not spec.is_original) and (spec.next_idx is not None)
+            default_target = SideFrameTarget(False, np.full(3, np.nan), np.full((3, 3), np.nan), None)
+            if use_left:
+                if use_interp:
+                    left_target = trajectory.interpolate_side_target("left", spec.base_idx, spec.next_idx, spec.interp_ratio, args.pose_source)
+                else:
+                    left_target = trajectory.get_side_target("left", frame_idx, args.pose_source)
+            else:
+                left_target = default_target
+            if use_right:
+                if use_interp:
+                    right_target = trajectory.interpolate_side_target("right", spec.base_idx, spec.next_idx, spec.interp_ratio, args.pose_source)
+                else:
+                    right_target = trajectory.get_side_target("right", frame_idx, args.pose_source)
+            else:
+                right_target = default_target
 
             left_world = None
             right_world = None
             if left_target.valid:
                 left_world = build_world_target_pose(renderer, "left", left_target, apply_forced_orientation=True)
-                left_world_targets[frame_idx] = left_world
+                if spec.is_original:
+                    left_world_targets[frame_idx] = left_world
             if right_target.valid:
                 right_world = build_world_target_pose(renderer, "right", right_target, apply_forced_orientation=True)
-                right_world_targets[frame_idx] = right_world
+                if spec.is_original:
+                    right_world_targets[frame_idx] = right_world
 
             renderer.update_target_axis_visuals(left_world, right_world)
             if args.debug_mode:
@@ -2347,8 +2442,10 @@ def main() -> None:
                     renderer.print_frame_debug(frame_idx, "right", right_target, right_world, right_plan)
 
             left_status, right_status = renderer.execute_plans(left_plan, right_plan)
-            left_statuses[frame_idx] = left_status
-            right_statuses[frame_idx] = right_status
+            if spec.is_original:
+                left_statuses[frame_idx] = left_status
+                right_statuses[frame_idx] = right_status
+                original_counter += 1
 
             if args.debug_mode and bool(args.debug_post_execute):
                 if use_left:
@@ -2363,30 +2460,40 @@ def main() -> None:
             if not use_right:
                 right_gripper = None
             renderer.set_grippers(left_gripper, right_gripper)
-            if left_gripper is not None:
-                left_values[frame_idx] = left_gripper
-            if right_gripper is not None:
-                right_values[frame_idx] = right_gripper
+            if spec.is_original:
+                if left_gripper is not None:
+                    left_values[frame_idx] = left_gripper
+                if right_gripper is not None:
+                    right_values[frame_idx] = right_gripper
 
             renderer.update_robot_link_cameras()
             rgb, depth = renderer.capture_camera(renderer.zed_camera)
-            overlay_lines = [
-                f"Frame {frame_idx} ({out_idx + 1}/{len(indices)})",
-                f"Left plan: {left_statuses[frame_idx] or 'Skipped'}",
-                f"Right plan: {right_statuses[frame_idx] or 'Skipped'}",
-            ]
+            overlay_lines: List[str] = []
+            if smooth_enabled:
+                if spec.is_original:
+                    overlay_lines.append(f"Frame {frame_idx} (orig {original_counter}/{total_original})")
+                else:
+                    overlay_lines.append(f"Smooth frame {smooth_idx + 1}/{total_playback}")
+                    overlay_lines.append(f"interp {spec.base_idx}->{spec.next_idx} t={spec.interp_ratio:.2f}")
+            else:
+                overlay_lines.append(f"Frame {frame_idx} ({smooth_idx + 1}/{total_playback})")
+            overlay_lines.append(f"Left plan: {left_status or 'Skipped'}")
+            overlay_lines.append(f"Right plan: {right_status or 'Skipped'}")
             if bool(args.overlay_text_enable):
                 main_bgr = overlay_text(rgb, overlay_lines)
             else:
                 main_bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
-            main_writer.write(main_bgr)
+            if smooth_writer is not None:
+                smooth_writer.write(main_bgr)
 
-            depth_safe = np.nan_to_num(depth, nan=0.0, posinf=0.0, neginf=0.0)
-            if depth_safe.max() > depth_safe.min():
-                depth_norm = ((depth_safe - depth_safe.min()) / (depth_safe.max() - depth_safe.min()) * 255.0).astype(np.uint8)
-            else:
-                depth_norm = np.zeros_like(depth_safe, dtype=np.uint8)
-            depth_writer.write(depth_norm)
+            if (not smooth_enabled) or spec.is_original:
+                main_writer.write(main_bgr)
+                depth_safe = np.nan_to_num(depth, nan=0.0, posinf=0.0, neginf=0.0)
+                if depth_safe.max() > depth_safe.min():
+                    depth_norm = ((depth_safe - depth_safe.min()) / (depth_safe.max() - depth_safe.min()) * 255.0).astype(np.uint8)
+                else:
+                    depth_norm = np.zeros_like(depth_safe, dtype=np.uint8)
+                depth_writer.write(depth_norm)
 
             if third_writer is not None:
                 third_rgb, _ = renderer.capture_camera(renderer.third_camera)
@@ -2394,26 +2501,39 @@ def main() -> None:
                     third_bgr = overlay_text(third_rgb, overlay_lines)
                 else:
                     third_bgr = cv2.cvtColor(third_rgb, cv2.COLOR_RGB2BGR)
-                third_writer.write(third_bgr)
+                if (not smooth_enabled) or spec.is_original:
+                    third_writer.write(third_bgr)
 
-            if args.save_png_frames:
+            if args.save_png_frames and (not smooth_enabled or spec.is_original):
                 cv2.imwrite(str(frames_dir / f"zed_{frame_idx:04d}.png"), main_bgr)
+                depth_safe = np.nan_to_num(depth, nan=0.0, posinf=0.0, neginf=0.0)
                 cv2.imwrite(str(frames_dir / f"depth_{frame_idx:04d}.png"), depth_safe.astype(np.uint16))
                 if third_writer is not None:
                     cv2.imwrite(str(frames_dir / f"third_{frame_idx:04d}.png"), third_bgr)
 
-            print(
-                f"[frame {frame_idx:04d}] "
-                f"left={left_statuses[frame_idx] or 'Skipped'} "
-                f"right={right_statuses[frame_idx] or 'Skipped'} "
-                f"left_gripper={left_gripper if left_gripper is not None else 'N/A'} "
-                f"right_gripper={right_gripper if right_gripper is not None else 'N/A'}"
-            )
+            if spec.is_original:
+                print(
+                    f"[frame {frame_idx:04d}] "
+                    f"left={left_status or 'Skipped'} "
+                    f"right={right_status or 'Skipped'} "
+                    f"left_gripper={left_gripper if left_gripper is not None else 'N/A'} "
+                    f"right_gripper={right_gripper if right_gripper is not None else 'N/A'}"
+                )
+            else:
+                print(
+                    f"[smooth {spec.base_idx:04d}->{spec.next_idx:04d} t={spec.interp_ratio:.2f}] "
+                    f"left={left_status or 'Skipped'} "
+                    f"right={right_status or 'Skipped'} "
+                    f"left_gripper={left_gripper if left_gripper is not None else 'N/A'} "
+                    f"right_gripper={right_gripper if right_gripper is not None else 'N/A'}"
+                )
     finally:
         main_writer.release()
         depth_writer.release()
         if third_writer is not None:
             third_writer.release()
+        if smooth_writer is not None:
+            smooth_writer.release()
 
     if bool(args.save_world_targets):
         np.savez_compressed(
@@ -2433,6 +2553,8 @@ def main() -> None:
         )
 
     print(f"Saved zed replay video to: {main_video_path}")
+    if smooth_video_path is not None:
+        print(f"Saved smooth zed replay video to: {smooth_video_path}")
     print(f"Saved depth replay video to: {depth_video_path}")
     if args.third_person_view:
         print(f"Saved third-person replay video to: {third_video_path}")

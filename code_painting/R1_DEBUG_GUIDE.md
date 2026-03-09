@@ -469,3 +469,35 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_hand_retarget_r1_npz_urdfik.
   --debug_force_orientation none \
   --enable_viewer 1 \
   --viewer_wait_at_end 1
+
+## Smooth Replay Mode
+
+人手录像太快时，可以打开 `--smooth_mode` 自动在相邻帧之间插插值帧，机器人就会以更细的步长执行，并且脚本会同时导出：
+
+- `zed_replay_smooth.mp4`：包含插值帧，慢速可视化。
+- `zed_replay.mp4`：只保留原始帧，时间轴与检测结果一致。
+
+单个 NPZ 示例：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_hand_retarget_r1_npz_urdfik.sh \
+  /home/zaijia001/ssd/data/R1/hand_vis/hand_detections_0.npz \
+  /home/zaijia001/ssd/RoboTwin/code_painting/output_hand_retarget_smooth \
+  5 \
+  --smooth_mode 1 \
+  --smooth_interp_frames 1 \
+  --lighting_mode front_no_shadow
+```
+
+批处理版本：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_hand_retarget_r1_npz_urdfik_pool.sh \
+  --variant clean \
+  --workers 2,2,2,3,3,3 \
+  --lighting_mode front_no_shadow \
+  --smooth_mode 1 \
+  --smooth_interp_frames 1
+```
+
+`--smooth_interp_frames` 控制插值数量，默认 1（即两帧之间插入 1 帧，相当于速度减半）。如果想拉得更慢，可以改成 2、3 等。

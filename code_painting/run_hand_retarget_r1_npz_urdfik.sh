@@ -31,6 +31,11 @@ run_single() {
     --input_npz "${npz_path}" \
     --output_dir "${npz_output_dir}" \
     --fps "${fps}" \
+    --require_stored_gripper_pose 1 \
+    --pose_source gripper \
+    --orientation_remap_label swap_red_blue_keep_green \
+    --stored_orientation_post_rot_xyz_deg 0 0 0 \
+    --debug_force_orientation none \
     "$@"
 }
 

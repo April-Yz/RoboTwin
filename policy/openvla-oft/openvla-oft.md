@@ -3,24 +3,21 @@
 The conda environment for openvla-oft with RoboTwin is identical to the official openvla-oft environment for the ALOHA part. Please follow the ([openvla-oft official documentation](https://github.com/moojink/openvla-oft/blob/main/SETUP.md)) to install the environment and directly overwrite the RoboTwin virtual environment in [INSTALLATION.md](../../INSTALLATION.md).
 
 ```bash
-conda activate RoboTwin
-# Install PyTorch
-# Use a command specific to your machine: https://pytorch.org/get-started/locally/
-pip3 install torch torchvision torchaudio
-
-# Clone openvla-oft repo and pip install to download dependencies
-git clone https://github.com/moojink/openvla-oft.git
-cd openvla-oft
-pip install -e .
-
-# Install Flash Attention 2 for training (https://github.com/Dao-AILab/flash-attention)
-#   =>> If you run into difficulty, try `pip cache remove flash_attn` first
-pip install packaging ninja
-ninja --version; echo $?  # Verify Ninja --> should return exit code "0"
-pip install "flash-attn==2.5.5" --no-build-isolation
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
+conda activate RoboTwin_openvla
+cd policy/openvla-oft
+./install_robotwin_openvla.sh
 ```
 **Note!**  
-If you encounter problems on diffusers, try `pip install diffusers==0.33.1`
+This RoboTwin setup keeps the existing `torch 2.12.0.dev+cu128` stack instead of downgrading to the original `torch==2.2.0` recipe.
+
+For Blackwell / `sm120`, `install_robotwin_openvla.sh` forces:
+```bash
+CUDA_HOME=<RoboTwin_openvla nvcc root>
+TORCH_CUDA_ARCH_LIST=12.0
+FLASH_ATTN_CUDA_ARCHS=120
+```
+and builds `flash-attn 2.8.3` only for `sm120`.
 
 ## Collect RoboTwin Data
 
