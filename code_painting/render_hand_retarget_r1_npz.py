@@ -1779,7 +1779,7 @@ def parse_args() -> argparse.Namespace:
         "--clean_output",
         type=int,
         default=0,
-        help="Disable text overlay, hide target-axis visuals, and skip world target npz output",
+        help="Disable text overlay and hide target-axis visuals while still preserving world target npz output",
     )
     return parser.parse_args()
 
@@ -1788,7 +1788,6 @@ def main() -> None:
     args = parse_args()
     if bool(args.clean_output):
         args.overlay_text_enable = 0
-        args.save_world_targets = 0
         args.debug_visualize_targets = 0
     args.output_dir.mkdir(parents=True, exist_ok=True)
     frames_dir = args.output_dir / "frames"
