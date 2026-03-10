@@ -5,7 +5,8 @@ episode HDF5 format produced by process_data_R1.py.
 Example:
 python scripts/process_data_retageted_human.py d_pour_blue "pour water" 48 \
   --repaint-dir /home/zaijia001/ssd/inpainting_sam2_robot/results_repaint/d_pour_blue \
-  --retarget-dir /home/zaijia001/ssd/RoboTwin/code_painting/output_hand_retarget_swap_red_blue_keep_green_no_offset_pool_debug/d_pour_blue
+  --retarget-dir /home/zaijia001/ssd/RoboTwin/code_painting/output_hand_retarget_swap_red_blue_keep_green_no_offset_pool_debug/d_pour_blue \
+  --ignore-ids 2 7 9
 
 Notes:
 1. This script expects world_targets_and_status.npz for each episode. The
@@ -221,6 +222,7 @@ def process_dataset(
     episode_num: int,
     video_name: str,
     image_size: tuple[int, int],
+    ignore_ids: set[int],
 ) -> int:
     repaint_episodes = sorted(p for p in repaint_dir.iterdir() if p.is_dir())
     if not repaint_episodes:
@@ -233,6 +235,11 @@ def process_dataset(
     for episode_dir in repaint_episodes:
         if processed >= episode_num:
             break
+
+        episode_id = extract_episode_id(episode_dir)
+        if episode_id in ignore_ids:
+            print(f"[skip] ignored episode id={episode_id}: {episode_dir}")
+            continue
 
         world_targets_path = resolve_world_targets_path(episode_dir, retarget_dir)
         if world_targets_path is None:
@@ -292,6 +299,13 @@ def parse_args() -> argparse.Namespace:
         default="final_repainted.mp4",
         help="Video file name inside each repaint episode directory.",
     )
+    parser.add_argument(
+        "--ignore-ids",
+        type=int,
+        nargs="*",
+        required=True,
+        help="Episode ids to skip. This flag is mandatory every run; pass '--ignore-ids' with no values for an empty list.",
+    )
     parser.add_argument("--image-width", type=int, default=640)
     parser.add_argument("--image-height", type=int, default=480)
     return parser.parse_args()
@@ -308,6 +322,7 @@ def main() -> None:
         episode_num=args.expert_data_num,
         video_name=args.video_name,
         image_size=(args.image_width, args.image_height),
+        ignore_ids=set(args.ignore_ids),
     )
     print(f"[done] processed episodes: {processed}")
     print(f"[done] output dir: {save_dir}")
