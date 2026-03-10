@@ -211,6 +211,20 @@ bash finetune_beat_block_hammer_v1_tmux.sh 1
 
 - `/home/zaijia001/ssd/RoboTwin/data/beat_block_hammer/tmux_logs`
 
+如果当前 shell 的 `LD_LIBRARY_PATH` 被 `/home/zaijia001/ssd/local_install/lib` 污染，直接手敲 `tmux` 可能报：
+
+```bash
+tmux: error while loading shared libraries: libevent-2.1.so.7: cannot open shared object file
+```
+
+这种情况优先使用脚本：
+
+```bash
+bash finetune_beat_block_hammer_v1_tmux.sh 1
+```
+
+脚本会在干净的动态库环境下启动 `tmux`。
+
 如果你想改卡号，可以把最后那个位置参数换成别的 GPU id，例如：
 
 ```bash
@@ -258,6 +272,76 @@ torchrun --standalone --nnodes 1 --nproc-per-node 1 vla-scripts/finetune.py \
 ```
 
 说明：
+
+- `eval` 和 `train` 原则上可以同时跑，但更建议分不同 GPU。
+- 即使分卡运行，二者仍然会共享 CPU、系统内存、磁盘 IO 和 SAPIEN 渲染资源，所以并行时更容易出现系统层面的波动。
+- 如果训练已经接近显存或系统内存边界，不建议同时开评估。
+
+### 5.4 从 checkpoint 继续训练
+
+如果训练被系统 kill，只能从最近一次已保存 checkpoint 恢复，不能从未保存的中间 step 精确继续。
+
+例如从 `10000` step 继续：
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin/policy/openvla-oft
+RESUME=True \
+RESUME_STEP=10000 \
+VLA_PATH=/home/zaijia001/ssd/RoboTwin/data/beat_block_hammer/runs_openvla_v1/openvla-7b+aloha_beat_block_hammer_builder+b4+lr-0.0005+lora-r32+dropout-0.0--image_aug--pd-k4-dw0.5--beat_block_hammer_v1_gpu1--10000_chkpt \
+RESUME_BASE_MODEL_PATH=openvla/openvla-7b \
+BATCH_SIZE=4 \
+bash finetune_beat_block_hammer_v1_tmux.sh 1
+```
+
+恢复时会继续加载：
+
+- LoRA adapter
+- `vision_backbone`
+- `proprio_projector`
+- `action_head`
+- `future_projector`
+- optimizer state
+- scheduler state
+
+但下面这些仍然以你重新启动时传入的参数为准：
+
+- `BATCH_SIZE`
+- `LEARNING_RATE`
+- `MAX_STEPS`
+- `SAVE_FREQ`
+- `VAL_FREQ`
+
+### 5.5 `beat_block_hammer` 评估
+
+直接评估最近一次 checkpoint：
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin/policy/openvla-oft
+bash eval_beat_block_hammer_v1.sh
+```
+
+显式评估某个 checkpoint：
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin/policy/openvla-oft
+bash eval_beat_block_hammer_v1.sh \
+  /home/zaijia001/ssd/RoboTwin/data/beat_block_hammer/runs_openvla_v1/openvla-7b+aloha_beat_block_hammer_builder+b4+lr-0.0005+lora-r32+dropout-0.0--image_aug--pd-k4-dw0.5--beat_block_hammer_v1_gpu1--10000_chkpt
+```
+
+评估脚本会自动：
+
+- 选最新 checkpoint
+- 如果是未 merge 的 LoRA checkpoint，先 merge
+- 同步 `configuration_prismatic.py` 和 `modeling_prismatic.py`
+- 默认关闭 `SAPIEN_RT_DENOISER`，避免 OIDN CUDA 报错刷屏
+
+如果你看到：
+
+```bash
+Fail! 400 / 400
+```
+
+这表示该 episode 在最大步数 `400` 内没有成功完成任务。它说明“评估跑通了，但当前模型策略效果还不行”，不是脚本本身又挂了。
 
 - `num_images_in_input=3` 对应当前训练代码实际使用的 `head + left_wrist + right_wrist`
 - 当前 batch transform 没有把 `low_cam_image` 送入模型，所以这里不是 4
@@ -394,4 +478,3 @@ bash eval_beat_block_hammer_v1.sh
   tmux new -s openvla_beat_block_hammer_bs4
   cd /home/zaijia001/ssd/RoboTwin/policy/openvla-oft
   BATCH_SIZE=4 bash finetune_beat_block_hammer_v1.sh 1
-
