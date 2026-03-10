@@ -32,6 +32,7 @@ if [[ ! -f "${CHECKPOINT_PATH}/config.json" ]]; then
 fi
 
 unset LD_LIBRARY_PATH
+export SAPIEN_RT_DENOISER="${SAPIEN_RT_DENOISER:-none}"
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
 set +u
 conda activate RoboTwin_openvla

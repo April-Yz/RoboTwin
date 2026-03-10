@@ -9,6 +9,7 @@ gpu_id=${5}
 unnorm_key=${6}
 
 export CUDA_VISIBLE_DEVICES=${gpu_id}
+export SAPIEN_RT_DENOISER=${SAPIEN_RT_DENOISER:-none}
 echo -e "\033[33mgpu id (to use): ${gpu_id}\033[0m"
 
 cd ../..  # Go to root

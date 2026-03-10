@@ -214,7 +214,7 @@ class Base_Task(gym.Env):
         sapien.render.set_camera_shader_dir("rt")
         sapien.render.set_ray_tracing_samples_per_pixel(32)
         sapien.render.set_ray_tracing_path_depth(8)
-        denoiser = os.environ.get("SAPIEN_RT_DENOISER", "oidn").strip().lower()
+        denoiser = os.environ.get("SAPIEN_RT_DENOISER", "none").strip().lower()
         if denoiser and denoiser != "none":
             sapien.render.set_ray_tracing_denoiser(denoiser)
 
