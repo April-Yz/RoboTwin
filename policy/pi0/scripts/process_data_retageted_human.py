@@ -9,9 +9,8 @@ python scripts/process_data_retageted_human.py d_pour_blue "pour water" 48 \
   --ignore-ids 2 7 9
 
 Notes:
-1. This script expects world_targets_and_status.npz for each episode. The
-   current clean retarget pipeline disables that file, so you need a debug
-   export or another retarget export that keeps world targets.
+1. This script expects world_targets_and_status.npz plus
+   left_wrist_replay.mp4/right_wrist_replay.mp4 for each episode.
 2. Output structure matches process_data_R1.py:
    processed_data/<task>-<num>/episode_x/instructions.json
    processed_data/<task>-<num>/episode_x/episode_x.hdf5
@@ -31,6 +30,8 @@ from scipy.spatial.transform import Rotation
 
 
 WORLD_TARGETS_NAME = "world_targets_and_status.npz"
+LEFT_WRIST_VIDEO_NAME = "left_wrist_replay.mp4"
+RIGHT_WRIST_VIDEO_NAME = "right_wrist_replay.mp4"
 EPISODE_ID_RE = re.compile(r"(\d+)$")
 
 
@@ -117,6 +118,12 @@ def load_video_frames(video_path: Path, image_size: tuple[int, int]) -> list[np.
     return frames
 
 
+def load_required_video_frames(video_path: Path, image_size: tuple[int, int]) -> list[np.ndarray]:
+    if not video_path.is_file():
+        raise FileNotFoundError(f"Required video is missing: {video_path}")
+    return load_video_frames(video_path, image_size=image_size)
+
+
 def forward_fill_segments(values: np.ndarray, valid_mask: np.ndarray, label: str) -> np.ndarray:
     values = np.asarray(values, dtype=np.float64)
     valid_mask = np.asarray(valid_mask, dtype=bool)
@@ -179,23 +186,34 @@ def save_episode(
     episode_idx: int,
     instructions: str,
     state_action_seq: np.ndarray,
-    frames: list[np.ndarray],
+    cam_high_frames: list[np.ndarray],
+    cam_left_wrist_frames: list[np.ndarray],
+    cam_right_wrist_frames: list[np.ndarray],
 ) -> None:
     if state_action_seq.shape[0] < 2:
         raise ValueError("Need at least 2 frames to build state/action pairs.")
-    if len(frames) < 2:
-        raise ValueError("Need at least 2 video frames to build image/state pairs.")
+    if len(cam_high_frames) < 2 or len(cam_left_wrist_frames) < 2 or len(cam_right_wrist_frames) < 2:
+        raise ValueError("Need at least 2 frames for cam_high/cam_left_wrist/cam_right_wrist.")
 
-    usable_len = min(state_action_seq.shape[0], len(frames))
+    usable_len = min(
+        state_action_seq.shape[0],
+        len(cam_high_frames),
+        len(cam_left_wrist_frames),
+        len(cam_right_wrist_frames),
+    )
     if usable_len < 2:
         raise ValueError("Not enough aligned frames after clipping.")
 
     state_action_seq = state_action_seq[:usable_len]
-    frames = frames[:usable_len]
+    cam_high_frames = cam_high_frames[:usable_len]
+    cam_left_wrist_frames = cam_left_wrist_frames[:usable_len]
+    cam_right_wrist_frames = cam_right_wrist_frames[:usable_len]
 
     states = state_action_seq[:-1]
     actions = state_action_seq[1:]
-    cam_high = frames[:-1]
+    cam_high = cam_high_frames[:-1]
+    cam_left_wrist = cam_left_wrist_frames[:-1]
+    cam_right_wrist = cam_right_wrist_frames[:-1]
 
     episode_dir = save_dir / f"episode_{episode_idx}"
     episode_dir.mkdir(parents=True, exist_ok=True)
@@ -204,6 +222,8 @@ def save_episode(
         json.dump({"instructions": [instructions]}, f, indent=2)
 
     cam_high_enc, len_high = images_encoding(cam_high)
+    cam_left_wrist_enc, len_left = images_encoding(cam_left_wrist)
+    cam_right_wrist_enc, len_right = images_encoding(cam_right_wrist)
     with h5py.File(episode_dir / f"episode_{episode_idx}.hdf5", "w") as f:
         f.create_dataset("action", data=actions)
         obs = f.create_group("observations")
@@ -212,6 +232,8 @@ def save_episode(
         obs.create_dataset("right_arm_dim", data=np.full(len(actions), 7, dtype=np.int32))
         images = obs.create_group("images")
         images.create_dataset("cam_high", data=cam_high_enc, dtype=f"S{len_high}")
+        images.create_dataset("cam_left_wrist", data=cam_left_wrist_enc, dtype=f"S{len_left}")
+        images.create_dataset("cam_right_wrist", data=cam_right_wrist_enc, dtype=f"S{len_right}")
 
 
 def process_dataset(
@@ -224,7 +246,7 @@ def process_dataset(
     image_size: tuple[int, int],
     ignore_ids: set[int],
 ) -> int:
-    repaint_episodes = sorted(p for p in repaint_dir.iterdir() if p.is_dir())
+    repaint_episodes = sorted((p for p in repaint_dir.iterdir() if p.is_dir()), key=extract_episode_id)
     if not repaint_episodes:
         raise FileNotFoundError(f"No episode directories found in {repaint_dir}")
 
@@ -256,22 +278,33 @@ def process_dataset(
         print(f"          world_targets={world_targets_path}")
 
         state_action_seq = build_pose_sequence(world_targets_path)
-        frames = load_video_frames(video_path, image_size=image_size)
+        cam_high_frames = load_required_video_frames(video_path, image_size=image_size)
+        retarget_episode_dir = world_targets_path.parent
+        cam_left_wrist_frames = load_required_video_frames(
+            retarget_episode_dir / LEFT_WRIST_VIDEO_NAME,
+            image_size=image_size,
+        )
+        cam_right_wrist_frames = load_required_video_frames(
+            retarget_episode_dir / RIGHT_WRIST_VIDEO_NAME,
+            image_size=image_size,
+        )
         save_episode(
             save_dir=save_dir,
             episode_idx=processed,
             instructions=instructions,
             state_action_seq=state_action_seq,
-            frames=frames,
+            cam_high_frames=cam_high_frames,
+            cam_left_wrist_frames=cam_left_wrist_frames,
+            cam_right_wrist_frames=cam_right_wrist_frames,
         )
         processed += 1
 
     if processed == 0 and missing_world_targets:
         raise RuntimeError(
             "No usable episodes were processed. The repaint results exist, but "
-            f"{WORLD_TARGETS_NAME} is missing. Your clean retarget export likely "
-            "disabled world target saving. Re-run retargeting with a debug/non-clean "
-            "output that keeps world_targets_and_status.npz."
+            f"{WORLD_TARGETS_NAME} is missing. Re-run retargeting to make sure each "
+            "episode keeps world_targets_and_status.npz and the corresponding wrist "
+            "replay videos."
         )
     return processed
 

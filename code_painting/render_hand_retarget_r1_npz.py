@@ -2365,11 +2365,17 @@ def main() -> None:
     main_video_path = args.output_dir / "zed_replay.mp4"
     third_video_path = args.output_dir / "third_replay.mp4"
     depth_video_path = args.output_dir / "zed_depth.mp4"
+    left_wrist_video_path = args.output_dir / "left_wrist_replay.mp4"
+    right_wrist_video_path = args.output_dir / "right_wrist_replay.mp4"
 
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     main_writer = cv2.VideoWriter(str(main_video_path), fourcc, args.fps, (args.image_width, args.image_height))
     smooth_writer = None
     smooth_video_path = None
+    left_wrist_smooth_writer = None
+    left_wrist_smooth_video_path = None
+    right_wrist_smooth_writer = None
+    right_wrist_smooth_video_path = None
     if smooth_enabled:
         smooth_video_path = args.output_dir / "zed_replay_smooth.mp4"
         smooth_writer = cv2.VideoWriter(str(smooth_video_path), fourcc, args.fps, (args.image_width, args.image_height))
@@ -2377,6 +2383,18 @@ def main() -> None:
     if args.third_person_view:
         third_writer = cv2.VideoWriter(str(third_video_path), fourcc, args.fps, (args.image_width, args.image_height))
     depth_writer = cv2.VideoWriter(str(depth_video_path), fourcc, args.fps, (args.image_width, args.image_height), False)
+    left_wrist_writer = None
+    if renderer._left_wrist_camera_link is not None:
+        left_wrist_writer = cv2.VideoWriter(str(left_wrist_video_path), fourcc, args.fps, (args.image_width, args.image_height))
+        if smooth_enabled:
+            left_wrist_smooth_video_path = args.output_dir / "left_wrist_replay_smooth.mp4"
+            left_wrist_smooth_writer = cv2.VideoWriter(str(left_wrist_smooth_video_path), fourcc, args.fps, (args.image_width, args.image_height))
+    right_wrist_writer = None
+    if renderer._right_wrist_camera_link is not None:
+        right_wrist_writer = cv2.VideoWriter(str(right_wrist_video_path), fourcc, args.fps, (args.image_width, args.image_height))
+        if smooth_enabled:
+            right_wrist_smooth_video_path = args.output_dir / "right_wrist_replay_smooth.mp4"
+            right_wrist_smooth_writer = cv2.VideoWriter(str(right_wrist_smooth_video_path), fourcc, args.fps, (args.image_width, args.image_height))
 
     n_total = trajectory.length
     left_world_targets = np.full((n_total, 7), np.nan, dtype=np.float64)
@@ -2503,12 +2521,42 @@ def main() -> None:
                 if (not smooth_enabled) or spec.is_original:
                     third_writer.write(third_bgr)
 
+            left_wrist_bgr = None
+            if left_wrist_writer is not None:
+                left_wrist_rgb, _ = renderer.capture_camera(renderer.left_wrist_camera)
+                left_wrist_lines = list(overlay_lines) + ["left_wrist"]
+                if bool(args.overlay_text_enable):
+                    left_wrist_bgr = overlay_text(left_wrist_rgb, left_wrist_lines)
+                else:
+                    left_wrist_bgr = cv2.cvtColor(left_wrist_rgb, cv2.COLOR_RGB2BGR)
+                if left_wrist_smooth_writer is not None:
+                    left_wrist_smooth_writer.write(left_wrist_bgr)
+                if (not smooth_enabled) or spec.is_original:
+                    left_wrist_writer.write(left_wrist_bgr)
+
+            right_wrist_bgr = None
+            if right_wrist_writer is not None:
+                right_wrist_rgb, _ = renderer.capture_camera(renderer.right_wrist_camera)
+                right_wrist_lines = list(overlay_lines) + ["right_wrist"]
+                if bool(args.overlay_text_enable):
+                    right_wrist_bgr = overlay_text(right_wrist_rgb, right_wrist_lines)
+                else:
+                    right_wrist_bgr = cv2.cvtColor(right_wrist_rgb, cv2.COLOR_RGB2BGR)
+                if right_wrist_smooth_writer is not None:
+                    right_wrist_smooth_writer.write(right_wrist_bgr)
+                if (not smooth_enabled) or spec.is_original:
+                    right_wrist_writer.write(right_wrist_bgr)
+
             if args.save_png_frames and (not smooth_enabled or spec.is_original):
                 cv2.imwrite(str(frames_dir / f"zed_{frame_idx:04d}.png"), main_bgr)
                 depth_safe = np.nan_to_num(depth, nan=0.0, posinf=0.0, neginf=0.0)
                 cv2.imwrite(str(frames_dir / f"depth_{frame_idx:04d}.png"), depth_safe.astype(np.uint16))
                 if third_writer is not None:
                     cv2.imwrite(str(frames_dir / f"third_{frame_idx:04d}.png"), third_bgr)
+                if left_wrist_bgr is not None:
+                    cv2.imwrite(str(frames_dir / f"left_wrist_{frame_idx:04d}.png"), left_wrist_bgr)
+                if right_wrist_bgr is not None:
+                    cv2.imwrite(str(frames_dir / f"right_wrist_{frame_idx:04d}.png"), right_wrist_bgr)
 
             if spec.is_original:
                 print(
@@ -2533,6 +2581,14 @@ def main() -> None:
             third_writer.release()
         if smooth_writer is not None:
             smooth_writer.release()
+        if left_wrist_writer is not None:
+            left_wrist_writer.release()
+        if right_wrist_writer is not None:
+            right_wrist_writer.release()
+        if left_wrist_smooth_writer is not None:
+            left_wrist_smooth_writer.release()
+        if right_wrist_smooth_writer is not None:
+            right_wrist_smooth_writer.release()
 
     if bool(args.save_world_targets):
         np.savez_compressed(
@@ -2557,6 +2613,14 @@ def main() -> None:
     print(f"Saved depth replay video to: {depth_video_path}")
     if args.third_person_view:
         print(f"Saved third-person replay video to: {third_video_path}")
+    if left_wrist_writer is not None:
+        print(f"Saved left wrist replay video to: {left_wrist_video_path}")
+    if right_wrist_writer is not None:
+        print(f"Saved right wrist replay video to: {right_wrist_video_path}")
+    if left_wrist_smooth_video_path is not None:
+        print(f"Saved smooth left wrist replay video to: {left_wrist_smooth_video_path}")
+    if right_wrist_smooth_video_path is not None:
+        print(f"Saved smooth right wrist replay video to: {right_wrist_smooth_video_path}")
     if bool(args.save_world_targets):
         print(f"Saved world-space targets to: {args.output_dir / 'world_targets_and_status.npz'}")
     renderer.hold_viewer()
