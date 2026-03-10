@@ -7,8 +7,8 @@ GPU_ID="${3:-3}"
 TASK_CONFIG="${4:-demo_clean}"
 UNNORM_KEY="${UNNORM_KEY:-aloha_beat_block_hammer_builder}"
 TASK_NAME="beat_block_hammer"
-RUN_ROOT_DIR="${RUN_ROOT_DIR:-/home/zaijia001/ssd/RoboTwin/data/beat_block_hammer/runs_openvla_v1}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+RUN_ROOT_DIR="${RUN_ROOT_DIR:-${SCRIPT_DIR}/runs/beat_block_hammer_v1}"
 AUTO_MERGE_LORA_CHECKPOINT="${AUTO_MERGE_LORA_CHECKPOINT:-1}"
 
 if [[ -z "${CHECKPOINT_PATH}" ]]; then

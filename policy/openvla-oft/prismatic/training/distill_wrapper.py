@@ -148,4 +148,8 @@ class PrivilegedDistillWrapper(nn.Module):
             output = self._run_vla(batch, additional_patch_embeddings=future_token)
             labels = batch["labels"].to(self._model_device())[:, 1:]
             predicted_actions = self._predict_actions_from_output(output, labels)
-        return {"output": output, "predicted_actions": predicted_actions}
+        return {
+            "output": output,
+            "predicted_actions": predicted_actions,
+            "future_token": future_token,
+        }

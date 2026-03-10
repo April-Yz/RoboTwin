@@ -962,6 +962,7 @@ class OpenVLAForActionPrediction(PrismaticForConditionalGeneration):
         action_head=None,
         noisy_action_projector=None,
         use_film: bool = False,
+        return_diagnostics: bool = False,
         **kwargs: str,
     ) -> np.ndarray:
         """Predict actions from input sequence, with options for different prediction methods.
@@ -1066,6 +1067,13 @@ class OpenVLAForActionPrediction(PrismaticForConditionalGeneration):
 
         # Unnormalize predicted actions
         actions = self._unnormalize_actions(normalized_actions, unnorm_key)
+
+        if return_diagnostics:
+            diagnostics = {
+                "normalized_actions": normalized_actions,
+                "unnormalized_actions": actions,
+            }
+            return actions, actions_hidden_states, diagnostics
 
         return actions, actions_hidden_states
 

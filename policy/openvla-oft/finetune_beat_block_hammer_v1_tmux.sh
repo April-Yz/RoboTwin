@@ -5,7 +5,7 @@ GPU_ID="${GPU_ID:-${1:-1}}"
 SESSION_NAME="${SESSION_NAME:-openvla_beat_block_hammer_v1_gpu${GPU_ID}}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TRAIN_SCRIPT="${SCRIPT_DIR}/finetune_beat_block_hammer_v1.sh"
-LOG_DIR="${LOG_DIR:-/home/zaijia001/ssd/RoboTwin/data/beat_block_hammer/tmux_logs}"
+LOG_DIR="${LOG_DIR:-${SCRIPT_DIR}/tmux_logs}"
 TMUX_BIN="${TMUX_BIN:-/usr/bin/tmux}"
 
 mkdir -p "${LOG_DIR}"

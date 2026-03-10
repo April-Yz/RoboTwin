@@ -721,6 +721,7 @@ def get_vla_action(
     proprio_projector: Optional[torch.nn.Module] = None,
     noisy_action_projector: Optional[torch.nn.Module] = None,
     use_film: bool = False,
+    return_diagnostics: bool = False,
 ) -> List[np.ndarray]:
     """
     Generate action predictions with the VLA policy.
@@ -777,24 +778,64 @@ def get_vla_action(
             proprio = obs["state"]
 
         # Generate action
+        prediction_diagnostics = None
         if action_head is None:
             # Standard VLA output (single-image inputs, discrete actions)
-            action, _ = vla.predict_action(**inputs, unnorm_key=cfg.unnorm_key, do_sample=False)
+            if return_diagnostics:
+                action, _, prediction_diagnostics = vla.predict_action(
+                    **inputs,
+                    unnorm_key=cfg.unnorm_key,
+                    do_sample=False,
+                    return_diagnostics=True,
+                )
+            else:
+                action, _ = vla.predict_action(**inputs, unnorm_key=cfg.unnorm_key, do_sample=False)
         else:
             # Custom action head for continuous actions
-            action, _ = vla.predict_action(
-                **inputs,
-                unnorm_key=cfg.unnorm_key,
-                do_sample=False,
-                proprio=proprio,
-                proprio_projector=proprio_projector,
-                noisy_action_projector=noisy_action_projector,
-                action_head=action_head,
-                use_film=use_film,
-            )
+            if return_diagnostics:
+                action, _, prediction_diagnostics = vla.predict_action(
+                    **inputs,
+                    unnorm_key=cfg.unnorm_key,
+                    do_sample=False,
+                    proprio=proprio,
+                    proprio_projector=proprio_projector,
+                    noisy_action_projector=noisy_action_projector,
+                    action_head=action_head,
+                    use_film=use_film,
+                    return_diagnostics=True,
+                )
+            else:
+                action, _ = vla.predict_action(
+                    **inputs,
+                    unnorm_key=cfg.unnorm_key,
+                    do_sample=False,
+                    proprio=proprio,
+                    proprio_projector=proprio_projector,
+                    noisy_action_projector=noisy_action_projector,
+                    action_head=action_head,
+                    use_film=use_film,
+                )
 
     # Return action chunk as list of actions
-    return [action[i] for i in range(len(action))]
+    action_list = [action[i] for i in range(len(action))]
+    if not return_diagnostics:
+        return action_list
+
+    diagnostics = {
+        "raw_actions": prediction_diagnostics["normalized_actions"] if prediction_diagnostics is not None else np.asarray(action),
+        "denorm_actions": prediction_diagnostics["unnormalized_actions"] if prediction_diagnostics is not None else np.asarray(action),
+        "checkpoint_path": cfg.pretrained_checkpoint,
+        "has_lora_adapter": os.path.isdir(os.path.join(cfg.pretrained_checkpoint, "lora_adapter")),
+        "has_config_json": os.path.isfile(os.path.join(cfg.pretrained_checkpoint, "config.json")),
+        "use_proprio": cfg.use_proprio,
+        "use_film": use_film,
+        "num_images_in_input": cfg.num_images_in_input,
+        "unnorm_key": cfg.unnorm_key,
+        "action_dim": ACTION_DIM,
+        "action_chunk_size": NUM_ACTIONS_CHUNK,
+        "action_norm_type": ACTION_PROPRIO_NORMALIZATION_TYPE.value,
+    }
+    return action_list, diagnostics
 
 
 def get_action_from_server(

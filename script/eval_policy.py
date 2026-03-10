@@ -306,6 +306,9 @@ def eval_policy(task_name,
         else:
             print("\033[91mFail!\033[0m")
 
+        if hasattr(model, "finish_episode_diagnostics"):
+            model.finish_episode_diagnostics(success=succ, step_limit=TASK_ENV.step_lim)
+
         now_id += 1
         TASK_ENV.close_env(clear_cache=((succ_seed + 1) % clear_cache_freq == 0))
 

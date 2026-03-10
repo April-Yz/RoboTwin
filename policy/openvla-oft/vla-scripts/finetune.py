@@ -6,7 +6,7 @@ Fine-tunes OpenVLA via LoRA.
 
 import os
 import time
-from collections import deque
+from collections import defaultdict, deque
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Optional, Tuple, Type
@@ -52,6 +52,13 @@ from prismatic.models.future_projector import FutureObservationProjector
 from prismatic.models.projectors import (
     NoisyActionProjector,
     ProprioProjector,
+)
+from prismatic.training.action_diagnostics import (
+    compute_action_stats,
+    compute_curr_next_action_metrics,
+    compute_pairwise_action_metrics,
+    compute_tensor_stats,
+    corrupt_future_pixels,
 )
 from prismatic.training.distill_losses import compute_action_distill_loss
 from prismatic.training.distill_wrapper import PrivilegedDistillWrapper
@@ -136,6 +143,10 @@ class FinetuneConfig:
     run_id_note: Optional[str] = None                # Extra note to add to end of run ID for logging
     run_id_override: Optional[str] = None            # Optional string to override the run ID with
     wandb_log_freq: int = 10                         # WandB logging frequency in steps
+    log_action_diagnostics: bool = True              # If True, log student/teacher/GT action diagnostics
+    action_diagnostics_log_freq: int = 20            # Training action diagnostics logging frequency in steps
+    enable_future_corruption_debug: bool = False     # If True, compare teacher action against corrupted future input
+    future_corruption_debug_freq: int = 1000         # Future corruption debug frequency in steps
 
     # fmt: on
 
@@ -344,6 +355,8 @@ def run_forward_pass(
     bc_weight=1.0,
     compute_diffusion_l1=False,
     num_diffusion_steps_train=None,
+    log_action_diagnostics=False,
+    compute_future_corruption_debug=False,
 ) -> Tuple[torch.Tensor, Dict[str, float]]:
     """
     Compute model forward pass and metrics for both training and validation.
@@ -391,23 +404,61 @@ def run_forward_pass(
         )
         loss = bc_weight * loss_bc + distill_weight * loss_distill
 
-        ground_truth_curr_action = ground_truth_actions[:, 0]
-        predicted_curr_action = student_actions[:, 0]
-        ground_truth_next_actions = ground_truth_actions[:, 1:]
-        predicted_next_actions = student_actions[:, 1:]
-        curr_action_l1_loss = torch.nn.L1Loss()(ground_truth_curr_action, predicted_curr_action)
-        next_actions_l1_loss = torch.nn.L1Loss()(ground_truth_next_actions, predicted_next_actions)
-
         metrics.update(
             {
                 "loss_value": loss.item(),
                 "loss_total": loss.item(),
                 "loss_bc": loss_bc.item(),
                 "loss_distill": loss_distill.item(),
-                "curr_action_l1_loss": curr_action_l1_loss.item(),
-                "next_actions_l1_loss": next_actions_l1_loss.item(),
+                "distill_to_bc_ratio": (loss_distill / (loss_bc + 1e-8)).item(),
+                "weighted_distill_to_total_ratio": ((distill_weight * loss_distill) / (loss + 1e-8)).item(),
             }
         )
+
+        metrics.update(compute_curr_next_action_metrics(student_actions, ground_truth_actions))
+
+        if log_action_diagnostics:
+            metrics.update(compute_action_stats("student_action", student_actions))
+            metrics.update(compute_action_stats("teacher_action", teacher_actions))
+            metrics.update(compute_action_stats("gt_action", ground_truth_actions))
+            student_to_gt = compute_pairwise_action_metrics("student_action_to_gt", student_actions, ground_truth_actions)
+            teacher_to_gt = compute_pairwise_action_metrics("teacher_action_to_gt", teacher_actions, ground_truth_actions)
+            student_teacher = compute_pairwise_action_metrics("student_teacher_action", student_actions, teacher_actions)
+            metrics.update(student_to_gt)
+            metrics.update(teacher_to_gt)
+            metrics.update(student_teacher)
+            metrics.update(
+                {
+                    "student_action_l1_to_gt": student_to_gt["student_action_to_gt_l1"],
+                    "student_action_mse_to_gt": student_to_gt["student_action_to_gt_mse"],
+                    "teacher_action_l1_to_gt": teacher_to_gt["teacher_action_to_gt_l1"],
+                    "teacher_action_mse_to_gt": teacher_to_gt["teacher_action_to_gt_mse"],
+                    "student_teacher_action_l1": student_teacher["student_teacher_action_l1"],
+                    "student_teacher_action_mse": student_teacher["student_teacher_action_mse"],
+                    "student_teacher_action_cosine_sim": student_teacher["student_teacher_action_cosine_sim"],
+                }
+            )
+
+            future_token = teacher_dict.get("future_token")
+            if future_token is not None:
+                metrics.update(compute_tensor_stats("future_latent", future_token))
+
+        if compute_future_corruption_debug:
+            corrupt_batch = dict(batch)
+            corrupt_batch["future_pixel_values"] = corrupt_future_pixels(batch["future_pixel_values"])
+            corrupt_teacher_dict = distill_wrapper.forward_teacher(corrupt_batch)
+            corrupt_teacher_actions = corrupt_teacher_dict["predicted_actions"]
+            metrics.update(
+                {
+                    "debug_teacher_action_delta_when_corrupt_future_l1": torch.nn.functional.l1_loss(
+                        teacher_actions, corrupt_teacher_actions
+                    ).item(),
+                    "debug_teacher_action_delta_when_corrupt_future_mse": torch.nn.functional.mse_loss(
+                        teacher_actions, corrupt_teacher_actions
+                    ).item(),
+                }
+            )
+
         return loss, metrics
 
     # [Only for diffusion] Sample noisy actions used as input for noise predictor network
@@ -1064,6 +1115,25 @@ def finetune(cfg: FinetuneConfig) -> None:
     # Create experiment run directory
     run_dir = cfg.run_root_dir / run_id
     os.makedirs(run_dir, exist_ok=True)
+    print(
+        "[TrainConfig] "
+        f"run_root_dir={cfg.run_root_dir} "
+        f"run_dir={run_dir} "
+        f"use_privileged_distill={cfg.use_privileged_distill} "
+        f"use_proprio={cfg.use_proprio} "
+        f"use_film={cfg.use_film} "
+        f"num_images_in_input={cfg.num_images_in_input} "
+        f"batch_size={cfg.batch_size} "
+        f"save_freq={cfg.save_freq}"
+    )
+    if cfg.use_privileged_distill:
+        print(
+            "[TrainDiagnostics] "
+            f"log_action_diagnostics={cfg.log_action_diagnostics} "
+            f"action_diagnostics_log_freq={cfg.action_diagnostics_log_freq} "
+            f"enable_future_corruption_debug={cfg.enable_future_corruption_debug} "
+            f"future_corruption_debug_freq={cfg.future_corruption_debug_freq}"
+        )
 
     # GPU setup
     distributed_state = PartialState()
@@ -1407,22 +1477,41 @@ def finetune(cfg: FinetuneConfig) -> None:
         )
 
     # Deque to store recent train metrics (used for computing smoothened metrics for gradient accumulation)
-    recent_metrics = {
-        "loss_value": deque(maxlen=cfg.grad_accumulation_steps),
-        "loss_total": deque(maxlen=cfg.grad_accumulation_steps),
-        "loss_bc": deque(maxlen=cfg.grad_accumulation_steps),
-        "loss_distill": deque(maxlen=cfg.grad_accumulation_steps),
-        "curr_action_accuracy": deque(maxlen=cfg.grad_accumulation_steps),
-        "curr_action_l1_loss": deque(maxlen=cfg.grad_accumulation_steps),
-        "next_actions_accuracy": deque(maxlen=cfg.grad_accumulation_steps),
-        "next_actions_l1_loss": deque(maxlen=cfg.grad_accumulation_steps),
-    }
+    recent_metrics = defaultdict(lambda: deque(maxlen=cfg.grad_accumulation_steps))
+    for metric_name in (
+        "loss_value",
+        "loss_total",
+        "loss_bc",
+        "loss_distill",
+        "curr_action_accuracy",
+        "curr_action_l1_loss",
+        "next_actions_accuracy",
+        "next_actions_l1_loss",
+    ):
+        recent_metrics[metric_name] = deque(maxlen=cfg.grad_accumulation_steps)
 
     # Start training
     with tqdm.tqdm(total=cfg.max_steps, leave=False) as progress:
         vla.train()
         optimizer.zero_grad()
         for batch_idx, batch in enumerate(dataloader):
+            gradient_step_idx = batch_idx // cfg.grad_accumulation_steps
+            log_step = (
+                gradient_step_idx
+                if not cfg.resume
+                else cfg.resume_step + gradient_step_idx
+            )
+            should_log_action_diagnostics = (
+                cfg.use_privileged_distill
+                and cfg.log_action_diagnostics
+                and log_step % cfg.action_diagnostics_log_freq == 0
+            )
+            should_run_future_corruption_debug = (
+                cfg.use_privileged_distill
+                and cfg.enable_future_corruption_debug
+                and log_step % cfg.future_corruption_debug_freq == 0
+            )
+
             # Compute training metrics and loss
             compute_diffusion_l1 = (
                 cfg.use_diffusion and batch_idx % cfg.diffusion_sample_freq == 0
@@ -1451,6 +1540,8 @@ def finetune(cfg: FinetuneConfig) -> None:
                 num_diffusion_steps_train=cfg.num_diffusion_steps_train
                 if cfg.use_diffusion
                 else None,
+                log_action_diagnostics=should_log_action_diagnostics,
+                compute_future_corruption_debug=should_run_future_corruption_debug,
             )
 
             # Normalize loss to account for gradient accumulation
@@ -1461,21 +1552,12 @@ def finetune(cfg: FinetuneConfig) -> None:
 
             # Store recent train metrics
             for metric_name, value in metrics.items():
-                if metric_name in recent_metrics:
-                    recent_metrics[metric_name].append(value)
-
-            # Compute gradient step index
-            gradient_step_idx = batch_idx // cfg.grad_accumulation_steps
+                recent_metrics[metric_name].append(value)
 
             # Compute smoothened train metrics
             smoothened_metrics = compute_smoothened_metrics(recent_metrics)
 
             # Push Metrics to W&B (every wandb_log_freq gradient steps)
-            log_step = (
-                gradient_step_idx
-                if not cfg.resume
-                else cfg.resume_step + gradient_step_idx
-            )
             if distributed_state.is_main_process and log_step % cfg.wandb_log_freq == 0:
                 log_metrics_to_wandb(smoothened_metrics, "VLA Train", log_step, wandb)
 

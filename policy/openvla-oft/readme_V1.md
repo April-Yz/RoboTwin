@@ -196,7 +196,7 @@ bash finetune_beat_block_hammer_v1.sh 1
 - 激活 `RoboTwin_openvla`
 - 使用 `CUDA_VISIBLE_DEVICES=1`
 - 采用数据集 `aloha_beat_block_hammer_builder`
-- 输出到 `/home/zaijia001/ssd/RoboTwin/data/beat_block_hammer/runs_openvla_v1`
+- 输出到 `/home/zaijia001/ssd/RoboTwin/policy/openvla-oft/runs/beat_block_hammer_v1`
 - 默认使用 `WANDB_ENTITY=yangzaijia`
 - 默认使用 `WANDB_PROJECT=openvla-oft`
 
@@ -209,7 +209,7 @@ bash finetune_beat_block_hammer_v1_tmux.sh 1
 
 这会创建一个 `tmux` session，并把日志写到：
 
-- `/home/zaijia001/ssd/RoboTwin/data/beat_block_hammer/tmux_logs`
+- `/home/zaijia001/ssd/RoboTwin/policy/openvla-oft/tmux_logs`
 
 如果当前 shell 的 `LD_LIBRARY_PATH` 被 `/home/zaijia001/ssd/local_install/lib` 污染，直接手敲 `tmux` 可能报：
 
@@ -243,7 +243,7 @@ torchrun --standalone --nnodes 1 --nproc-per-node 1 vla-scripts/finetune.py \
   --vla_path openvla/openvla-7b \
   --data_root_dir /home/zaijia001/ssd/RoboTwin/data/beat_block_hammer/tfds \
   --dataset_name aloha_beat_block_hammer_builder \
-  --run_root_dir /home/zaijia001/ssd/RoboTwin/data/beat_block_hammer/runs_openvla_v1 \
+  --run_root_dir /home/zaijia001/ssd/RoboTwin/policy/openvla-oft/runs/beat_block_hammer_v1 \
   --use_l1_regression True \
   --use_diffusion False \
   --use_film True \
@@ -287,7 +287,7 @@ torchrun --standalone --nnodes 1 --nproc-per-node 1 vla-scripts/finetune.py \
 cd /home/zaijia001/ssd/RoboTwin/policy/openvla-oft
 RESUME=True \
 RESUME_STEP=10000 \
-VLA_PATH=/home/zaijia001/ssd/RoboTwin/data/beat_block_hammer/runs_openvla_v1/openvla-7b+aloha_beat_block_hammer_builder+b4+lr-0.0005+lora-r32+dropout-0.0--image_aug--pd-k4-dw0.5--beat_block_hammer_v1_gpu1--10000_chkpt \
+VLA_PATH=/home/zaijia001/ssd/RoboTwin/policy/openvla-oft/runs/beat_block_hammer_v1/openvla-7b+aloha_beat_block_hammer_builder+b4+lr-0.0005+lora-r32+dropout-0.0--image_aug--pd-k4-dw0.5--beat_block_hammer_v1_gpu1--10000_chkpt \
 RESUME_BASE_MODEL_PATH=openvla/openvla-7b \
 BATCH_SIZE=4 \
 bash finetune_beat_block_hammer_v1_tmux.sh 1
@@ -325,7 +325,7 @@ bash eval_beat_block_hammer_v1.sh
 ```bash
 cd /home/zaijia001/ssd/RoboTwin/policy/openvla-oft
 bash eval_beat_block_hammer_v1.sh \
-  /home/zaijia001/ssd/RoboTwin/data/beat_block_hammer/runs_openvla_v1/openvla-7b+aloha_beat_block_hammer_builder+b4+lr-0.0005+lora-r32+dropout-0.0--image_aug--pd-k4-dw0.5--beat_block_hammer_v1_gpu1--10000_chkpt
+  /home/zaijia001/ssd/RoboTwin/policy/openvla-oft/runs/beat_block_hammer_v1/openvla-7b+aloha_beat_block_hammer_builder+b4+lr-0.0005+lora-r32+dropout-0.0--image_aug--pd-k4-dw0.5--beat_block_hammer_v1_gpu1--10000_chkpt
 ```
 
 评估脚本会自动：
@@ -406,7 +406,7 @@ python vla-scripts/smoke_test_privileged_distill.py
 
 当前这份脚本默认把本地训练产物写到：
 
-- `/home/zaijia001/ssd/RoboTwin/data/beat_block_hammer/runs_openvla_v1`
+- `/home/zaijia001/ssd/RoboTwin/policy/openvla-oft/runs/beat_block_hammer_v1`
 
 如果你想临时不上传云端，可以先设置：
 
@@ -433,8 +433,60 @@ export WANDB_MODE=offline
 - `loss_distill`
 - `curr_action_l1_loss`
 - `next_actions_l1_loss`
+- `distill_to_bc_ratio`
+- `weighted_distill_to_total_ratio`
 
-## 10. 恢复训练和 checkpoint
+如果开启默认的动作诊断，还会额外记录：
+
+- `student_action_* / teacher_action_* / gt_action_*`
+- `student_action_l1_to_gt / teacher_action_l1_to_gt`
+- `student_teacher_action_l1 / student_teacher_action_mse / student_teacher_action_cosine_sim`
+- `curr_action_pred_abs_mean / next_actions_pred_abs_mean`
+- `future_latent_norm / future_latent_mean / future_latent_std`
+
+对应开关在 [`finetune.py`](/home/zaijia001/ssd/RoboTwin/policy/openvla-oft/vla-scripts/finetune.py) 里：
+
+```yaml
+log_action_diagnostics: true
+action_diagnostics_log_freq: 20
+enable_future_corruption_debug: false
+future_corruption_debug_freq: 1000
+```
+
+`enable_future_corruption_debug=True` 时，会低频记录：
+
+- `debug_teacher_action_delta_when_corrupt_future_l1`
+- `debug_teacher_action_delta_when_corrupt_future_mse`
+
+这些指标用于确认 teacher 是否真的在利用 future。
+
+## 10. Eval 诊断
+
+当前 eval 会在启动时打印：
+
+- 实际加载的 checkpoint 路径
+- `use_l1_regression / use_diffusion / use_proprio / use_film`
+- `num_images_in_input`
+- `unnorm_key`
+- checkpoint 是否含 `config.json`
+- checkpoint 是否仍有 `lora_adapter`
+
+并且会在前若干步以及固定频率下打印：
+
+- `raw_action_*`
+- `denorm_action_*`
+- `executed_action_*`
+
+每个 episode 结束后还会打印：
+
+- `episode_len`
+- `success`
+- `joint_delta_norm`
+- `gripper_open_close_changes`
+
+如果你看到 `Fail! 400 / 400`，但同时 `executed_action_abs_mean` 和 `joint_delta_norm` 都很小，优先排查动作幅值塌缩或反归一化链路。
+
+## 11. 恢复训练和 checkpoint
 
 启用蒸馏后，checkpoint 会额外保存：
 
@@ -464,17 +516,21 @@ bash eval_beat_block_hammer_v1.sh
 
 说明：
 
-- `merge_lora_beat_block_hammer_v1.sh` 不传参数时，会自动选 `runs_openvla_v1` 下最新的 `*chkpt` 目录
+- `merge_lora_beat_block_hammer_v1.sh` 不传参数时，会自动选 `runs/beat_block_hammer_v1` 下最新的 `*chkpt` 目录
 - `eval_beat_block_hammer_v1.sh` 不传参数时，也会默认评估最新的 `*chkpt` 目录
 - 如果你要指定 checkpoint，可以把目录路径作为第一个参数传进去
 
-  你要直接用 tmux + bs=4，用这条：
+如果你要直接用 `tmux + bs=4`：
 
-  cd /home/zaijia001/ssd/RoboTwin/policy/openvla-oft
-  BATCH_SIZE=4 bash finetune_beat_block_hammer_v1_tmux.sh 1
+```bash
+cd /home/zaijia001/ssd/RoboTwin/policy/openvla-oft
+BATCH_SIZE=4 bash finetune_beat_block_hammer_v1_tmux.sh 1
+```
 
-  如果你想自己手动开 tmux 再跑，用这条：
+如果你想自己手动开 `tmux` 再跑：
 
-  tmux new -s openvla_beat_block_hammer_bs4
-  cd /home/zaijia001/ssd/RoboTwin/policy/openvla-oft
-  BATCH_SIZE=4 bash finetune_beat_block_hammer_v1.sh 1
+```bash
+tmux new -s openvla_beat_block_hammer_bs4
+cd /home/zaijia001/ssd/RoboTwin/policy/openvla-oft
+BATCH_SIZE=4 bash finetune_beat_block_hammer_v1.sh 1
+```

@@ -3,6 +3,7 @@ set -euo pipefail
 
 GPU_ID="${GPU_ID:-${1:-1}}"
 NPROC_PER_NODE="${NPROC_PER_NODE:-1}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 unset LD_LIBRARY_PATH
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
@@ -10,14 +11,14 @@ set +u
 conda activate RoboTwin_openvla
 set -u
 
-cd /home/zaijia001/ssd/RoboTwin/policy/openvla-oft
+cd "${SCRIPT_DIR}"
 
 export CUDA_VISIBLE_DEVICES="${GPU_ID}"
 export WANDB_ENTITY="${WANDB_ENTITY:-yangzaijia}"
 export WANDB_PROJECT="${WANDB_PROJECT:-openvla-oft}"
 export WANDB_MODE="${WANDB_MODE:-online}"
 
-RUN_ROOT_DIR="${RUN_ROOT_DIR:-/home/zaijia001/ssd/RoboTwin/data/beat_block_hammer/runs_openvla_v1}"
+RUN_ROOT_DIR="${RUN_ROOT_DIR:-${SCRIPT_DIR}/runs/beat_block_hammer_v1}"
 DATA_ROOT_DIR="${DATA_ROOT_DIR:-/home/zaijia001/ssd/RoboTwin/data/beat_block_hammer/tfds}"
 DATASET_NAME="${DATASET_NAME:-aloha_beat_block_hammer_builder}"
 VLA_PATH="${VLA_PATH:-openvla/openvla-7b}"
