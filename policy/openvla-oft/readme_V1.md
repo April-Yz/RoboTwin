@@ -383,3 +383,15 @@ bash eval_beat_block_hammer_v1.sh
 - `merge_lora_beat_block_hammer_v1.sh` 不传参数时，会自动选 `runs_openvla_v1` 下最新的 `*chkpt` 目录
 - `eval_beat_block_hammer_v1.sh` 不传参数时，也会默认评估最新的 `*chkpt` 目录
 - 如果你要指定 checkpoint，可以把目录路径作为第一个参数传进去
+
+  你要直接用 tmux + bs=4，用这条：
+
+  cd /home/zaijia001/ssd/RoboTwin/policy/openvla-oft
+  BATCH_SIZE=4 bash finetune_beat_block_hammer_v1_tmux.sh 1
+
+  如果你想自己手动开 tmux 再跑，用这条：
+
+  tmux new -s openvla_beat_block_hammer_bs4
+  cd /home/zaijia001/ssd/RoboTwin/policy/openvla-oft
+  BATCH_SIZE=4 bash finetune_beat_block_hammer_v1.sh 1
+
