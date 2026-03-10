@@ -21,6 +21,9 @@ RUN_ROOT_DIR="${RUN_ROOT_DIR:-/home/zaijia001/ssd/RoboTwin/data/beat_block_hamme
 DATA_ROOT_DIR="${DATA_ROOT_DIR:-/home/zaijia001/ssd/RoboTwin/data/beat_block_hammer/tfds}"
 DATASET_NAME="${DATASET_NAME:-aloha_beat_block_hammer_builder}"
 VLA_PATH="${VLA_PATH:-openvla/openvla-7b}"
+RESUME="${RESUME:-False}"
+RESUME_STEP="${RESUME_STEP:-}"
+RESUME_BASE_MODEL_PATH="${RESUME_BASE_MODEL_PATH:-openvla/openvla-7b}"
 RUN_ID_NOTE="${RUN_ID_NOTE:-beat_block_hammer_v1_gpu${GPU_ID}}"
 BATCH_SIZE="${BATCH_SIZE:-2}"
 LEARNING_RATE="${LEARNING_RATE:-5e-4}"
@@ -44,6 +47,12 @@ echo "  RUN_ROOT_DIR=${RUN_ROOT_DIR}"
 echo "  BATCH_SIZE=${BATCH_SIZE}"
 echo "  MAX_STEPS=${MAX_STEPS}"
 echo "  SAVE_FREQ=${SAVE_FREQ}"
+echo "  RESUME=${RESUME}"
+if [[ "${RESUME}" == "True" ]]; then
+  echo "  RESUME_STEP=${RESUME_STEP}"
+  echo "  CHECKPOINT_DIR=${VLA_PATH}"
+  echo "  RESUME_BASE_MODEL_PATH=${RESUME_BASE_MODEL_PATH}"
+fi
 
 COMMON_ARGS=(
   --vla_path "${VLA_PATH}"
@@ -79,6 +88,18 @@ COMMON_ARGS=(
   --run_id_note "${RUN_ID_NOTE}"
   --wandb_log_freq "${WANDB_LOG_FREQ}"
 )
+
+if [[ "${RESUME}" == "True" ]]; then
+  if [[ -z "${RESUME_STEP}" ]]; then
+    echo "RESUME=True requires RESUME_STEP"
+    exit 1
+  fi
+  COMMON_ARGS+=(
+    --resume True
+    --resume_step "${RESUME_STEP}"
+    --resume_base_model_path "${RESUME_BASE_MODEL_PATH}"
+  )
+fi
 
 if [[ "${NPROC_PER_NODE}" == "1" ]]; then
   echo "  LAUNCH_MODE=python"
