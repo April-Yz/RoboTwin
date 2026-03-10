@@ -8,7 +8,7 @@ RUN_ROOT_DIR="${RUN_ROOT_DIR:-/home/zaijia001/ssd/RoboTwin/data/beat_block_hamme
 BASE_CHECKPOINT="${BASE_CHECKPOINT:-openvla/openvla-7b}"
 
 if [[ -z "${CHECKPOINT_DIR}" ]]; then
-  CHECKPOINT_DIR="$(find "${RUN_ROOT_DIR}" -maxdepth 1 -mindepth 1 -type d -name '*chkpt' | sort | tail -n 1)"
+  CHECKPOINT_DIR="$(find "${RUN_ROOT_DIR}" -maxdepth 1 -mindepth 1 -type d -name '*chkpt' | sort -V | tail -n 1)"
 fi
 
 if [[ -z "${CHECKPOINT_DIR}" || ! -d "${CHECKPOINT_DIR}" ]]; then

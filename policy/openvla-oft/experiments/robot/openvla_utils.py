@@ -38,6 +38,8 @@ DATE = time.strftime("%Y_%m_%d")
 DATE_TIME = time.strftime("%Y_%m_%d-%H_%M_%S")
 DEVICE = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
 OPENVLA_IMAGE_SIZE = 224  # Standard image size expected by OpenVLA
+OPENVLA_OFT_ROOT = Path(__file__).resolve().parents[2]
+OPENVLA_HF_MODULE_DIR = OPENVLA_OFT_ROOT / "prismatic" / "extern" / "hf"
 
 # Configure NumPy print settings
 np.set_printoptions(formatter={"float": lambda x: "{0:0.3f}".format(x)})
@@ -180,22 +182,19 @@ def check_model_logic_mismatch(pretrained_checkpoint: str) -> None:
     if not os.path.isdir(pretrained_checkpoint):
         return
 
-    # Find current files
-    curr_files = {"modeling_prismatic.py": None, "configuration_prismatic.py": None}
-
-    for root, _, files in os.walk("./prismatic/"):
-        for filename in curr_files.keys():
-            if filename in files and curr_files[filename] is None:
-                curr_files[filename] = os.path.join(root, filename)
+    curr_files = {
+        "modeling_prismatic.py": OPENVLA_HF_MODULE_DIR / "modeling_prismatic.py",
+        "configuration_prismatic.py": OPENVLA_HF_MODULE_DIR / "configuration_prismatic.py",
+    }
 
     # Check and handle each file
     for filename, curr_filepath in curr_files.items():
-        if curr_filepath is None:
+        if not curr_filepath.exists():
             print(f"WARNING: `{filename}` is not found anywhere in the current directory.")
             continue
 
         checkpoint_filepath = os.path.join(pretrained_checkpoint, filename)
-        _handle_file_sync(curr_filepath, checkpoint_filepath, filename)
+        _handle_file_sync(str(curr_filepath), checkpoint_filepath, filename)
 
 
 def find_checkpoint_file(pretrained_checkpoint: str, file_pattern: str) -> str:
