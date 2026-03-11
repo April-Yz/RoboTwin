@@ -49,6 +49,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--frame_stride", type=int, default=1)
     parser.add_argument("--max_frames", type=int, default=-1)
     parser.add_argument("--head_only", type=int, default=0, help="If 1, only save head_cam video and disable third_cam output.")
+    parser.add_argument("--hide_robot", type=int, default=0, help="If 1, freeze the head camera pose and move robot visuals out of view.")
     parser.add_argument("--overlay_text", type=int, default=1, help="If 1, draw overlay text on replay frames.")
     parser.add_argument("--third_person_view", type=int, default=1)
     parser.add_argument("--save_png_frames", type=int, default=0)
@@ -137,6 +138,7 @@ def build_renderer(args: argparse.Namespace) -> ReplayRenderer:
         init_gripper_open=None,
         lighting_mode=args.lighting_mode,
         attach_planner=False,
+        hide_robot=bool(args.hide_robot),
     )
 
 

@@ -43,6 +43,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--frame_stride", type=int, default=1)
     parser.add_argument("--max_frames", type=int, default=-1)
     parser.add_argument("--head_only", type=int, default=1)
+    parser.add_argument("--hide_robot", type=int, default=0)
     parser.add_argument("--overlay_text", type=int, default=0)
     parser.add_argument("--third_person_view", type=int, default=0)
     parser.add_argument("--save_png_frames", type=int, default=0)
@@ -122,6 +123,8 @@ def build_single_command(args: argparse.Namespace, video_dir: Path, output_dir: 
         str(args.max_frames),
         "--head_only",
         str(args.head_only),
+        "--hide_robot",
+        str(args.hide_robot),
         "--overlay_text",
         str(args.overlay_text),
         "--third_person_view",

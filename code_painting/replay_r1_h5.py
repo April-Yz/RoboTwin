@@ -63,8 +63,10 @@ def base_pose_to_world_pose(renderer: base.HandRetargetR1Renderer, pose_base: np
 
 
 class ReplayRenderer(base.HandRetargetR1Renderer):
-    def __init__(self, *args, attach_planner: bool = True, **kwargs) -> None:
+    def __init__(self, *args, attach_planner: bool = True, hide_robot: bool = False, **kwargs) -> None:
         self.attach_planner = bool(attach_planner)
+        self.hide_robot = bool(hide_robot)
+        self._fixed_head_camera_pose: Optional[sapien.Pose] = None
         super().__init__(*args, **kwargs)
 
     def _load_robot(self) -> None:
@@ -110,6 +112,38 @@ class ReplayRenderer(base.HandRetargetR1Renderer):
 
         self._update_table_pose()
         self.update_robot_link_cameras()
+        if self.hide_robot:
+            self._freeze_head_camera_and_hide_robot()
+
+    def _freeze_head_camera_and_hide_robot(self) -> None:
+        head_pose = self.get_head_camera_pose()
+        self._fixed_head_camera_pose = sapien.Pose(
+            np.asarray(head_pose.p, dtype=np.float64).tolist(),
+            np.asarray(head_pose.q, dtype=np.float64).tolist(),
+        )
+        self.zed_camera.set_entity_pose(self._fixed_head_camera_pose)
+        if self._left_wrist_camera_link is not None:
+            self.left_wrist_camera.set_entity_pose(base.HIDDEN_DEBUG_POSE)
+        if self._right_wrist_camera_link is not None:
+            self.right_wrist_camera.set_entity_pose(base.HIDDEN_DEBUG_POSE)
+        if self.third_person_view:
+            self.third_camera.set_entity_pose(self._build_third_camera_pose(self._fixed_head_camera_pose))
+        if self.robot is not None:
+            self.robot.left_entity.set_root_pose(base.HIDDEN_DEBUG_POSE)
+            self.robot.right_entity.set_root_pose(base.HIDDEN_DEBUG_POSE)
+        self.scene.update_render()
+
+    def update_robot_link_cameras(self) -> None:
+        if self._fixed_head_camera_pose is not None:
+            self.zed_camera.set_entity_pose(self._fixed_head_camera_pose)
+            if self._left_wrist_camera_link is not None:
+                self.left_wrist_camera.set_entity_pose(base.HIDDEN_DEBUG_POSE)
+            if self._right_wrist_camera_link is not None:
+                self.right_wrist_camera.set_entity_pose(base.HIDDEN_DEBUG_POSE)
+            if self.third_person_view:
+                self.third_camera.set_entity_pose(self._build_third_camera_pose(self._fixed_head_camera_pose))
+            return
+        super().update_robot_link_cameras()
 
 
 class H5ReplayTrajectory:
