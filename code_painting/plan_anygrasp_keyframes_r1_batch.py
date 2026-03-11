@@ -39,6 +39,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--open_gripper", type=float, default=1.0)
     parser.add_argument("--close_gripper", type=float, default=0.0)
     parser.add_argument("--approach_offset_m", type=float, default=0.08)
+    parser.add_argument("--settle_steps", type=int, default=4)
+    parser.add_argument("--execute_interp_steps", type=int, default=24)
+    parser.add_argument("--reach_pos_tol_m", type=float, default=0.03)
+    parser.add_argument("--reach_rot_tol_deg", type=float, default=20.0)
+    parser.add_argument("--max_stage_replans", type=int, default=3)
+    parser.add_argument("--hold_frames_after_stage", type=int, default=2)
     parser.add_argument("--head_only", type=int, default=1)
     parser.add_argument("--overlay_text", type=int, default=1)
     parser.add_argument("--third_person_view", type=int, default=0)
@@ -121,6 +127,18 @@ def build_single_command(args: argparse.Namespace, anygrasp_dir: Path, replay_di
         str(args.close_gripper),
         "--approach_offset_m",
         str(args.approach_offset_m),
+        "--settle_steps",
+        str(args.settle_steps),
+        "--execute_interp_steps",
+        str(args.execute_interp_steps),
+        "--reach_pos_tol_m",
+        str(args.reach_pos_tol_m),
+        "--reach_rot_tol_deg",
+        str(args.reach_rot_tol_deg),
+        "--max_stage_replans",
+        str(args.max_stage_replans),
+        "--hold_frames_after_stage",
+        str(args.hold_frames_after_stage),
         "--head_only",
         str(args.head_only),
         "--overlay_text",

@@ -84,6 +84,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--close_gripper", type=float, default=0.0)
     parser.add_argument("--approach_offset_m", type=float, default=0.08)
     parser.add_argument("--settle_steps", type=int, default=4)
+    parser.add_argument("--execute_interp_steps", type=int, default=24)
+    parser.add_argument("--reach_pos_tol_m", type=float, default=0.03)
+    parser.add_argument("--reach_rot_tol_deg", type=float, default=20.0)
+    parser.add_argument("--max_stage_replans", type=int, default=3)
+    parser.add_argument("--hold_frames_after_stage", type=int, default=2)
     parser.add_argument("--head_only", type=int, default=1)
     parser.add_argument("--overlay_text", type=int, default=1)
     parser.add_argument("--third_person_view", type=int, default=0)
@@ -345,6 +350,34 @@ def pose_with_offset_along_local_x(pose_world_wxyz: np.ndarray, offset_m: float)
     return np.concatenate([pose_world_matrix[:3, 3], quat]).astype(np.float64)
 
 
+def tcp_pose_errors(target_pose_world_wxyz: np.ndarray, current_pose_world_wxyz: np.ndarray) -> Tuple[float, float]:
+    target_pose_world_wxyz = np.asarray(target_pose_world_wxyz, dtype=np.float64).reshape(7)
+    current_pose_world_wxyz = np.asarray(current_pose_world_wxyz, dtype=np.float64).reshape(7)
+    pos_err = float(np.linalg.norm(target_pose_world_wxyz[:3] - current_pose_world_wxyz[:3]))
+    rot_err = float(base.quat_angle_deg_wxyz(current_pose_world_wxyz[3:], target_pose_world_wxyz[3:]))
+    return pos_err, rot_err
+
+
+def interpolate_joint_trajectory(position: np.ndarray, velocity: np.ndarray, num_steps: int) -> Tuple[np.ndarray, np.ndarray]:
+    position = np.asarray(position, dtype=np.float64)
+    velocity = np.asarray(velocity, dtype=np.float64)
+    if position.shape[0] < 2 or int(num_steps) <= position.shape[0]:
+        return position, velocity
+
+    out_pos = []
+    dof = position.shape[1]
+    zero_vel = np.zeros(dof, dtype=np.float64)
+    for idx in range(position.shape[0] - 1):
+        start = position[idx]
+        end = position[idx + 1]
+        seg = np.linspace(start, end, num=max(int(num_steps / max(position.shape[0] - 1, 1)), 2), endpoint=False)
+        out_pos.extend(seg.tolist())
+    out_pos.append(position[-1].tolist())
+    out_pos_arr = np.asarray(out_pos, dtype=np.float64)
+    out_vel_arr = np.tile(zero_vel[None, :], (out_pos_arr.shape[0], 1))
+    return out_pos_arr, out_vel_arr
+
+
 def execute_single_arm_plan(
     renderer: ReplayRenderer,
     arm: str,
@@ -355,6 +388,9 @@ def execute_single_arm_plan(
     use_overlay: bool,
     attached_actor: Optional[sapien.Entity] = None,
     tcp_to_object: Optional[np.ndarray] = None,
+    execute_interp_steps: int = 24,
+    settle_steps: int = 4,
+    hold_frames_after_stage: int = 0,
 ) -> str:
     status = renderer._plan_status(plan)
     overlay_lines = [f"stage={label}", f"arm={arm}", f"status={status}"]
@@ -364,6 +400,7 @@ def execute_single_arm_plan(
 
     position = np.asarray(plan["position"], dtype=np.float64)
     velocity = np.asarray(plan["velocity"], dtype=np.float64)
+    position, velocity = interpolate_joint_trajectory(position, velocity, execute_interp_steps)
     for idx in range(position.shape[0]):
         renderer.robot.set_arm_joints(position[idx], velocity[idx], arm)
         if attached_actor is not None and tcp_to_object is not None:
@@ -373,9 +410,84 @@ def execute_single_arm_plan(
             set_actor_pose(attached_actor, np.concatenate([object_world[:3, 3], quat]))
         renderer.step_scene(steps=1)
         record_frame(renderer, head_writer, third_writer, overlay_lines + [f"plan_step={idx + 1}/{position.shape[0]}"], use_overlay)
-    renderer.step_scene(steps=4)
+    renderer.step_scene(steps=max(int(settle_steps), 0))
     record_frame(renderer, head_writer, third_writer, overlay_lines + ["plan_step=done"], use_overlay)
+    for hold_idx in range(max(int(hold_frames_after_stage), 0)):
+        record_frame(renderer, head_writer, third_writer, overlay_lines + [f"hold={hold_idx + 1}/{hold_frames_after_stage}"], use_overlay)
     return status
+
+
+def execute_stage_until_reached(
+    renderer: ReplayRenderer,
+    arm: str,
+    target_pose_world_wxyz: np.ndarray,
+    label: str,
+    head_writer: cv2.VideoWriter,
+    third_writer: Optional[cv2.VideoWriter],
+    use_overlay: bool,
+    args: argparse.Namespace,
+    attached_actor: Optional[sapien.Entity] = None,
+    tcp_to_object: Optional[np.ndarray] = None,
+) -> Dict[str, object]:
+    last_status = "Missing"
+    last_pos_err = float("inf")
+    last_rot_err = float("inf")
+    attempts = 0
+    for attempt in range(1, max(int(args.max_stage_replans), 1) + 1):
+        attempts = attempt
+        plan = renderer.plan_path(arm, target_pose_world_wxyz)
+        last_status = execute_single_arm_plan(
+            renderer=renderer,
+            arm=arm,
+            plan=plan,
+            label=f"{label}_try{attempt}",
+            head_writer=head_writer,
+            third_writer=third_writer,
+            use_overlay=use_overlay,
+            attached_actor=attached_actor,
+            tcp_to_object=tcp_to_object,
+            execute_interp_steps=args.execute_interp_steps,
+            settle_steps=args.settle_steps,
+            hold_frames_after_stage=args.hold_frames_after_stage,
+        )
+        current_tcp = renderer.get_current_tcp_pose(arm)
+        last_pos_err, last_rot_err = tcp_pose_errors(target_pose_world_wxyz, current_tcp)
+        reached = (
+            last_status == "Success"
+            and last_pos_err <= float(args.reach_pos_tol_m)
+            and last_rot_err <= float(args.reach_rot_tol_deg)
+        )
+        record_frame(
+            renderer,
+            head_writer,
+            third_writer,
+            [
+                f"stage={label}",
+                f"arm={arm}",
+                f"attempt={attempt}/{args.max_stage_replans}",
+                f"status={last_status}",
+                f"pos_err={last_pos_err:.4f}m",
+                f"rot_err={last_rot_err:.2f}deg",
+                f"reached={int(reached)}",
+            ],
+            use_overlay,
+        )
+        if reached:
+            return {
+                "status": last_status,
+                "attempts": attempts,
+                "reached": True,
+                "pos_err_m": last_pos_err,
+                "rot_err_deg": last_rot_err,
+            }
+
+    return {
+        "status": last_status,
+        "attempts": attempts,
+        "reached": False,
+        "pos_err_m": last_pos_err,
+        "rot_err_deg": last_rot_err,
+    }
 
 
 def main() -> None:
@@ -439,11 +551,27 @@ def main() -> None:
         pregrasp_pose = pose_with_offset_along_local_x(grasp_pose, args.approach_offset_m)
         action_pose = selected_keyframes[1].candidate.pose_world_wxyz
 
-        pregrasp_plan = renderer.plan_path(arm, pregrasp_pose)
-        pregrasp_status = execute_single_arm_plan(renderer, arm, pregrasp_plan, "pregrasp", head_writer, third_writer, use_overlay)
+        pregrasp_result = execute_stage_until_reached(
+            renderer=renderer,
+            arm=arm,
+            target_pose_world_wxyz=pregrasp_pose,
+            label="pregrasp",
+            head_writer=head_writer,
+            third_writer=third_writer,
+            use_overlay=use_overlay,
+            args=args,
+        )
 
-        grasp_plan = renderer.plan_path(arm, grasp_pose)
-        grasp_status = execute_single_arm_plan(renderer, arm, grasp_plan, "grasp", head_writer, third_writer, use_overlay)
+        grasp_result = execute_stage_until_reached(
+            renderer=renderer,
+            arm=arm,
+            target_pose_world_wxyz=grasp_pose,
+            label="grasp",
+            head_writer=head_writer,
+            third_writer=third_writer,
+            use_overlay=use_overlay,
+            args=args,
+        )
 
         renderer.set_grippers(args.close_gripper if arm == "left" else None, args.close_gripper if arm == "right" else None)
         record_frame(renderer, head_writer, third_writer, ["stage=close_gripper", f"arm={arm}"], use_overlay)
@@ -452,15 +580,15 @@ def main() -> None:
         tcp_pose = renderer.get_current_tcp_pose(arm)
         tcp_to_object = np.linalg.inv(pose_wxyz_to_matrix(tcp_pose)) @ object_states[primary_object_name].pose_world_matrix
 
-        action_plan = renderer.plan_path(arm, action_pose)
-        action_status = execute_single_arm_plan(
-            renderer,
-            arm,
-            action_plan,
-            "action",
-            head_writer,
-            third_writer,
-            use_overlay,
+        action_result = execute_stage_until_reached(
+            renderer=renderer,
+            arm=arm,
+            target_pose_world_wxyz=action_pose,
+            label="action",
+            head_writer=head_writer,
+            third_writer=third_writer,
+            use_overlay=use_overlay,
+            args=args,
             attached_actor=attached_actor,
             tcp_to_object=tcp_to_object,
         )
@@ -477,9 +605,9 @@ def main() -> None:
         "selected_arm": arm,
         "selected_object": primary_object_name,
         "stages": {
-            "pregrasp": pregrasp_status,
-            "grasp": grasp_status,
-            "action": action_status,
+            "pregrasp": pregrasp_result,
+            "grasp": grasp_result,
+            "action": action_result,
         },
         "selected_candidates": [
             {
