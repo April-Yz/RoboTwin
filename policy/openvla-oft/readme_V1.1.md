@@ -185,6 +185,93 @@ python vla-scripts/finetune.py \
 
 如果你坚持 `batch_size=4`，建议先单独跑训练，不要同时开 eval。
 
+## 7.1 原始 OpenVLA-OFT baseline 对照
+
+如果你要做和当前 V1 蒸馏实验的对照，不需要重新 clone 仓库。当前 `finetune.py` 里：
+
+- `use_privileged_distill=False` 时，会退回原始非蒸馏训练路径
+
+我已经补了一个 baseline helper：
+
+- `/home/zaijia001/ssd/RoboTwin/policy/openvla-oft/finetune_beat_block_hammer_baseline.sh`
+
+这个脚本默认就是和你那组对照配置对齐的版本：
+
+- `batch_size=4`
+- `grad_accumulation_steps=4`
+- `learning_rate=1e-4`
+- `save_freq=1000`
+- `use_privileged_distill=False`
+
+直接运行：
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin/policy/openvla-oft
+bash finetune_beat_block_hammer_baseline.sh 1
+```
+
+默认输出目录：
+
+- `/home/zaijia001/ssd/RoboTwin/policy/openvla-oft/runs/beat_block_hammer_baseline`
+
+如果你想和你之前那组 `4x4` 蒸馏配置完全保持一致，只把 distill 关掉，这个脚本默认就已经是那种设定。
+
+等价的显式命令是：
+
+```bash
+unset LD_LIBRARY_PATH
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
+conda activate RoboTwin_openvla
+cd /home/zaijia001/ssd/RoboTwin/policy/openvla-oft
+
+export CUDA_VISIBLE_DEVICES=1
+
+python vla-scripts/finetune.py \
+  --vla_path openvla/openvla-7b \
+  --data_root_dir /home/zaijia001/ssd/RoboTwin/data/beat_block_hammer/tfds \
+  --dataset_name aloha_beat_block_hammer_builder \
+  --run_root_dir /home/zaijia001/ssd/RoboTwin/policy/openvla-oft/runs/beat_block_hammer_baseline \
+  --use_l1_regression True \
+  --use_diffusion False \
+  --use_film True \
+  --num_images_in_input 3 \
+  --use_proprio True \
+  --use_privileged_distill False \
+  --batch_size 4 \
+  --grad_accumulation_steps 4 \
+  --learning_rate 1e-4 \
+  --num_steps_before_decay 50000 \
+  --max_steps 100000 \
+  --use_val_set True \
+  --val_freq 1000 \
+  --save_freq 1000 \
+  --image_aug True \
+  --lora_rank 32 \
+  --wandb_entity yangzaijia \
+  --wandb_project openvla-oft \
+  --run_id_note beat_block_hammer_baseline_bs4_ga4_lr1e4
+```
+
+如果你想继续保留 helper 脚本但改一些值，可以直接覆盖环境变量，例如：
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin/policy/openvla-oft
+BATCH_SIZE=3 \
+GRAD_ACCUMULATION_STEPS=4 \
+SAVE_FREQ=1000 \
+bash finetune_beat_block_hammer_baseline.sh 1
+```
+
+这里的 `SAVE_FREQ=1000` 表示：
+
+- 每 `1000` 个 gradient step 保存一次 checkpoint
+
+也就是说你会得到类似：
+
+- `...--1000_chkpt`
+- `...--2000_chkpt`
+- `...--3000_chkpt`
+
 ## 8. 续训命令
 
 从 `10000` step checkpoint 续训：
