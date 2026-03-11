@@ -22,6 +22,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output_root", type=Path, required=True, help="Root directory for per-video replay outputs.")
     parser.add_argument("--ids", type=str, nargs="*", default=None, help="Optional subset ids like 0 5 12. Matches trailing folder id or exact folder name.")
     parser.add_argument("--objects", type=str, nargs="*", default=None, help="Optional subset of object subdir names, e.g. bottle cup.")
+    parser.add_argument(
+        "--object",
+        action="append",
+        default=None,
+        help="Repeatable mesh override in the form NAME=/path/to/mesh.obj. Forwarded to the single-video multi-object replay.",
+    )
     parser.add_argument("--skip_existing", type=int, default=1)
     parser.add_argument("--continue_on_error", type=int, default=1)
     parser.add_argument("--missing_frame_policy", choices=["hide", "hold_last"], default="hide")
@@ -40,11 +46,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--overlay_text", type=int, default=0)
     parser.add_argument("--third_person_view", type=int, default=0)
     parser.add_argument("--save_png_frames", type=int, default=0)
+    parser.add_argument("--save_head_depth", type=int, default=0)
+    parser.add_argument("--save_anygrasp_frames", type=int, default=0)
     parser.add_argument("--enable_viewer", type=int, default=0)
     parser.add_argument("--viewer_frame_delay", type=float, default=0.0)
     parser.add_argument("--viewer_wait_at_end", type=int, default=0)
     parser.add_argument("--disable_table", type=int, default=1)
     parser.add_argument("--need_topp", type=int, default=0)
+    parser.add_argument("--lighting_mode", choices=["default", "front", "front_no_shadow"], default="default")
     parser.add_argument("--camera_cv_axis_mode", type=str, default="legacy_r1")
     parser.add_argument("--head_camera_local_pos", type=float, nargs=3, default=[0.0, 0.0, 0.0])
     parser.add_argument("--head_camera_local_quat_wxyz", type=float, nargs=4, default=[1.0, 1.0, -1.0, 1.0])
@@ -119,6 +128,10 @@ def build_single_command(args: argparse.Namespace, video_dir: Path, output_dir: 
         str(args.third_person_view),
         "--save_png_frames",
         str(args.save_png_frames),
+        "--save_head_depth",
+        str(args.save_head_depth),
+        "--save_anygrasp_frames",
+        str(args.save_anygrasp_frames),
         "--enable_viewer",
         str(args.enable_viewer),
         "--viewer_frame_delay",
@@ -129,6 +142,8 @@ def build_single_command(args: argparse.Namespace, video_dir: Path, output_dir: 
         str(args.disable_table),
         "--need_topp",
         str(args.need_topp),
+        "--lighting_mode",
+        str(args.lighting_mode),
         "--camera_cv_axis_mode",
         str(args.camera_cv_axis_mode),
         "--head_camera_local_pos",
@@ -138,6 +153,9 @@ def build_single_command(args: argparse.Namespace, video_dir: Path, output_dir: 
     ]
     if args.objects:
         cmd.extend(["--objects", *(str(obj) for obj in args.objects)])
+    if args.object:
+        for object_spec in args.object:
+            cmd.extend(["--object", str(object_spec)])
     if args.robot_base_pose is not None:
         cmd.extend(["--robot_base_pose", *(str(v) for v in args.robot_base_pose)])
     return cmd

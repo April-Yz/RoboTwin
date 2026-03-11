@@ -29,8 +29,11 @@ from render_object_pose_r1_npz import (
     build_renderer,
     camera_pose_matrix_to_world_pose,
     create_object_actor,
+    get_camera_intrinsic_matrix,
     load_pose_sequence,
     pose_wxyz_to_matrix,
+    sanitize_depth_mm,
+    save_anygrasp_camera_info,
 )
 from replay_r1_h5 import build_frame_indices
 
@@ -49,11 +52,35 @@ class ObjectReplayData:
     aligned_visible: List[bool] = field(default_factory=list)
 
 
+def parse_object_mesh_overrides(specs: Optional[List[str]]) -> Dict[str, Path]:
+    overrides: Dict[str, Path] = {}
+    if not specs:
+        return overrides
+    for spec in specs:
+        if "=" not in spec:
+            raise ValueError(f"Invalid --object value '{spec}'. Expected NAME=/path/to/mesh.obj")
+        name, mesh_file = spec.split("=", 1)
+        name = name.strip()
+        mesh_path = Path(mesh_file.strip()).resolve()
+        if not name:
+            raise ValueError(f"Invalid --object value '{spec}'. Empty object name.")
+        if not mesh_path.is_file():
+            raise FileNotFoundError(f"Override mesh file does not exist: {mesh_path}")
+        overrides[name] = mesh_path
+    return overrides
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Replay multiple FoundationPose object folders into one RoboTwin scene.")
     parser.add_argument("--input_dir", type=Path, required=True, help="Video-level directory containing object subdirs, each with poses.npz.")
     parser.add_argument("--output_dir", type=Path, required=True, help="Directory for replay videos and combined world poses.")
     parser.add_argument("--objects", type=str, nargs="*", default=None, help="Optional subset of object subdir names to replay.")
+    parser.add_argument(
+        "--object",
+        action="append",
+        default=None,
+        help="Repeatable mesh override in the form NAME=/path/to/mesh.obj. If omitted, mesh_file is read from each object's run_config.json.",
+    )
     parser.add_argument("--missing_frame_policy", choices=["hide", "hold_last"], default="hide")
     parser.add_argument("--robot_config", type=Path, default=(PROJECT_ROOT / "robot_config_R1.json"))
     parser.add_argument("--image_width", type=int, default=640)
@@ -70,11 +97,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--overlay_text", type=int, default=0)
     parser.add_argument("--third_person_view", type=int, default=0)
     parser.add_argument("--save_png_frames", type=int, default=0)
+    parser.add_argument("--save_head_depth", type=int, default=0, help="If 1, save head camera depth PNGs in uint16 millimeters.")
+    parser.add_argument(
+        "--save_anygrasp_frames",
+        type=int,
+        default=0,
+        help="If 1, save per-frame head color/depth PNGs and camera intrinsics for AnyGrasp.",
+    )
     parser.add_argument("--enable_viewer", type=int, default=0)
     parser.add_argument("--viewer_frame_delay", type=float, default=0.0)
     parser.add_argument("--viewer_wait_at_end", type=int, default=0)
     parser.add_argument("--disable_table", type=int, default=1)
     parser.add_argument("--need_topp", type=int, default=0)
+    parser.add_argument("--lighting_mode", choices=["default", "front", "front_no_shadow"], default="default")
     parser.add_argument("--camera_cv_axis_mode", choices=sorted(base.CV_TO_WORLD_CAMERA_PRESETS.keys()), default="legacy_r1")
     parser.add_argument("--head_camera_local_pos", type=float, nargs=3, default=base.DEFAULT_HEAD_CAMERA_LOCAL_POS.tolist())
     parser.add_argument("--head_camera_local_quat_wxyz", type=float, nargs=4, default=base.DEFAULT_HEAD_CAMERA_LOCAL_QUAT_WXYZ.tolist())
@@ -133,6 +168,7 @@ def main() -> None:
     args.output_dir = args.output_dir.resolve()
     args.robot_config = args.robot_config.resolve()
     args.output_dir.mkdir(parents=True, exist_ok=True)
+    object_mesh_overrides = parse_object_mesh_overrides(args.object)
 
     if not args.robot_config.is_file():
         raise FileNotFoundError(f"Robot config not found: {args.robot_config}")
@@ -143,7 +179,7 @@ def main() -> None:
     object_entries: List[ObjectReplayData] = []
     for object_dir in object_dirs:
         poses_cam, source_frame_indices = load_pose_sequence(object_dir / "poses.npz")
-        mesh_file = load_mesh_from_run_config(object_dir)
+        mesh_file = object_mesh_overrides.get(object_dir.name, load_mesh_from_run_config(object_dir))
         actor = create_object_actor(renderer.scene, mesh_file, f"tracked_object_{object_dir.name}")
         frame_to_npz_index = {int(frame_idx): idx for idx, frame_idx in enumerate(source_frame_indices.tolist())}
         object_entries.append(
@@ -198,6 +234,36 @@ def main() -> None:
     frames_dir = args.output_dir / "frames" if bool(args.save_png_frames) else None
     if frames_dir is not None:
         frames_dir.mkdir(parents=True, exist_ok=True)
+    head_depth_dir = args.output_dir / "head_depth_frames" if bool(args.save_head_depth) else None
+    if head_depth_dir is not None:
+        head_depth_dir.mkdir(parents=True, exist_ok=True)
+        head_intrinsic = get_camera_intrinsic_matrix(
+            renderer.zed_camera,
+            image_width=args.image_width,
+            image_height=args.image_height,
+            fovy_deg=args.fovy_deg,
+        )
+        np.savez_compressed(
+            head_depth_dir / "camera_info.npz",
+            intrinsic_matrix=head_intrinsic.astype(np.float64),
+            fx=np.float64(head_intrinsic[0, 0]),
+            fy=np.float64(head_intrinsic[1, 1]),
+            cx=np.float64(head_intrinsic[0, 2]),
+            cy=np.float64(head_intrinsic[1, 2]),
+            depth_scale=np.float64(1000.0),
+            image_width=np.int32(args.image_width),
+            image_height=np.int32(args.image_height),
+        )
+    anygrasp_dir = args.output_dir / "head_anygrasp_frames" if bool(args.save_anygrasp_frames) else None
+    if anygrasp_dir is not None:
+        anygrasp_dir.mkdir(parents=True, exist_ok=True)
+        save_anygrasp_camera_info(
+            anygrasp_dir,
+            renderer.zed_camera,
+            image_width=args.image_width,
+            image_height=args.image_height,
+            fovy_deg=args.fovy_deg,
+        )
 
     try:
         for replay_idx, source_frame in enumerate(selected_source_frames):
@@ -229,9 +295,10 @@ def main() -> None:
                 f"visible={','.join(visible_names) if visible_names else 'none'}",
             ]
 
-            head_rgb, _ = renderer.capture_camera(renderer.zed_camera)
+            head_rgb, head_depth_mm = renderer.capture_camera(renderer.zed_camera)
             head_bgr = base.overlay_text(head_rgb, overlay_lines) if use_overlay else cv2.cvtColor(head_rgb, cv2.COLOR_RGB2BGR)
             head_writer.write(head_bgr)
+            head_depth_uint16 = sanitize_depth_mm(head_depth_mm)
 
             third_bgr = None
             if third_writer is not None:
@@ -243,6 +310,11 @@ def main() -> None:
                 cv2.imwrite(str(frames_dir / f"head_{int(source_frame):06d}.png"), head_bgr)
                 if third_bgr is not None:
                     cv2.imwrite(str(frames_dir / f"third_{int(source_frame):06d}.png"), third_bgr)
+            if head_depth_dir is not None:
+                cv2.imwrite(str(head_depth_dir / f"depth_{int(source_frame):06d}.png"), head_depth_uint16)
+            if anygrasp_dir is not None:
+                cv2.imwrite(str(anygrasp_dir / f"color_{int(source_frame):06d}.png"), head_bgr)
+                cv2.imwrite(str(anygrasp_dir / f"depth_{int(source_frame):06d}.png"), head_depth_uint16)
     finally:
         head_writer.release()
         if third_writer is not None:

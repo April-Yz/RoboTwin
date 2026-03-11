@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 from pathlib import Path
@@ -51,11 +52,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--overlay_text", type=int, default=1, help="If 1, draw overlay text on replay frames.")
     parser.add_argument("--third_person_view", type=int, default=1)
     parser.add_argument("--save_png_frames", type=int, default=0)
+    parser.add_argument("--save_head_depth", type=int, default=0, help="If 1, save head camera depth PNGs in uint16 millimeters.")
+    parser.add_argument(
+        "--save_anygrasp_frames",
+        type=int,
+        default=0,
+        help="If 1, save per-frame color/depth PNGs and camera intrinsics for AnyGrasp.",
+    )
     parser.add_argument("--enable_viewer", type=int, default=0)
     parser.add_argument("--viewer_frame_delay", type=float, default=0.0)
     parser.add_argument("--viewer_wait_at_end", type=int, default=0)
     parser.add_argument("--disable_table", type=int, default=1)
     parser.add_argument("--need_topp", type=int, default=0)
+    parser.add_argument("--lighting_mode", choices=["default", "front", "front_no_shadow"], default="default")
     parser.add_argument("--camera_cv_axis_mode", choices=sorted(base.CV_TO_WORLD_CAMERA_PRESETS.keys()), default="legacy_r1")
     parser.add_argument("--head_camera_local_pos", type=float, nargs=3, default=base.DEFAULT_HEAD_CAMERA_LOCAL_POS.tolist())
     parser.add_argument("--head_camera_local_quat_wxyz", type=float, nargs=4, default=base.DEFAULT_HEAD_CAMERA_LOCAL_QUAT_WXYZ.tolist())
@@ -126,6 +135,7 @@ def build_renderer(args: argparse.Namespace) -> ReplayRenderer:
         init_left_arm_joints=None,
         init_right_arm_joints=None,
         init_gripper_open=None,
+        lighting_mode=args.lighting_mode,
         attach_planner=False,
     )
 
@@ -157,6 +167,58 @@ def pose_wxyz_to_matrix(pose_wxyz: np.ndarray) -> np.ndarray:
     mat[:3, :3] = R.from_quat(base.quat_wxyz_to_xyzw(quat_wxyz)).as_matrix()
     mat[:3, 3] = pose_wxyz[:3]
     return mat
+
+
+def sanitize_depth_mm(depth_mm: np.ndarray) -> np.ndarray:
+    depth_safe = np.nan_to_num(np.asarray(depth_mm, dtype=np.float64), nan=0.0, posinf=0.0, neginf=0.0)
+    depth_safe = np.clip(depth_safe, 0.0, float(np.iinfo(np.uint16).max))
+    return np.rint(depth_safe).astype(np.uint16)
+
+
+def get_camera_intrinsic_matrix(camera, image_width: int, image_height: int, fovy_deg: float) -> np.ndarray:
+    try:
+        intrinsic = np.asarray(camera.get_intrinsic_matrix(), dtype=np.float64)
+        if intrinsic.shape == (4, 4):
+            intrinsic = intrinsic[:3, :3]
+        if intrinsic.shape == (3, 3) and np.isfinite(intrinsic).all():
+            return intrinsic
+    except Exception:
+        pass
+
+    fovy_rad = np.deg2rad(float(fovy_deg))
+    fy = float(image_height) / (2.0 * np.tan(fovy_rad / 2.0))
+    fx = fy
+    cx = float(image_width) / 2.0
+    cy = float(image_height) / 2.0
+    return np.array(
+        [
+            [fx, 0.0, cx],
+            [0.0, fy, cy],
+            [0.0, 0.0, 1.0],
+        ],
+        dtype=np.float64,
+    )
+
+
+def save_anygrasp_camera_info(output_dir: Path, camera, image_width: int, image_height: int, fovy_deg: float) -> None:
+    intrinsic = get_camera_intrinsic_matrix(camera, image_width=image_width, image_height=image_height, fovy_deg=fovy_deg)
+    info = {
+        "format": "anygrasp_rgbd_sequence_v1",
+        "camera_name": "head_cam",
+        "image_width": int(image_width),
+        "image_height": int(image_height),
+        "depth_unit": "millimeter",
+        "depth_scale": 1000.0,
+        "intrinsic_matrix": intrinsic.tolist(),
+        "fx": float(intrinsic[0, 0]),
+        "fy": float(intrinsic[1, 1]),
+        "cx": float(intrinsic[0, 2]),
+        "cy": float(intrinsic[1, 2]),
+        "color_pattern": "color_{source_frame:06d}.png",
+        "depth_pattern": "depth_{source_frame:06d}.png",
+    }
+    with (output_dir / "camera_info.json").open("w", encoding="utf-8") as f:
+        json.dump(info, f, indent=2)
 
 
 def main() -> None:
@@ -208,6 +270,19 @@ def main() -> None:
     frames_dir = args.output_dir / "frames" if bool(args.save_png_frames) else None
     if frames_dir is not None:
         frames_dir.mkdir(parents=True, exist_ok=True)
+    head_depth_dir = args.output_dir / "head_depth_frames" if bool(args.save_head_depth) else None
+    if head_depth_dir is not None:
+        head_depth_dir.mkdir(parents=True, exist_ok=True)
+    anygrasp_dir = args.output_dir / "head_anygrasp_frames" if bool(args.save_anygrasp_frames) else None
+    if anygrasp_dir is not None:
+        anygrasp_dir.mkdir(parents=True, exist_ok=True)
+        save_anygrasp_camera_info(
+            anygrasp_dir,
+            renderer.zed_camera,
+            image_width=args.image_width,
+            image_height=args.image_height,
+            fovy_deg=args.fovy_deg,
+        )
 
     world_pose_list = []
     used_source_frames = []
@@ -227,12 +302,13 @@ def main() -> None:
                 f"obj_xyz={np.round(pose_world[:3], 4).tolist()}",
             ]
 
-            head_rgb, _ = renderer.capture_camera(renderer.zed_camera)
+            head_rgb, head_depth_mm = renderer.capture_camera(renderer.zed_camera)
             if use_overlay:
                 head_bgr = base.overlay_text(head_rgb, overlay_lines)
             else:
                 head_bgr = cv2.cvtColor(head_rgb, cv2.COLOR_RGB2BGR)
             head_writer.write(head_bgr)
+            head_depth_uint16 = sanitize_depth_mm(head_depth_mm)
 
             third_bgr = None
             if third_writer is not None:
@@ -247,6 +323,11 @@ def main() -> None:
                 cv2.imwrite(str(frames_dir / f"head_{source_frame:06d}.png"), head_bgr)
                 if third_bgr is not None:
                     cv2.imwrite(str(frames_dir / f"third_{source_frame:06d}.png"), third_bgr)
+            if head_depth_dir is not None:
+                cv2.imwrite(str(head_depth_dir / f"depth_{source_frame:06d}.png"), head_depth_uint16)
+            if anygrasp_dir is not None:
+                cv2.imwrite(str(anygrasp_dir / f"color_{source_frame:06d}.png"), head_bgr)
+                cv2.imwrite(str(anygrasp_dir / f"depth_{source_frame:06d}.png"), head_depth_uint16)
 
             world_pose_list.append(pose_world.astype(np.float64))
             used_source_frames.append(source_frame)
