@@ -30,6 +30,7 @@ from prismatic.models.projectors import NoisyActionProjector, ProprioProjector
 from prismatic.vla.constants import (
     ACTION_DIM,
     ACTION_PROPRIO_NORMALIZATION_TYPE,
+    NUM_ACTIONS_CHUNK,
 )
 from prismatic.vla.datasets.rlds.utils.data_utils import NormalizationType
 
