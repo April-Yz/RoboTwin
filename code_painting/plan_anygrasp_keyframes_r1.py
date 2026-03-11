@@ -25,6 +25,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 import render_hand_retarget_r1_npz as base
+import render_hand_retarget_r1_npz_urdfik as urdfik_base
 from render_object_pose_r1_npz import create_object_actor, pose_wxyz_to_matrix
 from replay_r1_h5 import ReplayRenderer, parse_optional_base_pose
 
@@ -71,6 +72,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output_dir", type=Path, required=True, help="Output dir for planned demo video and metadata.")
     parser.add_argument("--keyframes", type=int, nargs=2, default=[1, 22], metavar=("GRASP_FRAME", "ACTION_FRAME"))
     parser.add_argument("--arm", choices=["auto", "left", "right"], default="auto")
+    parser.add_argument("--planner_backend", choices=["urdfik", "curobo"], default="urdfik")
     parser.add_argument("--robot_config", type=Path, default=R1_CONFIG)
     parser.add_argument("--image_width", type=int, default=640)
     parser.add_argument("--image_height", type=int, default=360)
@@ -97,7 +99,9 @@ def parse_args() -> argparse.Namespace:
 
 
 def build_renderer(args: argparse.Namespace) -> ReplayRenderer:
-    return ReplayRenderer(
+    renderer_cls = ReplayRenderer if args.planner_backend == "curobo" else urdfik_base.HandRetargetR1URDFIKRenderer
+    attach_planner = args.planner_backend == "curobo"
+    return renderer_cls(
         robot_config_path=args.robot_config,
         image_width=args.image_width,
         image_height=args.image_height,
@@ -138,7 +142,7 @@ def build_renderer(args: argparse.Namespace) -> ReplayRenderer:
         init_right_arm_joints=None,
         init_gripper_open=None,
         lighting_mode=args.lighting_mode,
-        attach_planner=True,
+        attach_planner=attach_planner,
         hide_robot=False,
     )
 

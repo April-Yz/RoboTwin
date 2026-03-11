@@ -26,6 +26,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ids", type=str, nargs="*", default=None, help="Optional subset ids like 1 4 22.")
     parser.add_argument("--keyframes", type=int, nargs=2, default=[1, 22], metavar=("GRASP_FRAME", "ACTION_FRAME"))
     parser.add_argument("--arm", choices=["auto", "left", "right"], default="auto")
+    parser.add_argument("--planner_backend", choices=["urdfik", "curobo"], default="urdfik")
     parser.add_argument("--skip_existing", type=int, default=1)
     parser.add_argument("--continue_on_error", type=int, default=1)
     parser.add_argument("--robot_config", type=Path, default=(THIS_DIR.parent / "robot_config_R1.json"))
@@ -100,6 +101,8 @@ def build_single_command(args: argparse.Namespace, anygrasp_dir: Path, replay_di
         *(str(v) for v in args.keyframes),
         "--arm",
         str(args.arm),
+        "--planner_backend",
+        str(args.planner_backend),
         "--robot_config",
         str(args.robot_config.resolve()),
         "--image_width",
