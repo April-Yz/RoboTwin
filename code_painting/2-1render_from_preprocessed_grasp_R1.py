@@ -23,7 +23,7 @@ import argparse
 import trimesh
 import time
 
-R1_URDF_PATH = "/data1/zjyang/program/third/RoboTwin/galaxea_sim/assets/r1_pro/robot.urdf"
+R1_URDF_PATH = "/projects/zaijia001/R1/galaxea_sim/assets/r1_pro/robot.urdf"
 R1_CONFIG_PATH = "/data1/zjyang/program/third/RoboTwin/robot_config_R1_pro.json"
 # 视频展示时固定腰部 4 个关节角（torso pos）
 R1_TORSO_JOINT_NAMES = ("torso_joint1", "torso_joint2", "torso_joint3", "torso_joint4")
@@ -49,6 +49,14 @@ class SimplifiedRobotRenderer:
                  depth_scale=1.0,
                  depth_offset=0.0,
                  grasp_json_path=None,
+                 link_cam_debug_enable=False,
+                 link_cam_debug_rot_xyz_deg=(0.0, 0.0, 0.0),
+                 link_cam_debug_forward=0.0,
+                 link_cam_debug_right=0.0,
+                 link_cam_debug_up=0.0,
+                 link_cam_axis_mode="none",
+                 link_cam_debug_apply_to="all",
+                 third_cam_show_link_cams=True,
                  third_person_view=True):
         """初始化机器人渲染器
         
@@ -65,6 +73,19 @@ class SimplifiedRobotRenderer:
         self.camera_x_offset = float(camera_x_offset)
         self.arms_z_offset = float(arms_z_offset)
         self.third_person_view = third_person_view  # 是否启用第三人称视角
+        self.link_cam_debug_enable = bool(link_cam_debug_enable)
+        self.link_cam_debug_rot_xyz_deg = np.array(link_cam_debug_rot_xyz_deg, dtype=float).reshape(3)
+        self.link_cam_debug_forward = float(link_cam_debug_forward)
+        self.link_cam_debug_right = float(link_cam_debug_right)
+        self.link_cam_debug_up = float(link_cam_debug_up)
+        self.link_cam_axis_mode = str(link_cam_axis_mode).strip().lower()
+        apply_to_tokens = [s.strip().lower() for s in str(link_cam_debug_apply_to).split(",") if s.strip()]
+        if not apply_to_tokens:
+            apply_to_tokens = ["all"]
+        self.link_cam_debug_apply_to = set(apply_to_tokens)
+        if "all" in self.link_cam_debug_apply_to:
+            self.link_cam_debug_apply_to = {"head", "left", "right"}
+        self.third_cam_show_link_cams = bool(third_cam_show_link_cams)
         
         # 模型相关参数（第一个模型）
         self.model_path = model_path
@@ -94,6 +115,14 @@ class SimplifiedRobotRenderer:
         # 固定 torso 的目标角度：用于突出双手动作表现，避免腰部跟随规划漂移。
         self.fixed_torso_pos = R1_FIXED_TORSO_POS.copy()
         self._torso_warning_printed = False
+        # 相机link缓存（仅本脚本维护，避免影响其他URDF流程）
+        self._head_camera_link = None
+        self._left_wrist_camera_link = None
+        self._right_wrist_camera_link = None
+        self._head_link_warning_printed = False
+        self._left_link_warning_printed = False
+        self._right_link_warning_printed = False
+        self._camera_debug_summary_printed = False
         
         # 初始化SAPIEN环境
         self._setup_sapien_scene()
@@ -182,6 +211,7 @@ class SimplifiedRobotRenderer:
             self.robot.init_joints()
             print("机器人加载成功")
             self._init_joint_states()
+            self._refresh_robot_camera_links(verbose=True)
         except Exception as e:
             self.robot = None
             print(f"加载机器人URDF失败: {e}")
@@ -247,6 +277,139 @@ class SimplifiedRobotRenderer:
     def _enforce_fixed_torso(self):
         """在关键步进前后调用，持续保持 torso 固定姿态。"""
         self._set_fixed_torso_joint_positions(verbose=False)
+
+    def _find_robot_link_by_names(self, candidate_names):
+        """在当前机器人实体中按候选名称查找link。"""
+        if self.robot is None:
+            return None
+
+        entities = []
+        if hasattr(self.robot, "left_entity") and self.robot.left_entity is not None:
+            entities.append(self.robot.left_entity)
+        if (
+            hasattr(self.robot, "right_entity")
+            and self.robot.right_entity is not None
+            and self.robot.right_entity is not self.robot.left_entity
+        ):
+            entities.append(self.robot.right_entity)
+
+        for entity in entities:
+            for link_name in candidate_names:
+                link = entity.find_link_by_name(link_name)
+                if link is not None:
+                    return link
+        return None
+
+    def _refresh_robot_camera_links(self, verbose=False):
+        """刷新R1相机link绑定。"""
+        self._head_camera_link = self._find_robot_link_by_names(
+            ["zed_link", "head_camera", "head", "camera_link"]
+        )
+        self._left_wrist_camera_link = self._find_robot_link_by_names(
+            ["left_realsense_link", "left_camera", "left_wrist_camera"]
+        )
+        self._right_wrist_camera_link = self._find_robot_link_by_names(
+            ["right_realsense_link", "right_camera", "right_wrist_camera"]
+        )
+
+        if self._head_camera_link is not None:
+            self._head_link_warning_printed = False
+        if self._left_wrist_camera_link is not None:
+            self._left_link_warning_printed = False
+        if self._right_wrist_camera_link is not None:
+            self._right_link_warning_printed = False
+
+        if verbose:
+            head_name = self._head_camera_link.get_name() if self._head_camera_link is not None else "None"
+            left_name = self._left_wrist_camera_link.get_name() if self._left_wrist_camera_link is not None else "None"
+            right_name = self._right_wrist_camera_link.get_name() if self._right_wrist_camera_link is not None else "None"
+            print(f"[camera-links] head={head_name}, left={left_name}, right={right_name}")
+
+        if self.link_cam_debug_enable and (verbose or not self._camera_debug_summary_printed):
+            print(self.get_link_camera_debug_summary())
+            self._camera_debug_summary_printed = True
+
+    def _should_apply_link_cam_debug(self, cam_tag: str) -> bool:
+        return self.link_cam_debug_enable and cam_tag in self.link_cam_debug_apply_to
+
+    def _get_axis_mode_rotation(self, mode: str, warn_attr: str = "_axis_mode_warned") -> np.ndarray:
+        """
+        返回用于相机朝向调试的基准旋转矩阵。
+        这些模式用于排查“轴定义不一致”问题。
+        """
+        mode = str(mode).strip().lower()
+        presets = {
+            "none": np.eye(3, dtype=np.float64),
+            "yaw_p90": Rotation1.from_euler("z", np.deg2rad(90.0)).as_matrix(),
+            "yaw_n90": Rotation1.from_euler("z", np.deg2rad(-90.0)).as_matrix(),
+            "pitch_p90": Rotation1.from_euler("y", np.deg2rad(90.0)).as_matrix(),
+            "pitch_n90": Rotation1.from_euler("y", np.deg2rad(-90.0)).as_matrix(),
+            "roll_p90": Rotation1.from_euler("x", np.deg2rad(90.0)).as_matrix(),
+            "roll_n90": Rotation1.from_euler("x", np.deg2rad(-90.0)).as_matrix(),
+            # 轴交换（保持右手系）
+            "swap_xy": np.array([[0, 1, 0], [1, 0, 0], [0, 0, -1]], dtype=np.float64),
+            "swap_xz": np.array([[0, 0, 1], [0, -1, 0], [1, 0, 0]], dtype=np.float64),
+            "swap_yz": np.array([[-1, 0, 0], [0, 0, 1], [0, 1, 0]], dtype=np.float64),
+        }
+        if mode not in presets:
+            if not hasattr(self, warn_attr):
+                print(f"警告: 未知 axis_mode='{mode}'，回退为 none")
+                setattr(self, warn_attr, True)
+            return presets["none"]
+        return presets[mode]
+
+    def _apply_link_camera_debug_transform(self, pose: sapien.Pose, cam_tag: str, verbose: bool = False) -> sapien.Pose:
+        """
+        对相机link位姿施加调试变换：
+        1) 先应用轴模式修正（axis mode）
+        2) 再在相机局部坐标系施加旋转(RPY, 度)
+        3) 再沿“原始相机朝向”平移（forward/right/up, 米）
+        """
+        if not self._should_apply_link_cam_debug(cam_tag):
+            return pose
+
+        quat_xyzw = np.array([pose.q[1], pose.q[2], pose.q[3], pose.q[0]], dtype=float)
+        rot_base = Rotation1.from_quat(quat_xyzw).as_matrix()
+        rot_axis_mode = self._get_axis_mode_rotation(self.link_cam_axis_mode, "_link_cam_axis_mode_warned")
+        rot_delta = Rotation1.from_euler("xyz", np.deg2rad(self.link_cam_debug_rot_xyz_deg)).as_matrix()
+        rot_new = rot_base @ rot_axis_mode @ rot_delta
+
+        # SAPIEN相机局部坐标：X右, Y上, Z后；“前进”对应局部 -Z
+        shift_local = np.array(
+            [self.link_cam_debug_right, self.link_cam_debug_up, -self.link_cam_debug_forward],
+            dtype=float,
+        )
+        pos_new = pose.p + rot_base @ shift_local
+
+        quat_new_xyzw = Rotation1.from_matrix(rot_new).as_quat()
+        quat_new_wxyz = np.array(
+            [quat_new_xyzw[3], quat_new_xyzw[0], quat_new_xyzw[1], quat_new_xyzw[2]],
+            dtype=np.float32,
+        )
+
+        if verbose:
+            print(
+                f"[camera-debug:{cam_tag}] axis_mode={self.link_cam_axis_mode}, "
+                f"rot_xyz_deg={self.link_cam_debug_rot_xyz_deg.tolist()}, "
+                f"shift(f,r,u)=({self.link_cam_debug_forward:+.3f}, {self.link_cam_debug_right:+.3f}, {self.link_cam_debug_up:+.3f})"
+            )
+
+        return sapien.Pose(pos_new, quat_new_wxyz)
+
+    def get_link_camera_debug_summary(self) -> str:
+        if not self.link_cam_debug_enable:
+            return "[camera-debug] disabled"
+
+        apply_to = ",".join(sorted(self.link_cam_debug_apply_to))
+        rx, ry, rz = self.link_cam_debug_rot_xyz_deg.tolist()
+        return (
+            "[camera-debug] enabled "
+            f"apply_to={apply_to} "
+            f"axis_mode={self.link_cam_axis_mode} "
+            f"rot_xyz_deg=({rx:+.2f},{ry:+.2f},{rz:+.2f}) "
+            f"shift_m(forward,right,up)=({self.link_cam_debug_forward:+.3f},"
+            f"{self.link_cam_debug_right:+.3f},{self.link_cam_debug_up:+.3f})"
+        )
     
     def _setup_camera(self):
         """设置相机：包括ego视角、observer视角和三个robot link相机"""
@@ -540,7 +703,7 @@ class SimplifiedRobotRenderer:
         
         print(f"Observer相机位置设置为: {observer_cam_pos}")
     
-    def update_robot_link_cameras(self):
+    def update_robot_link_cameras(self, verbose=False):
         """
         更新基于robot link的相机位姿（zed_camera, left_wrist_camera, right_wrist_camera）
         这些相机跟随机器人的特定link移动
@@ -549,31 +712,46 @@ class SimplifiedRobotRenderer:
             return
         
         try:
+            # 缓存为空时尝试重新绑定，避免依赖Robot通用实现中的相机字段
+            if (
+                self._head_camera_link is None
+                or self._left_wrist_camera_link is None
+                or self._right_wrist_camera_link is None
+            ):
+                self._refresh_robot_camera_links(verbose=verbose)
+
             # 更新zed_camera（头部相机）
-            # 尝试直接从robot对象获取head link（如果robot类有head属性）
-            if hasattr(self.robot, 'head') and self.robot.head is not None:
-                head_pose = self.robot.head.get_pose()
-                print(f"\033[92m  [update] head cam {head_pose} \033[0m  ")
+            if self._head_camera_link is not None:
+                head_pose = self._head_camera_link.get_pose()
+                head_pose = self._apply_link_camera_debug_transform(head_pose, "head", verbose=verbose)
+                if verbose:
+                    print(f"\033[92m  [update] head cam {head_pose} \033[0m  ")
                 self.zed_camera.set_pose(head_pose)
-            else:
-                # 如果没有head属性，zed_camera保持当前位置（使用ego_camera的位置）
-                pass
+            elif not self._head_link_warning_printed:
+                print("警告: 未找到头部相机link（期望: zed_link）")
+                self._head_link_warning_printed = True
             
-            # 更新left_wrist_camera - 使用robot.left_camera link（与0-4文件中的做法一致）
-            if hasattr(self.robot, 'left_camera') and self.robot.left_camera is not None:
-                left_camera_link_pose = self.robot.left_camera.get_pose()
-                print(f"\033[92m  [update] left wrist cam {left_camera_link_pose} \033[0m  ")
+            # 更新left_wrist_camera
+            if self._left_wrist_camera_link is not None:
+                left_camera_link_pose = self._left_wrist_camera_link.get_pose()
+                left_camera_link_pose = self._apply_link_camera_debug_transform(left_camera_link_pose, "left", verbose=verbose)
+                if verbose:
+                    print(f"\033[92m  [update] left wrist cam {left_camera_link_pose} \033[0m  ")
                 self.left_wrist_camera.set_pose(left_camera_link_pose)
-            else:
-                print("警告: robot.left_camera link 未找到")
+            elif not self._left_link_warning_printed:
+                print("警告: 未找到左腕相机link（期望: left_realsense_link）")
+                self._left_link_warning_printed = True
             
-            # 更新right_wrist_camera - 使用robot.right_camera link
-            if hasattr(self.robot, 'right_camera') and self.robot.right_camera is not None:
-                right_camera_link_pose = self.robot.right_camera.get_pose()
-                print(f"\033[92m  [update] right wrist cam {right_camera_link_pose} \033[0m  ")
+            # 更新right_wrist_camera
+            if self._right_wrist_camera_link is not None:
+                right_camera_link_pose = self._right_wrist_camera_link.get_pose()
+                right_camera_link_pose = self._apply_link_camera_debug_transform(right_camera_link_pose, "right", verbose=verbose)
+                if verbose:
+                    print(f"\033[92m  [update] right wrist cam {right_camera_link_pose} \033[0m  ")
                 self.right_wrist_camera.set_pose(right_camera_link_pose)
-            else:
-                print("警告: robot.right_camera link 未找到")
+            elif not self._right_link_warning_printed:
+                print("警告: 未找到右腕相机link（期望: right_realsense_link）")
+                self._right_link_warning_printed = True
                 
         except Exception as e:
             print(f"更新robot link相机位姿失败: {e}")
@@ -749,7 +927,7 @@ class SimplifiedRobotRenderer:
             cam_T_obj[:3, 3] = cam_T_obj[:3, 3] * self.depth_scale + np.array([0, 0, self.depth_offset])
             
             # 相机坐标系到世界坐标系的转换
-            camera_pose = self.camera.get_pose()
+            camera_pose = self.camera.get_entity_pose()
             camera_position = camera_pose.p
             camera_quat = camera_pose.q
             
@@ -826,7 +1004,7 @@ class SimplifiedRobotRenderer:
             
             # 相机坐标系到世界坐标系的转换
             # 需要获取当前相机的世界位姿
-            camera_pose = self.camera.get_pose() # 得到的是wxyz但是X_new = Z; y_new=-X ; z_new=-Y
+            camera_pose = self.camera.get_entity_pose() # 得到的是wxyz但是X_new = Z; y_new=-X ; z_new=-Y
             print(f"camera_pose: {camera_pose}")
             camera_position = camera_pose.p
             camera_quat = camera_pose.q  # wxyz格式
@@ -839,7 +1017,6 @@ class SimplifiedRobotRenderer:
                 [-1, 0, 0],
                 [0, -1, 0]
             ])
-
             # 3. 右乘修正矩阵，得到"正确"的矩阵
             camera_rotation_matrix = camera_rotation_matrix @ R_offset_inv
             print(f"camera_rotation_matrix: {camera_rotation_matrix}")
@@ -896,7 +1073,7 @@ class SimplifiedRobotRenderer:
             
             # 相机坐标系到世界坐标系的转换
             # 需要获取当前相机的世界位姿
-            camera_pose = self.camera.get_pose() # 得到的是wxyz但是X_new = Z; y_new=-X ; z_new=-Y
+            camera_pose = self.camera.get_entity_pose() # 得到的是wxyz但是X_new = Z; y_new=-X ; z_new=-Y
             camera_position = camera_pose.p
             camera_quat = camera_pose.q  # wxyz格式
             
@@ -907,7 +1084,6 @@ class SimplifiedRobotRenderer:
                 [-1, 0, 0],
                 [0, -1, 0]
             ])
-
             # 3. 右乘修正矩阵，得到"正确"的矩阵
             camera_rotation_matrix = camera_rotation_matrix @ R_offset_inv
 
@@ -1320,7 +1496,7 @@ class SimplifiedRobotRenderer:
             # ========================================================================
             # 步骤2: 获取当前SAPIEN相机在世界坐标系中的位姿
             # ========================================================================
-            cam_pose = self.camera.get_pose()
+            cam_pose = self.camera.get_entity_pose()
             cam_pos_world = cam_pose.p  # 相机在世界坐标系的位置
             cam_quat_wxyz = cam_pose.q  # 相机在世界坐标系的朝向(wxyz格式)
             
@@ -1340,7 +1516,6 @@ class SimplifiedRobotRenderer:
             # # ========================================================================
             # 构建相机在世界坐标系下的变换矩阵
             R_offset_inv = np.array([[0, 0, 1],[-1, 0, 0],[0, -1, 0]])
-
             # 3. 右乘修正矩阵，得到"正确"的矩阵
             camera_rotation_matrix = camera_rotation_matrix @ R_offset_inv
 
@@ -1715,7 +1890,7 @@ class SimplifiedRobotRenderer:
             right_euler = R.from_matrix(right_rotmat).as_euler('zyx', degrees=True)
             print(f"\033[94m 右臂末端欧拉角 (ZYX, 度): {right_euler}\033[0m")
             self.left_eelink = self.robot.right_entity.find_link_by_name("left_gripper_link")
-            left_eelink_pose = self.left_eelink.get_pose() # 当做wxyz处理
+            left_eelink_pose = self.left_eelink.get_entity_pose() # 当做wxyz处理
             rot = R.from_quat([left_eelink_pose.q[1], left_eelink_pose.q[2], left_eelink_pose.q[3], left_eelink_pose.q[0]])
             rot_matrix = rot.as_matrix()
             print(f"\033[92m 左臂末端link位姿:\nPosition: {left_eelink_pose.p}, Quaternion(wxyz): {left_eelink_pose.q}\033[0m")
@@ -1724,7 +1899,7 @@ class SimplifiedRobotRenderer:
             print(f"\033[94m 左臂末端link欧拉角 (ZYX, 度): {left_euler}\033[0m")
 
             self.right_eelink = self.robot.right_entity.find_link_by_name("right_gripper_link")
-            right_eelink_pose = self.right_eelink.get_pose()
+            right_eelink_pose = self.right_eelink.get_entity_pose()
             rot = R.from_quat([right_eelink_pose.q[1], right_eelink_pose.q[2], right_eelink_pose.q[3], right_eelink_pose.q[0]])
             rot_matrix = rot.as_matrix()
             print(f"\033[92m 右臂末端link位姿:\nPosition: {right_eelink_pose.p}, Quaternion(wxyz): {right_eelink_pose.q}\033[0m")
@@ -2049,6 +2224,10 @@ class SimplifiedRobotRenderer:
         # 如果有目标位姿数据，在图像上可视化
         if hasattr(self, '_left_target_pose_world') and hasattr(self, '_right_target_pose_world'):
             rgb = self.visualize_target_poses_on_third_image(rgb)
+
+        # 在third视角叠加头部/腕部相机位姿，用于调试相机安装方向与位置
+        if self.third_cam_show_link_cams:
+            rgb = self.visualize_link_cameras_on_third_image(rgb)
         
         return rgb, depth_image
     
@@ -2775,6 +2954,136 @@ class SimplifiedRobotRenderer:
         vis_img = cv2.cvtColor(vis_img, cv2.COLOR_BGR2RGB)
         
         return vis_img
+
+    def _get_world_to_camera_transform(self, camera_entity):
+        """获取世界坐标到指定相机坐标系的变换矩阵。"""
+        cam_pose = camera_entity.get_entity_pose()
+        cam_pos_world = cam_pose.p
+        cam_quat_wxyz = cam_pose.q
+
+        cam_quat_xyzw = np.array([cam_quat_wxyz[1], cam_quat_wxyz[2], cam_quat_wxyz[3], cam_quat_wxyz[0]])
+        camera_rotation_matrix = Rotation1.from_quat(cam_quat_xyzw).as_matrix()
+
+        # 与现有投影可视化逻辑保持一致
+        R_offset_inv = np.array([
+            [0, 0, 1],
+            [-1, 0, 0],
+            [0, -1, 0]
+        ])
+        camera_rotation_matrix = camera_rotation_matrix @ R_offset_inv
+
+        world_T_cam = np.eye(4)
+        world_T_cam[:3, :3] = camera_rotation_matrix
+        world_T_cam[:3, 3] = cam_pos_world
+        return np.linalg.inv(world_T_cam)
+
+    def _draw_world_pose_on_bgr(
+        self,
+        vis_img,
+        intrinsics,
+        cam_T_world,
+        pose_world,
+        label,
+        color,
+        axis_length=0.06,
+        view_dir_length=0.12,
+    ):
+        """将一个世界坐标系下的pose绘制到BGR图像。"""
+        T_world = np.eye(4)
+        T_world[:3, 3] = pose_world.p
+        quat = pose_world.q  # wxyz
+        quat_xyzw = np.array([quat[1], quat[2], quat[3], quat[0]], dtype=float)
+        T_world[:3, :3] = Rotation1.from_quat(quat_xyzw).as_matrix()
+
+        T_cam = cam_T_world @ T_world
+        origin_cam = T_cam[:3, 3]
+        px_center, valid_center = self._project_point(origin_cam, intrinsics)
+        if not valid_center:
+            return
+
+        h, w = vis_img.shape[:2]
+        if not (0 <= px_center[0] < w and 0 <= px_center[1] < h):
+            return
+
+        cv2.circle(vis_img, px_center, 6, color, -1)
+        cv2.circle(vis_img, px_center, 9, (255, 255, 255), 1)
+
+        axes_points_local = [
+            np.array([0, 0, 0, 1]),
+            np.array([axis_length, 0, 0, 1]),
+            np.array([0, axis_length, 0, 1]),
+            np.array([0, 0, axis_length, 1]),
+        ]
+        axes_pixels = []
+        axes_valid = []
+        for p in axes_points_local:
+            p_cam = T_cam @ p
+            px, ok = self._project_point(p_cam[:3], intrinsics)
+            axes_pixels.append(px)
+            axes_valid.append(ok)
+
+        axes_info = [
+            (1, (0, 0, 255)),   # X red
+            (2, (0, 255, 0)),   # Y green
+            (3, (255, 0, 0)),   # Z blue
+        ]
+        for idx, axis_color in axes_info:
+            if not axes_valid[idx]:
+                continue
+            clipped_start, clipped_end, has_visible = self._clip_line_to_image(
+                axes_pixels[0], axes_pixels[idx], w, h
+            )
+            if has_visible:
+                cv2.line(vis_img, clipped_start, clipped_end, axis_color, 2)
+
+        # 相机前向线（SAPIEN相机前向为局部 -Z）
+        view_end_local = np.array([0, 0, -view_dir_length, 1])
+        view_end_cam = T_cam @ view_end_local
+        px_view_end, valid_view = self._project_point(view_end_cam[:3], intrinsics)
+        if valid_view:
+            clipped_start, clipped_end, has_visible = self._clip_line_to_image(
+                axes_pixels[0], px_view_end, w, h
+            )
+            if has_visible:
+                cv2.line(vis_img, clipped_start, clipped_end, (0, 255, 255), 2)
+
+        text = label
+        (text_w, text_h), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.45, 2)
+        x0 = min(max(px_center[0] + 10, 0), max(0, w - text_w - 4))
+        y0 = min(max(px_center[1] - 6, text_h + 4), h - 2)
+        cv2.rectangle(vis_img, (x0 - 2, y0 - text_h - 2), (x0 + text_w + 2, y0 + 2), (0, 0, 0), -1)
+        cv2.putText(vis_img, text, (x0, y0), cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 2, cv2.LINE_AA)
+
+    def visualize_link_cameras_on_third_image(self, rgb_image):
+        """在third camera图像上叠加头部/腕部相机位姿。"""
+        if not hasattr(self, "third_camera") or self.third_camera is None:
+            return rgb_image
+
+        intrinsics, _, _, _, _ = self._get_camera_intrinsics()
+        cam_T_world = self._get_world_to_camera_transform(self.third_camera)
+
+        if not rgb_image.flags["C_CONTIGUOUS"]:
+            rgb_image = np.ascontiguousarray(rgb_image)
+        if rgb_image.dtype != np.uint8:
+            rgb_image = rgb_image.astype(np.uint8)
+        vis_img = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2BGR)
+
+        camera_poses = [
+            ("HeadCam", self.zed_camera.get_entity_pose(), (0, 255, 255)),
+            ("LeftWristCam", self.left_wrist_camera.get_entity_pose(), (0, 165, 255)),
+            ("RightWristCam", self.right_wrist_camera.get_entity_pose(), (255, 0, 255)),
+        ]
+        for label, pose_world, color in camera_poses:
+            self._draw_world_pose_on_bgr(
+                vis_img=vis_img,
+                intrinsics=intrinsics,
+                cam_T_world=cam_T_world,
+                pose_world=pose_world,
+                label=label,
+                color=color,
+            )
+
+        return cv2.cvtColor(vis_img, cv2.COLOR_BGR2RGB)
     
     # def _draw_axes(self, image, intr, cam_T_obj, length=0.1):
     #     """绘制坐标轴"""
@@ -2836,6 +3145,14 @@ def generate_robot_video_from_preprocessed(json_path: str,
                                            depth_scale: float = 1.0,
                                            depth_offset: float = 0.0,
                                            grasp_json_path: str = None,
+                                           link_cam_debug_enable: bool = False,
+                                           link_cam_debug_rot_xyz_deg=(0.0, 0.0, 0.0),
+                                           link_cam_debug_forward: float = 0.0,
+                                           link_cam_debug_right: float = 0.0,
+                                           link_cam_debug_up: float = 0.0,
+                                           link_cam_axis_mode: str = "none",
+                                           link_cam_debug_apply_to: str = "all",
+                                           third_cam_show_link_cams: bool = True,
                                            orientation_test_mode: bool = False):
     """
     从预处理的JSON数据生成机器人动作视频
@@ -2847,6 +3164,12 @@ def generate_robot_video_from_preprocessed(json_path: str,
         depth_scale: 深度缩放因子（调整深度估计误差，物体尺寸会相应调整）
         depth_offset: 深度偏移量（米）
         grasp_json_path: anygrasp抓取数据JSON路径
+        link_cam_debug_enable: 是否启用头部/腕部相机调试偏置
+        link_cam_debug_rot_xyz_deg: 相机局部RPY旋转（度）
+        link_cam_debug_forward/right/up: 按相机局部坐标平移（米）
+        link_cam_axis_mode: 轴修正模式（none/yaw_p90/.../swap_xy等）
+        link_cam_debug_apply_to: 应用对象，all/head/left/right，可逗号分隔
+        third_cam_show_link_cams: 是否在third视角叠加相机位姿可视化
         orientation_test_mode: 是否启用朝向测试模式（测试多个欧拉角组合）
     """
     
@@ -2902,6 +3225,14 @@ def generate_robot_video_from_preprocessed(json_path: str,
         depth_scale=depth_scale,
         depth_offset=depth_offset,
         grasp_json_path=grasp_json_path,
+        link_cam_debug_enable=link_cam_debug_enable,
+        link_cam_debug_rot_xyz_deg=link_cam_debug_rot_xyz_deg,
+        link_cam_debug_forward=link_cam_debug_forward,
+        link_cam_debug_right=link_cam_debug_right,
+        link_cam_debug_up=link_cam_debug_up,
+        link_cam_axis_mode=link_cam_axis_mode,
+        link_cam_debug_apply_to=link_cam_debug_apply_to,
+        third_cam_show_link_cams=third_cam_show_link_cams,
     )
     step_end = time.time()
     step_duration = step_end - step_start
@@ -3184,6 +3515,9 @@ def generate_robot_video_from_preprocessed(json_path: str,
             # else:
             #     current_time = time.time()
             
+            # 每帧先同步robot-link相机位姿，避免腕部/头部相机滞后
+            renderer.update_robot_link_cameras()
+
             # 渲染当前帧
             step_start = time.time()
             rgb_image, depth_image = renderer.render_frame(frame_idx)
@@ -3556,6 +3890,26 @@ def main():
                        help="深度偏移量（米，正值使物体远离相机，默认0.0）")
     parser.add_argument("--test_orientation", action="store_true",
                        help="启用朝向测试模式（测试多个欧拉角组合并保存图片）")
+    parser.add_argument("--link_cam_debug_enable", type=int, default=0,
+                       help="启用头部/腕部相机调试偏置: 0=关闭, 1=开启")
+    parser.add_argument("--link_cam_debug_rot_x_deg", type=float, default=0.0,
+                       help="相机调试旋转X（度，局部坐标）")
+    parser.add_argument("--link_cam_debug_rot_y_deg", type=float, default=0.0,
+                       help="相机调试旋转Y（度，局部坐标）")
+    parser.add_argument("--link_cam_debug_rot_z_deg", type=float, default=0.0,
+                       help="相机调试旋转Z（度，局部坐标）")
+    parser.add_argument("--link_cam_debug_forward", type=float, default=0.0,
+                       help="沿相机原始前向平移（米，正值前进）")
+    parser.add_argument("--link_cam_debug_right", type=float, default=0.0,
+                       help="沿相机原始右向平移（米）")
+    parser.add_argument("--link_cam_debug_up", type=float, default=0.0,
+                       help="沿相机原始上向平移（米）")
+    parser.add_argument("--link_cam_axis_mode", type=str, default="none",
+                       help="相机轴修正模式: none/yaw_p90/yaw_n90/pitch_p90/pitch_n90/roll_p90/roll_n90/swap_xy/swap_xz/swap_yz")
+    parser.add_argument("--link_cam_debug_apply_to", type=str, default="all",
+                       help="相机调试应用对象: all/head/left/right，可逗号分隔")
+    parser.add_argument("--third_cam_show_link_cams", type=int, default=1,
+                       help="是否在third视角叠加头部/腕部相机位姿: 0=否, 1=是")
     args = parser.parse_args()
     # 基于 session 构建固定格式路径
     base_dir = "/data1/zjyang/program/OnePoseviaGen/temp_local/pour/"
@@ -3644,6 +3998,18 @@ def main():
             depth_scale=args.depth_scale,
             depth_offset=args.depth_offset,
             grasp_json_path=grasp_json_path,
+            link_cam_debug_enable=(args.link_cam_debug_enable == 1),
+            link_cam_debug_rot_xyz_deg=(
+                args.link_cam_debug_rot_x_deg,
+                args.link_cam_debug_rot_y_deg,
+                args.link_cam_debug_rot_z_deg,
+            ),
+            link_cam_debug_forward=args.link_cam_debug_forward,
+            link_cam_debug_right=args.link_cam_debug_right,
+            link_cam_debug_up=args.link_cam_debug_up,
+            link_cam_axis_mode=args.link_cam_axis_mode,
+            link_cam_debug_apply_to=args.link_cam_debug_apply_to,
+            third_cam_show_link_cams=(args.third_cam_show_link_cams == 1),
             orientation_test_mode=args.test_orientation
         )
         

@@ -31,12 +31,24 @@ class Policy(BasePolicy):
         sample_kwargs: dict[str, Any] | None = None,
         metadata: dict[str, Any] | None = None,
     ):
+        self._model = model
         self._sample_actions = nnx_utils.module_jit(model.sample_actions)
         self._input_transform = _transforms.compose(transforms)
         self._output_transform = _transforms.compose(output_transforms)
         self._rng = rng or jax.random.key(0)
         self._sample_kwargs = sample_kwargs or {}
         self._metadata = metadata or {}
+
+    def _to_numpy_tree(self, tree):
+        if isinstance(tree, dict):
+            return {k: self._to_numpy_tree(v) for k, v in tree.items()}
+        if isinstance(tree, list):
+            return [self._to_numpy_tree(v) for v in tree]
+        if isinstance(tree, tuple):
+            return tuple(self._to_numpy_tree(v) for v in tree)
+        if hasattr(tree, "shape") and hasattr(tree, "dtype"):
+            return np.asarray(tree)
+        return tree
 
     @override
     def infer(self, obs: dict) -> dict:  # type: ignore[misc]
@@ -55,6 +67,36 @@ class Policy(BasePolicy):
         # Unbatch and convert to np.ndarray.
         outputs = jax.tree.map(lambda x: np.asarray(x[0, ...]), outputs)
         return self._output_transform(outputs)
+
+    def infer_with_attention(self, obs: dict) -> dict:
+        """Inference path that returns both action predictions and attention tensors."""
+        if not hasattr(self._model, "sample_actions_with_attention"):
+            raise AttributeError("This model does not implement sample_actions_with_attention.")
+
+        inputs = jax.tree.map(lambda x: x, obs)
+        inputs = self._input_transform(inputs)
+        inputs = jax.tree.map(lambda x: jnp.asarray(x)[np.newaxis, ...], inputs)
+
+        self._rng, sample_rng = jax.random.split(self._rng)
+        actions, attention = self._model.sample_actions_with_attention(
+            sample_rng,
+            _model.Observation.from_dict(inputs),
+            **self._sample_kwargs,
+        )
+
+        outputs = {
+            "state": np.asarray(inputs["state"][0, ...]),
+            "actions": np.asarray(actions[0, ...]),
+        }
+        outputs = self._output_transform(outputs)
+
+        attention = self._to_numpy_tree(attention)
+        attn_scores = attention.get("attn_scores")
+        if isinstance(attn_scores, np.ndarray) and attn_scores.ndim == 4 and attn_scores.shape[1] == 1:
+            attention["attn_scores"] = attn_scores[:, 0]
+
+        outputs["attention"] = attention
+        return outputs
 
     @property
     def metadata(self) -> dict[str, Any]:

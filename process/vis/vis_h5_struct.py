@@ -3,6 +3,7 @@
 # print(f['obs/arm_left/joint_pos'].shape)
 # print(f['obs/arm_right/joint_pos'].shape)
 # f.close()
+# python vis/vis_h5_struct.py ../h5/pour/pour_0201/r1_data_20260201_212204.h5 
 
 
 import argparse

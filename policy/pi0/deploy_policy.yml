@@ -11,3 +11,9 @@ train_config_name: null
 model_name: null
 checkpoint_id: 30000
 pi0_step: 50
+
+# Attention visualization (optional)
+attn_vis_enable: false
+attn_vis_every_n_steps: 20
+attn_vis_max_images_per_episode: 6
+attn_vis_overlay_alpha: 0.45

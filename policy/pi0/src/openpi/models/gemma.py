@@ -158,7 +158,7 @@ class Attention(nn.Module):
     configs: Sequence[Config]
 
     @nn.compact
-    def __call__(self, xs, positions, attn_mask, kv_cache):
+    def __call__(self, xs, positions, attn_mask, kv_cache, *, return_attn: bool = False):
         # all experts must share the same head dim, num heads, and num kv heads for self-attention to work
         assert all(config.head_dim == self.configs[0].head_dim for config in self.configs)
         assert all(config.num_heads == self.configs[0].num_heads for config in self.configs)
@@ -242,6 +242,9 @@ class Attention(nn.Module):
             else:
                 out.append(None)
 
+        if return_attn:
+            attn_scores = jnp.mean(probs.astype(jnp.float32), axis=(1, 2))
+            return out, (k, v), attn_scores
         return out, (k, v)
 
 
@@ -286,7 +289,8 @@ class Block(nn.Module):
     dropout_bdims: tuple[int, ...] = ()
 
     @nn.compact
-    def __call__(self, xs, kv_cache, positions, attn_mask, decode, deterministic=True):  # noqa: FBT002
+    def __call__(self, xs, kv_cache, positions, attn_mask, deterministic=True,
+                 return_attn=False):  # noqa: FBT002
         xs = sharding.activation_sharding_constraint(xs)
         drop = nn.Dropout(self.dropout, self.dropout_bdims) if self.dropout else lambda x, _: x
 
@@ -299,7 +303,11 @@ class Block(nn.Module):
             pre_attn.append(x)
 
         pre_attn = sharding.activation_sharding_constraint(pre_attn)
-        post_attn, kv_cache = attn(pre_attn, positions, attn_mask, kv_cache)
+        if return_attn:
+            post_attn, kv_cache, attn_scores = attn(pre_attn, positions, attn_mask, kv_cache, return_attn=True)
+        else:
+            post_attn, kv_cache = attn(pre_attn, positions, attn_mask, kv_cache)
+            attn_scores = jnp.zeros((1, 1, 1), dtype=jnp.float32)
         post_attn = jax.tree.map(lambda x: drop(x, deterministic), post_attn)
         post_attn = sharding.activation_sharding_constraint(post_attn)
         xs = jax.tree.map(lambda x, y: x + y, xs, post_attn)
@@ -323,7 +331,7 @@ class Block(nn.Module):
         xs = jax.tree.map(lambda x, y: x + y, xs, out)
         xs = sharding.activation_sharding_constraint(xs)
 
-        return xs, kv_cache
+        return xs, (kv_cache, attn_scores)
 
 
 KVCache: TypeAlias = tuple[at.Float[at.Array, "l b _t _k _h"], at.Float[at.Array, "l b _t _v _h"]]
@@ -351,7 +359,7 @@ class Module(nn.Module):
         block_cls = nn.remat(
             Block,
             prevent_cse=False,
-            static_argnums=(5, ),  # 0=self, 5=deterministic
+            static_argnums=(5, 6),  # 0=self, 5=deterministic, 6=return_attn
             policy=jax.checkpoint_policies.nothing_saveable,
         )
         self.layers = nn.scan(
@@ -361,7 +369,13 @@ class Module(nn.Module):
                 "params": True,
                 "dropout": True
             },
-            in_axes=(0, nn.broadcast, nn.broadcast, nn.broadcast),  # 0=kv_cache, 1=positions, 2=mask, 3=decode
+            in_axes=(
+                0,
+                nn.broadcast,
+                nn.broadcast,
+                nn.broadcast,
+                nn.broadcast,
+            ),  # 0=kv_cache, 1=positions, 2=mask, 3=deterministic, 4=return_attn
             length=self.configs[0].depth,
         )(
             configs=self.configs,
@@ -384,15 +398,27 @@ class Module(nn.Module):
         *,
         kv_cache: KVCache | None = None,
         deterministic: bool = True,
-    ) -> tuple[Sequence[at.Float[at.Array, "b _t _d"] | None], KVCache]:
+        return_attn: bool = False,
+    ) -> tuple[
+        Sequence[at.Float[at.Array, "b _t _d"] | None],
+        KVCache,
+    ] | tuple[
+        Sequence[at.Float[at.Array, "b _t _d"] | None],
+        KVCache,
+        at.Float[at.Array, "l b t s"],
+    ]:
         embedded = jax.tree.map(lambda e: e.astype(self.embed_dtype), embedded)
         mask = jnp.asarray(mask)[:, None, :, :]
 
-        embedded, kv_cache = self.layers(embedded, kv_cache, positions, mask, deterministic)
+        embedded, (kv_cache, attn_scores) = self.layers(embedded, kv_cache, positions, mask, deterministic,
+                                                        return_attn)
 
         assert all(e.dtype == jnp.dtype(self.embed_dtype) for e in embedded if e is not None)
 
-        return [f(e) if e is not None else e for f, e in zip(self.final_norms, embedded, strict=True)], kv_cache
+        outputs = [f(e) if e is not None else e for f, e in zip(self.final_norms, embedded, strict=True)]
+        if return_attn:
+            return outputs, kv_cache, attn_scores
+        return outputs, kv_cache
 
     def init(self):
         """Convenience method for initializing all parameters, necessary due to the quirks of linen."""

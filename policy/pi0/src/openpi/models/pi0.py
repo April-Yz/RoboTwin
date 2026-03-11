@@ -193,6 +193,63 @@ class Pi0(_model.BaseModel):
         ar_mask = jnp.array(ar_mask)
         return tokens, input_mask, ar_mask
 
+    def embed_prefix_with_layout(
+        self,
+        obs: _model.Observation,
+    ) -> tuple[
+        at.Float[at.Array, "b s emb"],
+        at.Bool[at.Array, "b s"],
+        at.Bool[at.Array, " s"],
+        list[dict[str, int | str]],
+    ]:
+        """Same as `embed_prefix`, but also returns token span metadata."""
+        input_mask = []
+        ar_mask = []
+        tokens = []
+        layout: list[dict[str, int | str]] = []
+        offset = 0
+
+        for name in obs.images:
+            image_tokens, _ = self.PaliGemma.img(obs.images[name], train=False)
+            token_count = int(image_tokens.shape[1])
+
+            tokens.append(image_tokens)
+            input_mask.append(einops.repeat(
+                obs.image_masks[name],
+                "b -> b s",
+                s=image_tokens.shape[1],
+            ))
+            ar_mask += [False] * token_count
+
+            layout.append({
+                "name": name,
+                "type": "image",
+                "start": offset,
+                "end": offset + token_count,
+            })
+            offset += token_count
+
+        if obs.tokenized_prompt is not None:
+            tokenized_inputs = self.PaliGemma.llm(obs.tokenized_prompt, method="embed")
+            token_count = int(tokenized_inputs.shape[1])
+
+            tokens.append(tokenized_inputs)
+            input_mask.append(obs.tokenized_prompt_mask)
+            ar_mask += [False] * token_count
+
+            layout.append({
+                "name": "prompt_tokens",
+                "type": "text",
+                "start": offset,
+                "end": offset + token_count,
+            })
+            offset += token_count
+
+        tokens = jnp.concatenate(tokens, axis=1)
+        input_mask = jnp.concatenate(input_mask, axis=1)
+        ar_mask = jnp.array(ar_mask)
+        return tokens, input_mask, ar_mask, layout
+
     @at.typecheck
     def embed_suffix(
         self, obs: _model.Observation, noisy_actions: _model.Actions, timestep: at.Float[at.Array, " b"]
@@ -314,3 +371,59 @@ class Pi0(_model.BaseModel):
 
         x_0, _ = jax.lax.while_loop(cond, step, (noise, 1.0))
         return x_0
+
+    def sample_actions_with_attention(
+        self,
+        rng: at.KeyArrayLike,
+        observation: _model.Observation,
+        *,
+        num_steps: int = 10,
+    ) -> tuple[_model.Actions, dict]:
+        """Debug inference path that also returns attention maps for suffix query tokens."""
+        observation = _model.preprocess_observation(None, observation, train=False)
+        num_steps = int(num_steps)
+        dt = -1.0 / num_steps
+        batch_size = observation.state.shape[0]
+        noise = jax.random.normal(rng, (batch_size, self.action_horizon, self.action_dim))
+
+        prefix_tokens, prefix_mask, prefix_ar_mask, prefix_layout = self.embed_prefix_with_layout(observation)
+        prefix_attn_mask = make_attn_mask(prefix_mask, prefix_ar_mask)
+        prefix_positions = jnp.cumsum(prefix_mask, axis=1) - 1
+        _, kv_cache = self.PaliGemma.llm([prefix_tokens, None], mask=prefix_attn_mask, positions=prefix_positions)
+
+        x_t = noise
+        time = 1.0
+        attn_scores = None
+
+        for _ in range(num_steps):
+            suffix_tokens, suffix_mask, suffix_ar_mask = self.embed_suffix(observation, x_t,
+                                                                           jnp.broadcast_to(time, batch_size))
+            suffix_attn_mask = make_attn_mask(suffix_mask, suffix_ar_mask)
+            prefix_to_suffix_mask = einops.repeat(prefix_mask, "b p -> b s p", s=suffix_tokens.shape[1])
+            full_attn_mask = jnp.concatenate([prefix_to_suffix_mask, suffix_attn_mask], axis=-1)
+            positions = jnp.sum(prefix_mask, axis=-1)[:, None] + jnp.cumsum(suffix_mask, axis=-1) - 1
+
+            (prefix_out, suffix_out), _, attn_scores = self.PaliGemma.llm(
+                [None, suffix_tokens],
+                mask=full_attn_mask,
+                positions=positions,
+                kv_cache=kv_cache,
+                return_attn=True,
+            )
+            assert prefix_out is None
+            v_t = self.action_out_proj(suffix_out[:, -self.action_horizon:])
+            x_t = x_t + dt * v_t
+            time = time + dt
+
+        if attn_scores is None:
+            raise RuntimeError("No attention scores captured during debug inference.")
+
+        attn_metadata = {
+            "attn_scores": attn_scores,  # [layers, batch, query_len, key_len]
+            "prefix_layout": prefix_layout,
+            "prefix_len": int(prefix_tokens.shape[1]),
+            "suffix_len": int(self.action_horizon + 1),
+            "action_query_start": 1,  # index 0 is the state token
+            "action_query_end": int(self.action_horizon + 1),
+        }
+        return x_t, attn_metadata

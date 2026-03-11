@@ -124,6 +124,16 @@ def main(usr_args):
     save_dir = Path(f"eval_result/{task_name}/{policy_name}/{task_config}/{ckpt_setting}/{current_time}")
     save_dir.mkdir(parents=True, exist_ok=True)
 
+    usr_args["attn_vis_enable"] = bool(usr_args.get("attn_vis_enable", False))
+    usr_args["attn_vis_every_n_steps"] = int(usr_args.get("attn_vis_every_n_steps", 20))
+    usr_args["attn_vis_max_images_per_episode"] = int(usr_args.get("attn_vis_max_images_per_episode", 6))
+    usr_args["attn_vis_overlay_alpha"] = float(usr_args.get("attn_vis_overlay_alpha", 0.45))
+    usr_args["attn_vis_save_dir"] = None
+    if usr_args["attn_vis_enable"]:
+        attn_vis_dir = save_dir / "attention_vis"
+        attn_vis_dir.mkdir(parents=True, exist_ok=True)
+        usr_args["attn_vis_save_dir"] = str(attn_vis_dir)
+
     if args["eval_video_log"]:
         video_save_dir = save_dir
         camera_config = get_camera_config(args["camera"]["head_camera_type"])
@@ -148,6 +158,11 @@ def main(usr_args):
     print("\033[94mWrist Camera Config:\033[0m " + str(args["camera"]["wrist_camera_type"]) + f", " +
           str(args["camera"]["collect_wrist_camera"]))
     print("\033[94mEmbodiment Config:\033[0m " + embodiment_name)
+    print("\033[96mAttention Vis:\033[0m " + str(usr_args["attn_vis_enable"]))
+    if usr_args["attn_vis_enable"]:
+        print(" - Every N Steps: " + str(usr_args["attn_vis_every_n_steps"]))
+        print(" - Max Images Per Episode: " + str(usr_args["attn_vis_max_images_per_episode"]))
+        print(" - Save Dir: " + str(usr_args["attn_vis_save_dir"]))
     print("\n==================================")
 
     TASK_ENV = class_decorator(args["task_name"])

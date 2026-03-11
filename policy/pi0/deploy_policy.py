@@ -25,7 +25,17 @@ def encode_obs(observation):
 def get_model(usr_args):
     train_config_name, model_name, checkpoint_id, pi0_step = (usr_args["train_config_name"], usr_args["model_name"],
                                                               usr_args["checkpoint_id"], usr_args["pi0_step"])
-    return PI0(train_config_name, model_name, checkpoint_id, pi0_step)
+    return PI0(
+        train_config_name,
+        model_name,
+        checkpoint_id,
+        pi0_step,
+        attn_vis_enable=usr_args.get("attn_vis_enable", False),
+        attn_vis_every_n_steps=usr_args.get("attn_vis_every_n_steps", 20),
+        attn_vis_max_images_per_episode=usr_args.get("attn_vis_max_images_per_episode", 6),
+        attn_vis_overlay_alpha=usr_args.get("attn_vis_overlay_alpha", 0.45),
+        attn_vis_save_dir=usr_args.get("attn_vis_save_dir"),
+    )
 
 
 def eval(TASK_ENV, model, observation):
@@ -39,7 +49,10 @@ def eval(TASK_ENV, model, observation):
 
     # ======== Get Action ========
 
-    actions = model.get_action()[:model.pi0_step]
+    actions = model.get_action(
+        episode_id=TASK_ENV.test_num,
+        env_step=TASK_ENV.take_action_cnt,
+    )[:model.pi0_step]
 
     for action in actions:
         TASK_ENV.take_action(action)

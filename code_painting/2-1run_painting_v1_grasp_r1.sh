@@ -1,11 +1,26 @@
-source /data1/zjyang/anaconda3/etc/profile.d/conda.sh
+# source /data1/zjyang/anaconda3/etc/profile.d/conda.sh
+source "$(conda info --base)/etc/profile.d/conda.sh"
 # bash script/run_painting_v1_table.sh 3 "pour" 0 0 5 > log/1103_pour_0_0_2mode3max=5maddtable1.json
 # bash script/1-0run_painting_v1_only_obj.sh 3 "pour" 0 0 5
 # bash script/1-1run_painting_v1_only_obj.sh 1 "pour" 2 2 5
 # 用 hdf5_aloha.py 生成的json render + inpainting
 #调整代码，帮我检查导入的这两个模型是否在按照json的数据执行（model1可能需要修改，我看到结果好像他被固定在了一个位置）。2.把手部动作的执行取消，机械臂不用移动，在系统的初始位置
 # python -m code_painting.2-1render_from_preprocessed_grasp_R1 --mode 2 --test_orientation
+# 仅前进 5cm（检查是否原来拍进了link内部）
+# bash script/2-1run_painting_v1_grasp_r1.sh 1 pour 0 0 0 0 3 \
+#   --link_cam_debug_enable 1 \
+#   --link_cam_debug_forward 0.05
 
+# # 仅后退 5cm
+# bash script/2-1run_painting_v1_grasp_r1.sh 1 pour 0 0 0 0 3 \
+#   --link_cam_debug_enable 1 \
+#   --link_cam_debug_forward -0.05
+
+# # 仅俯仰 +10°（检查朝向是否反了）
+# bash script/2-1run_painting_v1_grasp_r1.sh 1 pour 0 0 0 0 3 \
+#   --link_cam_debug_enable 1 \
+#   --link_cam_debug_rot_y_deg 10
+# bash code_painting/2-1run_painting_v1_grasp_r1.sh 0 pour 0 0 0 0 3 --link_cam_debug_enable 1 --link_cam_debug_right 0.1
 # 后退基座，拍不到手臂，减少干扰
 train_gpu=${1:-"0"}
 # task=${1}
@@ -15,6 +30,7 @@ end_idx=${4:-"1"}
 fps=${5:-"5"}
 lg=${6:-"0"}
 rg=${7:-"3"}
+extra_args=("${@:8}")
 printf 'train_gpu = %s\n' "$train_gpu"
 printf 'task = %s\n' "$task_name"
 printf 'start_idx = %s\n' "$start_idx"
@@ -22,6 +38,7 @@ printf 'end_idx = %s\n' "$end_idx"
 printf 'fps = %s\n' "$fps"
 printf 'lg = %s\n' "$lg"
 printf 'rg = %s\n' "$rg"
+printf 'extra_args = %s\n' "${extra_args[*]}"
 # cd ../
 for video_id in $(seq ${start_idx} ${end_idx})
 # for video_id in {7..7}
@@ -37,7 +54,9 @@ do
             --lg ${lg} \
             --rg ${rg} \
             --test_orientation \
-            --session pour_${video_id}_left_bottle_right_cup #"pour_0_right_cup" \
+            --session pour_${video_id}_left_bottle_right_cup \
+            "${extra_args[@]}"
+            # "pour_0_right_cup" \
             # --session2 "pour_0_left_bottle"
             # --session "session_1101190816" \
             # --session2 "session_1029165750"
@@ -46,13 +65,13 @@ do
             # /double_model/double_model.obj session_1029163454 session_1029165750 | bottle session_1101161225 session_1101190816
 
 
-    printf '处理Inpaint-Anything: video_idx=%s\n' "$video_id"
-    printf '处理Inpaint-Anything: video_path=/data1/zjyang/program/third/RoboTwin/code_painting/%s/%s_%s_%sfps.mp4\n' "$task_name" "$task_name" "$video_id" "$fps"
-    cd ../Inpaint-Anything/
-    conda activate inpainting
+    # printf '处理Inpaint-Anything: video_idx=%s\n' "$video_id"
+    # printf '处理Inpaint-Anything: video_path=/data1/zjyang/program/third/RoboTwin/code_painting/%s/%s_%s_%sfps.mp4\n' "$task_name" "$task_name" "$video_id" "$fps"
+    # cd ../Inpaint-Anything/
+    # conda activate inpainting
 
 
-    printf '处理Inpaint-Anything_human: video_idx=%s\n' "$video_id"
+    # printf '处理Inpaint-Anything_human: video_idx=%s\n' "$video_id"
     # CUDA_VISIBLE_DEVICES=${train_gpu} python remove_anything_video_sam2.py \
     #     --input_video /data1/zjyang/program/egodex/egodex_stored/${task_name}/${video_id}.mp4 \
     #     --coords_type key_in \

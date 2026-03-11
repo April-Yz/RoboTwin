@@ -2,6 +2,7 @@
 """
 rosbag info clone (Pure Python - rosbags version v4)
 Fix: Uses 'reader.topics' API for reliable message counting.
+  555  python vis/vis_rosbag_struct.py ../pour/pour_0201/r1_data_20260201_212204.bag
 """
 
 import argparse
