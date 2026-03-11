@@ -44,6 +44,17 @@ class ObjectState:
 
 
 @dataclass
+class ObjectTrack:
+    name: str
+    mesh_file: Path
+    frame_indices: np.ndarray
+    pose_world_wxyz: np.ndarray
+    pose_world_matrix: np.ndarray
+    visible: np.ndarray
+    actor: Optional[sapien.Entity] = None
+
+
+@dataclass
 class CandidatePose:
     candidate_idx: int
     score: float
@@ -89,6 +100,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--reach_rot_tol_deg", type=float, default=20.0)
     parser.add_argument("--max_stage_replans", type=int, default=3)
     parser.add_argument("--hold_frames_after_stage", type=int, default=2)
+    parser.add_argument("--save_debug_preview", type=int, default=1)
+    parser.add_argument("--debug_preview_fps", type=int, default=10)
+    parser.add_argument("--debug_target_axis_length", type=float, default=0.08)
+    parser.add_argument("--debug_target_axis_thickness", type=float, default=0.004)
     parser.add_argument("--head_only", type=int, default=1)
     parser.add_argument("--overlay_text", type=int, default=1)
     parser.add_argument("--third_person_view", type=int, default=0)
@@ -130,9 +145,9 @@ def build_renderer(args: argparse.Namespace) -> ReplayRenderer:
         viewer_wait_at_end=bool(args.viewer_wait_at_end),
         debug_mode=False,
         debug_force_orientation="none",
-        debug_visualize_targets=False,
-        debug_target_axis_length=0.08,
-        debug_target_axis_thickness=0.004,
+        debug_visualize_targets=bool(args.save_debug_preview),
+        debug_target_axis_length=args.debug_target_axis_length,
+        debug_target_axis_thickness=args.debug_target_axis_thickness,
         orientation_remap_label="identity",
         orientation_remap_matrix=np.eye(3, dtype=np.float64),
         stored_orientation_post_rot_xyz_deg=[0.0, 0.0, 0.0],
@@ -193,6 +208,28 @@ def load_object_states(replay_dir: Path, source_frame: int) -> Dict[str, ObjectS
             visible=visible,
         )
     return states
+
+
+def load_object_tracks(replay_dir: Path) -> Tuple[np.ndarray, Dict[str, ObjectTrack]]:
+    pose_path = replay_dir / "multi_object_world_poses.npz"
+    if not pose_path.is_file():
+        raise FileNotFoundError(f"Missing multi_object_world_poses.npz: {pose_path}")
+    data = np.load(str(pose_path), allow_pickle=True)
+    frame_indices = np.asarray(data["selected_source_frame_indices"], dtype=np.int32).reshape(-1)
+    object_names = [str(name) for name in np.asarray(data["object_names"], dtype=object).tolist()]
+    tracks: Dict[str, ObjectTrack] = {}
+    for object_name in object_names:
+        key = object_name
+        mesh_file = Path(str(np.asarray(data[f"{key}__mesh_file"], dtype=object).reshape(()))).resolve()
+        tracks[object_name] = ObjectTrack(
+            name=object_name,
+            mesh_file=mesh_file,
+            frame_indices=frame_indices.copy(),
+            pose_world_wxyz=np.asarray(data[f"{key}__pose_world_wxyz"], dtype=np.float64),
+            pose_world_matrix=np.asarray(data[f"{key}__pose_world_matrix"], dtype=np.float64),
+            visible=np.asarray(data[f"{key}__visible"], dtype=bool),
+        )
+    return frame_indices, tracks
 
 
 def rotation_distance_deg(rot_a: np.ndarray, rot_b: np.ndarray) -> float:
@@ -321,6 +358,10 @@ def choose_keyframes(
 def set_actor_pose(actor: sapien.Entity, pose_world_wxyz: np.ndarray) -> None:
     pose_world_wxyz = np.asarray(pose_world_wxyz, dtype=np.float64).reshape(7)
     actor.set_pose(sapien.Pose(pose_world_wxyz[:3], base.normalize_quat_wxyz(pose_world_wxyz[3:])))
+
+
+def hide_actor(actor: sapien.Entity) -> None:
+    actor.set_pose(base.HIDDEN_DEBUG_POSE)
 
 
 def record_frame(
@@ -490,6 +531,62 @@ def execute_stage_until_reached(
     }
 
 
+def generate_debug_preview(
+    renderer: ReplayRenderer,
+    args: argparse.Namespace,
+    replay_frame_indices: np.ndarray,
+    object_tracks: Dict[str, ObjectTrack],
+    selected_keyframes: List[SelectedKeyframe],
+) -> Optional[Path]:
+    if not bool(args.save_debug_preview):
+        renderer.update_target_axis_visuals(None, None)
+        return None
+
+    debug_video_path = args.output_dir / "debug_selection_preview.mp4"
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    writer = cv2.VideoWriter(str(debug_video_path), fourcc, int(args.debug_preview_fps), (args.image_width, args.image_height))
+    if not writer.isOpened():
+        raise RuntimeError(f"Failed to open {debug_video_path}")
+
+    selected_by_frame = {int(item.source_frame): item for item in selected_keyframes}
+    try:
+        for idx, source_frame in enumerate(replay_frame_indices.tolist()):
+            overlay_lines = [f"mode=debug_preview", f"source_frame={source_frame}"]
+            for name, track in object_tracks.items():
+                if track.actor is None:
+                    continue
+                is_visible = bool(track.visible[idx])
+                if is_visible:
+                    set_actor_pose(track.actor, track.pose_world_wxyz[idx])
+                else:
+                    hide_actor(track.actor)
+                overlay_lines.append(f"{name}={int(is_visible)}")
+
+            selected = selected_by_frame.get(int(source_frame))
+            if selected is not None:
+                if selected.arm == "left":
+                    renderer.update_target_axis_visuals(selected.candidate.pose_world_wxyz, None)
+                else:
+                    renderer.update_target_axis_visuals(None, selected.candidate.pose_world_wxyz)
+                overlay_lines.extend(
+                    [
+                        f"selected_keyframe={selected.source_frame}",
+                        f"selected_arm={selected.arm}",
+                        f"selected_object={selected.candidate.nearest_object}",
+                        f"candidate_idx={selected.candidate.candidate_idx}",
+                        f"rot_err={selected.candidate.rotation_distance_deg:.2f}deg",
+                    ]
+                )
+            else:
+                renderer.update_target_axis_visuals(None, None)
+
+            record_frame(renderer, writer, None, overlay_lines, use_overlay=True)
+    finally:
+        writer.release()
+        renderer.update_target_axis_visuals(None, None)
+    return debug_video_path
+
+
 def main() -> None:
     args = parse_args()
     args.anygrasp_dir = args.anygrasp_dir.resolve()
@@ -509,6 +606,7 @@ def main() -> None:
     renderer = build_renderer(args)
     hand_data = load_hand_data(args.hand_npz)
     keyframes = [int(v) for v in args.keyframes]
+    replay_frame_indices, object_tracks = load_object_tracks(args.replay_dir)
     object_states_per_frame = {frame: load_object_states(args.replay_dir, frame) for frame in keyframes}
     selected_keyframes = choose_keyframes(
         renderer=renderer,
@@ -526,10 +624,19 @@ def main() -> None:
     for state in object_states.values():
         state.actor = create_object_actor(renderer.scene, state.mesh_file, f"planned_object_{state.name}")
         set_actor_pose(state.actor, state.pose_world_wxyz)
+        if state.name in object_tracks:
+            object_tracks[state.name].actor = state.actor
 
     renderer.update_robot_link_cameras()
     renderer.step_scene(steps=1)
     renderer.set_grippers(args.open_gripper if arm == "left" else None, args.open_gripper if arm == "right" else None)
+
+    debug_video_path = generate_debug_preview(renderer, args, replay_frame_indices, object_tracks, selected_keyframes)
+    for state in object_states.values():
+        if state.actor is not None:
+            set_actor_pose(state.actor, state.pose_world_wxyz)
+    renderer.update_target_axis_visuals(None, None)
+    renderer.step_scene(steps=1)
 
     head_video_path = args.output_dir / "head_cam_plan.mp4"
     third_video_path = args.output_dir / "third_cam_plan.mp4"
@@ -625,6 +732,7 @@ def main() -> None:
             }
             for item in selected_keyframes
         ],
+        "debug_preview_video": str(debug_video_path) if debug_video_path is not None else None,
         "head_video": str(head_video_path),
         "third_video": str(third_video_path) if third_writer is not None else None,
     }

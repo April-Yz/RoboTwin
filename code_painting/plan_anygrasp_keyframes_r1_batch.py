@@ -45,6 +45,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--reach_rot_tol_deg", type=float, default=20.0)
     parser.add_argument("--max_stage_replans", type=int, default=3)
     parser.add_argument("--hold_frames_after_stage", type=int, default=2)
+    parser.add_argument("--save_debug_preview", type=int, default=1)
+    parser.add_argument("--debug_preview_fps", type=int, default=10)
+    parser.add_argument("--debug_target_axis_length", type=float, default=0.08)
+    parser.add_argument("--debug_target_axis_thickness", type=float, default=0.004)
     parser.add_argument("--head_only", type=int, default=1)
     parser.add_argument("--overlay_text", type=int, default=1)
     parser.add_argument("--third_person_view", type=int, default=0)
@@ -139,6 +143,14 @@ def build_single_command(args: argparse.Namespace, anygrasp_dir: Path, replay_di
         str(args.max_stage_replans),
         "--hold_frames_after_stage",
         str(args.hold_frames_after_stage),
+        "--save_debug_preview",
+        str(args.save_debug_preview),
+        "--debug_preview_fps",
+        str(args.debug_preview_fps),
+        "--debug_target_axis_length",
+        str(args.debug_target_axis_length),
+        "--debug_target_axis_thickness",
+        str(args.debug_target_axis_thickness),
         "--head_only",
         str(args.head_only),
         "--overlay_text",
