@@ -133,14 +133,16 @@ def build_attention_frame(
     return np.asarray(canvas, dtype=np.uint8)
 
 
-def save_attention_frame(frame: np.ndarray, output_path: Path) -> None:
+def save_attention_frame(frame: np.ndarray, output_path: Path | str) -> None:
+    output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     imageio.imwrite(output_path, frame)
 
 
-def save_attention_video(frames: List[np.ndarray], output_path: Path, *, fps: int = 10) -> None:
+def save_attention_video(frames: List[np.ndarray], output_path: Path | str, *, fps: int = 10) -> None:
     if not frames:
         return
+    output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with imageio.get_writer(output_path, fps=fps) as writer:
         for frame in frames:
@@ -152,7 +154,7 @@ def render_and_save_attention_snapshot(
     patch_attention_maps: Iterable[np.ndarray],
     *,
     title: str,
-    output_path: Path,
+    output_path: Path | str,
 ) -> None:
     frame = build_attention_frame(images, patch_attention_maps, title=title)
     save_attention_frame(frame, output_path)
