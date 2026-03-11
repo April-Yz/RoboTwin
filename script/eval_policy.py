@@ -25,6 +25,17 @@ current_file_path = os.path.abspath(__file__)
 parent_directory = os.path.dirname(current_file_path)
 
 
+def rename_eval_video_with_outcome(video_dir, episode_idx, success):
+    original_path = Path(video_dir) / f"episode{episode_idx}.mp4"
+    if not original_path.exists():
+        return
+    outcome = "succ" if success else "fail"
+    renamed_path = Path(video_dir) / f"episode{episode_idx}-{outcome}.mp4"
+    if renamed_path.exists():
+        renamed_path.unlink()
+    original_path.rename(renamed_path)
+
+
 def class_decorator(task_name):
     envs_module = importlib.import_module(f"envs.{task_name}")
     try:
@@ -299,6 +310,7 @@ def eval_policy(task_name,
         # task_total_reward += TASK_ENV.episode_score
         if TASK_ENV.eval_video_path is not None:
             TASK_ENV._del_eval_video_ffmpeg()
+            rename_eval_video_with_outcome(TASK_ENV.eval_video_path, TASK_ENV.test_num, succ)
 
         if succ:
             TASK_ENV.suc += 1
