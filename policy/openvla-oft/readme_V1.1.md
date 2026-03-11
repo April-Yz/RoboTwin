@@ -214,6 +214,34 @@ bash finetune_beat_block_hammer_baseline.sh 1
 
 - `/home/zaijia001/ssd/RoboTwin/policy/openvla-oft/runs/beat_block_hammer_baseline`
 
+baseline 的 eval helper 也已经补了：
+
+- `/home/zaijia001/ssd/RoboTwin/policy/openvla-oft/eval_beat_block_hammer_baseline.sh`
+
+如果你想直接评估最新 baseline checkpoint：
+
+```bash
+unset LD_LIBRARY_PATH
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
+conda activate RoboTwin_openvla
+cd /home/zaijia001/ssd/RoboTwin/policy/openvla-oft
+
+CUDA_VISIBLE_DEVICES=0 bash /home/zaijia001/ssd/RoboTwin/policy/openvla-oft/eval_beat_block_hammer_baseline.sh
+```
+
+如果你想显式指定 `1000` step 的 baseline checkpoint：
+
+```bash
+unset LD_LIBRARY_PATH
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
+conda activate RoboTwin_openvla
+cd /home/zaijia001/ssd/RoboTwin/policy/openvla-oft
+
+CUDA_VISIBLE_DEVICES=0 bash /home/zaijia001/ssd/RoboTwin/policy/openvla-oft/eval_beat_block_hammer_baseline.sh \
+  /home/zaijia001/ssd/RoboTwin/policy/openvla-oft/runs/beat_block_hammer_baseline/openvla-7b+aloha_beat_block_hammer_builder+b16+lr-0.0001+lora-r32+dropout-0.0--image_aug--beat_block_hammer_baseline_bs4_ga4_lr1e4--1000_chkpt \
+  0 0
+```
+
 如果你想和你之前那组 `4x4` 蒸馏配置完全保持一致，只把 distill 关掉，这个脚本默认就已经是那种设定。
 
 等价的显式命令是：
