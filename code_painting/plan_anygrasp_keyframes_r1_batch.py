@@ -67,7 +67,14 @@ def discover_anygrasp_dirs(anygrasp_root: Path) -> List[Path]:
             continue
         if (child / "grasps").is_dir():
             dirs.append(child)
-    return sorted(dirs, key=lambda p: (trailing_id(p.name) is None, trailing_id(p.name) or p.name))
+    return sorted(
+        dirs,
+        key=lambda p: (
+            trailing_id(p.name) is None,
+            trailing_id(p.name) if trailing_id(p.name) is not None else sys.maxsize,
+            p.name,
+        ),
+    )
 
 
 def filter_dirs(video_dirs: List[Path], ids: Optional[List[str]]) -> List[Path]:
