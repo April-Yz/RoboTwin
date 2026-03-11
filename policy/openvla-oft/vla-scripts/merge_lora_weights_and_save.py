@@ -36,6 +36,7 @@ class ConvertConfig:
 
     base_checkpoint: Union[str, Path] = ""                   # Base model checkpoint path/dir (either openvla/openvla-7b or whichever model you fine-tuned / resumed training from)
     lora_finetuned_checkpoint_dir: Union[str, Path] = ""     # Checkpoint directory containing the LoRA adapter
+    merge_device: str = "cpu"                                # Device used for LoRA merge; "cpu" avoids eval-time GPU spikes
 
     # fmt: on
 
@@ -58,12 +59,19 @@ def main(cfg: ConvertConfig) -> None:
     )
 
     # Load LoRA weights and merge into base model, then save final checkpoint
-    print("Merging LoRA weights into base model...")
+    merge_device = str(cfg.merge_device).lower()
+    print(f"Merging LoRA weights into base model on device: {merge_device}")
     start_time = time.time()
-    merged_vla = PeftModel.from_pretrained(vla, os.path.join(cfg.lora_finetuned_checkpoint_dir, "lora_adapter")).to(
-        "cuda"
+    merged_vla = PeftModel.from_pretrained(
+        vla,
+        os.path.join(cfg.lora_finetuned_checkpoint_dir, "lora_adapter"),
     )
+    if merge_device != "cpu":
+        merged_vla = merged_vla.to(merge_device)
     merged_vla = merged_vla.merge_and_unload()
+    if merge_device != "cpu":
+        merged_vla = merged_vla.to("cpu")
+        torch.cuda.empty_cache()
     merged_vla.save_pretrained(cfg.lora_finetuned_checkpoint_dir)
     print(f"\nMerging complete! Time elapsed (sec): {time.time() - start_time}")
     print(f"\nSaved merged model checkpoint at:\n{cfg.lora_finetuned_checkpoint_dir}")

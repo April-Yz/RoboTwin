@@ -10,6 +10,7 @@ TASK_NAME="beat_block_hammer"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RUN_ROOT_DIR="${RUN_ROOT_DIR:-${SCRIPT_DIR}/runs/beat_block_hammer_v1}"
 AUTO_MERGE_LORA_CHECKPOINT="${AUTO_MERGE_LORA_CHECKPOINT:-1}"
+MERGE_DEVICE="${MERGE_DEVICE:-cpu}"
 
 if [[ -z "${CHECKPOINT_PATH}" ]]; then
   CHECKPOINT_PATH="$(find "${RUN_ROOT_DIR}" -maxdepth 1 -mindepth 1 -type d -name '*chkpt' | sort -V | tail -n 1)"
@@ -22,7 +23,7 @@ fi
 
 if [[ "${AUTO_MERGE_LORA_CHECKPOINT}" == "1" && ! -f "${CHECKPOINT_PATH}/config.json" && -d "${CHECKPOINT_PATH}/lora_adapter" ]]; then
   echo "detected unmerged LoRA checkpoint: ${CHECKPOINT_PATH}"
-  GPU_ID="${GPU_ID}" bash "${SCRIPT_DIR}/merge_lora_beat_block_hammer_v1.sh" "${CHECKPOINT_PATH}"
+  GPU_ID="${GPU_ID}" MERGE_DEVICE="${MERGE_DEVICE}" bash "${SCRIPT_DIR}/merge_lora_beat_block_hammer_v1.sh" "${CHECKPOINT_PATH}"
 fi
 
 if [[ ! -f "${CHECKPOINT_PATH}/config.json" ]]; then

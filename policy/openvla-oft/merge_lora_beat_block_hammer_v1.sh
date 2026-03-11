@@ -6,6 +6,7 @@ GPU_ID="${GPU_ID:-0}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RUN_ROOT_DIR="${RUN_ROOT_DIR:-${SCRIPT_DIR}/runs/beat_block_hammer_v1}"
 BASE_CHECKPOINT="${BASE_CHECKPOINT:-openvla/openvla-7b}"
+MERGE_DEVICE="${MERGE_DEVICE:-cpu}"
 
 if [[ -z "${CHECKPOINT_DIR}" ]]; then
   CHECKPOINT_DIR="$(find "${RUN_ROOT_DIR}" -maxdepth 1 -mindepth 1 -type d -name '*chkpt' | sort -V | tail -n 1)"
@@ -27,6 +28,7 @@ export CUDA_VISIBLE_DEVICES="${GPU_ID}"
 
 python vla-scripts/merge_lora_weights_and_save.py \
   --base_checkpoint "${BASE_CHECKPOINT}" \
-  --lora_finetuned_checkpoint_dir "${CHECKPOINT_DIR}"
+  --lora_finetuned_checkpoint_dir "${CHECKPOINT_DIR}" \
+  --merge_device "${MERGE_DEVICE}"
 
 echo "merged checkpoint: ${CHECKPOINT_DIR}"

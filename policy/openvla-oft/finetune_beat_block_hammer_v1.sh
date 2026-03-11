@@ -27,14 +27,19 @@ RESUME_STEP="${RESUME_STEP:-}"
 RESUME_BASE_MODEL_PATH="${RESUME_BASE_MODEL_PATH:-openvla/openvla-7b}"
 RUN_ID_NOTE="${RUN_ID_NOTE:-beat_block_hammer_v1_gpu${GPU_ID}}"
 BATCH_SIZE="${BATCH_SIZE:-2}"
+GRAD_ACCUMULATION_STEPS="${GRAD_ACCUMULATION_STEPS:-1}"
 LEARNING_RATE="${LEARNING_RATE:-5e-4}"
 NUM_STEPS_BEFORE_DECAY="${NUM_STEPS_BEFORE_DECAY:-50000}"
 MAX_STEPS="${MAX_STEPS:-100000}"
 VAL_FREQ="${VAL_FREQ:-1000}"
-SAVE_FREQ="${SAVE_FREQ:-5000}"
+SAVE_FREQ="${SAVE_FREQ:-1000}"
 WANDB_LOG_FREQ="${WANDB_LOG_FREQ:-10}"
 MERGE_LORA_DURING_TRAINING="${MERGE_LORA_DURING_TRAINING:-False}"
 SAVE_LATEST_CHECKPOINT_ONLY="${SAVE_LATEST_CHECKPOINT_ONLY:-False}"
+DISTILL_LOSS_TYPE="${DISTILL_LOSS_TYPE:-mse}"
+DISTILL_WEIGHT="${DISTILL_WEIGHT:-0.5}"
+BC_WEIGHT="${BC_WEIGHT:-1.0}"
+TEACHER_DETACH="${TEACHER_DETACH:-True}"
 
 mkdir -p "${RUN_ROOT_DIR}"
 
@@ -46,6 +51,7 @@ echo "  DATA_ROOT_DIR=${DATA_ROOT_DIR}"
 echo "  DATASET_NAME=${DATASET_NAME}"
 echo "  RUN_ROOT_DIR=${RUN_ROOT_DIR}"
 echo "  BATCH_SIZE=${BATCH_SIZE}"
+echo "  GRAD_ACCUMULATION_STEPS=${GRAD_ACCUMULATION_STEPS}"
 echo "  MAX_STEPS=${MAX_STEPS}"
 echo "  SAVE_FREQ=${SAVE_FREQ}"
 echo "  RESUME=${RESUME}"
@@ -66,6 +72,7 @@ COMMON_ARGS=(
   --num_images_in_input 3
   --use_proprio True
   --batch_size "${BATCH_SIZE}"
+  --grad_accumulation_steps "${GRAD_ACCUMULATION_STEPS}"
   --learning_rate "${LEARNING_RATE}"
   --num_steps_before_decay "${NUM_STEPS_BEFORE_DECAY}"
   --max_steps "${MAX_STEPS}"
@@ -80,10 +87,10 @@ COMMON_ARGS=(
   --future_horizon 4
   --future_mode image_latent
   --distill_target action
-  --distill_loss_type mse
-  --distill_weight 0.5
-  --bc_weight 1.0
-  --teacher_detach True
+  --distill_loss_type "${DISTILL_LOSS_TYPE}"
+  --distill_weight "${DISTILL_WEIGHT}"
+  --bc_weight "${BC_WEIGHT}"
+  --teacher_detach "${TEACHER_DETACH}"
   --wandb_entity "${WANDB_ENTITY}"
   --wandb_project "${WANDB_PROJECT}"
   --run_id_note "${RUN_ID_NOTE}"
