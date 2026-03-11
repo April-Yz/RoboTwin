@@ -27,6 +27,7 @@ from prismatic.extern.hf.processing_prismatic import PrismaticImageProcessor, Pr
 from prismatic.models.action_heads import DiffusionActionHead, L1RegressionActionHead
 from prismatic.models.film_vit_wrapper import FiLMedPrismaticVisionBackbone
 from prismatic.models.projectors import NoisyActionProjector, ProprioProjector
+from prismatic.util.attention_visualization import build_attention_frame
 from prismatic.vla.constants import (
     ACTION_DIM,
     ACTION_PROPRIO_NORMALIZATION_TYPE,
@@ -780,6 +781,7 @@ def get_vla_action(
 
         # Generate action
         prediction_diagnostics = None
+        return_attentions = bool(getattr(cfg, "log_eval_attention", False))
         if action_head is None:
             # Standard VLA output (single-image inputs, discrete actions)
             if return_diagnostics:
@@ -788,6 +790,7 @@ def get_vla_action(
                     unnorm_key=cfg.unnorm_key,
                     do_sample=False,
                     return_diagnostics=True,
+                    return_attentions=return_attentions,
                 )
             else:
                 action, _ = vla.predict_action(**inputs, unnorm_key=cfg.unnorm_key, do_sample=False)
@@ -804,6 +807,7 @@ def get_vla_action(
                     action_head=action_head,
                     use_film=use_film,
                     return_diagnostics=True,
+                    return_attentions=return_attentions,
                 )
             else:
                 action, _ = vla.predict_action(
@@ -836,6 +840,15 @@ def get_vla_action(
         "action_chunk_size": NUM_ACTIONS_CHUNK,
         "action_norm_type": ACTION_PROPRIO_NORMALIZATION_TYPE.value,
     }
+    attention_summary = prediction_diagnostics.get("attention_summary") if prediction_diagnostics is not None else None
+    if attention_summary is not None:
+        attention_images = [np.asarray(primary_image)]
+        attention_images.extend(np.asarray(image) for image in all_images)
+        diagnostics["attention_frame"] = build_attention_frame(
+            attention_images,
+            attention_summary["per_image_patch_maps"],
+            title=f"action-attention | chunk={NUM_ACTIONS_CHUNK} | dim={ACTION_DIM}",
+        )
     return action_list, diagnostics
 
 

@@ -25,6 +25,7 @@ from prismatic.training.train_utils import (
     get_current_action_mask,
     get_next_actions_mask,
 )
+from prismatic.util.attention_visualization import summarize_action_patch_attention
 from prismatic.vla.constants import (
     ACTION_DIM,
     ACTION_PROPRIO_NORMALIZATION_TYPE,
@@ -896,6 +897,7 @@ class OpenVLAForActionPrediction(PrismaticForConditionalGeneration):
         NUM_PATCHES,
         NUM_PROMPT_TOKENS,
         action_head=None,
+        output_attentions: bool = False,
     ):
         """Run L1 regression-based continuous action prediction or discrete action tokens prediction."""
         # Zero out action token embeddings
@@ -916,7 +918,7 @@ class OpenVLAForActionPrediction(PrismaticForConditionalGeneration):
             inputs_embeds=multimodal_embeddings,
             labels=None,
             use_cache=None,
-            output_attentions=False,
+            output_attentions=output_attentions,
             output_hidden_states=True,
             return_dict=True,
         )
@@ -951,7 +953,17 @@ class OpenVLAForActionPrediction(PrismaticForConditionalGeneration):
             normalized_actions = self.bin_centers[discretized_actions]
             normalized_actions = normalized_actions.reshape(NUM_ACTIONS_CHUNK, ACTION_DIM)
 
-        return normalized_actions, actions_hidden_states
+        attention_summary = None
+        if output_attentions and language_model_output.attentions:
+            attention_summary = summarize_action_patch_attention(
+                language_model_output.attentions[-1],
+                all_actions_mask.squeeze(-1),
+                num_patch_tokens=NUM_PATCHES,
+                num_images=self.vision_backbone.get_num_images_in_input(),
+                num_patches_per_image=self.vision_backbone.get_num_patches(),
+            )
+
+        return normalized_actions, actions_hidden_states, attention_summary
 
     def predict_action(
         self,
@@ -963,6 +975,7 @@ class OpenVLAForActionPrediction(PrismaticForConditionalGeneration):
         noisy_action_projector=None,
         use_film: bool = False,
         return_diagnostics: bool = False,
+        return_attentions: bool = False,
         **kwargs: str,
     ) -> np.ndarray:
         """Predict actions from input sequence, with options for different prediction methods.
@@ -1052,9 +1065,10 @@ class OpenVLAForActionPrediction(PrismaticForConditionalGeneration):
                 NUM_PROMPT_TOKENS,
                 noisy_action_projector,
             )
+            attention_summary = None
         else:
             # Run regression or discrete token-based prediction
-            normalized_actions, actions_hidden_states = self._regression_or_discrete_prediction(
+            normalized_actions, actions_hidden_states, attention_summary = self._regression_or_discrete_prediction(
                 input_embeddings,
                 all_actions_mask,
                 projected_patch_embeddings,
@@ -1063,6 +1077,7 @@ class OpenVLAForActionPrediction(PrismaticForConditionalGeneration):
                 NUM_PATCHES,
                 NUM_PROMPT_TOKENS,
                 action_head,
+                output_attentions=return_attentions,
             )
 
         # Unnormalize predicted actions
@@ -1072,6 +1087,7 @@ class OpenVLAForActionPrediction(PrismaticForConditionalGeneration):
             diagnostics = {
                 "normalized_actions": normalized_actions,
                 "unnormalized_actions": actions,
+                "attention_summary": attention_summary,
             }
             return actions, actions_hidden_states, diagnostics
 

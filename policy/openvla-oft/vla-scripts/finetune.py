@@ -68,6 +68,11 @@ from prismatic.training.train_utils import (
     get_current_action_mask,
     get_next_actions_mask,
 )
+from prismatic.util.attention_visualization import (
+    render_and_save_attention_snapshot,
+    summarize_action_patch_attention,
+    tensor_images_to_uint8_list,
+)
 from prismatic.util.data_utils import PaddedCollatorForActionPrediction
 from prismatic.vla.action_tokenizer import ActionTokenizer
 from prismatic.vla.constants import (
@@ -147,6 +152,9 @@ class FinetuneConfig:
     action_diagnostics_log_freq: int = 20            # Training action diagnostics logging frequency in steps
     enable_future_corruption_debug: bool = False     # If True, compare teacher action against corrupted future input
     future_corruption_debug_freq: int = 1000         # Future corruption debug frequency in steps
+    log_attention_diagnostics: bool = False          # If True, periodically save student attention visualizations
+    attention_diagnostics_log_freq: int = 1000       # Step frequency for attention snapshots
+    attention_diagnostics_num_samples: int = 1       # Number of samples to dump per attention snapshot event
 
     # fmt: on
 
@@ -718,6 +726,80 @@ def run_diffusion_sampling(
     return curr_noisy_actions.reshape(actions_shape)
 
 
+def save_attention_diagnostics(
+    *,
+    vla,
+    batch,
+    log_step: int,
+    run_dir: Path,
+    use_proprio: bool,
+    proprio_projector,
+    use_film: bool,
+    max_samples: int,
+) -> None:
+    if max_samples <= 0:
+        return
+
+    model = getattr(vla, "module", vla)
+    device = next(model.parameters()).device
+    num_images = int(batch["pixel_values"].shape[1])
+    num_patches_per_image = model.vision_backbone.get_num_patches()
+    attention_dir = run_dir / "attention_diagnostics"
+    was_training = model.training
+
+    for sample_idx in range(min(max_samples, batch["pixel_values"].shape[0])):
+        sample = {}
+        for key, value in batch.items():
+            if isinstance(value, torch.Tensor):
+                sample[key] = value[sample_idx : sample_idx + 1]
+            else:
+                sample[key] = value
+
+        with torch.no_grad(), torch.autocast("cuda", dtype=torch.bfloat16):
+            output = model(
+                input_ids=sample["input_ids"].to(device),
+                attention_mask=sample["attention_mask"].to(device),
+                pixel_values=sample["pixel_values"].to(torch.bfloat16).to(device),
+                labels=sample["labels"].to(device),
+                output_attentions=True,
+                output_projector_features=True,
+                output_hidden_states=False,
+                proprio=sample["proprio"].to(device) if use_proprio and sample.get("proprio") is not None else None,
+                proprio_projector=proprio_projector if use_proprio else None,
+                use_film=use_film,
+            )
+
+        if not output.attentions:
+            print("[AttentionDiagnostics] attentions unavailable; skipping snapshot.")
+            break
+
+        labels = sample["labels"].to(device)[:, 1:]
+        action_mask = get_current_action_mask(labels) | get_next_actions_mask(labels)
+        attention_summary = summarize_action_patch_attention(
+            output.attentions[-1],
+            action_mask,
+            num_patch_tokens=output.projector_features.shape[1],
+            num_images=num_images,
+            num_patches_per_image=num_patches_per_image,
+        )
+        if attention_summary is None:
+            print("[AttentionDiagnostics] failed to summarize attention; skipping snapshot.")
+            continue
+
+        images = tensor_images_to_uint8_list(sample["pixel_values"][0])
+        output_path = attention_dir / f"step_{log_step:07d}_sample{sample_idx}.png"
+        render_and_save_attention_snapshot(
+            images,
+            attention_summary["per_image_patch_maps"],
+            title=f"train-attention | step={log_step} | sample={sample_idx}",
+            output_path=output_path,
+        )
+        print(f"[AttentionDiagnostics] saved {output_path}")
+
+    if was_training:
+        model.train()
+
+
 def compute_smoothened_metrics(metrics_deques) -> dict:
     """
     Compute smoothened metrics from recent deques.
@@ -1134,6 +1216,12 @@ def finetune(cfg: FinetuneConfig) -> None:
             f"enable_future_corruption_debug={cfg.enable_future_corruption_debug} "
             f"future_corruption_debug_freq={cfg.future_corruption_debug_freq}"
         )
+    print(
+        "[AttentionDiagnostics] "
+        f"log_attention_diagnostics={cfg.log_attention_diagnostics} "
+        f"attention_diagnostics_log_freq={cfg.attention_diagnostics_log_freq} "
+        f"attention_diagnostics_num_samples={cfg.attention_diagnostics_num_samples}"
+    )
 
     # GPU setup
     distributed_state = PartialState()
@@ -1560,6 +1648,24 @@ def finetune(cfg: FinetuneConfig) -> None:
             # Push Metrics to W&B (every wandb_log_freq gradient steps)
             if distributed_state.is_main_process and log_step % cfg.wandb_log_freq == 0:
                 log_metrics_to_wandb(smoothened_metrics, "VLA Train", log_step, wandb)
+
+            if (
+                distributed_state.is_main_process
+                and cfg.log_attention_diagnostics
+                and log_step > 0
+                and log_step % cfg.attention_diagnostics_log_freq == 0
+                and (batch_idx + 1) % cfg.grad_accumulation_steps == 0
+            ):
+                save_attention_diagnostics(
+                    vla=vla,
+                    batch=batch,
+                    log_step=log_step,
+                    run_dir=run_dir,
+                    use_proprio=cfg.use_proprio,
+                    proprio_projector=proprio_projector if cfg.use_proprio else None,
+                    use_film=cfg.use_film,
+                    max_samples=cfg.attention_diagnostics_num_samples,
+                )
 
             # [If applicable] Linearly warm up learning rate from 10% to 100% of original
             if cfg.lr_warmup_steps > 0:

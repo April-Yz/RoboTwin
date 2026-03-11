@@ -2,6 +2,7 @@ import os
 import numpy as np
 from dataclasses import dataclass
 
+from prismatic.util.attention_visualization import save_attention_video
 from prismatic.vla.constants import NUM_ACTIONS_CHUNK, PROPRIO_DIM
 from experiments.robot.openvla_utils import (
     get_vla,
@@ -29,6 +30,8 @@ class InferenceConfig:
     log_eval_action_stats: bool = True
     eval_action_stats_freq: int = 10
     eval_action_stats_print_first_n_steps: int = 20
+    log_eval_attention: bool = False
+    eval_attention_fps: int = 10
 
 
 def encode_obs(obs: dict) -> dict:
@@ -60,11 +63,14 @@ class Model:
         self.episode_joint_delta_norm = 0.0
         self.episode_gripper_open_close_changes = 0
         self._last_gripper_sign = None
+        self._pending_attention_frame = None
+        self.episode_attention_frames = []
         self._print_eval_config_summary()
 
     def get_action(self, observation: dict):
         obs = encode_obs(observation)
-        if self.cfg.log_eval_action_stats:
+        need_diagnostics = self.cfg.log_eval_action_stats or self.cfg.log_eval_attention
+        if need_diagnostics:
             actions, diagnostics = get_vla_action(
                 cfg=self.cfg,
                 vla=self.vla,
@@ -77,6 +83,7 @@ class Model:
                 return_diagnostics=True,
             )
             self.last_action_diagnostics = diagnostics
+            self._pending_attention_frame = diagnostics.get("attention_frame")
         else:
             actions = get_vla_action(
                 cfg=self.cfg,
@@ -89,6 +96,7 @@ class Model:
                 use_film=self.cfg.use_film,
             )
             self.last_action_diagnostics = None
+            self._pending_attention_frame = None
         return actions
 
     def _print_eval_config_summary(self):
@@ -103,7 +111,8 @@ class Model:
             f"use_proprio={self.cfg.use_proprio} "
             f"use_film={self.cfg.use_film} "
             f"num_images_in_input={self.cfg.num_images_in_input} "
-            f"unnorm_key={self.cfg.unnorm_key}"
+            f"unnorm_key={self.cfg.unnorm_key} "
+            f"log_eval_attention={self.cfg.log_eval_attention}"
         )
         print(
             "[EvalCheckpoint] "
@@ -150,6 +159,8 @@ class Model:
         self.episode_joint_delta_norm = 0.0
         self.episode_gripper_open_close_changes = 0
         self._last_gripper_sign = None
+        self._pending_attention_frame = None
+        self.episode_attention_frames = []
 
     def record_executed_action(
         self,
@@ -170,7 +181,7 @@ class Model:
         denorm_stats = self._vector_stats("denorm_action", denorm_action[None, :])
         executed_stats = self._vector_stats("executed_action", executed_action[None, :])
 
-        should_print = (
+        should_print = self.cfg.log_eval_action_stats and (
             self.global_eval_step <= self.cfg.eval_action_stats_print_first_n_steps
             or self.global_eval_step % self.cfg.eval_action_stats_freq == 0
         )
@@ -194,8 +205,10 @@ class Model:
                 np.any(current_gripper_sign != self._last_gripper_sign)
             )
         self._last_gripper_sign = current_gripper_sign
+        if self.cfg.log_eval_attention and self._pending_attention_frame is not None:
+            self.episode_attention_frames.append(np.asarray(self._pending_attention_frame, dtype=np.uint8))
 
-    def finish_episode_diagnostics(self, success: bool, step_limit: int):
+    def finish_episode_diagnostics(self, success: bool, step_limit: int, video_dir: str | None = None, episode_idx: int | None = None):
         print(
             "[EvalEpisode] "
             f"episode_len={self.episode_action_count} "
@@ -204,6 +217,19 @@ class Model:
             f"gripper_open_close_changes={self.episode_gripper_open_close_changes} "
             f"step_limit={step_limit}"
         )
+        if (
+            self.cfg.log_eval_attention
+            and video_dir is not None
+            and episode_idx is not None
+            and self.episode_attention_frames
+        ):
+            outcome = "succ" if success else "fail"
+            attention_video_path = os.path.join(video_dir, f"episode{episode_idx}-attention-{outcome}.mp4")
+            save_attention_video(
+                self.episode_attention_frames,
+                output_path=os.path.abspath(attention_video_path),
+                fps=self.cfg.eval_attention_fps,
+            )
 
 
 def get_model(usr_args: dict):
@@ -223,6 +249,8 @@ def get_model(usr_args: dict):
         "log_eval_action_stats": usr_args.get("log_eval_action_stats", True),
         "eval_action_stats_freq": usr_args.get("eval_action_stats_freq", 10),
         "eval_action_stats_print_first_n_steps": usr_args.get("eval_action_stats_print_first_n_steps", 20),
+        "log_eval_attention": usr_args.get("log_eval_attention", False),
+        "eval_attention_fps": usr_args.get("eval_attention_fps", 10),
     }
 
     cfg = InferenceConfig(**config_args)
@@ -246,7 +274,7 @@ def eval(TASK_ENV, model: Model, observation: dict):
         observation_before = observation
         TASK_ENV.take_action(action)
         observation = TASK_ENV.get_obs()
-        if model.cfg.log_eval_action_stats:
+        if model.cfg.log_eval_action_stats or model.cfg.log_eval_attention:
             raw_action = raw_actions[action_idx]
             denorm_action = denorm_actions[action_idx]
             model.record_executed_action(

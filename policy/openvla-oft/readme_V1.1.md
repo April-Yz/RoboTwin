@@ -224,7 +224,7 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
 conda activate RoboTwin_openvla
 cd /home/zaijia001/ssd/RoboTwin/policy/openvla-oft
 
-export CUDA_VISIBLE_DEVICES=1
+export CUDA_VISIBLE_DEVICES=0
 
 python vla-scripts/finetune.py \
   --vla_path openvla/openvla-7b \
@@ -326,6 +326,46 @@ GPU 选择优先级现在是：
 
 ```bash
 CUDA_VISIBLE_DEVICES=1 bash eval_beat_block_hammer_v1.sh /path/to/your_chkpt
+```
+
+如果想在 eval 时额外导出 attention 视频，可以直接这样跑：
+
+```bash
+unset LD_LIBRARY_PATH
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
+conda activate RoboTwin_openvla
+cd /home/zaijia001/ssd/RoboTwin/policy/openvla-oft
+
+LOG_EVAL_ATTENTION=True \
+EVAL_ATTENTION_FPS=10 \
+CUDA_VISIBLE_DEVICES=1 bash /home/zaijia001/ssd/RoboTwin/policy/openvla-oft/eval_beat_block_hammer_v1.sh \
+  /home/zaijia001/ssd/RoboTwin/policy/openvla-oft/runs/beat_block_hammer_v1/openvla-7b+aloha_beat_block_hammer_builder+b16+lr-0.0001+lora-r32+dropout-0.0--image_aug--pd-k4-dw1.0--beat_block_hammer_v1_bs4_ga4_lr1e4_dw1--5000_chkpt \
+  0 1
+```
+
+这会在同一个 episode 目录下额外保存：
+
+- `episode0-attention-succ.mp4`
+- `episode1-attention-fail.mp4`
+
+其中 attention 视频当前是“输入图像上的 patch attention 热图”，不是直接写回主渲染视频本身。
+
+训练时如果只想每 `1000` step 抽 1 个样本保存 attention 图，可以这样开：
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin/policy/openvla-oft
+LOG_ATTENTION_DIAGNOSTICS=True \
+ATTENTION_DIAGNOSTICS_LOG_FREQ=1000 \
+ATTENTION_DIAGNOSTICS_NUM_SAMPLES=1 \
+BATCH_SIZE=4 \
+GRAD_ACCUMULATION_STEPS=4 \
+bash finetune_beat_block_hammer_v1.sh 1
+```
+
+attention 图片会保存到：
+
+```text
+/home/zaijia001/ssd/RoboTwin/policy/openvla-oft/runs/beat_block_hammer_v1/<run_dir>/attention_diagnostics/
 ```
 
 ## 10. 结果怎么看

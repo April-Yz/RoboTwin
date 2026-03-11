@@ -7,6 +7,8 @@ checkpoint_path=${3}
 seed=${4}
 gpu_id=${5:-}
 unnorm_key=${6}
+log_eval_attention=${LOG_EVAL_ATTENTION:-False}
+eval_attention_fps=${EVAL_ATTENTION_FPS:-10}
 
 if [[ -n "${gpu_id}" ]]; then
     export CUDA_VISIBLE_DEVICES=${gpu_id}
@@ -25,7 +27,9 @@ python script/eval_policy.py --config policy/${policy_name}/deploy_policy.yml \
     --ckpt_setting ${checkpoint_path} \
     --seed ${seed} \
     --policy_name ${policy_name} \
-    --unnorm_key ${unnorm_key}
+    --unnorm_key ${unnorm_key} \
+    --log_eval_attention ${log_eval_attention} \
+    --eval_attention_fps ${eval_attention_fps}
 
 # example usage 
 # bash eval.sh move_can_pot demo_randomized ckpt_path 0 5 aloha_move_can_pot_builder

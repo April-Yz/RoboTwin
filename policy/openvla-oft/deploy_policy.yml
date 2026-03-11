@@ -23,3 +23,5 @@ lora_rank: 32
 log_eval_action_stats: true
 eval_action_stats_freq: 10
 eval_action_stats_print_first_n_steps: 20
+log_eval_attention: false
+eval_attention_fps: 10

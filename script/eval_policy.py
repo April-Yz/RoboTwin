@@ -319,7 +319,12 @@ def eval_policy(task_name,
             print("\033[91mFail!\033[0m")
 
         if hasattr(model, "finish_episode_diagnostics"):
-            model.finish_episode_diagnostics(success=succ, step_limit=TASK_ENV.step_lim)
+            model.finish_episode_diagnostics(
+                success=succ,
+                step_limit=TASK_ENV.step_lim,
+                video_dir=str(TASK_ENV.eval_video_path) if TASK_ENV.eval_video_path is not None else None,
+                episode_idx=TASK_ENV.test_num,
+            )
 
         now_id += 1
         TASK_ENV.close_env(clear_cache=((succ_seed + 1) % clear_cache_freq == 0))
