@@ -5,12 +5,14 @@ task_name=${1}
 task_config=${2}
 checkpoint_path=${3}
 seed=${4}
-gpu_id=${5}
+gpu_id=${5:-}
 unnorm_key=${6}
 
-export CUDA_VISIBLE_DEVICES=${gpu_id}
+if [[ -n "${gpu_id}" ]]; then
+    export CUDA_VISIBLE_DEVICES=${gpu_id}
+fi
 export SAPIEN_RT_DENOISER=${SAPIEN_RT_DENOISER:-none}
-echo -e "\033[33mgpu id (to use): ${gpu_id}\033[0m"
+echo -e "\033[33mgpu id (to use): ${CUDA_VISIBLE_DEVICES:-unset}\033[0m"
 
 cd ../..  # Go to root
 

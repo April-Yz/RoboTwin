@@ -3,7 +3,7 @@ set -euo pipefail
 
 CHECKPOINT_PATH="${1:-}"
 SEED="${2:-0}"
-GPU_ID="${3:-3}"
+GPU_ID="${3:-${GPU_ID:-${CUDA_VISIBLE_DEVICES:-3}}}"
 TASK_CONFIG="${4:-demo_clean}"
 UNNORM_KEY="${UNNORM_KEY:-aloha_beat_block_hammer_builder}"
 TASK_NAME="beat_block_hammer"

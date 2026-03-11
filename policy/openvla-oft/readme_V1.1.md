@@ -228,6 +228,19 @@ CUDA_VISIBLE_DEVICES=1 bash eval_beat_block_hammer_v1.sh \
 - 如果还没 merge，默认先在 CPU 上 merge
 - 然后再进入真正的 eval
 
+GPU 选择优先级现在是：
+
+- eval 脚本第 3 个位置参数
+- 环境变量 `GPU_ID`
+- 当前 shell 里的 `CUDA_VISIBLE_DEVICES`
+- 都没有时才默认 `3`
+
+所以这条会真正跑在物理 `GPU 1`：
+
+```bash
+CUDA_VISIBLE_DEVICES=1 bash eval_beat_block_hammer_v1.sh /path/to/your_chkpt
+```
+
 ## 10. 结果怎么看
 
 评估成功跑起来后，看到这种：
