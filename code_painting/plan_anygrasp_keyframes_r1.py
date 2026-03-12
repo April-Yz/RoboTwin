@@ -60,6 +60,8 @@ class CandidatePose:
     score: float
     translation_cam: np.ndarray
     rotation_cam: np.ndarray
+    width_m: float
+    depth_m: float
     pose_world_wxyz: np.ndarray
     pose_world_matrix: np.ndarray
     nearest_object: str
@@ -75,6 +77,20 @@ class SelectedKeyframe:
     hand_rotation_cam: np.ndarray
 
 
+@dataclass
+class ArmSelectionResult:
+    arm: str
+    expected_object: Optional[str]
+    selected_keyframes: List[SelectedKeyframe]
+    ranked_candidates_per_frame: Dict[int, List[CandidatePose]]
+
+
+@dataclass
+class DebugVisualBundle:
+    keyframe_axis_actors: Dict[int, sapien.Entity]
+    candidate_actors: Dict[int, List[sapien.Entity]]
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Use AnyGrasp keyframes + hand orientation to plan a two-keyframe RoboTwin demo.")
     parser.add_argument("--anygrasp_dir", type=Path, required=True, help="Per-video AnyGrasp result dir, e.g. anygrasp_batch_results/d_pour_blue_1.")
@@ -84,6 +100,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--keyframes", type=int, nargs=2, default=[1, 22], metavar=("GRASP_FRAME", "ACTION_FRAME"))
     parser.add_argument("--arm", choices=["auto", "left", "right"], default="auto")
     parser.add_argument("--planner_backend", choices=["urdfik", "curobo"], default="urdfik")
+    parser.add_argument("--left_target_object", type=str, default="cup")
+    parser.add_argument("--right_target_object", type=str, default="bottle")
+    parser.add_argument("--candidate_object_max_distance_m", type=float, default=0.12)
+    parser.add_argument("--debug_candidate_top_k", type=int, default=4)
     parser.add_argument("--robot_config", type=Path, default=R1_CONFIG)
     parser.add_argument("--image_width", type=int, default=640)
     parser.add_argument("--image_height", type=int, default=360)
@@ -146,7 +166,7 @@ def build_renderer(args: argparse.Namespace) -> ReplayRenderer:
         viewer_wait_at_end=bool(args.viewer_wait_at_end),
         debug_mode=False,
         debug_force_orientation="none",
-        debug_visualize_targets=bool(args.save_debug_preview),
+        debug_visualize_targets=False,
         debug_target_axis_length=args.debug_target_axis_length,
         debug_target_axis_thickness=args.debug_target_axis_thickness,
         orientation_remap_label="identity",
@@ -233,6 +253,16 @@ def load_object_tracks(replay_dir: Path) -> Tuple[np.ndarray, Dict[str, ObjectTr
     return frame_indices, tracks
 
 
+def expected_object_for_arm(args: argparse.Namespace, arm: str) -> Optional[str]:
+    if arm == "left":
+        value = str(args.left_target_object).strip()
+    elif arm == "right":
+        value = str(args.right_target_object).strip()
+    else:
+        value = ""
+    return value or None
+
+
 def rotation_distance_deg(rot_a: np.ndarray, rot_b: np.ndarray) -> float:
     delta = R.from_matrix(np.asarray(rot_a, dtype=np.float64).reshape(3, 3)).inv() * R.from_matrix(np.asarray(rot_b, dtype=np.float64).reshape(3, 3))
     return float(np.rad2deg(delta.magnitude()))
@@ -263,31 +293,39 @@ def nearest_object_name(candidate_world_matrix: np.ndarray, object_states: Dict[
     return best_name, best_dist
 
 
-def select_keyframes_for_arm(
+def build_ranked_candidates_for_arm(
     renderer: ReplayRenderer,
+    args: argparse.Namespace,
     anygrasp_dir: Path,
     hand_data: Dict[str, np.ndarray],
     keyframes: Sequence[int],
     arm: str,
     object_states_per_frame: Dict[int, Dict[str, ObjectState]],
-) -> Optional[List[SelectedKeyframe]]:
+) -> Optional[Dict[int, List[CandidatePose]]]:
     hand_valid = np.asarray(hand_data[f"{arm}_gripper_valid"], dtype=bool)
     hand_rotations = np.asarray(hand_data[f"{arm}_gripper_rotation_matrix"], dtype=np.float64)
     if any(not bool(hand_valid[frame]) for frame in keyframes):
         return None
 
+    expected_object = expected_object_for_arm(args, arm)
     candidates_per_frame: Dict[int, List[CandidatePose]] = {}
     for frame in keyframes:
         all_candidates = []
         for candidate_idx, grasp in enumerate(load_anygrasp_candidates(anygrasp_dir, frame)):
             pose_world_wxyz, pose_world_matrix = candidate_to_world_pose(renderer, grasp)
             nearest_name, nearest_dist = nearest_object_name(pose_world_matrix, object_states_per_frame[frame])
+            if expected_object is not None and nearest_name != expected_object:
+                continue
+            if nearest_dist > float(args.candidate_object_max_distance_m):
+                continue
             all_candidates.append(
                 CandidatePose(
                     candidate_idx=candidate_idx,
                     score=float(grasp["score"]),
                     translation_cam=np.asarray(grasp["translation"], dtype=np.float64).reshape(3),
                     rotation_cam=np.asarray(grasp["rotation_matrix"], dtype=np.float64).reshape(3, 3),
+                    width_m=float(grasp.get("width", 0.08)),
+                    depth_m=float(grasp.get("depth", 0.04)),
                     pose_world_wxyz=pose_world_wxyz,
                     pose_world_matrix=pose_world_matrix,
                     nearest_object=nearest_name,
@@ -295,7 +333,34 @@ def select_keyframes_for_arm(
                     rotation_distance_deg=rotation_distance_deg(hand_rotations[frame], grasp["rotation_matrix"]),
                 )
             )
+        all_candidates.sort(key=lambda cand: (cand.rotation_distance_deg, cand.nearest_object_distance_m, -cand.score))
         candidates_per_frame[frame] = all_candidates
+        if not all_candidates:
+            return None
+    return candidates_per_frame
+
+
+def select_keyframes_for_arm(
+    renderer: ReplayRenderer,
+    args: argparse.Namespace,
+    anygrasp_dir: Path,
+    hand_data: Dict[str, np.ndarray],
+    keyframes: Sequence[int],
+    arm: str,
+    object_states_per_frame: Dict[int, Dict[str, ObjectState]],
+) -> Optional[ArmSelectionResult]:
+    hand_rotations = np.asarray(hand_data[f"{arm}_gripper_rotation_matrix"], dtype=np.float64)
+    candidates_per_frame = build_ranked_candidates_for_arm(
+        renderer=renderer,
+        args=args,
+        anygrasp_dir=anygrasp_dir,
+        hand_data=hand_data,
+        keyframes=keyframes,
+        arm=arm,
+        object_states_per_frame=object_states_per_frame,
+    )
+    if candidates_per_frame is None:
+        return None
 
     best_selection: Optional[List[SelectedKeyframe]] = None
     best_cost = float("inf")
@@ -304,10 +369,7 @@ def select_keyframes_for_arm(
         second_candidates = [cand for cand in candidates_per_frame[keyframes[1]] if cand.nearest_object == object_name]
         if not second_candidates:
             continue
-        best_second = min(
-            second_candidates,
-            key=lambda cand: (cand.rotation_distance_deg, cand.nearest_object_distance_m, -cand.score),
-        )
+        best_second = second_candidates[0]
         total_cost = (
             first_candidate.rotation_distance_deg
             + best_second.rotation_distance_deg
@@ -329,25 +391,33 @@ def select_keyframes_for_arm(
                     hand_rotation_cam=np.asarray(hand_rotations[keyframes[1]], dtype=np.float64),
                 ),
             ]
-    return best_selection
+    if best_selection is None:
+        return None
+    return ArmSelectionResult(
+        arm=arm,
+        expected_object=expected_object_for_arm(args, arm),
+        selected_keyframes=best_selection,
+        ranked_candidates_per_frame=candidates_per_frame,
+    )
 
 
 def choose_keyframes(
     renderer: ReplayRenderer,
+    args: argparse.Namespace,
     anygrasp_dir: Path,
     hand_data: Dict[str, np.ndarray],
     keyframes: Sequence[int],
     arm_mode: str,
     object_states_per_frame: Dict[int, Dict[str, ObjectState]],
-) -> List[SelectedKeyframe]:
+) -> ArmSelectionResult:
     candidate_arms = [arm_mode] if arm_mode in ("left", "right") else ["left", "right"]
-    best: Optional[List[SelectedKeyframe]] = None
+    best: Optional[ArmSelectionResult] = None
     best_cost = float("inf")
     for arm in candidate_arms:
-        selection = select_keyframes_for_arm(renderer, anygrasp_dir, hand_data, keyframes, arm, object_states_per_frame)
+        selection = select_keyframes_for_arm(renderer, args, anygrasp_dir, hand_data, keyframes, arm, object_states_per_frame)
         if selection is None:
             continue
-        total_cost = sum(item.candidate.rotation_distance_deg for item in selection)
+        total_cost = sum(item.candidate.rotation_distance_deg for item in selection.selected_keyframes)
         if total_cost < best_cost:
             best_cost = total_cost
             best = selection
@@ -363,6 +433,61 @@ def set_actor_pose(actor: sapien.Entity, pose_world_wxyz: np.ndarray) -> None:
 
 def hide_actor(actor: sapien.Entity) -> None:
     actor.set_pose(base.HIDDEN_DEBUG_POSE)
+
+
+def create_colored_axis_actor(
+    scene: sapien.Scene,
+    name: str,
+    axis_length: float,
+    thickness: float,
+    colors: Tuple[Sequence[float], Sequence[float], Sequence[float]],
+) -> sapien.Entity:
+    builder = scene.create_actor_builder()
+    axis_half = axis_length * 0.5
+    builder.add_sphere_visual(radius=thickness * 1.8, material=[1.0, 1.0, 1.0])
+    builder.add_box_visual(pose=sapien.Pose([axis_half, 0.0, 0.0]), half_size=[axis_half, thickness, thickness], material=list(colors[0]))
+    builder.add_box_visual(pose=sapien.Pose([0.0, axis_half, 0.0]), half_size=[thickness, axis_half, thickness], material=list(colors[1]))
+    builder.add_box_visual(pose=sapien.Pose([0.0, 0.0, axis_half]), half_size=[thickness, thickness, axis_half], material=list(colors[2]))
+    actor = builder.build_kinematic(name=name)
+    hide_actor(actor)
+    return actor
+
+
+def create_gripper_candidate_actor(scene: sapien.Scene, name: str, color: Sequence[float]) -> sapien.Entity:
+    builder = scene.create_actor_builder()
+    body_half = [0.008, 0.026, 0.004]
+    finger_half = [0.018, 0.0035, 0.0035]
+    builder.add_box_visual(pose=sapien.Pose([-0.012, 0.0, 0.0]), half_size=body_half, material=list(color))
+    builder.add_box_visual(pose=sapien.Pose([0.012, 0.020, 0.0]), half_size=finger_half, material=list(color))
+    builder.add_box_visual(pose=sapien.Pose([0.012, -0.020, 0.0]), half_size=finger_half, material=list(color))
+    actor = builder.build_kinematic(name=name)
+    hide_actor(actor)
+    return actor
+
+
+def create_debug_visual_bundle(renderer: ReplayRenderer, args: argparse.Namespace, keyframes: Sequence[int]) -> DebugVisualBundle:
+    axis_colors = {
+        int(keyframes[0]): ([1.0, 0.35, 0.10], [1.0, 0.65, 0.15], [1.0, 0.90, 0.20]),
+        int(keyframes[1]): ([0.15, 0.85, 1.0], [0.15, 0.45, 1.0], [0.55, 0.25, 1.0]),
+    }
+    keyframe_axis_actors = {
+        int(frame): create_colored_axis_actor(
+            renderer.scene,
+            f"debug_axis_keyframe_{int(frame)}",
+            axis_length=float(args.debug_target_axis_length),
+            thickness=float(args.debug_target_axis_thickness),
+            colors=axis_colors[int(frame)],
+        )
+        for frame in keyframes
+    }
+    candidate_actors = {
+        int(frame): [
+            create_gripper_candidate_actor(renderer.scene, f"debug_candidate_{int(frame)}_{rank}", color=[0.9, 0.9 - 0.12 * rank, 0.2 + 0.12 * rank])
+            for rank in range(max(int(args.debug_candidate_top_k), 0))
+        ]
+        for frame in keyframes
+    }
+    return DebugVisualBundle(keyframe_axis_actors=keyframe_axis_actors, candidate_actors=candidate_actors)
 
 
 def set_single_arm_target_visual(renderer: ReplayRenderer, arm: str, pose_world_wxyz: Optional[np.ndarray]) -> None:
@@ -553,12 +678,28 @@ def execute_stage_until_reached(
     }
 
 
+def update_candidate_debug_visuals(
+    debug_visuals: DebugVisualBundle,
+    active_frame: Optional[int],
+    ranked_candidates_per_frame: Dict[int, List[CandidatePose]],
+) -> None:
+    for frame, actors in debug_visuals.candidate_actors.items():
+        candidates = ranked_candidates_per_frame.get(int(frame), [])
+        for idx, actor in enumerate(actors):
+            if active_frame is not None and int(frame) == int(active_frame) and idx < len(candidates):
+                set_actor_pose(actor, candidates[idx].pose_world_wxyz)
+            else:
+                hide_actor(actor)
+
+
 def generate_debug_preview(
     renderer: ReplayRenderer,
     args: argparse.Namespace,
     replay_frame_indices: np.ndarray,
     object_tracks: Dict[str, ObjectTrack],
     selected_keyframes: List[SelectedKeyframe],
+    ranked_candidates_per_frame: Dict[int, List[CandidatePose]],
+    debug_visuals: DebugVisualBundle,
 ) -> Optional[Path]:
     if not bool(args.save_debug_preview):
         renderer.update_target_axis_visuals(None, None)
@@ -572,6 +713,10 @@ def generate_debug_preview(
 
     selected_by_frame = {int(item.source_frame): item for item in selected_keyframes}
     selected_frames = sorted(selected_by_frame.keys())
+    for item in selected_keyframes:
+        actor = debug_visuals.keyframe_axis_actors.get(int(item.source_frame))
+        if actor is not None:
+            set_actor_pose(actor, item.candidate.pose_world_wxyz)
     try:
         for idx, source_frame in enumerate(replay_frame_indices.tolist()):
             overlay_lines = [f"mode=debug_preview", f"source_frame={source_frame}"]
@@ -593,23 +738,25 @@ def generate_debug_preview(
             if selected is None:
                 selected = selected_by_frame.get(int(source_frame))
             if selected is not None:
-                set_single_arm_target_visual(renderer, selected.arm, selected.candidate.pose_world_wxyz)
+                update_candidate_debug_visuals(debug_visuals, int(selected.source_frame), ranked_candidates_per_frame)
                 overlay_lines.extend(
                     [
                         f"selected_keyframe={selected.source_frame}",
                         f"selected_arm={selected.arm}",
+                        f"expected_object={selected.candidate.nearest_object}",
                         f"selected_object={selected.candidate.nearest_object}",
                         f"candidate_idx={selected.candidate.candidate_idx}",
                         f"rot_err={selected.candidate.rotation_distance_deg:.2f}deg",
+                        f"top_k={min(len(ranked_candidates_per_frame.get(int(selected.source_frame), [])), int(args.debug_candidate_top_k))}",
                     ]
                 )
             else:
-                renderer.update_target_axis_visuals(None, None)
+                update_candidate_debug_visuals(debug_visuals, None, ranked_candidates_per_frame)
 
             record_frame(renderer, writer, None, overlay_lines, use_overlay=True)
     finally:
         writer.release()
-        renderer.update_target_axis_visuals(None, None)
+        update_candidate_debug_visuals(debug_visuals, None, ranked_candidates_per_frame)
     return debug_video_path
 
 
@@ -634,17 +781,21 @@ def main() -> None:
     keyframes = [int(v) for v in args.keyframes]
     replay_frame_indices, object_tracks = load_object_tracks(args.replay_dir)
     object_states_per_frame = {frame: load_object_states(args.replay_dir, frame) for frame in keyframes}
-    selected_keyframes = choose_keyframes(
+    selection_result = choose_keyframes(
         renderer=renderer,
+        args=args,
         anygrasp_dir=args.anygrasp_dir,
         hand_data=hand_data,
         keyframes=keyframes,
         arm_mode=args.arm,
         object_states_per_frame=object_states_per_frame,
     )
+    selected_keyframes = selection_result.selected_keyframes
+    ranked_candidates_per_frame = selection_result.ranked_candidates_per_frame
 
     arm = selected_keyframes[0].arm
     primary_object_name = selected_keyframes[0].candidate.nearest_object
+    debug_visuals = create_debug_visual_bundle(renderer, args, keyframes)
 
     object_states = object_states_per_frame[keyframes[0]]
     for state in object_states.values():
@@ -653,15 +804,28 @@ def main() -> None:
         if state.name in object_tracks:
             object_tracks[state.name].actor = state.actor
 
+    for item in selected_keyframes:
+        actor = debug_visuals.keyframe_axis_actors.get(int(item.source_frame))
+        if actor is not None:
+            set_actor_pose(actor, item.candidate.pose_world_wxyz)
+
     renderer.update_robot_link_cameras()
     renderer.step_scene(steps=1)
     renderer.set_grippers(args.open_gripper if arm == "left" else None, args.open_gripper if arm == "right" else None)
 
-    debug_video_path = generate_debug_preview(renderer, args, replay_frame_indices, object_tracks, selected_keyframes)
+    debug_video_path = generate_debug_preview(
+        renderer,
+        args,
+        replay_frame_indices,
+        object_tracks,
+        selected_keyframes,
+        ranked_candidates_per_frame,
+        debug_visuals,
+    )
     for state in object_states.values():
         if state.actor is not None:
             set_actor_pose(state.actor, state.pose_world_wxyz)
-    renderer.update_target_axis_visuals(None, None)
+    update_candidate_debug_visuals(debug_visuals, None, ranked_candidates_per_frame)
     renderer.step_scene(steps=1)
 
     head_video_path = args.output_dir / "head_cam_plan.mp4"
@@ -761,6 +925,7 @@ def main() -> None:
         "hand_npz": str(args.hand_npz),
         "keyframes": keyframes,
         "selected_arm": arm,
+        "expected_object_for_selected_arm": selection_result.expected_object,
         "selected_object": primary_object_name,
         "stages": {
             "pregrasp": pregrasp_result,
@@ -776,6 +941,8 @@ def main() -> None:
                 "rotation_distance_deg": item.candidate.rotation_distance_deg,
                 "nearest_object": item.candidate.nearest_object,
                 "nearest_object_distance_m": item.candidate.nearest_object_distance_m,
+                "width_m": item.candidate.width_m,
+                "depth_m": item.candidate.depth_m,
                 "pose_world_wxyz": item.candidate.pose_world_wxyz.tolist(),
                 "translation_cam": item.candidate.translation_cam.tolist(),
                 "rotation_cam": item.candidate.rotation_cam.tolist(),
@@ -783,6 +950,22 @@ def main() -> None:
             }
             for item in selected_keyframes
         ],
+        "top_candidates_per_keyframe": {
+            str(frame): [
+                {
+                    "candidate_idx": cand.candidate_idx,
+                    "score": cand.score,
+                    "nearest_object": cand.nearest_object,
+                    "nearest_object_distance_m": cand.nearest_object_distance_m,
+                    "rotation_distance_deg": cand.rotation_distance_deg,
+                    "width_m": cand.width_m,
+                    "depth_m": cand.depth_m,
+                    "pose_world_wxyz": cand.pose_world_wxyz.tolist(),
+                }
+                for cand in ranked_candidates_per_frame.get(int(frame), [])[: max(int(args.debug_candidate_top_k), 0)]
+            ]
+            for frame in keyframes
+        },
         "debug_preview_video": str(debug_video_path) if debug_video_path is not None else None,
         "head_video": str(head_video_path),
         "third_video": str(third_video_path) if third_writer is not None else None,

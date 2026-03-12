@@ -6,8 +6,12 @@
 
 1. 从 AnyGrasp 结果中读取关键帧 `1` 和 `22` 的所有抓取候选
 2. 读取人手 `npz` 中对应帧的 `left/right_gripper_rotation_matrix`
-3. 选择和人手 gripper 朝向最接近的候选
-4. 要求两个关键帧都落在同一个物体上
+3. 按手别绑定目标物体
+   - 左手默认只允许 `cup`
+   - 右手默认只允许 `bottle`
+4. 过滤掉距离目标物体太远的候选
+5. 在剩余候选里按 gripper 朝向接近程度排序
+6. 要求两个关键帧都落在同一个物体上
 5. 在 RoboTwin 中执行：
    - `pregrasp`
    - `grasp`
@@ -159,8 +163,9 @@ batch 根目录下会生成：
 它会做三件事：
 
 1. 按 `multi_object_world_poses.npz` 里的轨迹，把该视频里的物体完整回放
-2. 在关键帧 `1` 和 `22` 上显示被选中的抓取位姿坐标轴
-3. 在画面左上角写出：
+2. 持续显示关键帧 `1` 和 `22` 的两个不同颜色目标轴
+3. 在命中关键帧窗口时，额外显示该关键帧 top-k 候选的简化夹爪预览
+4. 在画面左上角写出：
    - `source_frame`
    - `selected_arm`
    - `selected_object`
@@ -176,6 +181,8 @@ batch 根目录下会生成：
   - debug 预览视频帧率
 - `--debug_keyframe_hold_frames`
   - 关键帧命中的抓取坐标轴在 debug 预览里持续显示的帧数
+- `--debug_candidate_top_k`
+  - debug 预览里显示多少个最接近的候选夹爪
 - `--debug_target_axis_length`
   - 抓取位姿坐标轴长度
 - `--debug_target_axis_thickness`
@@ -207,6 +214,12 @@ batch 根目录下会生成：
 - `--arm`
   - `auto` / `left` / `right`
   - `auto` 会自动在左右手里选更接近人手朝向的一侧
+- `--left_target_object`
+  - 左手允许抓取的物体名，默认 `cup`
+- `--right_target_object`
+  - 右手允许抓取的物体名，默认 `bottle`
+- `--candidate_object_max_distance_m`
+  - 候选抓取点到目标物体中心的最大允许距离
 - `--approach_offset_m`
   - `pregrasp` 相对 `grasp` 的后退距离
 - `--open_gripper`
@@ -250,9 +263,12 @@ batch 根目录下会生成：
 关键字段：
 
 - `selected_arm`
+- `expected_object_for_selected_arm`
 - `selected_object`
 - `selected_candidates`
   - 每个关键帧最终选中的候选
+- `top_candidates_per_keyframe`
+  - 每个关键帧按规则排序后的前几个候选
 - `stages.pregrasp`
 - `stages.grasp`
 - `stages.action`

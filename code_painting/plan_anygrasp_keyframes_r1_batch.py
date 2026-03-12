@@ -27,6 +27,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--keyframes", type=int, nargs=2, default=[1, 22], metavar=("GRASP_FRAME", "ACTION_FRAME"))
     parser.add_argument("--arm", choices=["auto", "left", "right"], default="auto")
     parser.add_argument("--planner_backend", choices=["urdfik", "curobo"], default="urdfik")
+    parser.add_argument("--left_target_object", type=str, default="cup")
+    parser.add_argument("--right_target_object", type=str, default="bottle")
+    parser.add_argument("--candidate_object_max_distance_m", type=float, default=0.12)
+    parser.add_argument("--debug_candidate_top_k", type=int, default=4)
     parser.add_argument("--skip_existing", type=int, default=1)
     parser.add_argument("--continue_on_error", type=int, default=1)
     parser.add_argument("--robot_config", type=Path, default=(THIS_DIR.parent / "robot_config_R1.json"))
@@ -114,6 +118,14 @@ def build_single_command(args: argparse.Namespace, anygrasp_dir: Path, replay_di
         str(args.arm),
         "--planner_backend",
         str(args.planner_backend),
+        "--left_target_object",
+        str(args.left_target_object),
+        "--right_target_object",
+        str(args.right_target_object),
+        "--candidate_object_max_distance_m",
+        str(args.candidate_object_max_distance_m),
+        "--debug_candidate_top_k",
+        str(args.debug_candidate_top_k),
         "--robot_config",
         str(args.robot_config.resolve()),
         "--image_width",
