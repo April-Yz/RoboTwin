@@ -161,20 +161,55 @@ class Pi0(_model.BaseModel):
         self.action_time_mlp_out = nnx.Linear(action_expert_config.width, action_expert_config.width, rngs=rngs)
         self.action_out_proj = nnx.Linear(action_expert_config.width, config.action_dim, rngs=rngs)
 
+    def _aggregate_future_image_tokens(
+        self,
+        obs: _model.Observation,
+        name: str,
+    ) -> tuple[at.Float[at.Array, "b s emb"], at.Bool[at.Array, "b"]]:
+        if obs.future_images is None or name not in obs.future_images:
+            raise ValueError(f"Future images for key '{name}' are required for privileged distillation.")
+
+        future_images = obs.future_images[name]
+        batch_size, future_horizon = future_images.shape[:2]
+        flat_images = einops.rearrange(future_images, "b fh h w c -> (b fh) h w c")
+        image_tokens, _ = self.PaliGemma.img(flat_images, train=False)
+        image_tokens = einops.rearrange(image_tokens, "(b fh) s e -> b fh s e", b=batch_size, fh=future_horizon)
+
+        if obs.future_image_masks is not None and name in obs.future_image_masks:
+            future_mask = obs.future_image_masks[name]
+        else:
+            future_mask = jnp.ones((batch_size, future_horizon), dtype=jnp.bool_)
+
+        if obs.future_valid_mask is not None:
+            future_mask = jnp.logical_and(future_mask, obs.future_valid_mask)
+
+        weights = future_mask.astype(image_tokens.dtype)
+        denom = jnp.maximum(jnp.sum(weights, axis=1, keepdims=True), 1.0)
+        pooled_tokens = jnp.sum(image_tokens * weights[:, :, None, None], axis=1) / denom[:, None]
+        pooled_mask = jnp.any(future_mask, axis=1)
+        return pooled_tokens, pooled_mask
+
     @at.typecheck
     def embed_prefix(
-        self, obs: _model.Observation
+        self,
+        obs: _model.Observation,
+        *,
+        use_future_images: bool = False,
     ) -> tuple[at.Float[at.Array, "b s emb"], at.Bool[at.Array, "b s"], at.Bool[at.Array, " s"]]:
         input_mask = []
         ar_mask = []
         tokens = []
         # embed images
         for name in obs.images:
-            image_tokens, _ = self.PaliGemma.img(obs.images[name], train=False)
+            if use_future_images and obs.future_images is not None and name in obs.future_images:
+                image_tokens, image_mask = self._aggregate_future_image_tokens(obs, name)
+            else:
+                image_tokens, _ = self.PaliGemma.img(obs.images[name], train=False)
+                image_mask = obs.image_masks[name]
 
             tokens.append(image_tokens)
             input_mask.append(einops.repeat(
-                obs.image_masks[name],
+                image_mask,
                 "b -> b s",
                 s=image_tokens.shape[1],
             ))
@@ -192,6 +227,24 @@ class Pi0(_model.BaseModel):
         input_mask = jnp.concatenate(input_mask, axis=1)
         ar_mask = jnp.array(ar_mask)
         return tokens, input_mask, ar_mask
+
+    @at.typecheck
+    def predict_velocity(
+        self,
+        observation: _model.Observation,
+        noisy_actions: _model.Actions,
+        timestep: at.Float[at.Array, " b"],
+        *,
+        use_future_images: bool = False,
+    ) -> _model.Actions:
+        prefix_tokens, prefix_mask, prefix_ar_mask = self.embed_prefix(observation, use_future_images=use_future_images)
+        suffix_tokens, suffix_mask, suffix_ar_mask = self.embed_suffix(observation, noisy_actions, timestep)
+        input_mask = jnp.concatenate([prefix_mask, suffix_mask], axis=1)
+        ar_mask = jnp.concatenate([prefix_ar_mask, suffix_ar_mask], axis=0)
+        attn_mask = make_attn_mask(input_mask, ar_mask)
+        positions = jnp.cumsum(input_mask, axis=1) - 1
+        (_, suffix_out), _ = self.PaliGemma.llm([prefix_tokens, suffix_tokens], mask=attn_mask, positions=positions)
+        return self.action_out_proj(suffix_out[:, -self.action_horizon:])
 
     @at.typecheck
     def embed_suffix(
@@ -241,18 +294,7 @@ class Pi0(_model.BaseModel):
         time_expanded = time[..., None, None]
         x_t = time_expanded * noise + (1 - time_expanded) * actions
         u_t = noise - actions
-
-        # one big forward pass of prefix + suffix at once
-        prefix_tokens, prefix_mask, prefix_ar_mask = self.embed_prefix(observation)
-        suffix_tokens, suffix_mask, suffix_ar_mask = self.embed_suffix(observation, x_t, time)
-        input_mask = jnp.concatenate([prefix_mask, suffix_mask], axis=1)
-        ar_mask = jnp.concatenate([prefix_ar_mask, suffix_ar_mask], axis=0)
-        attn_mask = make_attn_mask(input_mask, ar_mask)
-        positions = jnp.cumsum(input_mask, axis=1) - 1
-        (prefix_out, suffix_out), _ = self.PaliGemma.llm([prefix_tokens, suffix_tokens],
-                                                         mask=attn_mask,
-                                                         positions=positions)
-        v_t = self.action_out_proj(suffix_out[:, -self.action_horizon:])
+        v_t = self.predict_velocity(observation, x_t, time)
 
         return jnp.mean(jnp.square(v_t - u_t), axis=-1)
 

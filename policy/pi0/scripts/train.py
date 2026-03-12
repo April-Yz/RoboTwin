@@ -16,6 +16,7 @@ import tqdm_loggable.auto as tqdm
 import wandb
 
 import openpi.models.model as _model
+import openpi.models.pi0 as _pi0_model
 import openpi.shared.array_typing as at
 import openpi.shared.nnx_utils as nnx_utils
 import openpi.training.checkpoints as _checkpoints
@@ -92,6 +93,66 @@ def _load_weights_and_validate(loader: _weight_loaders.WeightLoader, params_shap
         k: v
         for k, v in traverse_util.flatten_dict(loaded_params).items() if not isinstance(v, jax.ShapeDtypeStruct)
     })
+
+
+def _smooth_l1_loss(pred: at.Array, target: at.Array, *, beta: float = 1.0) -> at.Array:
+    diff = pred - target
+    abs_diff = jnp.abs(diff)
+    quadratic = jnp.minimum(abs_diff, beta)
+    linear = abs_diff - quadratic
+    return 0.5 * quadratic**2 / beta + linear
+
+
+def _make_distill_loss(pred: at.Array, target: at.Array, loss_type: str) -> at.Array:
+    if loss_type == "mse":
+        return jnp.square(pred - target)
+    if loss_type == "smooth_l1":
+        return _smooth_l1_loss(pred, target)
+    raise ValueError(f"Unsupported distill_loss_type: {loss_type}")
+
+
+def _compute_pi0_distill_loss(
+    config: _config.TrainConfig,
+    model: _pi0_model.Pi0,
+    rng: at.KeyArrayLike,
+    observation: _model.Observation,
+    actions: _model.Actions,
+) -> tuple[at.Array, dict[str, at.Array]]:
+    preprocess_rng, noise_rng, time_rng = jax.random.split(rng, 3)
+    observation = _model.preprocess_observation(preprocess_rng, observation, train=True)
+
+    batch_shape = actions.shape[:-2]
+    noise = jax.random.normal(noise_rng, actions.shape)
+    time = jax.random.beta(time_rng, 1.5, 1, batch_shape) * 0.999 + 0.001
+    time_expanded = time[..., None, None]
+    x_t = time_expanded * noise + (1 - time_expanded) * actions
+    u_t = noise - actions
+
+    student_v = model.predict_velocity(observation, x_t, time, use_future_images=False)
+    bc_loss = jnp.mean(jnp.square(student_v - u_t), axis=-1)
+    student_action = x_t - time_expanded * student_v
+
+    teacher_v = model.predict_velocity(observation, x_t, time, use_future_images=True)
+    if config.teacher_detach:
+        teacher_v = jax.lax.stop_gradient(teacher_v)
+    teacher_action = x_t - time_expanded * teacher_v
+
+    distill_loss = jnp.mean(_make_distill_loss(student_action, teacher_action, config.distill_loss_type), axis=(-1, -2))
+    total_loss = config.bc_weight * jnp.mean(bc_loss) + config.distill_weight * jnp.mean(distill_loss)
+
+    metrics = {
+        "loss": total_loss,
+        "bc_loss": jnp.mean(bc_loss),
+        "distill_loss": jnp.mean(distill_loss),
+        "student_action_abs_mean": jnp.mean(jnp.abs(student_action)),
+        "teacher_action_abs_mean": jnp.mean(jnp.abs(teacher_action)),
+        "student_teacher_l1": jnp.mean(jnp.abs(student_action - teacher_action)),
+        "future_valid_ratio": (
+            jnp.mean(observation.future_valid_mask.astype(jnp.float32))
+            if observation.future_valid_mask is not None else jnp.asarray(1.0, dtype=jnp.float32)
+        ),
+    }
+    return total_loss, metrics
 
 
 @at.typecheck
@@ -171,15 +232,27 @@ def train_step(
         observation: _model.Observation,
         actions: _model.Actions,
     ):
+        if config.use_privileged_distill:
+            if not isinstance(model, _pi0_model.Pi0):
+                raise ValueError("Privileged distillation is only implemented for pi0 models.")
+            return _compute_pi0_distill_loss(config, model, rng, observation, actions)
+
         chunked_loss = model.compute_loss(rng, observation, actions, train=True)
-        return jnp.mean(chunked_loss)
+        loss = jnp.mean(chunked_loss)
+        return loss, {
+            "loss": loss,
+            "bc_loss": loss,
+            "distill_loss": jnp.asarray(0.0, dtype=loss.dtype),
+        }
 
     train_rng = jax.random.fold_in(rng, state.step)
     observation, actions = batch
 
     # Filter out frozen params.
     diff_state = nnx.DiffState(0, config.trainable_filter)
-    loss, grads = nnx.value_and_grad(loss_fn, argnums=diff_state)(model, train_rng, observation, actions)
+    (loss, aux_metrics), grads = nnx.value_and_grad(loss_fn, has_aux=True, argnums=diff_state)(
+        model, train_rng, observation, actions
+    )
 
     params = state.params.filter(config.trainable_filter)
     updates, new_opt_state = state.tx.update(grads, state.opt_state, params)
@@ -210,6 +283,7 @@ def train_step(
         ),
     )
     info = {
+        **aux_metrics,
         "loss": loss,
         "grad_norm": optax.global_norm(grads),
         "param_norm": optax.global_norm(kernel_params),

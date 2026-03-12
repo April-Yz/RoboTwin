@@ -100,6 +100,11 @@ class Observation(Generic[ArrayT]):
     # Token loss mask (for FAST autoregressive model).
     token_loss_mask: at.Bool[ArrayT, "*b l"] | None = None
 
+    # Privileged future observations for teacher-side training only.
+    future_images: dict[str, at.Float[ArrayT, "*b fh h w c"]] | None = None
+    future_image_masks: dict[str, at.Bool[ArrayT, "*b fh"]] | None = None
+    future_valid_mask: at.Bool[ArrayT, "*b fh"] | None = None
+
     @classmethod
     def from_dict(cls, data: at.PyTree[ArrayT]) -> "Observation[ArrayT]":
         """This method defines the mapping between unstructured data (i.e., nested dict) to the structured Observation format."""
@@ -118,6 +123,9 @@ class Observation(Generic[ArrayT]):
             tokenized_prompt_mask=data.get("tokenized_prompt_mask"),
             token_ar_mask=data.get("token_ar_mask"),
             token_loss_mask=data.get("token_loss_mask"),
+            future_images=data.get("future_image"),
+            future_image_masks=data.get("future_image_mask"),
+            future_valid_mask=data.get("future_valid_mask"),
         )
 
     def to_dict(self) -> at.PyTree[ArrayT]:
@@ -125,6 +133,8 @@ class Observation(Generic[ArrayT]):
         result = dataclasses.asdict(self)
         result["image"] = result.pop("images")
         result["image_mask"] = result.pop("image_masks")
+        result["future_image"] = result.pop("future_images")
+        result["future_image_mask"] = result.pop("future_image_masks")
         return result
 
 
@@ -180,6 +190,20 @@ def preprocess_observation(
 
         out_images[key] = image
 
+    out_future_images = None
+    if observation.future_images is not None:
+        out_future_images = {}
+        for key in image_keys:
+            if key not in observation.future_images:
+                continue
+
+            future_image = observation.future_images[key]
+            orig_shape = future_image.shape
+            flat_future = future_image.reshape((-1, *orig_shape[-3:]))
+            if flat_future.shape[1:3] != image_resolution:
+                flat_future = image_tools.resize_with_pad(flat_future, *image_resolution)
+            out_future_images[key] = flat_future.reshape((*orig_shape[:-3], *image_resolution, orig_shape[-1]))
+
     # obtain mask
     out_masks = {}
     for key in out_images:
@@ -189,6 +213,15 @@ def preprocess_observation(
         else:
             out_masks[key] = jnp.asarray(observation.image_masks[key])
 
+    out_future_masks = None
+    if observation.future_images is not None:
+        out_future_masks = {}
+        for key in out_future_images or {}:
+            if observation.future_image_masks is None or key not in observation.future_image_masks:
+                out_future_masks[key] = jnp.ones(observation.future_images[key].shape[:-3], dtype=jnp.bool_)
+            else:
+                out_future_masks[key] = jnp.asarray(observation.future_image_masks[key])
+
     return Observation(
         images=out_images,
         image_masks=out_masks,
@@ -197,6 +230,9 @@ def preprocess_observation(
         tokenized_prompt_mask=observation.tokenized_prompt_mask,
         token_ar_mask=observation.token_ar_mask,
         token_loss_mask=observation.token_loss_mask,
+        future_images=out_future_images,
+        future_image_masks=out_future_masks,
+        future_valid_mask=None if observation.future_valid_mask is None else jnp.asarray(observation.future_valid_mask),
     )
 
 

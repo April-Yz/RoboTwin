@@ -312,6 +312,16 @@ class TrainConfig:
     # Determines the data to be trained on.
     data: DataConfigFactory = dataclasses.field(default_factory=FakeDataConfig)
 
+    # Privileged self-distillation options. These are training-only and do not affect inference checkpoints.
+    use_privileged_distill: bool = False
+    future_horizon: int = 4
+    future_mode: str = "image_latent"
+    distill_target: str = "action"
+    distill_loss_type: str = "smooth_l1"
+    distill_weight: float = 1.0
+    bc_weight: float = 1.0
+    teacher_detach: bool = True
+
     # Base directory for config assets (e.g., norm stats).
     assets_base_dir: str = "./assets"
     # Base directory for checkpoints.
@@ -371,6 +381,18 @@ class TrainConfig:
     def __post_init__(self) -> None:
         if self.resume and self.overwrite:
             raise ValueError("Cannot resume and overwrite at the same time.")
+        if self.use_privileged_distill and self.model.model_type != ModelType.PI0:
+            raise ValueError("Privileged distillation is currently only implemented for pi0.")
+        if self.future_horizon < 1:
+            raise ValueError("future_horizon must be >= 1.")
+        if self.future_mode != "image_latent":
+            raise ValueError("Only future_mode='image_latent' is currently supported.")
+        if self.distill_target != "action":
+            raise ValueError("Only distill_target='action' is currently supported.")
+        if self.distill_loss_type not in {"mse", "smooth_l1"}:
+            raise ValueError("distill_loss_type must be one of {'mse', 'smooth_l1'}.")
+        if self.distill_weight < 0 or self.bc_weight < 0:
+            raise ValueError("distill_weight and bc_weight must be non-negative.")
 
 
 # Use `get_config` if you need to get a config by name in your code.
@@ -637,6 +659,49 @@ _CONFIGS = [
         weight_loader=weight_loaders.CheckpointWeightLoader("s3://openpi-assets/checkpoints/pi0_base/params"),
         num_train_steps=30000,
         fsdp_devices=1,  # refer line 359
+    ),
+    # pi0_v1.1 by lora with future-image privileged self-distillation
+    TrainConfig(
+        name="pi0_v1_1_aloha_robotwin_lora_distill",
+        model=pi0.Pi0Config(paligemma_variant="gemma_2b_lora", action_expert_variant="gemma_300m_lora"),
+        data=LeRobotAlohaDataConfig(
+            repo_id="your_repo_id",
+            adapt_to_pi=False,
+            repack_transforms=_transforms.Group(inputs=[
+                _transforms.RepackTransform({
+                    "images": {
+                        "cam_high": "observation.images.cam_high",
+                        "cam_left_wrist": "observation.images.cam_left_wrist",
+                        "cam_right_wrist": "observation.images.cam_right_wrist",
+                    },
+                    "state": "observation.state",
+                    "actions": "action",
+                    "prompt": "prompt",
+                })
+            ]),
+            base_config=DataConfig(
+                local_files_only=True,
+                prompt_from_task=True,
+            ),
+        ),
+        freeze_filter=pi0.Pi0Config(
+            paligemma_variant="gemma_2b_lora",
+            action_expert_variant="gemma_300m_lora",
+        ).get_freeze_filter(),
+        batch_size=32,
+        weight_loader=weight_loaders.CheckpointWeightLoader("s3://openpi-assets/checkpoints/pi0_base/params"),
+        num_train_steps=30000,
+        save_interval=1000,
+        keep_period=5000,
+        fsdp_devices=1,
+        use_privileged_distill=True,
+        future_horizon=4,
+        future_mode="image_latent",
+        distill_target="action",
+        distill_loss_type="smooth_l1",
+        distill_weight=1.0,
+        bc_weight=1.0,
+        teacher_detach=True,
     ),
     # pi0_fast_base by lora
     TrainConfig(

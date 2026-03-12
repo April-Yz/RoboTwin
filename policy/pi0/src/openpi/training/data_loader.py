@@ -51,6 +51,51 @@ class TransformedDataset(Dataset[T_co]):
         return len(self._dataset)
 
 
+class PrivilegedDistillationDataset(Dataset[T_co]):
+
+    def __init__(self, raw_dataset: Dataset, transformed_dataset: Dataset, future_horizon: int):
+        self._raw_dataset = raw_dataset
+        self._transformed_dataset = transformed_dataset
+        self._future_horizon = future_horizon
+
+    def __len__(self) -> int:
+        return len(self._transformed_dataset)
+
+    def __getitem__(self, index: SupportsIndex) -> T_co:
+        current_index = index.__index__()
+        current_raw = self._raw_dataset[current_index]
+        current_item = dict(self._transformed_dataset[current_index])
+
+        current_episode = _extract_episode_index(current_raw)
+        last_valid_item = current_item
+        future_images: dict[str, list[np.ndarray]] = {k: [] for k in current_item["image"]}
+        future_masks: dict[str, list[np.ndarray]] = {k: [] for k in current_item["image_mask"]}
+        future_valid_mask = []
+
+        for offset in range(1, self._future_horizon + 1):
+            candidate_index = min(current_index + offset, len(self._raw_dataset) - 1)
+            candidate_raw = self._raw_dataset[candidate_index]
+            candidate_episode = _extract_episode_index(candidate_raw)
+            same_episode = current_episode is None or candidate_episode is None or candidate_episode == current_episode
+
+            if same_episode:
+                candidate_item = self._transformed_dataset[candidate_index]
+                last_valid_item = candidate_item
+                future_valid_mask.append(True)
+            else:
+                candidate_item = last_valid_item
+                future_valid_mask.append(False)
+
+            for key in future_images:
+                future_images[key].append(np.asarray(candidate_item["image"][key]))
+                future_masks[key].append(np.asarray(candidate_item["image_mask"][key]))
+
+        current_item["future_image"] = {k: np.stack(v, axis=0) for k, v in future_images.items()}
+        current_item["future_image_mask"] = {k: np.stack(v, axis=0) for k, v in future_masks.items()}
+        current_item["future_valid_mask"] = np.asarray(future_valid_mask, dtype=np.bool_)
+        return current_item
+
+
 class FakeDataset(Dataset):
 
     def __init__(self, model_config: _model.BaseModelConfig, num_samples: int):
@@ -152,7 +197,11 @@ def create_data_loader(
     data_config = config.data.create(config.assets_dirs, config.model)
 
     dataset = create_dataset(data_config, config.model)
-    dataset = transform_dataset(dataset, data_config, skip_norm_stats=skip_norm_stats)
+    transformed_dataset = transform_dataset(dataset, data_config, skip_norm_stats=skip_norm_stats)
+    if config.use_privileged_distill:
+        dataset = PrivilegedDistillationDataset(dataset, transformed_dataset, future_horizon=config.future_horizon)
+    else:
+        dataset = transformed_dataset
 
     data_loader = TorchDataLoader(
         dataset,
@@ -178,6 +227,16 @@ def create_data_loader(
                 yield _model.Observation.from_dict(batch), batch["actions"]
 
     return DataLoaderImpl(data_config, data_loader)
+
+
+def _extract_episode_index(item) -> int | None:
+    if not isinstance(item, dict) or "episode_index" not in item:
+        return None
+
+    value = np.asarray(item["episode_index"])
+    if value.size == 0:
+        return None
+    return int(value.reshape(-1)[0])
 
 
 class TorchDataLoader:
