@@ -176,8 +176,13 @@ batch 根目录下会生成：
 颜色约定：
 
 - 绿色：所有候选
-- 蓝色：排序靠前的候选
+- 蓝色：按左右手各自排序后保留下来的 top-k 候选
 - 红色：最终被选中的候选
+
+左右手区分：
+
+- 左手候选：夹爪上方有白色小标记
+- 右手候选：夹爪下方有白色小标记
 
 `debug_execution_preview.mp4` 用来调试慢速执行。
 
@@ -186,6 +191,7 @@ batch 根目录下会生成：
 - 当前阶段对应关键帧的候选抓取
 - 关键帧 `1` 和 `22` 的目标轴
 - 左上角的阶段信息
+- 左右手候选的白色标记
 
 相关参数：
 
@@ -284,6 +290,8 @@ batch 根目录下会生成：
 - `selected_arm`
 - `expected_object_for_selected_arm`
 - `selected_object`
+- `arm_debugs`
+  - 左右手各自的筛选诊断和最终是否被选中
 - `selected_candidates`
   - 每个关键帧最终选中的候选
 - `top_candidates_per_keyframe`
