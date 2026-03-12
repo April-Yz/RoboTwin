@@ -47,6 +47,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--hold_frames_after_stage", type=int, default=2)
     parser.add_argument("--save_debug_preview", type=int, default=1)
     parser.add_argument("--debug_preview_fps", type=int, default=10)
+    parser.add_argument("--debug_keyframe_hold_frames", type=int, default=12)
     parser.add_argument("--debug_target_axis_length", type=float, default=0.08)
     parser.add_argument("--debug_target_axis_thickness", type=float, default=0.004)
     parser.add_argument("--head_only", type=int, default=1)
@@ -147,6 +148,8 @@ def build_single_command(args: argparse.Namespace, anygrasp_dir: Path, replay_di
         str(args.save_debug_preview),
         "--debug_preview_fps",
         str(args.debug_preview_fps),
+        "--debug_keyframe_hold_frames",
+        str(args.debug_keyframe_hold_frames),
         "--debug_target_axis_length",
         str(args.debug_target_axis_length),
         "--debug_target_axis_thickness",

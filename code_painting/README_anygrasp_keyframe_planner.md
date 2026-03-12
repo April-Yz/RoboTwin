@@ -88,6 +88,9 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_r1_b
   --keyframes 1 22 \
   --lighting_mode front_no_shadow \
   --planner_backend urdfik \
+  --save_debug_preview 1 \
+  --debug_preview_fps 10 \
+  --debug_keyframe_hold_frames 20 \
   --execute_interp_steps 40 \
   --settle_steps 10 \
   --hold_frames_after_stage 6 \
@@ -107,6 +110,32 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_r1_b
   --keyframes 1 22 \
   --lighting_mode front_no_shadow \
   --planner_backend urdfik
+```
+
+### 打开 viewer 调试
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_r1_batch.sh \
+  /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_batch_results \
+  /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_d_pour_blue \
+  /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis \
+  /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes \
+  --ids 1 \
+  --keyframes 1 22 \
+  --lighting_mode front_no_shadow \
+  --planner_backend urdfik \
+  --save_debug_preview 1 \
+  --debug_preview_fps 10 \
+  --debug_keyframe_hold_frames 20 \
+  --execute_interp_steps 40 \
+  --settle_steps 10 \
+  --hold_frames_after_stage 6 \
+  --reach_pos_tol_m 0.02 \
+  --reach_rot_tol_deg 12 \
+  --max_stage_replans 5 \
+  --enable_viewer 1 \
+  --viewer_frame_delay 0.02 \
+  --viewer_wait_at_end 1
 ```
 
 
@@ -145,6 +174,8 @@ batch 根目录下会生成：
   - `0` 不保存
 - `--debug_preview_fps`
   - debug 预览视频帧率
+- `--debug_keyframe_hold_frames`
+  - 关键帧命中的抓取坐标轴在 debug 预览里持续显示的帧数
 - `--debug_target_axis_length`
   - 抓取位姿坐标轴长度
 - `--debug_target_axis_thickness`

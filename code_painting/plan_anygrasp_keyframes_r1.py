@@ -102,6 +102,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--hold_frames_after_stage", type=int, default=2)
     parser.add_argument("--save_debug_preview", type=int, default=1)
     parser.add_argument("--debug_preview_fps", type=int, default=10)
+    parser.add_argument("--debug_keyframe_hold_frames", type=int, default=12)
     parser.add_argument("--debug_target_axis_length", type=float, default=0.08)
     parser.add_argument("--debug_target_axis_thickness", type=float, default=0.004)
     parser.add_argument("--head_only", type=int, default=1)
@@ -364,6 +365,18 @@ def hide_actor(actor: sapien.Entity) -> None:
     actor.set_pose(base.HIDDEN_DEBUG_POSE)
 
 
+def set_single_arm_target_visual(renderer: ReplayRenderer, arm: str, pose_world_wxyz: Optional[np.ndarray]) -> None:
+    if pose_world_wxyz is None:
+        renderer.update_target_axis_visuals(None, None)
+        return
+    if arm == "left":
+        renderer.update_target_axis_visuals(pose_world_wxyz, None)
+    elif arm == "right":
+        renderer.update_target_axis_visuals(None, pose_world_wxyz)
+    else:
+        renderer.update_target_axis_visuals(None, None)
+
+
 def record_frame(
     renderer: ReplayRenderer,
     head_writer: cv2.VideoWriter,
@@ -432,9 +445,14 @@ def execute_single_arm_plan(
     execute_interp_steps: int = 24,
     settle_steps: int = 4,
     hold_frames_after_stage: int = 0,
+    target_visual_pose: Optional[np.ndarray] = None,
+    target_visual_label: Optional[str] = None,
 ) -> str:
     status = renderer._plan_status(plan)
     overlay_lines = [f"stage={label}", f"arm={arm}", f"status={status}"]
+    if target_visual_label:
+        overlay_lines.append(f"goal={target_visual_label}")
+    set_single_arm_target_visual(renderer, arm, target_visual_pose)
     if status != "Success":
         record_frame(renderer, head_writer, third_writer, overlay_lines, use_overlay)
         return status
@@ -469,6 +487,8 @@ def execute_stage_until_reached(
     args: argparse.Namespace,
     attached_actor: Optional[sapien.Entity] = None,
     tcp_to_object: Optional[np.ndarray] = None,
+    target_visual_pose: Optional[np.ndarray] = None,
+    target_visual_label: Optional[str] = None,
 ) -> Dict[str, object]:
     last_status = "Missing"
     last_pos_err = float("inf")
@@ -490,6 +510,8 @@ def execute_stage_until_reached(
             execute_interp_steps=args.execute_interp_steps,
             settle_steps=args.settle_steps,
             hold_frames_after_stage=args.hold_frames_after_stage,
+            target_visual_pose=target_visual_pose,
+            target_visual_label=target_visual_label,
         )
         current_tcp = renderer.get_current_tcp_pose(arm)
         last_pos_err, last_rot_err = tcp_pose_errors(target_pose_world_wxyz, current_tcp)
@@ -549,6 +571,7 @@ def generate_debug_preview(
         raise RuntimeError(f"Failed to open {debug_video_path}")
 
     selected_by_frame = {int(item.source_frame): item for item in selected_keyframes}
+    selected_frames = sorted(selected_by_frame.keys())
     try:
         for idx, source_frame in enumerate(replay_frame_indices.tolist()):
             overlay_lines = [f"mode=debug_preview", f"source_frame={source_frame}"]
@@ -562,12 +585,15 @@ def generate_debug_preview(
                     hide_actor(track.actor)
                 overlay_lines.append(f"{name}={int(is_visible)}")
 
-            selected = selected_by_frame.get(int(source_frame))
+            selected = None
+            for keyframe in selected_frames:
+                if int(source_frame) >= keyframe and int(source_frame) < keyframe + max(int(args.debug_keyframe_hold_frames), 1):
+                    selected = selected_by_frame[keyframe]
+                    break
+            if selected is None:
+                selected = selected_by_frame.get(int(source_frame))
             if selected is not None:
-                if selected.arm == "left":
-                    renderer.update_target_axis_visuals(selected.candidate.pose_world_wxyz, None)
-                else:
-                    renderer.update_target_axis_visuals(None, selected.candidate.pose_world_wxyz)
+                set_single_arm_target_visual(renderer, selected.arm, selected.candidate.pose_world_wxyz)
                 overlay_lines.extend(
                     [
                         f"selected_keyframe={selected.source_frame}",
@@ -652,11 +678,22 @@ def main() -> None:
     use_overlay = bool(args.overlay_text)
 
     try:
-        record_frame(renderer, head_writer, third_writer, ["stage=init", f"arm={arm}", f"object={primary_object_name}"], use_overlay)
-
         grasp_pose = selected_keyframes[0].candidate.pose_world_wxyz
         pregrasp_pose = pose_with_offset_along_local_x(grasp_pose, args.approach_offset_m)
         action_pose = selected_keyframes[1].candidate.pose_world_wxyz
+        set_single_arm_target_visual(renderer, arm, grasp_pose)
+        record_frame(
+            renderer,
+            head_writer,
+            third_writer,
+            [
+                "stage=init",
+                f"arm={arm}",
+                f"object={primary_object_name}",
+                f"goal=keyframe_{selected_keyframes[0].source_frame}",
+            ],
+            use_overlay,
+        )
 
         pregrasp_result = execute_stage_until_reached(
             renderer=renderer,
@@ -667,6 +704,8 @@ def main() -> None:
             third_writer=third_writer,
             use_overlay=use_overlay,
             args=args,
+            target_visual_pose=grasp_pose,
+            target_visual_label=f"keyframe_{selected_keyframes[0].source_frame}",
         )
 
         grasp_result = execute_stage_until_reached(
@@ -678,10 +717,19 @@ def main() -> None:
             third_writer=third_writer,
             use_overlay=use_overlay,
             args=args,
+            target_visual_pose=grasp_pose,
+            target_visual_label=f"keyframe_{selected_keyframes[0].source_frame}",
         )
 
+        set_single_arm_target_visual(renderer, arm, grasp_pose)
         renderer.set_grippers(args.close_gripper if arm == "left" else None, args.close_gripper if arm == "right" else None)
-        record_frame(renderer, head_writer, third_writer, ["stage=close_gripper", f"arm={arm}"], use_overlay)
+        record_frame(
+            renderer,
+            head_writer,
+            third_writer,
+            ["stage=close_gripper", f"arm={arm}", f"goal=keyframe_{selected_keyframes[0].source_frame}"],
+            use_overlay,
+        )
 
         attached_actor = object_states[primary_object_name].actor
         tcp_pose = renderer.get_current_tcp_pose(arm)
@@ -698,11 +746,14 @@ def main() -> None:
             args=args,
             attached_actor=attached_actor,
             tcp_to_object=tcp_to_object,
+            target_visual_pose=action_pose,
+            target_visual_label=f"keyframe_{selected_keyframes[1].source_frame}",
         )
     finally:
         head_writer.release()
         if third_writer is not None:
             third_writer.release()
+        renderer.update_target_axis_visuals(None, None)
 
     summary = {
         "anygrasp_dir": str(args.anygrasp_dir),
