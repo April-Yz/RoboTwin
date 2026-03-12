@@ -83,6 +83,7 @@ class ArmSelectionResult:
     expected_object: Optional[str]
     selected_keyframes: List[SelectedKeyframe]
     ranked_candidates_per_frame: Dict[int, List[CandidatePose]]
+    diagnostics: Dict[int, Dict[str, int]]
 
 
 @dataclass
@@ -301,23 +302,31 @@ def build_ranked_candidates_for_arm(
     keyframes: Sequence[int],
     arm: str,
     object_states_per_frame: Dict[int, Dict[str, ObjectState]],
-) -> Optional[Dict[int, List[CandidatePose]]]:
+) -> Tuple[Optional[Dict[int, List[CandidatePose]]], Dict[int, Dict[str, int]]]:
     hand_valid = np.asarray(hand_data[f"{arm}_gripper_valid"], dtype=bool)
     hand_rotations = np.asarray(hand_data[f"{arm}_gripper_rotation_matrix"], dtype=np.float64)
     if any(not bool(hand_valid[frame]) for frame in keyframes):
-        return None
+        return None, {int(frame): {"hand_valid": int(bool(hand_valid[frame]))} for frame in keyframes}
 
     expected_object = expected_object_for_arm(args, arm)
     candidates_per_frame: Dict[int, List[CandidatePose]] = {}
+    diagnostics: Dict[int, Dict[str, int]] = {}
     for frame in keyframes:
         all_candidates = []
+        total = 0
+        object_pass = 0
+        distance_pass = 0
         for candidate_idx, grasp in enumerate(load_anygrasp_candidates(anygrasp_dir, frame)):
+            total += 1
             pose_world_wxyz, pose_world_matrix = candidate_to_world_pose(renderer, grasp)
             nearest_name, nearest_dist = nearest_object_name(pose_world_matrix, object_states_per_frame[frame])
-            if expected_object is not None and nearest_name != expected_object:
+            object_ok = expected_object is None or nearest_name == expected_object
+            if not object_ok:
                 continue
+            object_pass += 1
             if nearest_dist > float(args.candidate_object_max_distance_m):
                 continue
+            distance_pass += 1
             all_candidates.append(
                 CandidatePose(
                     candidate_idx=candidate_idx,
@@ -335,9 +344,16 @@ def build_ranked_candidates_for_arm(
             )
         all_candidates.sort(key=lambda cand: (cand.rotation_distance_deg, cand.nearest_object_distance_m, -cand.score))
         candidates_per_frame[frame] = all_candidates
+        diagnostics[int(frame)] = {
+            "hand_valid": 1,
+            "total_candidates": total,
+            "object_pass": object_pass,
+            "distance_pass": distance_pass,
+            "final_ranked": len(all_candidates),
+        }
         if not all_candidates:
-            return None
-    return candidates_per_frame
+            return None, diagnostics
+    return candidates_per_frame, diagnostics
 
 
 def select_keyframes_for_arm(
@@ -350,7 +366,7 @@ def select_keyframes_for_arm(
     object_states_per_frame: Dict[int, Dict[str, ObjectState]],
 ) -> Optional[ArmSelectionResult]:
     hand_rotations = np.asarray(hand_data[f"{arm}_gripper_rotation_matrix"], dtype=np.float64)
-    candidates_per_frame = build_ranked_candidates_for_arm(
+    candidates_per_frame, diagnostics = build_ranked_candidates_for_arm(
         renderer=renderer,
         args=args,
         anygrasp_dir=anygrasp_dir,
@@ -398,6 +414,7 @@ def select_keyframes_for_arm(
         expected_object=expected_object_for_arm(args, arm),
         selected_keyframes=best_selection,
         ranked_candidates_per_frame=candidates_per_frame,
+        diagnostics=diagnostics,
     )
 
 
@@ -413,16 +430,44 @@ def choose_keyframes(
     candidate_arms = [arm_mode] if arm_mode in ("left", "right") else ["left", "right"]
     best: Optional[ArmSelectionResult] = None
     best_cost = float("inf")
+    diagnostic_lines: List[str] = []
     for arm in candidate_arms:
         selection = select_keyframes_for_arm(renderer, args, anygrasp_dir, hand_data, keyframes, arm, object_states_per_frame)
         if selection is None:
+            expected_object = expected_object_for_arm(args, arm)
+            ranked, diagnostics = build_ranked_candidates_for_arm(
+                renderer=renderer,
+                args=args,
+                anygrasp_dir=anygrasp_dir,
+                hand_data=hand_data,
+                keyframes=keyframes,
+                arm=arm,
+                object_states_per_frame=object_states_per_frame,
+            )
+            diag_chunks = []
+            for frame in keyframes:
+                info = diagnostics.get(int(frame), {})
+                diag_chunks.append(
+                    f"frame={int(frame)} hand_valid={info.get('hand_valid', 0)} "
+                    f"total={info.get('total_candidates', 0)} "
+                    f"object_pass={info.get('object_pass', 0)} "
+                    f"distance_pass={info.get('distance_pass', 0)} "
+                    f"final={info.get('final_ranked', 0)}"
+                )
+            diagnostic_lines.append(
+                f"arm={arm} expected_object={expected_object} " + " | ".join(diag_chunks)
+            )
             continue
         total_cost = sum(item.candidate.rotation_distance_deg for item in selection.selected_keyframes)
         if total_cost < best_cost:
             best_cost = total_cost
             best = selection
     if best is None:
-        raise RuntimeError("Failed to find valid AnyGrasp candidates that match the requested hand orientation.")
+        diag_msg = "; ".join(diagnostic_lines) if diagnostic_lines else "no diagnostics"
+        raise RuntimeError(
+            "Failed to find valid AnyGrasp candidates after object/distance/orientation filtering. "
+            f"Diagnostics: {diag_msg}"
+        )
     return best
 
 
