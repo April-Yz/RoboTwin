@@ -117,11 +117,32 @@ cd /home/zaijia001/ssd/RoboTwin/policy/pi0
 bash finetune.sh pi0_base_aloha_robotwin_lora my_baseline 0
 ```
 
+Use the dedicated baseline helper with a concrete example:
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin/policy/pi0
+DATA_REPO_ID=aloha_beat_block_hammer_builder \
+EXP_NAME=pi0_baseline_b32 \
+SAVE_INTERVAL=1000 \
+KEEP_PERIOD=5000 \
+bash /home/zaijia001/ssd/RoboTwin/policy/pi0/finetune_pi0_baseline.sh 0
+```
+
 Run RoboTwin eval:
 
 ```bash
 cd /home/zaijia001/ssd/RoboTwin/policy/pi0
 bash eval.sh beat_block_hammer demo_clean pi0_base_aloha_robotwin_lora my_baseline 0 0
+```
+
+Evaluate the latest baseline checkpoint with the helper:
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin/policy/pi0
+MODEL_NAME=pi0_baseline_b32 \
+TASK_NAME=beat_block_hammer \
+TASK_CONFIG=demo_clean \
+bash /home/zaijia001/ssd/RoboTwin/policy/pi0/eval_pi0_baseline.sh latest 0 0
 ```
 
 ## 8. What to read first

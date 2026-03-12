@@ -137,6 +137,17 @@ cd /home/zaijia001/ssd/RoboTwin/policy/pi0
 bash finetune.sh pi0_v1_1_aloha_robotwin_lora_distill pi0_v1_1_run 0
 ```
 
+Dedicated helper with a concrete example:
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin/policy/pi0
+DATA_REPO_ID=aloha_beat_block_hammer_builder \
+EXP_NAME=pi0_v1_1_b32 \
+SAVE_INTERVAL=1000 \
+KEEP_PERIOD=5000 \
+bash /home/zaijia001/ssd/RoboTwin/policy/pi0/finetune_pi0_v1_1.sh 0
+```
+
 ### 4.2 Override the data repo at launch time
 
 If you want to keep the named config but swap the dataset:
@@ -163,6 +174,28 @@ These are the current defaults in `pi0_v1_1_aloha_robotwin_lora_distill`:
 - `bc_weight=1.0`
 - `teacher_detach=True`
 
+### 4.4 Evaluate a saved v1.1 checkpoint
+
+Evaluate the latest checkpoint:
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin/policy/pi0
+MODEL_NAME=pi0_v1_1_b32 \
+TASK_NAME=beat_block_hammer \
+TASK_CONFIG=demo_clean \
+bash /home/zaijia001/ssd/RoboTwin/policy/pi0/eval_pi0_v1_1.sh latest 0 0
+```
+
+Evaluate a specific checkpoint step:
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin/policy/pi0
+MODEL_NAME=pi0_v1_1_b32 \
+TASK_NAME=beat_block_hammer \
+TASK_CONFIG=demo_clean \
+bash /home/zaijia001/ssd/RoboTwin/policy/pi0/eval_pi0_v1_1.sh 1000 0 0
+```
+
 ## 5. Logged metrics
 
 When distillation is enabled, training now logs:
@@ -187,3 +220,28 @@ When distillation is enabled, training now logs:
 ## 7. Practical note
 
 The main memory cost of `pi0_v1.1` vs baseline is the second forward pass. It should still be materially lighter than the OpenVLA-OFT version because pi0 itself is smaller.
+
+## 8. Sync to another server
+
+Push the current branch:
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin
+git push origin main
+```
+
+On the other server, update the same branch:
+
+```bash
+cd /path/to/RoboTwin
+git fetch origin
+git switch main
+git pull --ff-only origin main
+```
+
+If you also want a separate local worktree there:
+
+```bash
+cd /path/to/RoboTwin
+git worktree add /path/to/RoboTwin_main origin/main
+```
