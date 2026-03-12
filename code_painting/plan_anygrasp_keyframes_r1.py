@@ -93,6 +93,14 @@ class DebugVisualBundle:
     candidate_actors: Dict[int, List[sapien.Entity]]
 
 
+@dataclass
+class DebugExecutionState:
+    writer: Optional[cv2.VideoWriter]
+    selected_keyframes: List[SelectedKeyframe]
+    display_candidates_per_frame: Dict[int, List[CandidatePose]]
+    active_frame: Optional[int] = None
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Use AnyGrasp keyframes + hand orientation to plan a two-keyframe RoboTwin demo.")
     parser.add_argument("--anygrasp_dir", type=Path, required=True, help="Per-video AnyGrasp result dir, e.g. anygrasp_batch_results/d_pour_blue_1.")
@@ -128,6 +136,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--save_debug_preview", type=int, default=1)
     parser.add_argument("--debug_preview_fps", type=int, default=10)
     parser.add_argument("--debug_keyframe_hold_frames", type=int, default=12)
+    parser.add_argument("--save_debug_execution_preview", type=int, default=1)
+    parser.add_argument("--debug_execution_fps", type=int, default=10)
     parser.add_argument("--debug_target_axis_length", type=float, default=0.08)
     parser.add_argument("--debug_target_axis_thickness", type=float, default=0.004)
     parser.add_argument("--head_only", type=int, default=1)
@@ -533,11 +543,29 @@ def create_gripper_candidate_actor(scene: sapien.Scene, name: str, color: Sequen
     return actor
 
 
+def build_display_candidates_per_frame(
+    args: argparse.Namespace,
+    keyframes: Sequence[int],
+    ranked_candidates_per_frame: Dict[int, List[CandidatePose]],
+    all_candidates_per_frame: Dict[int, List[CandidatePose]],
+) -> Dict[int, List[CandidatePose]]:
+    display: Dict[int, List[CandidatePose]] = {}
+    for frame in keyframes:
+        frame = int(frame)
+        if bool(args.debug_show_all_candidates):
+            display[frame] = list(all_candidates_per_frame.get(frame, []))
+        else:
+            display[frame] = list(ranked_candidates_per_frame.get(frame, [])[: max(int(args.debug_candidate_top_k), 0)])
+    return display
+
+
 def create_debug_visual_bundle(
     renderer: ReplayRenderer,
     args: argparse.Namespace,
     keyframes: Sequence[int],
-    all_candidates_per_frame: Dict[int, List[CandidatePose]],
+    display_candidates_per_frame: Dict[int, List[CandidatePose]],
+    ranked_candidates_per_frame: Dict[int, List[CandidatePose]],
+    selected_keyframes: List[SelectedKeyframe],
 ) -> DebugVisualBundle:
     axis_colors = {
         int(keyframes[0]): ([1.0, 0.35, 0.10], [1.0, 0.65, 0.15], [1.0, 0.90, 0.20]),
@@ -553,14 +581,25 @@ def create_debug_visual_bundle(
         )
         for frame in keyframes
     }
+    selected_by_frame = {int(item.source_frame): item.candidate.candidate_idx for item in selected_keyframes}
+    topk_by_frame = {
+        int(frame): {cand.candidate_idx for cand in ranked_candidates_per_frame.get(int(frame), [])[: max(int(args.debug_candidate_top_k), 0)]}
+        for frame in keyframes
+    }
     candidate_actors = {
         int(frame): [
-            create_gripper_candidate_actor(renderer.scene, f"debug_candidate_{int(frame)}_{rank}", color=[0.9, 0.9 - 0.12 * rank, 0.2 + 0.12 * rank])
-            for rank in range(
-                len(all_candidates_per_frame.get(int(frame), []))
-                if bool(args.debug_show_all_candidates)
-                else max(int(args.debug_candidate_top_k), 0)
+            create_gripper_candidate_actor(
+                renderer.scene,
+                f"debug_candidate_{int(frame)}_{rank}",
+                color=(
+                    [1.0, 0.1, 0.1]
+                    if cand.candidate_idx == selected_by_frame.get(int(frame))
+                    else [0.15, 0.45, 1.0]
+                    if cand.candidate_idx in topk_by_frame.get(int(frame), set())
+                    else [0.1, 0.85, 0.2]
+                ),
             )
+            for rank, cand in enumerate(display_candidates_per_frame.get(int(frame), []))
         ]
         for frame in keyframes
     }
@@ -585,7 +624,15 @@ def record_frame(
     third_writer: Optional[cv2.VideoWriter],
     overlay_lines: Sequence[str],
     use_overlay: bool,
+    debug_visuals: Optional[DebugVisualBundle] = None,
+    debug_execution_state: Optional[DebugExecutionState] = None,
 ) -> None:
+    if debug_visuals is not None:
+        for actor in debug_visuals.keyframe_axis_actors.values():
+            hide_actor(actor)
+        for actors in debug_visuals.candidate_actors.values():
+            for actor in actors:
+                hide_actor(actor)
     renderer.update_robot_link_cameras()
     renderer.scene.update_render()
     head_rgb, _ = renderer.capture_camera(renderer.zed_camera)
@@ -595,6 +642,38 @@ def record_frame(
         third_rgb, _ = renderer.capture_camera(renderer.third_camera)
         third_bgr = base.overlay_text(third_rgb, overlay_lines) if use_overlay else cv2.cvtColor(third_rgb, cv2.COLOR_RGB2BGR)
         third_writer.write(third_bgr)
+    if debug_execution_state is not None and debug_execution_state.writer is not None and debug_visuals is not None:
+        for item in debug_execution_state.selected_keyframes:
+            actor = debug_visuals.keyframe_axis_actors.get(int(item.source_frame))
+            if actor is not None:
+                set_actor_pose(actor, item.candidate.pose_world_wxyz)
+        update_candidate_debug_visuals(
+            debug_visuals,
+            debug_execution_state.active_frame,
+            debug_execution_state.display_candidates_per_frame,
+        )
+        renderer.update_robot_link_cameras()
+        renderer.scene.update_render()
+        debug_overlay = list(overlay_lines)
+        debug_overlay.extend(
+            [
+                "mode=debug_execution",
+                (
+                    f"active_keyframe={int(debug_execution_state.active_frame)}"
+                    if debug_execution_state.active_frame is not None
+                    else "active_keyframe=none"
+                ),
+                "color=green:all blue:top red:selected",
+            ]
+        )
+        debug_rgb, _ = renderer.capture_camera(renderer.zed_camera)
+        debug_bgr = base.overlay_text(debug_rgb, debug_overlay) if use_overlay else cv2.cvtColor(debug_rgb, cv2.COLOR_RGB2BGR)
+        debug_execution_state.writer.write(debug_bgr)
+        for actors in debug_visuals.candidate_actors.values():
+            for actor in actors:
+                hide_actor(actor)
+        for actor in debug_visuals.keyframe_axis_actors.values():
+            hide_actor(actor)
 
 
 def pose_with_offset_along_local_x(pose_world_wxyz: np.ndarray, offset_m: float) -> np.ndarray:
@@ -649,6 +728,8 @@ def execute_single_arm_plan(
     hold_frames_after_stage: int = 0,
     target_visual_pose: Optional[np.ndarray] = None,
     target_visual_label: Optional[str] = None,
+    debug_visuals: Optional[DebugVisualBundle] = None,
+    debug_execution_state: Optional[DebugExecutionState] = None,
 ) -> str:
     status = renderer._plan_status(plan)
     overlay_lines = [f"stage={label}", f"arm={arm}", f"status={status}"]
@@ -656,7 +737,7 @@ def execute_single_arm_plan(
         overlay_lines.append(f"goal={target_visual_label}")
     set_single_arm_target_visual(renderer, arm, target_visual_pose)
     if status != "Success":
-        record_frame(renderer, head_writer, third_writer, overlay_lines, use_overlay)
+        record_frame(renderer, head_writer, third_writer, overlay_lines, use_overlay, debug_visuals, debug_execution_state)
         return status
 
     position = np.asarray(plan["position"], dtype=np.float64)
@@ -670,11 +751,27 @@ def execute_single_arm_plan(
             quat = base.quat_xyzw_to_wxyz(R.from_matrix(object_world[:3, :3]).as_quat())
             set_actor_pose(attached_actor, np.concatenate([object_world[:3, 3], quat]))
         renderer.step_scene(steps=1)
-        record_frame(renderer, head_writer, third_writer, overlay_lines + [f"plan_step={idx + 1}/{position.shape[0]}"], use_overlay)
+        record_frame(
+            renderer,
+            head_writer,
+            third_writer,
+            overlay_lines + [f"plan_step={idx + 1}/{position.shape[0]}"],
+            use_overlay,
+            debug_visuals,
+            debug_execution_state,
+        )
     renderer.step_scene(steps=max(int(settle_steps), 0))
-    record_frame(renderer, head_writer, third_writer, overlay_lines + ["plan_step=done"], use_overlay)
+    record_frame(renderer, head_writer, third_writer, overlay_lines + ["plan_step=done"], use_overlay, debug_visuals, debug_execution_state)
     for hold_idx in range(max(int(hold_frames_after_stage), 0)):
-        record_frame(renderer, head_writer, third_writer, overlay_lines + [f"hold={hold_idx + 1}/{hold_frames_after_stage}"], use_overlay)
+        record_frame(
+            renderer,
+            head_writer,
+            third_writer,
+            overlay_lines + [f"hold={hold_idx + 1}/{hold_frames_after_stage}"],
+            use_overlay,
+            debug_visuals,
+            debug_execution_state,
+        )
     return status
 
 
@@ -691,6 +788,8 @@ def execute_stage_until_reached(
     tcp_to_object: Optional[np.ndarray] = None,
     target_visual_pose: Optional[np.ndarray] = None,
     target_visual_label: Optional[str] = None,
+    debug_visuals: Optional[DebugVisualBundle] = None,
+    debug_execution_state: Optional[DebugExecutionState] = None,
 ) -> Dict[str, object]:
     last_status = "Missing"
     last_pos_err = float("inf")
@@ -714,6 +813,8 @@ def execute_stage_until_reached(
             hold_frames_after_stage=args.hold_frames_after_stage,
             target_visual_pose=target_visual_pose,
             target_visual_label=target_visual_label,
+            debug_visuals=debug_visuals,
+            debug_execution_state=debug_execution_state,
         )
         current_tcp = renderer.get_current_tcp_pose(arm)
         last_pos_err, last_rot_err = tcp_pose_errors(target_pose_world_wxyz, current_tcp)
@@ -736,6 +837,8 @@ def execute_stage_until_reached(
                 f"reached={int(reached)}",
             ],
             use_overlay,
+            debug_visuals,
+            debug_execution_state,
         )
         if reached:
             return {
@@ -878,10 +981,23 @@ def main() -> None:
     selected_keyframes = selection_result.selected_keyframes
     ranked_candidates_per_frame = selection_result.ranked_candidates_per_frame
     all_candidates_per_frame = selection_result.all_candidates_per_frame
+    display_candidates_per_frame = build_display_candidates_per_frame(
+        args,
+        keyframes,
+        ranked_candidates_per_frame,
+        all_candidates_per_frame,
+    )
 
     arm = selected_keyframes[0].arm
     primary_object_name = selected_keyframes[0].candidate.nearest_object
-    debug_visuals = create_debug_visual_bundle(renderer, args, keyframes, all_candidates_per_frame)
+    debug_visuals = create_debug_visual_bundle(
+        renderer,
+        args,
+        keyframes,
+        display_candidates_per_frame,
+        ranked_candidates_per_frame,
+        selected_keyframes,
+    )
 
     object_states = object_states_per_frame[keyframes[0]]
     for state in object_states.values():
@@ -912,12 +1028,12 @@ def main() -> None:
     for state in object_states.values():
         if state.actor is not None:
             set_actor_pose(state.actor, state.pose_world_wxyz)
-    shown_candidates = all_candidates_per_frame if bool(args.debug_show_all_candidates) else ranked_candidates_per_frame
-    update_candidate_debug_visuals(debug_visuals, None, shown_candidates)
+    update_candidate_debug_visuals(debug_visuals, None, display_candidates_per_frame)
     renderer.step_scene(steps=1)
 
     head_video_path = args.output_dir / "head_cam_plan.mp4"
     third_video_path = args.output_dir / "third_cam_plan.mp4"
+    debug_execution_video_path = args.output_dir / "debug_execution_preview.mp4"
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     head_writer = cv2.VideoWriter(str(head_video_path), fourcc, args.fps, (args.image_width, args.image_height))
     if not head_writer.isOpened():
@@ -927,12 +1043,24 @@ def main() -> None:
         third_writer = cv2.VideoWriter(str(third_video_path), fourcc, args.fps, (args.image_width, args.image_height))
         if not third_writer.isOpened():
             raise RuntimeError(f"Failed to open {third_video_path}")
+    debug_execution_writer = None
+    if bool(args.save_debug_execution_preview):
+        debug_execution_writer = cv2.VideoWriter(str(debug_execution_video_path), fourcc, int(args.debug_execution_fps), (args.image_width, args.image_height))
+        if not debug_execution_writer.isOpened():
+            raise RuntimeError(f"Failed to open {debug_execution_video_path}")
+    debug_execution_state = DebugExecutionState(
+        writer=debug_execution_writer,
+        selected_keyframes=selected_keyframes,
+        display_candidates_per_frame=display_candidates_per_frame,
+        active_frame=None,
+    )
     use_overlay = bool(args.overlay_text)
 
     try:
         grasp_pose = selected_keyframes[0].candidate.pose_world_wxyz
         pregrasp_pose = pose_with_offset_along_local_x(grasp_pose, args.approach_offset_m)
         action_pose = selected_keyframes[1].candidate.pose_world_wxyz
+        debug_execution_state.active_frame = int(selected_keyframes[0].source_frame)
         set_single_arm_target_visual(renderer, arm, grasp_pose)
         record_frame(
             renderer,
@@ -943,8 +1071,12 @@ def main() -> None:
                 f"arm={arm}",
                 f"object={primary_object_name}",
                 f"goal=keyframe_{selected_keyframes[0].source_frame}",
+                f"selected_f1_candidate={selected_keyframes[0].candidate.candidate_idx}",
+                f"selected_f22_candidate={selected_keyframes[1].candidate.candidate_idx}",
             ],
             use_overlay,
+            debug_visuals,
+            debug_execution_state,
         )
 
         pregrasp_result = execute_stage_until_reached(
@@ -958,6 +1090,8 @@ def main() -> None:
             args=args,
             target_visual_pose=grasp_pose,
             target_visual_label=f"keyframe_{selected_keyframes[0].source_frame}",
+            debug_visuals=debug_visuals,
+            debug_execution_state=debug_execution_state,
         )
 
         grasp_result = execute_stage_until_reached(
@@ -971,6 +1105,8 @@ def main() -> None:
             args=args,
             target_visual_pose=grasp_pose,
             target_visual_label=f"keyframe_{selected_keyframes[0].source_frame}",
+            debug_visuals=debug_visuals,
+            debug_execution_state=debug_execution_state,
         )
 
         set_single_arm_target_visual(renderer, arm, grasp_pose)
@@ -981,12 +1117,15 @@ def main() -> None:
             third_writer,
             ["stage=close_gripper", f"arm={arm}", f"goal=keyframe_{selected_keyframes[0].source_frame}"],
             use_overlay,
+            debug_visuals,
+            debug_execution_state,
         )
 
         attached_actor = object_states[primary_object_name].actor
         tcp_pose = renderer.get_current_tcp_pose(arm)
         tcp_to_object = np.linalg.inv(pose_wxyz_to_matrix(tcp_pose)) @ object_states[primary_object_name].pose_world_matrix
 
+        debug_execution_state.active_frame = int(selected_keyframes[1].source_frame)
         action_result = execute_stage_until_reached(
             renderer=renderer,
             arm=arm,
@@ -1000,11 +1139,15 @@ def main() -> None:
             tcp_to_object=tcp_to_object,
             target_visual_pose=action_pose,
             target_visual_label=f"keyframe_{selected_keyframes[1].source_frame}",
+            debug_visuals=debug_visuals,
+            debug_execution_state=debug_execution_state,
         )
     finally:
         head_writer.release()
         if third_writer is not None:
             third_writer.release()
+        if debug_execution_writer is not None:
+            debug_execution_writer.release()
         renderer.update_target_axis_visuals(None, None)
 
     summary = {
@@ -1072,6 +1215,7 @@ def main() -> None:
             for frame in keyframes
         },
         "debug_preview_video": str(debug_video_path) if debug_video_path is not None else None,
+        "debug_execution_video": str(debug_execution_video_path) if debug_execution_writer is not None else None,
         "head_video": str(head_video_path),
         "third_video": str(third_video_path) if third_writer is not None else None,
     }
@@ -1081,6 +1225,8 @@ def main() -> None:
     print(
         "[done] "
         f"arm={arm} object={primary_object_name} "
+        f"selected_f{selected_keyframes[0].source_frame}=candidate_{selected_keyframes[0].candidate.candidate_idx} "
+        f"selected_f{selected_keyframes[1].source_frame}=candidate_{selected_keyframes[1].candidate.candidate_idx} "
         f"statuses={summary['stages']} "
         f"head_video={head_video_path}"
     )

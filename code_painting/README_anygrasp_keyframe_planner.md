@@ -148,6 +148,7 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_r1_b
 每个视频目录下会生成：
 
 - `debug_selection_preview.mp4`
+- `debug_execution_preview.mp4`
 - `head_cam_plan.mp4`
 - `plan_summary.json`
 
@@ -172,6 +173,20 @@ batch 根目录下会生成：
    - `candidate_idx`
    - `rot_err`
 
+颜色约定：
+
+- 绿色：所有候选
+- 蓝色：排序靠前的候选
+- 红色：最终被选中的候选
+
+`debug_execution_preview.mp4` 用来调试慢速执行。
+
+它会在机器人执行 `pregrasp -> grasp -> action` 的过程中持续保留：
+
+- 当前阶段对应关键帧的候选抓取
+- 关键帧 `1` 和 `22` 的目标轴
+- 左上角的阶段信息
+
 相关参数：
 
 - `--save_debug_preview`
@@ -179,6 +194,10 @@ batch 根目录下会生成：
   - `0` 不保存
 - `--debug_preview_fps`
   - debug 预览视频帧率
+- `--save_debug_execution_preview`
+  - 是否保存慢速执行的 debug 视频
+- `--debug_execution_fps`
+  - 第三个 debug 执行视频帧率
 - `--debug_keyframe_hold_frames`
   - 关键帧命中的抓取坐标轴在 debug 预览里持续显示的帧数
 - `--debug_candidate_top_k`
@@ -269,6 +288,8 @@ batch 根目录下会生成：
   - 每个关键帧最终选中的候选
 - `top_candidates_per_keyframe`
   - 每个关键帧按规则排序后的前几个候选
+- `all_candidates_per_keyframe`
+  - 每个关键帧的全部候选
 - `stages.pregrasp`
 - `stages.grasp`
 - `stages.action`
