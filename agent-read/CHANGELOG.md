@@ -5,4 +5,5 @@
 - Created the `RoboTwin-lingbot` worktree from the upstream `baseline` branch.
 - Created the `RoboTwin-lingbot` conda environment by cloning the existing `RoboTwin` environment.
 - Updated `script/requirements.txt` to use `huggingface_hub==0.36.2` for LingBot-VA compatibility.
+- Reused the original RoboTwin asset directories via links inside this worktree.
 - Documented the new isolated RoboTwin workspace in `agent-read/`.

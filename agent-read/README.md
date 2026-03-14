@@ -21,5 +21,5 @@ This copy isolates RoboTwin-side evaluation changes needed by LingBot-VA without
 
 ## Current Assumptions
 
-- Assets still need to exist under this RoboTwin workspace if evaluation is to be run here.
+- RoboTwin assets can be reused from `/home/zaijia001/ssd/RoboTwin/assets` via local links in this worktree.
 - LingBot-VA should point its RoboTwin client code at `/home/zaijia001/vam/RoboTwin-lingbot`.
