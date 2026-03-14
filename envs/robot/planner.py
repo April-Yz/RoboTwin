@@ -9,6 +9,7 @@ from mplib.sapien_utils import SapienPlanner, SapienPlanningWorld
 import transforms3d as t3d
 import envs._GLOBAL_CONFIGS as CONFIGS
 
+CuroboPlanner = None
 
 try:
     # ********************** CuroboPlanner (optional) **********************
@@ -271,6 +272,7 @@ try:
             return result_p, result_q
     
 except Exception as e:
+    CuroboPlanner = None
     print('[planner.py]: Something wrong happened when importing CuroboPlanner! Please check if Curobo is installed correctly. If the problem still exists, you can install Curobo from https://github.com/NVlabs/curobo manually.')
     print('Exception traceback:')
     traceback.print_exc()
@@ -307,9 +309,11 @@ class MplibPlanner:
             self.planner.set_base_pose(robot_origion_pose)
         else:
             planning_world = SapienPlanningWorld(scene, [robot_entity])
-            self.planner = SapienPlanner(planning_world, move_group)
+        self.planner = SapienPlanner(planning_world, move_group)
 
-        self.planner_type = planner_type
+        # Fall back to the default MPLib planner when embodiment configs request
+        # Curobo but the optional dependency is unavailable on this machine.
+        self.planner_type = planner_type if planner_type in {"mplib_RRT", "mplib_screw"} else "mplib_RRT"
         self.plan_step_lim = 2500
         self.TOPP = self.planner.TOPP
 
@@ -332,17 +336,20 @@ class MplibPlanner:
 
         now_try_times = 1
         while result["status"] != "Success" and now_try_times < try_times:
-            result = self.planner.plan_pose(
-                goal_pose=target_pose,
-                current_qpos=np.array(now_qpos),
-                time_step=1 / 250,
-                planning_time=5,
-                # rrt_range=0.05
-                # =================== mplib 0.1.1 ===================
-                # use_point_cloud=use_point_cloud,
-                # use_attach=use_attach,
-                # planner_name="RRTConnect"
-            )
+            try:
+                result = self.planner.plan_pose(
+                    goal_pose=target_pose,
+                    current_qpos=np.array(now_qpos),
+                    time_step=1 / 250,
+                    planning_time=5,
+                    # rrt_range=0.05
+                    # =================== mplib 0.1.1 ===================
+                    # use_point_cloud=use_point_cloud,
+                    # use_attach=use_attach,
+                    # planner_name="RRTConnect"
+                )
+            except RuntimeError as exc:
+                result = {"status": f"Fail ({exc})"}
             now_try_times += 1
 
         if result["status"] != "Success":
@@ -370,14 +377,17 @@ class MplibPlanner:
         Interpolative planning with screw motion.
         Will not avoid collision and will fail if the path contains collision.
         """
-        result = self.planner.plan_screw(
-            goal_pose=target_pose,
-            current_qpos=now_qpos,
-            time_step=1 / 250,
-            # =================== mplib 0.1.1 ===================
-            # use_point_cloud=use_point_cloud,
-            # use_attach=use_attach,
-        )
+        try:
+            result = self.planner.plan_screw(
+                goal_pose=target_pose,
+                current_qpos=now_qpos,
+                time_step=1 / 250,
+                # =================== mplib 0.1.1 ===================
+                # use_point_cloud=use_point_cloud,
+                # use_attach=use_attach,
+            )
+        except RuntimeError as exc:
+            result = {"status": f"Fail ({exc})"}
 
         # plan fail
         if result["status"] != "Success":
@@ -398,6 +408,7 @@ class MplibPlanner:
         self,
         now_qpos,
         target_pose,
+        constraint_pose=None,
         use_point_cloud=False,
         use_attach=False,
         arms_tag=None,
@@ -419,8 +430,49 @@ class MplibPlanner:
             )
         elif self.planner_type == "mplib_screw":
             result = self.plan_screw(now_qpos, target_pose, use_point_cloud, use_attach, arms_tag, log)
+        else:
+            result = self.plan_pose(
+                now_qpos,
+                target_pose,
+                use_point_cloud,
+                use_attach,
+                arms_tag,
+                try_times=10,
+                log=log,
+            )
 
         return result
+
+    def plan_batch(
+        self,
+        now_qpos,
+        target_pose_list,
+        constraint_pose=None,
+        arms_tag=None,
+    ):
+        statuses = []
+        positions = []
+        velocities = []
+
+        for target_pose in target_pose_list:
+            result = self.plan_path(
+                now_qpos,
+                target_pose,
+                use_point_cloud=False,
+                use_attach=False,
+                arms_tag=arms_tag,
+                log=False,
+            )
+            status = "Success" if result.get("status") == "Success" else "Failure"
+            statuses.append(status)
+            positions.append(result.get("position", []))
+            velocities.append(result.get("velocity", []))
+
+        return {
+            "status": np.array(statuses, dtype=object),
+            "position": positions,
+            "velocity": velocities,
+        }
 
     def plan_grippers(self, now_val, target_val):
         num_step = 200  # TODO

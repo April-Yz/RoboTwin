@@ -123,6 +123,11 @@ class Robot:
 
     def reset(self, scene, need_topp=False, **kwargs):
         self._init_robot_(scene, need_topp, **kwargs)
+        use_curobo = (
+            CuroboPlanner is not None
+            and isinstance(getattr(self, "left_planner", None), CuroboPlanner)
+            and isinstance(getattr(self, "right_planner", None), CuroboPlanner)
+        )
 
         if self.communication_flag:
             if hasattr(self, "left_conn") and self.left_conn:
@@ -132,7 +137,7 @@ class Robot:
                 self.right_conn.send({"cmd": "reset"})
                 _ = self.right_conn.recv()
         else:
-            if not isinstance(self.left_planner, CuroboPlanner) or not isinstance(self.right_planner, CuroboPlanner):
+            if not use_curobo:
                 self.set_planner(scene=scene)
 
         self.init_joints()
@@ -259,12 +264,33 @@ class Robot:
         abs_right_curobo_yml_path = os.path.join(CONFIGS.ROOT_PATH, self.right_curobo_yml_path)
 
         self.communication_flag = (abs_left_curobo_yml_path != abs_right_curobo_yml_path)
+        use_curobo = CuroboPlanner is not None
 
         if self.is_dual_arm:
             abs_left_curobo_yml_path = abs_left_curobo_yml_path.replace("curobo.yml", "curobo_left.yml")
             abs_right_curobo_yml_path = abs_right_curobo_yml_path.replace("curobo.yml", "curobo_right.yml")
 
-        if not self.communication_flag:
+        if not use_curobo:
+            self.communication_flag = False
+            self.left_planner = MplibPlanner(
+                self.left_urdf_path,
+                self.left_srdf_path,
+                self.left_move_group,
+                self.left_entity_origion_pose,
+                self.left_entity,
+                "mplib_RRT",
+                scene,
+            )
+            self.right_planner = MplibPlanner(
+                self.right_urdf_path,
+                self.right_srdf_path,
+                self.right_move_group,
+                self.right_entity_origion_pose,
+                self.right_entity,
+                "mplib_RRT",
+                scene,
+            )
+        elif not self.communication_flag:
             self.left_planner = CuroboPlanner(self.left_entity_origion_pose,
                                               self.left_arm_joints_name,
                                               [joint.get_name() for joint in self.left_entity.get_active_joints()],
@@ -301,24 +327,28 @@ class Robot:
             self.right_proc.start()
 
         if self.need_topp:
-            self.left_mplib_planner = MplibPlanner(
-                self.left_urdf_path,
-                self.left_srdf_path,
-                self.left_move_group,
-                self.left_entity_origion_pose,
-                self.left_entity,
-                self.left_planner_type,
-                scene,
-            )
-            self.right_mplib_planner = MplibPlanner(
-                self.right_urdf_path,
-                self.right_srdf_path,
-                self.right_move_group,
-                self.right_entity_origion_pose,
-                self.right_entity,
-                self.right_planner_type,
-                scene,
-            )
+            if isinstance(self.left_planner, MplibPlanner) and isinstance(self.right_planner, MplibPlanner):
+                self.left_mplib_planner = self.left_planner
+                self.right_mplib_planner = self.right_planner
+            else:
+                self.left_mplib_planner = MplibPlanner(
+                    self.left_urdf_path,
+                    self.left_srdf_path,
+                    self.left_move_group,
+                    self.left_entity_origion_pose,
+                    self.left_entity,
+                    "mplib_RRT" if not use_curobo else self.left_planner_type,
+                    scene,
+                )
+                self.right_mplib_planner = MplibPlanner(
+                    self.right_urdf_path,
+                    self.right_srdf_path,
+                    self.right_move_group,
+                    self.right_entity_origion_pose,
+                    self.right_entity,
+                    "mplib_RRT" if not use_curobo else self.right_planner_type,
+                    scene,
+                )
 
     def update_world_pcd(self, world_pcd):
         try:

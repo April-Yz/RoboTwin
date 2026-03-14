@@ -17,6 +17,7 @@ task_config/
 
 # eval result
 eval_result/
+smoke-results/
 
 # Code Generation
 assets/*

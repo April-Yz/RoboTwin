@@ -18,8 +18,11 @@ This copy isolates RoboTwin-side evaluation changes needed by LingBot-VA without
 - `script/requirements.txt` is aligned with LingBot-VA's RoboTwin setup notes for `huggingface_hub==0.36.2`.
 - `script/_install.sh` already uses `pip install "git+https://github.com/facebookresearch/pytorch3d.git@stable" --no-build-isolation`, which matches the LingBot-VA README requirement.
 - The environment was cloned from the existing `RoboTwin` conda environment into `RoboTwin-lingbot` and should be treated as the only editable RoboTwin environment for LingBot-VA work in this session.
+- On this machine, upstream `curobo` cannot be used as-is for evaluation because the local NVCC toolchain is CUDA 12.1 while the GPU is Blackwell (`sm_120`). `envs/robot/robot.py` and `envs/robot/planner.py` now fall back to `MplibPlanner` when `CuroboPlanner` import or build fails.
+- The fallback normalizes embodiment planner declarations like `"curobo"` to `"mplib_RRT"` and converts MPLib `TOPP` parameterization exceptions into ordinary planning failures so eval can continue instead of aborting the whole process.
 
 ## Current Assumptions
 
 - RoboTwin assets can be reused from `/home/zaijia001/ssd/RoboTwin/assets` via local links in this worktree.
 - LingBot-VA should point its RoboTwin client code at `/home/zaijia001/vam/RoboTwin-lingbot`.
+- `click_bell` has been smoke-tested end-to-end against the LingBot-VA websocket server with `test_num=1`, producing a successful run and result artifacts under ignored output directories.
