@@ -133,6 +133,14 @@ class ReplayRenderer(base.HandRetargetR1Renderer):
             self.robot.right_entity.set_root_pose(base.HIDDEN_DEBUG_POSE)
         self.scene.update_render()
 
+    def get_head_camera_pose(self) -> sapien.Pose:
+        if self._fixed_head_camera_pose is not None:
+            return sapien.Pose(
+                np.asarray(self._fixed_head_camera_pose.p, dtype=np.float64).tolist(),
+                np.asarray(self._fixed_head_camera_pose.q, dtype=np.float64).tolist(),
+            )
+        return super().get_head_camera_pose()
+
     def update_robot_link_cameras(self) -> None:
         if self._fixed_head_camera_pose is not None:
             self.zed_camera.set_entity_pose(self._fixed_head_camera_pose)
