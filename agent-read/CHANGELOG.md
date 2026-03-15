@@ -13,3 +13,8 @@
   - red = selected candidate
 - Added `arm_debugs` to `plan_summary.json` so downstream inspection can see per-arm diagnostics and whether a hand was actually selected.
 - Updated `code_painting/README_anygrasp_keyframe_planner.md` to document the left/right visualization markers.
+
+### 2026-03-15
+- Added projected candidate IDs to AnyGrasp planner debug videos.
+- Switched left/right arm markers from white to black for better contrast on white backgrounds.
+- Added a no-code reproduction guide at `code_painting/README_anygrasp_keyframe_planner_repro.md`.

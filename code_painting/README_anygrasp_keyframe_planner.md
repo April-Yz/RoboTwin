@@ -181,8 +181,12 @@ batch 根目录下会生成：
 
 左右手区分：
 
-- 左手候选：夹爪上方有白色小标记
-- 右手候选：夹爪下方有白色小标记
+- 左手候选：夹爪上方有黑色小标记
+- 右手候选：夹爪下方有黑色小标记
+- 每个候选都会在图像里投影出编号
+  - 绿色编号：全部候选的原始 `candidate_idx`
+  - `L12`：左手 top 候选里的 `candidate_idx=12`
+  - `R12`：右手 top 候选里的 `candidate_idx=12`
 
 `debug_execution_preview.mp4` 用来调试慢速执行。
 
@@ -191,7 +195,7 @@ batch 根目录下会生成：
 - 当前阶段对应关键帧的候选抓取
 - 关键帧 `1` 和 `22` 的目标轴
 - 左上角的阶段信息
-- 左右手候选的白色标记
+- 左右手候选的黑色标记和编号
 
 相关参数：
 
@@ -292,6 +296,8 @@ batch 根目录下会生成：
 - `selected_object`
 - `arm_debugs`
   - 左右手各自的筛选诊断和最终是否被选中
+- `selected_candidates` 里的 `candidate_idx`
+  - 对应视频中红色候选旁边的编号
 - `selected_candidates`
   - 每个关键帧最终选中的候选
 - `top_candidates_per_keyframe`

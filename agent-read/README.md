@@ -28,8 +28,9 @@ Candidate visualization semantics:
 - Green grippers: common candidate set shown for the active keyframe.
 - Blue grippers: arm-specific top-ranked candidates.
 - Red gripper: final selected candidate.
-- Left-arm candidates carry a white marker above the gripper.
-- Right-arm candidates carry a white marker below the gripper.
+- Left-arm candidates carry a black marker above the gripper.
+- Right-arm candidates carry a black marker below the gripper.
+- Candidate IDs are projected into the debug videos: raw IDs as numbers, arm-ranked IDs as `L<num>` / `R<num>`.
 
 Repository note:
 - The repo currently has unrelated local changes and large generated outputs. Any future edits should continue to avoid committing generated videos, rollouts, logs, tarballs, and batch output folders.

@@ -26,7 +26,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 import render_hand_retarget_r1_npz as base
 import render_hand_retarget_r1_npz_urdfik as urdfik_base
-from render_object_pose_r1_npz import create_object_actor, pose_wxyz_to_matrix
+from render_object_pose_r1_npz import create_object_actor, get_camera_intrinsic_matrix, pose_wxyz_to_matrix
 from replay_r1_h5 import ReplayRenderer, parse_optional_base_pose
 
 
@@ -110,6 +110,7 @@ class DebugExecutionState:
     selected_keyframes: List[SelectedKeyframe]
     common_candidates_per_frame: Dict[int, List[CandidatePose]]
     arm_display_candidates: Dict[str, Dict[int, List[CandidatePose]]]
+    head_intrinsic: np.ndarray
     active_frame: Optional[int] = None
 
 
@@ -567,13 +568,103 @@ def create_gripper_candidate_actor(scene: sapien.Scene, name: str, color: Sequen
     builder.add_box_visual(pose=sapien.Pose([-0.012, 0.0, 0.0]), half_size=body_half, material=list(color))
     builder.add_box_visual(pose=sapien.Pose([0.012, 0.020, 0.0]), half_size=finger_half, material=list(color))
     builder.add_box_visual(pose=sapien.Pose([0.012, -0.020, 0.0]), half_size=finger_half, material=list(color))
+    marker_color = [0.05, 0.05, 0.05]
     if marker_side == "left":
-        builder.add_box_visual(pose=sapien.Pose([0.0, 0.0, 0.012]), half_size=[0.004, 0.004, 0.002], material=[1.0, 1.0, 1.0])
+        builder.add_box_visual(pose=sapien.Pose([0.0, 0.0, 0.012]), half_size=[0.004, 0.004, 0.002], material=marker_color)
     elif marker_side == "right":
-        builder.add_box_visual(pose=sapien.Pose([0.0, 0.0, -0.012]), half_size=[0.004, 0.004, 0.002], material=[1.0, 1.0, 1.0])
+        builder.add_box_visual(pose=sapien.Pose([0.0, 0.0, -0.012]), half_size=[0.004, 0.004, 0.002], material=marker_color)
     actor = builder.build_kinematic(name=name)
     hide_actor(actor)
     return actor
+
+
+def project_world_point_to_image(
+    camera,
+    intrinsic: np.ndarray,
+    point_world: np.ndarray,
+    image_width: int,
+    image_height: int,
+) -> Optional[Tuple[int, int]]:
+    try:
+        extrinsic = np.asarray(camera.get_extrinsic_matrix(), dtype=np.float64)
+    except Exception:
+        return None
+    if extrinsic.shape == (3, 4):
+        extrinsic_4x4 = np.eye(4, dtype=np.float64)
+        extrinsic_4x4[:3, :4] = extrinsic
+        extrinsic = extrinsic_4x4
+    if extrinsic.shape != (4, 4):
+        return None
+
+    point_h = np.ones(4, dtype=np.float64)
+    point_h[:3] = np.asarray(point_world, dtype=np.float64).reshape(3)
+    point_cam = extrinsic @ point_h
+    z = float(point_cam[2])
+    if not np.isfinite(z) or z <= 1e-6:
+        return None
+
+    pixel = np.asarray(intrinsic, dtype=np.float64) @ point_cam[:3]
+    if not np.isfinite(pixel).all() or abs(pixel[2]) <= 1e-6:
+        return None
+    u = int(round(float(pixel[0] / pixel[2])))
+    v = int(round(float(pixel[1] / pixel[2])))
+    if u < -32 or u >= image_width + 32 or v < -32 or v >= image_height + 32:
+        return None
+    return u, v
+
+
+def draw_small_candidate_label(image_bgr: np.ndarray, text: str, pixel_xy: Tuple[int, int], color_bgr: Tuple[int, int, int]) -> None:
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    font_scale = 0.35
+    thickness = 1
+    (text_w, text_h), baseline = cv2.getTextSize(text, font, font_scale, thickness)
+    x, y = int(pixel_xy[0]), int(pixel_xy[1])
+    x0 = max(x - 2, 0)
+    y0 = max(y - text_h - baseline - 4, 0)
+    x1 = min(x + text_w + 4, image_bgr.shape[1] - 1)
+    y1 = min(y + 2, image_bgr.shape[0] - 1)
+    cv2.rectangle(image_bgr, (x0, y0), (x1, y1), (255, 255, 255), thickness=-1)
+    cv2.rectangle(image_bgr, (x0, y0), (x1, y1), color_bgr, thickness=1)
+    cv2.putText(image_bgr, text, (x + 1, y - 2), font, font_scale, (255, 255, 255), thickness + 2, cv2.LINE_AA)
+    cv2.putText(image_bgr, text, (x + 1, y - 2), font, font_scale, (10, 10, 10), thickness, cv2.LINE_AA)
+
+
+def annotate_candidate_labels(
+    image_bgr: np.ndarray,
+    camera,
+    intrinsic: np.ndarray,
+    active_frame: Optional[int],
+    common_candidates_per_frame: Dict[int, List[CandidatePose]],
+    arm_display_candidates: Dict[str, Dict[int, List[CandidatePose]]],
+) -> None:
+    if active_frame is None:
+        return
+
+    width = int(image_bgr.shape[1])
+    height = int(image_bgr.shape[0])
+    frame = int(active_frame)
+
+    common_candidates = common_candidates_per_frame.get(frame, [])
+    for cand in common_candidates:
+        origin = np.asarray(cand.pose_world_wxyz[:3], dtype=np.float64)
+        pixel = project_world_point_to_image(camera, intrinsic, origin, width, height)
+        if pixel is None:
+            continue
+        draw_small_candidate_label(image_bgr, str(int(cand.candidate_idx)), pixel, (0, 120, 0))
+
+    arm_styles = {
+        "left": ((200, 80, 0), np.array([0.0, 0.0, 0.018], dtype=np.float64)),
+        "right": ((160, 0, 160), np.array([0.0, 0.0, -0.018], dtype=np.float64)),
+    }
+    for arm_name, (border_color, local_offset) in arm_styles.items():
+        frame_candidates = arm_display_candidates.get(arm_name, {}).get(frame, [])
+        for cand in frame_candidates:
+            pose_world = np.asarray(cand.pose_world_matrix, dtype=np.float64)
+            label_world = pose_world[:3, 3] + pose_world[:3, :3] @ local_offset
+            pixel = project_world_point_to_image(camera, intrinsic, label_world, width, height)
+            if pixel is None:
+                continue
+            draw_small_candidate_label(image_bgr, f"{arm_name[0].upper()}{int(cand.candidate_idx)}", pixel, border_color)
 
 
 def build_display_candidates_per_frame(
@@ -717,11 +808,20 @@ def record_frame(
                     else "active_keyframe=none"
                 ),
                 "color=green:all blue:arm-top red:selected",
-                "marker=left:+white right:-white",
+                "marker=left:+black right:-black",
+                "labels=num=all Lnum=left Rnum=right",
             ]
         )
         debug_rgb, _ = renderer.capture_camera(renderer.zed_camera)
         debug_bgr = base.overlay_text(debug_rgb, debug_overlay) if use_overlay else cv2.cvtColor(debug_rgb, cv2.COLOR_RGB2BGR)
+        annotate_candidate_labels(
+            debug_bgr,
+            renderer.zed_camera,
+            debug_execution_state.head_intrinsic,
+            debug_execution_state.active_frame,
+            debug_execution_state.common_candidates_per_frame,
+            debug_execution_state.arm_display_candidates,
+        )
         debug_execution_state.writer.write(debug_bgr)
         for actors in debug_visuals.common_candidate_actors.values():
             for actor in actors:
@@ -948,6 +1048,7 @@ def generate_debug_preview(
     selected_keyframes: List[SelectedKeyframe],
     common_candidates_per_frame: Dict[int, List[CandidatePose]],
     arm_display_candidates: Dict[str, Dict[int, List[CandidatePose]]],
+    head_intrinsic: np.ndarray,
     debug_visuals: DebugVisualBundle,
 ) -> Optional[Path]:
     if not bool(args.save_debug_preview):
@@ -1003,7 +1104,8 @@ def generate_debug_preview(
                         f"rot_err={selected.candidate.rotation_distance_deg:.2f}deg",
                         f"all_candidates={len(common_candidates_per_frame.get(int(selected.source_frame), []))}",
                         "color=green:all blue:arm-top red:selected",
-                        "marker=left:+white right:-white",
+                        "marker=left:+black right:-black",
+                        "labels=num=all Lnum=left Rnum=right",
                     ]
                 )
             else:
@@ -1014,7 +1116,19 @@ def generate_debug_preview(
                     arm_display_candidates,
                 )
 
-            record_frame(renderer, writer, None, overlay_lines, use_overlay=True)
+            renderer.update_robot_link_cameras()
+            renderer.scene.update_render()
+            debug_rgb, _ = renderer.capture_camera(renderer.zed_camera)
+            debug_bgr = base.overlay_text(debug_rgb, overlay_lines)
+            annotate_candidate_labels(
+                debug_bgr,
+                renderer.zed_camera,
+                head_intrinsic,
+                int(selected.source_frame) if selected is not None else None,
+                common_candidates_per_frame,
+                arm_display_candidates,
+            )
+            writer.write(debug_bgr)
     finally:
         writer.release()
         update_candidate_debug_visuals(
@@ -1100,6 +1214,12 @@ def main() -> None:
     renderer.update_robot_link_cameras()
     renderer.step_scene(steps=1)
     renderer.set_grippers(args.open_gripper if arm == "left" else None, args.open_gripper if arm == "right" else None)
+    head_intrinsic = get_camera_intrinsic_matrix(
+        renderer.zed_camera,
+        image_width=args.image_width,
+        image_height=args.image_height,
+        fovy_deg=args.fovy_deg,
+    )
 
     debug_video_path = generate_debug_preview(
         renderer,
@@ -1109,6 +1229,7 @@ def main() -> None:
         selected_keyframes,
         common_candidates_per_frame,
         arm_display_candidates,
+        head_intrinsic,
         debug_visuals,
     )
     for state in object_states.values():
@@ -1139,6 +1260,7 @@ def main() -> None:
         selected_keyframes=selected_keyframes,
         common_candidates_per_frame=common_candidates_per_frame,
         arm_display_candidates=arm_display_candidates,
+        head_intrinsic=head_intrinsic,
         active_frame=None,
     )
     use_overlay = bool(args.overlay_text)
