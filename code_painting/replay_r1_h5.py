@@ -70,7 +70,7 @@ class ReplayRenderer(base.HandRetargetR1Renderer):
         super().__init__(*args, **kwargs)
 
     def _load_robot(self) -> None:
-        from envs.robot import Robot
+        from envs.robot.robot import Robot
 
         with self.robot_config_path.open("r", encoding="utf-8") as f:
             robot_cfg = json.load(f)

@@ -114,6 +114,15 @@ class DebugExecutionState:
     active_frame: Optional[int] = None
 
 
+@dataclass
+class RankPreviewRecord:
+    frame: int
+    rank: int
+    image_path: str
+    left_candidate_idx: Optional[int]
+    right_candidate_idx: Optional[int]
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Use AnyGrasp keyframes + hand orientation to plan a two-keyframe RoboTwin demo.")
     parser.add_argument("--anygrasp_dir", type=Path, required=True, help="Per-video AnyGrasp result dir, e.g. anygrasp_batch_results/d_pour_blue_1.")
@@ -154,6 +163,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--debug_keyframe_hold_frames", type=int, default=12)
     parser.add_argument("--save_debug_execution_preview", type=int, default=1)
     parser.add_argument("--debug_execution_fps", type=int, default=10)
+    parser.add_argument("--save_rank_preview_images", type=int, default=1)
+    parser.add_argument("--rank_preview_top_n", type=int, default=3, help="Save per-keyframe rank preview PNGs for left/right rank 1..N.")
     parser.add_argument("--debug_target_axis_length", type=float, default=0.08)
     parser.add_argument("--debug_target_axis_thickness", type=float, default=0.004)
     parser.add_argument("--head_only", type=int, default=1)
@@ -591,6 +602,12 @@ def create_gripper_candidate_actor(
     actor = builder.build_kinematic(name=name)
     hide_actor(actor)
     return actor
+
+
+
+def capture_head_bgr(renderer: ReplayRenderer) -> np.ndarray:
+    head_rgb, _ = renderer.capture_camera(renderer.zed_camera)
+    return cv2.cvtColor(head_rgb, cv2.COLOR_RGB2BGR)
 
 
 def project_world_point_to_image(
@@ -1057,6 +1074,127 @@ def update_candidate_debug_visuals(
                     hide_actor(actor)
 
 
+
+
+def export_rank_preview_images(
+    renderer: ReplayRenderer,
+    args: argparse.Namespace,
+    keyframes: Sequence[int],
+    object_states_per_frame: Dict[int, Dict[str, ObjectState]],
+    arm_debugs: Dict[str, ArmDebugInfo],
+    selected_keyframes: List[SelectedKeyframe],
+    head_intrinsic: np.ndarray,
+) -> List[RankPreviewRecord]:
+    if not bool(args.save_rank_preview_images):
+        return []
+
+    preview_dir = args.output_dir / "rank_previews"
+    preview_dir.mkdir(parents=True, exist_ok=True)
+    top_n = max(int(args.rank_preview_top_n), 0)
+    if top_n <= 0:
+        return []
+
+    temp_actors = {
+        "left": create_gripper_candidate_actor(
+            renderer.scene,
+            "rank_preview_left",
+            color=[0.1, 0.45, 1.0],
+            scale=1.35,
+            opening_width_m=0.04,
+        ),
+        "right": create_gripper_candidate_actor(
+            renderer.scene,
+            "rank_preview_right",
+            color=[1.0, 0.55, 0.0],
+            scale=1.35,
+            opening_width_m=0.04,
+        ),
+    }
+    selected_map = {int(item.source_frame): (item.arm, int(item.candidate.candidate_idx)) for item in selected_keyframes}
+    records: List[RankPreviewRecord] = []
+
+    try:
+        for frame in keyframes:
+            frame = int(frame)
+            object_states = object_states_per_frame[frame]
+            for state in object_states.values():
+                if state.actor is None:
+                    continue
+                if state.visible:
+                    set_actor_pose(state.actor, state.pose_world_wxyz)
+                else:
+                    hide_actor(state.actor)
+
+            left_ranked = arm_debugs.get("left", ArmDebugInfo("left", None, {}, {}, {})).ranked_candidates_per_frame.get(frame, [])
+            right_ranked = arm_debugs.get("right", ArmDebugInfo("right", None, {}, {}, {})).ranked_candidates_per_frame.get(frame, [])
+
+            for rank_idx in range(top_n):
+                left_cand = left_ranked[rank_idx] if rank_idx < len(left_ranked) else None
+                right_cand = right_ranked[rank_idx] if rank_idx < len(right_ranked) else None
+                if left_cand is None and right_cand is None:
+                    continue
+
+                if left_cand is not None:
+                    set_actor_pose(temp_actors["left"], left_cand.pose_world_wxyz)
+                else:
+                    hide_actor(temp_actors["left"])
+                if right_cand is not None:
+                    set_actor_pose(temp_actors["right"], right_cand.pose_world_wxyz)
+                else:
+                    hide_actor(temp_actors["right"])
+
+                renderer.update_robot_link_cameras()
+                renderer.scene.update_render()
+                overlay_lines = [
+                    "mode=rank_preview",
+                    f"source_frame={frame}",
+                    f"rank={rank_idx + 1}",
+                    (
+                        f"left_candidate={left_cand.candidate_idx}"
+                        + (" selected" if selected_map.get(frame) == ("left", int(left_cand.candidate_idx)) else "")
+                        if left_cand is not None
+                        else "left_candidate=none"
+                    ),
+                    (
+                        f"right_candidate={right_cand.candidate_idx}"
+                        + (" selected" if selected_map.get(frame) == ("right", int(right_cand.candidate_idx)) else "")
+                        if right_cand is not None
+                        else "right_candidate=none"
+                    ),
+                    "color=blue:left orange:right",
+                ]
+                head_rgb, _ = renderer.capture_camera(renderer.zed_camera)
+                image_bgr = base.overlay_text(head_rgb, overlay_lines)
+                annotate_candidate_labels(
+                    image_bgr,
+                    renderer.zed_camera,
+                    head_intrinsic,
+                    frame,
+                    {},
+                    {
+                        "left": {frame: [] if left_cand is None else [left_cand]},
+                        "right": {frame: [] if right_cand is None else [right_cand]},
+                    },
+                    selected_keyframes,
+                )
+                out_path = preview_dir / f"keyframe_{frame:06d}_rank_{rank_idx + 1}.png"
+                if not cv2.imwrite(str(out_path), image_bgr):
+                    raise RuntimeError(f"Failed to write {out_path}")
+                records.append(
+                    RankPreviewRecord(
+                        frame=frame,
+                        rank=rank_idx + 1,
+                        image_path=str(out_path),
+                        left_candidate_idx=None if left_cand is None else int(left_cand.candidate_idx),
+                        right_candidate_idx=None if right_cand is None else int(right_cand.candidate_idx),
+                    )
+                )
+    finally:
+        for actor in temp_actors.values():
+            hide_actor(actor)
+    return records
+
+
 def generate_debug_preview(
     renderer: ReplayRenderer,
     args: argparse.Namespace,
@@ -1255,6 +1393,15 @@ def main() -> None:
         arm_display_candidates,
         head_intrinsic,
         debug_visuals,
+    )
+    rank_preview_records = export_rank_preview_images(
+        renderer=renderer,
+        args=args,
+        keyframes=keyframes,
+        object_states_per_frame=object_states_per_frame,
+        arm_debugs=arm_debugs,
+        selected_keyframes=selected_keyframes,
+        head_intrinsic=head_intrinsic,
     )
     for state in object_states.values():
         if state.actor is not None:
@@ -1470,6 +1617,16 @@ def main() -> None:
             for frame in keyframes
         },
         "debug_preview_video": str(debug_video_path) if debug_video_path is not None else None,
+        "rank_preview_images": [
+            {
+                "frame": item.frame,
+                "rank": item.rank,
+                "image_path": item.image_path,
+                "left_candidate_idx": item.left_candidate_idx,
+                "right_candidate_idx": item.right_candidate_idx,
+            }
+            for item in rank_preview_records
+        ],
         "debug_execution_video": str(debug_execution_video_path) if debug_execution_writer is not None else None,
         "head_video": str(head_video_path),
         "third_video": str(third_video_path) if third_writer is not None else None,

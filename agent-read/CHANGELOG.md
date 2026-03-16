@@ -22,3 +22,6 @@
 - Fixed a second label-overlay regression where `record_frame()` called `annotate_candidate_labels()` without `selected_keyframes`, causing a runtime crash before debug execution video writing.
 - Reduced candidate label size again, removed visual clutter from background boxes, and made selected candidates larger. Added `--debug_common_candidate_top_k` so raw green candidates can be hidden or capped independently from per-arm top-k display.
 - Added AnyGrasp orientation-debug parameters (`--candidate_orientation_remap_label`, `--candidate_post_rot_xyz_deg`) and documented the likely missing fixed orientation conversion. Debug gripper actors now visualize the AnyGrasp opening width, and top1-only debugging is documented.
+- Decoupled `urdfik` workflows from eager `curobo` imports by switching `replay_r1_h5.py` to import `Robot` from `envs.robot.robot` directly and by making `CuroboPlanner` a lazy import inside `Robot.set_planner()`. This prevents urdfik-only runs from failing on curobo CUDA OOM during module import.
+
+- Added offscreen-safe rank preview PNG export for the AnyGrasp planner (`--save_rank_preview_images`, `--rank_preview_top_n`). Each keyframe can now produce rank-1..N still images that show the left candidate in blue and the right candidate in orange, making manual candidate selection possible even when the interactive viewer fails to open.

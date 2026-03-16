@@ -351,3 +351,10 @@ batch 根目录下会生成：
 
 关于 AnyGrasp 朝向链路和 hand replay 朝向链路的对比结论，见：
 - [README_anygrasp_orientation_check.md](/home/zaijia001/ssd/RoboTwin/code_painting/README_anygrasp_orientation_check.md)
+
+### Viewer fallback and rank previews
+
+- If the log shows `Renderer does not support display`, SAPIEN failed to open an interactive window in the current shell/VNC context and will automatically fall back to offscreen rendering only. The planner still runs and writes videos and PNGs.
+- For manual candidate picking, the planner now writes `rank_previews/keyframe_<frame>_rank_<k>.png`. Each PNG shows the left-hand rank-`k` candidate in blue and the right-hand rank-`k` candidate in orange for that keyframe.
+- The selected automatic candidate, if it matches that rank, is tagged with `selected` in the overlay text.
+- Main controls: `--save_rank_preview_images 1` and `--rank_preview_top_n 3`.

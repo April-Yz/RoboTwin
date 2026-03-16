@@ -12,7 +12,6 @@ from copy import deepcopy
 import sapien.core as sapien
 import envs._GLOBAL_CONFIGS as CONFIGS
 from envs.utils import transforms
-from .planner import CuroboPlanner
 import torch.multiprocessing as mp
 
 
@@ -132,7 +131,9 @@ class Robot:
                 self.right_conn.send({"cmd": "reset"})
                 _ = self.right_conn.recv()
         else:
-            if not isinstance(self.left_planner, CuroboPlanner) or not isinstance(self.right_planner, CuroboPlanner):
+            left_ok = getattr(self.left_planner, "__class__", type(None)).__name__ == "CuroboPlanner"
+            right_ok = getattr(self.right_planner, "__class__", type(None)).__name__ == "CuroboPlanner"
+            if not left_ok or not right_ok:
                 self.set_planner(scene=scene)
 
         self.init_joints()
@@ -255,6 +256,8 @@ class Robot:
         print("right ee: ", self.right_ee.get_name())
 
     def set_planner(self, scene=None):
+        from .planner import CuroboPlanner
+
         abs_left_curobo_yml_path = os.path.join(CONFIGS.ROOT_PATH, self.left_curobo_yml_path)
         abs_right_curobo_yml_path = os.path.join(CONFIGS.ROOT_PATH, self.right_curobo_yml_path)
 

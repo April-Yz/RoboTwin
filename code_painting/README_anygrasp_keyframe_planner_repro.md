@@ -230,3 +230,33 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_r1_b
 - 对应是左手还是右手
 
 这三个信息现在都能直接从 debug 视频里读出来，不需要回头看源码。
+
+### 6.5 导出关键帧 rank 静态图
+
+如果 viewer 起不来，可以直接导出静态图给人工挑选候选。
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_r1_batch.sh \
+  /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_batch_results \
+  /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_d_pour_blue \
+  /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis \
+  /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes \
+  --ids 1 \
+  --keyframes 1 22 \
+  --planner_backend urdfik \
+  --save_rank_preview_images 1 \
+  --rank_preview_top_n 3
+```
+
+输出目录：`rank_previews/`
+
+- `keyframe_000001_rank_1.png`
+- `keyframe_000001_rank_2.png`
+- `keyframe_000001_rank_3.png`
+- `keyframe_000022_rank_1.png`
+- `keyframe_000022_rank_2.png`
+- `keyframe_000022_rank_3.png`
+
+每张图同时显示：
+- 蓝色：左手该 rank 的候选
+- 橙色：右手该 rank 的候选

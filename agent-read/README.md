@@ -36,3 +36,8 @@ Repository note:
 
 Orientation investigation note:
 - `code_painting/README_anygrasp_orientation_check.md` records the current conclusion that the AnyGrasp path likely missed the fixed local orientation conversion already present in the hand replay path.
+
+Import-chain note:
+- `code_painting/replay_r1_h5.py` and `envs/robot/robot.py` were adjusted so `urdfik`-based replay/planning no longer imports `curobo` eagerly during robot construction. This avoids CUDA OOM or import failures in workflows that do not call `set_planner()`.
+
+- The AnyGrasp keyframe planner now exports stable still-image previews for manual candidate selection. For each keyframe it can write rank-specific PNGs (`rank_previews/keyframe_<frame>_rank_<k>.png`) showing the left rank-k candidate in blue and the right rank-k candidate in orange. This is intended for cases where the interactive SAPIEN viewer cannot be created and the workflow must fall back to offscreen-only debugging.
