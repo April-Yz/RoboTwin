@@ -32,8 +32,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--candidate_object_max_distance_m", type=float, default=0.12)
     parser.add_argument("--enforce_target_object_constraint", type=int, default=1)
     parser.add_argument("--enforce_candidate_distance_constraint", type=int, default=1)
-    parser.add_argument("--debug_candidate_top_k", type=int, default=4)
+    parser.add_argument("--debug_candidate_top_k", type=int, default=5)
     parser.add_argument("--debug_show_all_candidates", type=int, default=1)
+    parser.add_argument("--debug_common_candidate_top_k", type=int, default=0)
     parser.add_argument("--skip_existing", type=int, default=1)
     parser.add_argument("--continue_on_error", type=int, default=1)
     parser.add_argument("--robot_config", type=Path, default=(THIS_DIR.parent / "robot_config_R1.json"))
@@ -137,6 +138,8 @@ def build_single_command(args: argparse.Namespace, anygrasp_dir: Path, replay_di
         str(args.debug_candidate_top_k),
         "--debug_show_all_candidates",
         str(args.debug_show_all_candidates),
+        "--debug_common_candidate_top_k",
+        str(args.debug_common_candidate_top_k),
         "--robot_config",
         str(args.robot_config.resolve()),
         "--image_width",

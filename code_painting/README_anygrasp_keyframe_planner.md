@@ -183,12 +183,13 @@ batch 根目录下会生成：
 
 - 左右手和最终选中改用颜色区分：
 
-- 绿色：全部候选
+- 绿色：原始候选里按分数排序后保留下来的少量候选
 - 蓝色：左手 top 候选
 - 橙色：右手 top 候选
 - 红色：最终选中的候选
 - 每个候选都会在图像里投影出更小的纯数字 `candidate_idx`
-- 数字不再带背景，也不再显示 `L/R` 前缀
+- 数字不带背景，也不显示 `L/R` 前缀
+- 红色选中候选会画得更大一些，方便直接定位
 
 `debug_execution_preview.mp4` 用来调试慢速执行。
 
@@ -213,7 +214,11 @@ batch 根目录下会生成：
 - `--debug_keyframe_hold_frames`
   - 关键帧命中的抓取坐标轴在 debug 预览里持续显示的帧数
 - `--debug_candidate_top_k`
-  - debug 预览里显示多少个最接近的候选夹爪
+  - 左手和右手各自最多显示多少个 top 候选
+- `--debug_common_candidate_top_k`
+  - 绿色原始候选最多显示多少个
+  - `0` 表示不显示绿色原始候选
+  - 推荐调试值是 `0`
 - `--debug_target_axis_length`
   - 抓取位姿坐标轴长度
 - `--debug_target_axis_thickness`

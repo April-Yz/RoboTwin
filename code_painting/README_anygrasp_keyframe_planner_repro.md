@@ -171,7 +171,8 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_r1_b
   --enforce_target_object_constraint 0 \
   --enforce_candidate_distance_constraint 0 \
   --debug_show_all_candidates 1 \
-  --debug_candidate_top_k 20 \
+  --debug_candidate_top_k 5 \
+  --debug_common_candidate_top_k 0 \
   --save_debug_preview 1 \
   --save_debug_execution_preview 1
 ```
@@ -190,7 +191,8 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_r1_b
   --enforce_target_object_constraint 0 \
   --enforce_candidate_distance_constraint 0 \
   --debug_show_all_candidates 1 \
-  --debug_candidate_top_k 20 \
+  --debug_candidate_top_k 5 \
+  --debug_common_candidate_top_k 0 \
   --save_debug_preview 1 \
   --save_debug_execution_preview 1 \
   --enable_viewer 1 \

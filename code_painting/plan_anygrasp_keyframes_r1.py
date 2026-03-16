@@ -128,8 +128,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--candidate_object_max_distance_m", type=float, default=0.12)
     parser.add_argument("--enforce_target_object_constraint", type=int, default=1)
     parser.add_argument("--enforce_candidate_distance_constraint", type=int, default=1)
-    parser.add_argument("--debug_candidate_top_k", type=int, default=4)
+    parser.add_argument("--debug_candidate_top_k", type=int, default=5)
     parser.add_argument("--debug_show_all_candidates", type=int, default=1)
+    parser.add_argument("--debug_common_candidate_top_k", type=int, default=0, help="How many raw-score candidates to show in green per keyframe. 0 hides them.")
     parser.add_argument("--robot_config", type=Path, default=R1_CONFIG)
     parser.add_argument("--image_width", type=int, default=640)
     parser.add_argument("--image_height", type=int, default=360)
@@ -561,10 +562,11 @@ def create_colored_axis_actor(
     return actor
 
 
-def create_gripper_candidate_actor(scene: sapien.Scene, name: str, color: Sequence[float], marker_side: str = "none") -> sapien.Entity:
+def create_gripper_candidate_actor(scene: sapien.Scene, name: str, color: Sequence[float], marker_side: str = "none", scale: float = 1.0) -> sapien.Entity:
     builder = scene.create_actor_builder()
-    body_half = [0.008, 0.026, 0.004]
-    finger_half = [0.018, 0.0035, 0.0035]
+    scale = float(scale)
+    body_half = [0.008 * scale, 0.026 * scale, 0.004 * scale]
+    finger_half = [0.018 * scale, 0.0035 * scale, 0.0035 * scale]
     builder.add_box_visual(pose=sapien.Pose([-0.012, 0.0, 0.0]), half_size=body_half, material=list(color))
     builder.add_box_visual(pose=sapien.Pose([0.012, 0.020, 0.0]), half_size=finger_half, material=list(color))
     builder.add_box_visual(pose=sapien.Pose([0.012, -0.020, 0.0]), half_size=finger_half, material=list(color))
@@ -615,10 +617,9 @@ def project_world_point_to_image(
 
 def draw_small_candidate_label(image_bgr: np.ndarray, text: str, pixel_xy: Tuple[int, int], color_bgr: Tuple[int, int, int]) -> None:
     font = cv2.FONT_HERSHEY_SIMPLEX
-    font_scale = 0.28
+    font_scale = 0.20
     thickness = 1
     x, y = int(pixel_xy[0]), int(pixel_xy[1])
-    cv2.putText(image_bgr, text, (x, y), font, font_scale, (0, 0, 0), thickness + 1, cv2.LINE_AA)
     cv2.putText(image_bgr, text, (x, y), font, font_scale, color_bgr, thickness, cv2.LINE_AA)
 
 
@@ -646,7 +647,7 @@ def annotate_candidate_labels(
         pixel = project_world_point_to_image(camera, intrinsic, origin, width, height)
         if pixel is None:
             continue
-        draw_small_candidate_label(image_bgr, str(int(cand.candidate_idx)), pixel, (0, 150, 0))
+        draw_small_candidate_label(image_bgr, str(int(cand.candidate_idx)), (pixel[0] + 2, pixel[1] - 2), (0, 150, 0))
 
     arm_styles = {
         "left": ((220, 120, 20), np.array([0.0, 0.0, 0.018], dtype=np.float64)),
@@ -662,7 +663,7 @@ def annotate_candidate_labels(
             if pixel is None:
                 continue
             color = (0, 0, 255) if arm_name == selected_arm and int(cand.candidate_idx) == selected_idx else label_color
-            draw_small_candidate_label(image_bgr, str(int(cand.candidate_idx)), pixel, color)
+            draw_small_candidate_label(image_bgr, str(int(cand.candidate_idx)), (pixel[0] + 2, pixel[1] - 2), color)
 
 
 def build_display_candidates_per_frame(
@@ -672,12 +673,14 @@ def build_display_candidates_per_frame(
     all_candidates_per_frame: Dict[int, List[CandidatePose]],
 ) -> Dict[int, List[CandidatePose]]:
     display: Dict[int, List[CandidatePose]] = {}
+    common_top_k = int(args.debug_common_candidate_top_k)
     for frame in keyframes:
         frame = int(frame)
         if bool(args.debug_show_all_candidates):
-            display[frame] = list(all_candidates_per_frame.get(frame, []))
+            ranked_common = sorted(all_candidates_per_frame.get(frame, []), key=lambda item: float(item.score), reverse=True)
+            display[frame] = ranked_common if common_top_k < 0 else ranked_common[: max(common_top_k, 0)]
         else:
-            display[frame] = list(ranked_candidates_per_frame.get(frame, [])[: max(int(args.debug_candidate_top_k), 0)])
+            display[frame] = []
     return display
 
 
@@ -711,6 +714,7 @@ def create_debug_visual_bundle(
                 f"debug_common_candidate_{int(frame)}_{rank}",
                 color=[0.1, 0.85, 0.2],
                 marker_side="none",
+                scale=0.82,
             )
             for rank, _cand in enumerate(common_candidates_per_frame.get(int(frame), []))
         ]
@@ -732,6 +736,7 @@ def create_debug_visual_bundle(
                         f"debug_{arm_name}_candidate_{frame}_{rank}",
                         color=[1.0, 0.1, 0.1] if cand.candidate_idx == selected_idx else ([0.1, 0.45, 1.0] if arm_name == "left" else [1.0, 0.55, 0.0]),
                         marker_side="none",
+                        scale=1.45 if cand.candidate_idx == selected_idx else 1.0,
                     )
                 )
             arm_candidate_actors[arm_name][frame] = actors
@@ -804,8 +809,8 @@ def record_frame(
                     if debug_execution_state.active_frame is not None
                     else "active_keyframe=none"
                 ),
-                "color=green:all blue:left orange:right red:selected",
-                "labels=small colored candidate_idx",
+                "color=green:raw blue:left orange:right red:selected",
+                "labels=tiny candidate_idx",
             ]
         )
         debug_rgb, _ = renderer.capture_camera(renderer.zed_camera)
@@ -1099,9 +1104,10 @@ def generate_debug_preview(
                         f"selected_object={selected.candidate.nearest_object}",
                         f"candidate_idx={selected.candidate.candidate_idx}",
                         f"rot_err={selected.candidate.rotation_distance_deg:.2f}deg",
-                        f"all_candidates={len(common_candidates_per_frame.get(int(selected.source_frame), []))}",
-                        "color=green:all blue:left orange:right red:selected",
-                        "labels=small colored candidate_idx",
+                        f"raw_candidates={len(common_candidates_per_frame.get(int(selected.source_frame), []))}",
+                        f"per_arm_top_k={int(args.debug_candidate_top_k)}",
+                        "color=green:raw blue:left orange:right red:selected",
+                        "labels=tiny candidate_idx",
                     ]
                 )
             else:

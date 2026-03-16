@@ -20,3 +20,4 @@
 - Added a no-code reproduction guide at `code_painting/README_anygrasp_keyframe_planner_repro.md`.
 - Fixed a regression where debug execution video recording passed one extra argument into `update_candidate_debug_visuals`, causing runtime failure before planning started.
 - Fixed a second label-overlay regression where `record_frame()` called `annotate_candidate_labels()` without `selected_keyframes`, causing a runtime crash before debug execution video writing.
+- Reduced candidate label size again, removed visual clutter from background boxes, and made selected candidates larger. Added `--debug_common_candidate_top_k` so raw green candidates can be hidden or capped independently from per-arm top-k display.
