@@ -38,3 +38,4 @@ This copy isolates RoboTwin-side evaluation changes needed by LingBot-VA without
 - A March 16, 2026 environment-level validation confirmed:
   - `CUROBO_FILE` resolves to `/home/zaijia001/vam/RoboTwin-lingbot/envs/curobo/src/curobo/__init__.py`
   - `CuroboPlanner_is_none` is now `False` in the normal `RoboTwin-lingbot` environment context
+- A local `/home/zaijia001/vam/RoboTwin-lingbot/AGENTS.md` file now records the standing scope-protection, debug-log, and command-sync rules for this isolated worktree.

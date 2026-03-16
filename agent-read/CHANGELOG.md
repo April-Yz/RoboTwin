@@ -24,3 +24,4 @@
 - Verified in the normal `RoboTwin-lingbot` environment context that:
   - `CUROBO_FILE` now resolves to the local worktree copy
   - `CuroboPlanner_is_none` is `False`
+- Added a local `AGENTS.md` so this worktree now carries explicit in-repo rules for scope protection, debug logging, and command documentation synchronization.
