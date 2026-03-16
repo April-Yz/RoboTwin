@@ -25,3 +25,4 @@
   - `CUROBO_FILE` now resolves to the local worktree copy
   - `CuroboPlanner_is_none` is `False`
 - Added a local `AGENTS.md` so this worktree now carries explicit in-repo rules for scope protection, debug logging, and command documentation synchronization.
+- Ignored the temporary `results_posttrain_eval_step10000*` directories produced by the March 16, 2026 quaternion-order `checkpoint_step_10000` smoke comparison so future debug runs do not leave generated eval outputs in the worktree.
