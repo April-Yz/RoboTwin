@@ -47,3 +47,5 @@ Import-chain note:
 - First-keyframe-only manual inspection can be done by running the AnyGrasp planner with `--keyframes 1 1` together with manual candidate overrides. This keeps the workflow in a single-frame debug loop while preserving the existing viewer/video outputs.
 
 - In headed SAPIEN mode, the AnyGrasp planner now keeps keyframe axes and candidate gripper visuals persistent in the viewer for the current active keyframe. This makes orientation debugging possible directly in the simulator window instead of relying on single-frame flashes.
+
+- In headed AnyGrasp debug mode, each displayed left/right candidate now has its own coordinate axis actor. This avoids the previous behavior where only the selected arm kept an axis while the other manual candidate showed only the gripper mesh.

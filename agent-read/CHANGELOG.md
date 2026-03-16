@@ -31,3 +31,5 @@
 - Shrunk the green common-candidate labels again in AnyGrasp debug outputs so first-keyframe manual inspection is less cluttered.
 
 - Changed the AnyGrasp planner viewer path so debug axes and candidate grippers remain visible persistently in a headed SAPIEN viewer instead of flashing for a single frame. Offscreen video output still hides them unless the debug video is being written.
+
+- Added per-candidate axis actors for the headed AnyGrasp viewer, so non-selected manual candidates now keep their own coordinate axes instead of showing only the gripper geometry.

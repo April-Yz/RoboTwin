@@ -102,6 +102,7 @@ class DebugVisualBundle:
     keyframe_axis_actors: Dict[int, sapien.Entity]
     common_candidate_actors: Dict[int, List[sapien.Entity]]
     arm_candidate_actors: Dict[str, Dict[int, List[sapien.Entity]]]
+    arm_candidate_axis_actors: Dict[str, Dict[int, List[sapien.Entity]]]
 
 
 @dataclass
@@ -822,14 +823,18 @@ def create_debug_visual_bundle(
         for frame in keyframes
     }
     arm_candidate_actors: Dict[str, Dict[int, List[sapien.Entity]]] = {}
+    arm_candidate_axis_actors: Dict[str, Dict[int, List[sapien.Entity]]] = {}
+    standard_axis_colors = ([1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.4, 1.0])
     for arm_name, frame_candidates in arm_display_candidates.items():
         arm_candidate_actors[arm_name] = {}
+        arm_candidate_axis_actors[arm_name] = {}
         for frame in keyframes:
             frame = int(frame)
             selected_idx = None
             if arm_name == selected_keyframes[0].arm:
                 selected_idx = selected_by_frame.get(frame)
             actors = []
+            axis_actors = []
             for rank, cand in enumerate(frame_candidates.get(frame, [])):
                 actors.append(
                     create_gripper_candidate_actor(
@@ -841,11 +846,22 @@ def create_debug_visual_bundle(
                         opening_width_m=float(cand.width_m),
                     )
                 )
+                axis_actors.append(
+                    create_colored_axis_actor(
+                        renderer.scene,
+                        f"debug_{arm_name}_candidate_axis_{frame}_{rank}",
+                        axis_length=float(args.debug_target_axis_length) * 0.72,
+                        thickness=float(args.debug_target_axis_thickness) * 0.72,
+                        colors=standard_axis_colors,
+                    )
+                )
             arm_candidate_actors[arm_name][frame] = actors
+            arm_candidate_axis_actors[arm_name][frame] = axis_actors
     return DebugVisualBundle(
         keyframe_axis_actors=keyframe_axis_actors,
         common_candidate_actors=common_candidate_actors,
         arm_candidate_actors=arm_candidate_actors,
+        arm_candidate_axis_actors=arm_candidate_axis_actors,
     )
 
 
@@ -878,6 +894,10 @@ def record_frame(
             for actor in actors:
                 hide_actor(actor)
         for per_frame in debug_visuals.arm_candidate_actors.values():
+            for actors in per_frame.values():
+                for actor in actors:
+                    hide_actor(actor)
+        for per_frame in debug_visuals.arm_candidate_axis_actors.values():
             for actors in per_frame.values():
                 for actor in actors:
                     hide_actor(actor)
@@ -936,6 +956,10 @@ def record_frame(
             for actor in actors:
                 hide_actor(actor)
         for per_frame in debug_visuals.arm_candidate_actors.values():
+            for actors in per_frame.values():
+                for actor in actors:
+                    hide_actor(actor)
+        for per_frame in debug_visuals.arm_candidate_axis_actors.values():
             for actors in per_frame.values():
                 for actor in actors:
                     hide_actor(actor)
@@ -1140,13 +1164,19 @@ def update_candidate_debug_visuals(
                 hide_actor(actor)
     for arm_name, per_frame in debug_visuals.arm_candidate_actors.items():
         candidates_map = arm_display_candidates.get(arm_name, {})
+        axis_map = debug_visuals.arm_candidate_axis_actors.get(arm_name, {})
         for frame, actors in per_frame.items():
             candidates = candidates_map.get(int(frame), [])
+            axis_actors = axis_map.get(frame, [])
             for idx, actor in enumerate(actors):
                 if active_frame is not None and int(frame) == int(active_frame) and idx < len(candidates):
                     set_actor_pose(actor, candidates[idx].pose_world_wxyz)
+                    if idx < len(axis_actors):
+                        set_actor_pose(axis_actors[idx], candidates[idx].pose_world_wxyz)
                 else:
                     hide_actor(actor)
+                    if idx < len(axis_actors):
+                        hide_actor(axis_actors[idx])
 
 
 
