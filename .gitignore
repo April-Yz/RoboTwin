@@ -21,6 +21,10 @@ smoke-results/
 eval-test-decoder/
 results_regression_eval/
 results_posttrain_eval_step5000_fix*/
+results_posttrain_eval_step5000/
+results_official_posttrain_*/
+.torch_extensions/
+.tmp_build/
 
 # Code Generation
 assets/*

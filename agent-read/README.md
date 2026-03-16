@@ -19,6 +19,9 @@ This copy isolates RoboTwin-side evaluation changes needed by LingBot-VA without
 - `script/_install.sh` already uses `pip install "git+https://github.com/facebookresearch/pytorch3d.git@stable" --no-build-isolation`, which matches the LingBot-VA README requirement.
 - The environment was cloned from the existing `RoboTwin` conda environment into `RoboTwin-lingbot` and should be treated as the only editable RoboTwin environment for LingBot-VA work in this session.
 - On this machine, upstream `curobo` cannot be used as-is for evaluation because the local NVCC toolchain is CUDA 12.1 while the GPU is Blackwell (`sm_120`). `envs/robot/robot.py` and `envs/robot/planner.py` now fall back to `MplibPlanner` when `CuroboPlanner` import or build fails.
+- On March 16, 2026, the `RoboTwin-lingbot` environment was rebuilt so its editable `nvidia_curobo` install now points to the local worktree copy under `/home/zaijia001/vam/RoboTwin-lingbot/envs/curobo/src` instead of `/home/zaijia001/ssd/RoboTwin/curobo/src`.
+- That rebuild used the `RoboTwin-lingbot` conda environment plus this worktree only; it did not modify `/home/zaijia001/ssd/RoboTwin` source files or any other RoboTwin conda environment.
+- The detailed rebuild/debug record is in `agent-read/curobo-rebuild-v1.md`.
 - The fallback normalizes embodiment planner declarations like `"curobo"` to `"mplib_RRT"` and converts MPLib `TOPP` parameterization exceptions into ordinary planning failures so eval can continue instead of aborting the whole process.
 - `envs/camera/camera.py` now has a CPU farthest-point fallback when `pytorch3d` is unavailable, so RGB-based LingBot online runs no longer hard-exit on this host.
 
@@ -32,3 +35,6 @@ This copy isolates RoboTwin-side evaluation changes needed by LingBot-VA without
 - On March 16, 2026, this worktree also completed the first `place_can_basket` post-train LingBot smoke eval result against `checkpoint_step_5000`. The result was `0/1`, but the server-client-task pipeline completed and wrote metrics plus rollout artifacts instead of aborting during setup or planning.
 - `envs/_base_task.py` now converts missing grasp poses into ordinary planning failures instead of constructing `move` actions with `target_pose=None`.
 - `envs/place_can_basket.py` now fills `self.info["info"]` during `setup_demo(...)`, which keeps prompt generation available even when expert pre-check is disabled for smoke debugging.
+- A March 16, 2026 environment-level validation confirmed:
+  - `CUROBO_FILE` resolves to `/home/zaijia001/vam/RoboTwin-lingbot/envs/curobo/src/curobo/__init__.py`
+  - `CuroboPlanner_is_none` is now `False` in the normal `RoboTwin-lingbot` environment context
