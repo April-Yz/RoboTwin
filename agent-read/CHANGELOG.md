@@ -25,3 +25,5 @@
 - Decoupled `urdfik` workflows from eager `curobo` imports by switching `replay_r1_h5.py` to import `Robot` from `envs.robot.robot` directly and by making `CuroboPlanner` a lazy import inside `Robot.set_planner()`. This prevents urdfik-only runs from failing on curobo CUDA OOM during module import.
 
 - Added offscreen-safe rank preview PNG export for the AnyGrasp planner (`--save_rank_preview_images`, `--rank_preview_top_n`). Each keyframe can now produce rank-1..N still images that show the left candidate in blue and the right candidate in orange, making manual candidate selection possible even when the interactive viewer fails to open.
+
+- Added manual AnyGrasp candidate overrides via repeated `--manual_candidate FRAME ARM CANDIDATE_IDX`. Partial overrides reorder and surface the chosen candidates for debug; complete two-keyframe overrides for one arm are used directly by the planner.

@@ -358,3 +358,15 @@ batch 根目录下会生成：
 - For manual candidate picking, the planner now writes `rank_previews/keyframe_<frame>_rank_<k>.png`. Each PNG shows the left-hand rank-`k` candidate in blue and the right-hand rank-`k` candidate in orange for that keyframe.
 - The selected automatic candidate, if it matches that rank, is tagged with `selected` in the overlay text.
 - Main controls: `--save_rank_preview_images 1` and `--rank_preview_top_n 3`.
+
+### Manual candidate override
+
+You can pin specific AnyGrasp candidates before orientation debugging with repeated `--manual_candidate FRAME ARM CANDIDATE_IDX` arguments.
+
+Example:
+```bash
+--manual_candidate 1 left 5 \
+--manual_candidate 1 right 11
+```
+
+If only part of the keyframes are specified, the override is used to reorder and highlight debug candidates. If both keyframes are specified for one arm, the planner will use those candidates directly for that arm.

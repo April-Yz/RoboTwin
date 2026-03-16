@@ -37,6 +37,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--debug_common_candidate_top_k", type=int, default=0)
     parser.add_argument("--candidate_orientation_remap_label", type=str, default="identity")
     parser.add_argument("--candidate_post_rot_xyz_deg", type=float, nargs=3, default=[0.0, 0.0, 0.0])
+    parser.add_argument("--manual_candidate", type=str, nargs=3, action="append", default=[])
     parser.add_argument("--skip_existing", type=int, default=1)
     parser.add_argument("--continue_on_error", type=int, default=1)
     parser.add_argument("--robot_config", type=Path, default=(THIS_DIR.parent / "robot_config_R1.json"))
@@ -148,6 +149,7 @@ def build_single_command(args: argparse.Namespace, anygrasp_dir: Path, replay_di
         str(args.candidate_orientation_remap_label),
         "--candidate_post_rot_xyz_deg",
         *(str(v) for v in args.candidate_post_rot_xyz_deg),
+        *(sum((["--manual_candidate", str(spec[0]), str(spec[1]), str(spec[2])] for spec in args.manual_candidate), [])),
         "--robot_config",
         str(args.robot_config.resolve()),
         "--image_width",

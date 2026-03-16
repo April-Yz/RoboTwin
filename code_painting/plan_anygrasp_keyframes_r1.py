@@ -142,6 +142,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--debug_common_candidate_top_k", type=int, default=0, help="How many raw-score candidates to show in green per keyframe. 0 hides them.")
     parser.add_argument("--candidate_orientation_remap_label", type=str, default="identity")
     parser.add_argument("--candidate_post_rot_xyz_deg", type=float, nargs=3, default=[0.0, 0.0, 0.0])
+    parser.add_argument("--manual_candidate", type=str, nargs=3, action="append", default=[], metavar=("FRAME", "ARM", "CANDIDATE_IDX"), help="Optional manual candidate override, e.g. --manual_candidate 1 left 5. Partial overrides only reorder debug display; full two-frame overrides for one arm drive selection directly.")
     parser.add_argument("--robot_config", type=Path, default=R1_CONFIG)
     parser.add_argument("--image_width", type=int, default=640)
     parser.add_argument("--image_height", type=int, default=360)
@@ -418,6 +419,37 @@ def build_ranked_candidates_for_arm(
     return candidates_per_frame, diagnostics, all_candidates_per_frame
 
 
+def parse_manual_candidate_overrides(specs: Sequence[Sequence[str]]) -> Dict[str, Dict[int, int]]:
+    overrides: Dict[str, Dict[int, int]] = {"left": {}, "right": {}}
+    for spec in specs:
+        if len(spec) != 3:
+            raise ValueError(f"Invalid --manual_candidate entry: {spec}")
+        frame = int(spec[0])
+        arm = str(spec[1]).strip().lower()
+        candidate_idx = int(spec[2])
+        if arm not in overrides:
+            raise ValueError(f"Unsupported arm in --manual_candidate: {arm}")
+        overrides[arm][frame] = candidate_idx
+    return overrides
+
+
+def find_candidate_by_idx(candidates: Sequence[CandidatePose], candidate_idx: int) -> Optional[CandidatePose]:
+    for cand in candidates:
+        if int(cand.candidate_idx) == int(candidate_idx):
+            return cand
+    return None
+
+
+def reorder_candidates_with_manual_choice(candidates: Sequence[CandidatePose], candidate_idx: Optional[int]) -> List[CandidatePose]:
+    ordered = list(candidates)
+    if candidate_idx is None:
+        return ordered
+    chosen = find_candidate_by_idx(ordered, int(candidate_idx))
+    if chosen is None:
+        return ordered
+    return [chosen] + [cand for cand in ordered if int(cand.candidate_idx) != int(candidate_idx)]
+
+
 def select_keyframes_for_arm(
     renderer: ReplayRenderer,
     args: argparse.Namespace,
@@ -439,6 +471,39 @@ def select_keyframes_for_arm(
     )
     if candidates_per_frame is None:
         return None
+
+    manual_overrides = getattr(args, "manual_candidate_overrides", {}).get(arm, {})
+    for frame in keyframes:
+        frame = int(frame)
+        manual_idx = manual_overrides.get(frame)
+        candidates_per_frame[frame] = reorder_candidates_with_manual_choice(candidates_per_frame.get(frame, []), manual_idx)
+        all_candidates_per_frame[frame] = reorder_candidates_with_manual_choice(all_candidates_per_frame.get(frame, []), manual_idx)
+        diagnostics.setdefault(frame, {})["manual_candidate_idx"] = -1 if manual_idx is None else int(manual_idx)
+        diagnostics[frame]["manual_candidate_found"] = int(find_candidate_by_idx(all_candidates_per_frame.get(frame, []), manual_idx) is not None) if manual_idx is not None else 0
+
+    if all(int(frame) in manual_overrides for frame in keyframes):
+        manual_selection: List[SelectedKeyframe] = []
+        for frame in keyframes:
+            frame = int(frame)
+            chosen = find_candidate_by_idx(all_candidates_per_frame.get(frame, []), int(manual_overrides[frame]))
+            if chosen is None:
+                return None
+            manual_selection.append(
+                SelectedKeyframe(
+                    source_frame=frame,
+                    arm=arm,
+                    candidate=chosen,
+                    hand_rotation_cam=np.asarray(hand_rotations[frame], dtype=np.float64),
+                )
+            )
+        return ArmSelectionResult(
+            arm=arm,
+            expected_object=expected_object_for_arm(args, arm),
+            selected_keyframes=manual_selection,
+            ranked_candidates_per_frame=candidates_per_frame,
+            all_candidates_per_frame=all_candidates_per_frame,
+            diagnostics=diagnostics,
+        )
 
     best_selection: Optional[List[SelectedKeyframe]] = None
     best_cost = float("inf")
@@ -1312,6 +1377,7 @@ def main() -> None:
     if not args.hand_npz.is_file():
         raise FileNotFoundError(f"hand_npz not found: {args.hand_npz}")
 
+    args.manual_candidate_overrides = parse_manual_candidate_overrides(args.manual_candidate)
     args.candidate_orientation_remap_label, args.candidate_orientation_remap_matrix = base.resolve_orientation_remap(args.candidate_orientation_remap_label)
     args.candidate_post_rot_xyz_deg = np.asarray(args.candidate_post_rot_xyz_deg, dtype=np.float64)
     args.candidate_post_rot_matrix = base.orthonormalize_rotation(
@@ -1540,6 +1606,7 @@ def main() -> None:
         "selection_diagnostics": selection_result.diagnostics,
         "candidate_orientation_remap_label": args.candidate_orientation_remap_label,
         "candidate_post_rot_xyz_deg": args.candidate_post_rot_xyz_deg.tolist(),
+        "manual_candidate_overrides": {arm: {str(frame): idx for frame, idx in frame_map.items()} for arm, frame_map in args.manual_candidate_overrides.items() if frame_map},
         "arm_debugs": {
             arm_name: {
                 "expected_object": arm_info.expected_object,

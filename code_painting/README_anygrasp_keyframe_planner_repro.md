@@ -260,3 +260,24 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_r1_b
 每张图同时显示：
 - 蓝色：左手该 rank 的候选
 - 橙色：右手该 rank 的候选
+
+### 6.6 手工指定候选
+
+如果你已经通过 `rank_previews/` 看中了某些候选，可以直接指定：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_r1_batch.sh \
+  /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_batch_results \
+  /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_d_pour_blue \
+  /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis \
+  /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes \
+  --ids 1 \
+  --keyframes 1 22 \
+  --planner_backend urdfik \
+  --manual_candidate 1 left 5 \
+  --manual_candidate 1 right 11
+```
+
+说明：
+- 只指定部分关键帧时：主要用于 debug 显示排序和朝向检查
+- 对同一只手把两帧都指定齐时：planner 会直接使用你指定的候选
