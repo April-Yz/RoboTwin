@@ -131,6 +131,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--debug_candidate_top_k", type=int, default=5)
     parser.add_argument("--debug_show_all_candidates", type=int, default=1)
     parser.add_argument("--debug_common_candidate_top_k", type=int, default=0, help="How many raw-score candidates to show in green per keyframe. 0 hides them.")
+    parser.add_argument("--candidate_orientation_remap_label", type=str, default="identity")
+    parser.add_argument("--candidate_post_rot_xyz_deg", type=float, nargs=3, default=[0.0, 0.0, 0.0])
     parser.add_argument("--robot_config", type=Path, default=R1_CONFIG)
     parser.add_argument("--image_width", type=int, default=640)
     parser.add_argument("--image_height", type=int, default=360)
@@ -299,10 +301,13 @@ def rotation_distance_deg(rot_a: np.ndarray, rot_b: np.ndarray) -> float:
     return float(np.rad2deg(delta.magnitude()))
 
 
-def candidate_to_world_pose(renderer: ReplayRenderer, grasp: Dict) -> Tuple[np.ndarray, np.ndarray]:
+def candidate_to_world_pose(renderer: ReplayRenderer, args: argparse.Namespace, grasp: Dict) -> Tuple[np.ndarray, np.ndarray]:
     rot_cam = np.asarray(grasp["rotation_matrix"], dtype=np.float64).reshape(3, 3)
     trans_cam = np.asarray(grasp["translation"], dtype=np.float64).reshape(3)
-    pose_world_wxyz = renderer.camera_to_world_pose(trans_cam, rot_cam)
+    remapped_rotation = base.orthonormalize_rotation(
+        base.orthonormalize_rotation(rot_cam) @ args.candidate_post_rot_matrix @ args.candidate_orientation_remap_matrix
+    )
+    pose_world_wxyz = renderer.camera_to_world_pose(trans_cam, remapped_rotation)
     pose_world_matrix = pose_wxyz_to_matrix(pose_world_wxyz)
     return pose_world_wxyz, pose_world_matrix
 
@@ -360,7 +365,7 @@ def build_ranked_candidates_for_arm(
         distance_pass = 0
         for candidate_idx, grasp in enumerate(load_anygrasp_candidates(anygrasp_dir, frame)):
             total += 1
-            pose_world_wxyz, pose_world_matrix = candidate_to_world_pose(renderer, grasp)
+            pose_world_wxyz, pose_world_matrix = candidate_to_world_pose(renderer, args, grasp)
             nearest_name, nearest_dist = nearest_object_name(pose_world_matrix, object_states_per_frame[frame])
             candidate = CandidatePose(
                 candidate_idx=candidate_idx,
@@ -562,14 +567,22 @@ def create_colored_axis_actor(
     return actor
 
 
-def create_gripper_candidate_actor(scene: sapien.Scene, name: str, color: Sequence[float], marker_side: str = "none", scale: float = 1.0) -> sapien.Entity:
+def create_gripper_candidate_actor(
+    scene: sapien.Scene,
+    name: str,
+    color: Sequence[float],
+    marker_side: str = "none",
+    scale: float = 1.0,
+    opening_width_m: float = 0.04,
+) -> sapien.Entity:
     builder = scene.create_actor_builder()
     scale = float(scale)
     body_half = [0.008 * scale, 0.026 * scale, 0.004 * scale]
     finger_half = [0.018 * scale, 0.0035 * scale, 0.0035 * scale]
-    builder.add_box_visual(pose=sapien.Pose([-0.012, 0.0, 0.0]), half_size=body_half, material=list(color))
-    builder.add_box_visual(pose=sapien.Pose([0.012, 0.020, 0.0]), half_size=finger_half, material=list(color))
-    builder.add_box_visual(pose=sapien.Pose([0.012, -0.020, 0.0]), half_size=finger_half, material=list(color))
+    finger_gap = float(np.clip(opening_width_m, 0.0, 0.12)) * 0.5 + finger_half[1]
+    builder.add_box_visual(pose=sapien.Pose([-0.012 * scale, 0.0, 0.0]), half_size=body_half, material=list(color))
+    builder.add_box_visual(pose=sapien.Pose([0.012 * scale, finger_gap, 0.0]), half_size=finger_half, material=list(color))
+    builder.add_box_visual(pose=sapien.Pose([0.012 * scale, -finger_gap, 0.0]), half_size=finger_half, material=list(color))
     marker_color = [0.05, 0.05, 0.05]
     if marker_side == "left":
         builder.add_box_visual(pose=sapien.Pose([0.0, 0.0, 0.012]), half_size=[0.004, 0.004, 0.002], material=marker_color)
@@ -715,6 +728,7 @@ def create_debug_visual_bundle(
                 color=[0.1, 0.85, 0.2],
                 marker_side="none",
                 scale=0.82,
+                opening_width_m=float(_cand.width_m),
             )
             for rank, _cand in enumerate(common_candidates_per_frame.get(int(frame), []))
         ]
@@ -736,7 +750,8 @@ def create_debug_visual_bundle(
                         f"debug_{arm_name}_candidate_{frame}_{rank}",
                         color=[1.0, 0.1, 0.1] if cand.candidate_idx == selected_idx else ([0.1, 0.45, 1.0] if arm_name == "left" else [1.0, 0.55, 0.0]),
                         marker_side="none",
-                        scale=1.45 if cand.candidate_idx == selected_idx else 1.0,
+                        scale=1.65 if cand.candidate_idx == selected_idx else 1.0,
+                        opening_width_m=float(cand.width_m),
                     )
                 )
             arm_candidate_actors[arm_name][frame] = actors
@@ -1159,6 +1174,12 @@ def main() -> None:
     if not args.hand_npz.is_file():
         raise FileNotFoundError(f"hand_npz not found: {args.hand_npz}")
 
+    args.candidate_orientation_remap_label, args.candidate_orientation_remap_matrix = base.resolve_orientation_remap(args.candidate_orientation_remap_label)
+    args.candidate_post_rot_xyz_deg = np.asarray(args.candidate_post_rot_xyz_deg, dtype=np.float64)
+    args.candidate_post_rot_matrix = base.orthonormalize_rotation(
+        R.from_euler("xyz", np.deg2rad(args.candidate_post_rot_xyz_deg)).as_matrix()
+    )
+
     renderer = build_renderer(args)
     hand_data = load_hand_data(args.hand_npz)
     keyframes = [int(v) for v in args.keyframes]
@@ -1370,6 +1391,8 @@ def main() -> None:
         "selected_arm": arm,
         "expected_object_for_selected_arm": selection_result.expected_object,
         "selection_diagnostics": selection_result.diagnostics,
+        "candidate_orientation_remap_label": args.candidate_orientation_remap_label,
+        "candidate_post_rot_xyz_deg": args.candidate_post_rot_xyz_deg.tolist(),
         "arm_debugs": {
             arm_name: {
                 "expected_object": arm_info.expected_object,

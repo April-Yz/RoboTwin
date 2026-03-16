@@ -215,10 +215,15 @@ batch 根目录下会生成：
   - 关键帧命中的抓取坐标轴在 debug 预览里持续显示的帧数
 - `--debug_candidate_top_k`
   - 左手和右手各自最多显示多少个 top 候选
+  - 只想看 top1 时设成 `1`
 - `--debug_common_candidate_top_k`
   - 绿色原始候选最多显示多少个
   - `0` 表示不显示绿色原始候选
   - 推荐调试值是 `0`
+- `--candidate_orientation_remap_label`
+  - AnyGrasp 候选姿态的固定轴重映射标签
+- `--candidate_post_rot_xyz_deg`
+  - AnyGrasp 候选姿态在相机系里的固定后置欧拉角旋转
 - `--debug_target_axis_length`
   - 抓取位姿坐标轴长度
 - `--debug_target_axis_thickness`
@@ -340,3 +345,9 @@ batch 根目录下会生成：
    - 确认 `pregrasp/grasp/action` 是否真的到位
 3. 最后看 `plan_summary.json`
    - 检查 `reached`, `pos_err_m`, `rot_err_deg`
+
+
+## Orientation Check
+
+关于 AnyGrasp 朝向链路和 hand replay 朝向链路的对比结论，见：
+- [README_anygrasp_orientation_check.md](/home/zaijia001/ssd/RoboTwin/code_painting/README_anygrasp_orientation_check.md)

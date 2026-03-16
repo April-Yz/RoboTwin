@@ -33,3 +33,6 @@ Candidate visualization semantics:
 
 Repository note:
 - The repo currently has unrelated local changes and large generated outputs. Any future edits should continue to avoid committing generated videos, rollouts, logs, tarballs, and batch output folders.
+
+Orientation investigation note:
+- `code_painting/README_anygrasp_orientation_check.md` records the current conclusion that the AnyGrasp path likely missed the fixed local orientation conversion already present in the hand replay path.
