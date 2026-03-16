@@ -26,5 +26,6 @@ This copy isolates RoboTwin-side evaluation changes needed by LingBot-VA without
 
 - RoboTwin assets can be reused from `/home/zaijia001/ssd/RoboTwin/assets` via local links in this worktree.
 - LingBot-VA should point its RoboTwin client code at `/home/zaijia001/vam/RoboTwin-lingbot`.
+- The worktree now also provides `task_config/demo_clean_large_d435.yml`, which keeps the original `demo_clean` behavior but switches both head and wrist cameras to `Large_D435` (`640x480`).
 - `click_bell` has been smoke-tested end-to-end against the LingBot-VA websocket server with `test_num=1`, producing a successful run and result artifacts under ignored output directories.
 - On March 16, 2026, the LingBot action-only DSRL entry in the separate `lingbot-va` repo completed one full `click_bell` RoboTwin online episode against this worktree, emitted SAC metrics, and exited cleanly with zero task successes.

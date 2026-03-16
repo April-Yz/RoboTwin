@@ -14,3 +14,4 @@
 - Ignored the local `eval-test-decoder/` output directory in `.gitignore`.
 - Confirmed this worktree now supports a full March 16, 2026 LingBot action-only DSRL online `click_bell` episode from the separate `lingbot-va` repo; the run completed end-to-end and logged SAC metrics, although task success remained `0/1`.
 - Ignored the local `results_regression_eval/` directory after the March 16, 2026 original LingBot eval regression smoke run (`click_bell 1/1`).
+- Added `task_config/demo_clean_large_d435.yml` so LingBot action-only training can target the `Large_D435` camera layout (`640x480`) without overwriting the original `demo_clean.yml`.
