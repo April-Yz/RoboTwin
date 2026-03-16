@@ -792,7 +792,6 @@ def record_frame(
             debug_execution_state.active_frame,
             debug_execution_state.common_candidates_per_frame,
             debug_execution_state.arm_display_candidates,
-            debug_execution_state.selected_keyframes,
         )
         renderer.update_robot_link_cameras()
         renderer.scene.update_render()

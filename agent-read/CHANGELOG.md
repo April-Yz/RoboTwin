@@ -18,3 +18,4 @@
 - Shrunk candidate IDs in AnyGrasp planner debug videos and removed background boxes.
 - Switched from marker-based left/right distinction to color-based distinction: blue for left, orange for right, red for selected.
 - Added a no-code reproduction guide at `code_painting/README_anygrasp_keyframe_planner_repro.md`.
+- Fixed a regression where debug execution video recording passed one extra argument into `update_candidate_debug_visuals`, causing runtime failure before planning started.
