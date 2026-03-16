@@ -29,3 +29,5 @@
 - Added manual AnyGrasp candidate overrides via repeated `--manual_candidate FRAME ARM CANDIDATE_IDX`. Partial overrides reorder and surface the chosen candidates for debug; complete two-keyframe overrides for one arm are used directly by the planner.
 
 - Shrunk the green common-candidate labels again in AnyGrasp debug outputs so first-keyframe manual inspection is less cluttered.
+
+- Changed the AnyGrasp planner viewer path so debug axes and candidate grippers remain visible persistently in a headed SAPIEN viewer instead of flashing for a single frame. Offscreen video output still hides them unless the debug video is being written.

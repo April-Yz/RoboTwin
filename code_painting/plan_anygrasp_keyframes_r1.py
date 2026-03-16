@@ -870,6 +870,7 @@ def record_frame(
     debug_visuals: Optional[DebugVisualBundle] = None,
     debug_execution_state: Optional[DebugExecutionState] = None,
 ) -> None:
+    viewer_active = bool(getattr(renderer, "viewer", None) is not None and not renderer.viewer.closed)
     if debug_visuals is not None:
         for actor in debug_visuals.keyframe_axis_actors.values():
             hide_actor(actor)
@@ -880,8 +881,21 @@ def record_frame(
             for actors in per_frame.values():
                 for actor in actors:
                     hide_actor(actor)
+        if debug_execution_state is not None:
+            for item in debug_execution_state.selected_keyframes:
+                actor = debug_visuals.keyframe_axis_actors.get(int(item.source_frame))
+                if actor is not None:
+                    set_actor_pose(actor, item.candidate.pose_world_wxyz)
+            update_candidate_debug_visuals(
+                debug_visuals,
+                debug_execution_state.active_frame,
+                debug_execution_state.common_candidates_per_frame,
+                debug_execution_state.arm_display_candidates,
+            )
     renderer.update_robot_link_cameras()
     renderer.scene.update_render()
+    if viewer_active:
+        renderer.viewer.render()
     head_rgb, _ = renderer.capture_camera(renderer.zed_camera)
     head_bgr = base.overlay_text(head_rgb, overlay_lines) if use_overlay else cv2.cvtColor(head_rgb, cv2.COLOR_RGB2BGR)
     head_writer.write(head_bgr)
@@ -890,16 +904,6 @@ def record_frame(
         third_bgr = base.overlay_text(third_rgb, overlay_lines) if use_overlay else cv2.cvtColor(third_rgb, cv2.COLOR_RGB2BGR)
         third_writer.write(third_bgr)
     if debug_execution_state is not None and debug_execution_state.writer is not None and debug_visuals is not None:
-        for item in debug_execution_state.selected_keyframes:
-            actor = debug_visuals.keyframe_axis_actors.get(int(item.source_frame))
-            if actor is not None:
-                set_actor_pose(actor, item.candidate.pose_world_wxyz)
-        update_candidate_debug_visuals(
-            debug_visuals,
-            debug_execution_state.active_frame,
-            debug_execution_state.common_candidates_per_frame,
-            debug_execution_state.arm_display_candidates,
-        )
         renderer.update_robot_link_cameras()
         renderer.scene.update_render()
         debug_overlay = list(overlay_lines)
@@ -927,6 +931,7 @@ def record_frame(
             debug_execution_state.selected_keyframes,
         )
         debug_execution_state.writer.write(debug_bgr)
+    if debug_visuals is not None and not viewer_active:
         for actors in debug_visuals.common_candidate_actors.values():
             for actor in actors:
                 hide_actor(actor)

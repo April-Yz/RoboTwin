@@ -45,3 +45,5 @@ Import-chain note:
 - The AnyGrasp keyframe planner now supports manual candidate overrides with `--manual_candidate FRAME ARM CANDIDATE_IDX`. This is intended for orientation debugging after reviewing `rank_previews/` still images.
 
 - First-keyframe-only manual inspection can be done by running the AnyGrasp planner with `--keyframes 1 1` together with manual candidate overrides. This keeps the workflow in a single-frame debug loop while preserving the existing viewer/video outputs.
+
+- In headed SAPIEN mode, the AnyGrasp planner now keeps keyframe axes and candidate gripper visuals persistent in the viewer for the current active keyframe. This makes orientation debugging possible directly in the simulator window instead of relying on single-frame flashes.
