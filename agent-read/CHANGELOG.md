@@ -15,6 +15,6 @@
 - Updated `code_painting/README_anygrasp_keyframe_planner.md` to document the left/right visualization markers.
 
 ### 2026-03-15
-- Added projected candidate IDs to AnyGrasp planner debug videos.
-- Switched left/right arm markers from white to black for better contrast on white backgrounds.
+- Shrunk candidate IDs in AnyGrasp planner debug videos and removed background boxes.
+- Switched from marker-based left/right distinction to color-based distinction: blue for left, orange for right, red for selected.
 - Added a no-code reproduction guide at `code_painting/README_anygrasp_keyframe_planner_repro.md`.

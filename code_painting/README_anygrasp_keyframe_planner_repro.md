@@ -105,12 +105,9 @@
 ### 编号
 现在每个候选都会画编号：
 - 绿色小编号 `12`: 表示原始候选 `candidate_idx=12`
-- `L12`: 表示左手排序结果里的 `candidate_idx=12`
-- `R12`: 表示右手排序结果里的 `candidate_idx=12`
-
-如果一个红色候选旁边写的是 `L12`，意思就是：
-- 最终选中的是左手候选
-- 对应 AnyGrasp 候选编号 12
+- 蓝色数字：左手排序结果里的候选编号
+- 橙色数字：右手排序结果里的候选编号
+- 红色数字：最终选中的候选编号
 
 ---
 
@@ -218,7 +215,7 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_r1_b
 ## 7. 现在最推荐的 debug 顺序
 
 1. 先看 `debug_selection_preview.mp4`
-   - 重点看绿色编号和 `Lxx/Rxx`
+   - 重点看绿色、蓝色、橙色、红色数字
    - 判断候选本身是否合理
 2. 再看 `debug_execution_preview.mp4`
    - 判断机器人是不是先到位再继续

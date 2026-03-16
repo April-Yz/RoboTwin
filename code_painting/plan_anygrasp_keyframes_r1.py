@@ -615,18 +615,11 @@ def project_world_point_to_image(
 
 def draw_small_candidate_label(image_bgr: np.ndarray, text: str, pixel_xy: Tuple[int, int], color_bgr: Tuple[int, int, int]) -> None:
     font = cv2.FONT_HERSHEY_SIMPLEX
-    font_scale = 0.35
+    font_scale = 0.28
     thickness = 1
-    (text_w, text_h), baseline = cv2.getTextSize(text, font, font_scale, thickness)
     x, y = int(pixel_xy[0]), int(pixel_xy[1])
-    x0 = max(x - 2, 0)
-    y0 = max(y - text_h - baseline - 4, 0)
-    x1 = min(x + text_w + 4, image_bgr.shape[1] - 1)
-    y1 = min(y + 2, image_bgr.shape[0] - 1)
-    cv2.rectangle(image_bgr, (x0, y0), (x1, y1), (255, 255, 255), thickness=-1)
-    cv2.rectangle(image_bgr, (x0, y0), (x1, y1), color_bgr, thickness=1)
-    cv2.putText(image_bgr, text, (x + 1, y - 2), font, font_scale, (255, 255, 255), thickness + 2, cv2.LINE_AA)
-    cv2.putText(image_bgr, text, (x + 1, y - 2), font, font_scale, (10, 10, 10), thickness, cv2.LINE_AA)
+    cv2.putText(image_bgr, text, (x, y), font, font_scale, (0, 0, 0), thickness + 1, cv2.LINE_AA)
+    cv2.putText(image_bgr, text, (x, y), font, font_scale, color_bgr, thickness, cv2.LINE_AA)
 
 
 def annotate_candidate_labels(
@@ -636,6 +629,7 @@ def annotate_candidate_labels(
     active_frame: Optional[int],
     common_candidates_per_frame: Dict[int, List[CandidatePose]],
     arm_display_candidates: Dict[str, Dict[int, List[CandidatePose]]],
+    selected_keyframes: List[SelectedKeyframe],
 ) -> None:
     if active_frame is None:
         return
@@ -644,27 +638,31 @@ def annotate_candidate_labels(
     height = int(image_bgr.shape[0])
     frame = int(active_frame)
 
+    selected_by_frame = {int(item.source_frame): (item.arm, int(item.candidate.candidate_idx)) for item in selected_keyframes}
+
     common_candidates = common_candidates_per_frame.get(frame, [])
     for cand in common_candidates:
         origin = np.asarray(cand.pose_world_wxyz[:3], dtype=np.float64)
         pixel = project_world_point_to_image(camera, intrinsic, origin, width, height)
         if pixel is None:
             continue
-        draw_small_candidate_label(image_bgr, str(int(cand.candidate_idx)), pixel, (0, 120, 0))
+        draw_small_candidate_label(image_bgr, str(int(cand.candidate_idx)), pixel, (0, 150, 0))
 
     arm_styles = {
-        "left": ((200, 80, 0), np.array([0.0, 0.0, 0.018], dtype=np.float64)),
-        "right": ((160, 0, 160), np.array([0.0, 0.0, -0.018], dtype=np.float64)),
+        "left": ((220, 120, 20), np.array([0.0, 0.0, 0.018], dtype=np.float64)),
+        "right": ((0, 140, 255), np.array([0.0, 0.0, -0.018], dtype=np.float64)),
     }
-    for arm_name, (border_color, local_offset) in arm_styles.items():
+    for arm_name, (label_color, local_offset) in arm_styles.items():
         frame_candidates = arm_display_candidates.get(arm_name, {}).get(frame, [])
+        selected_arm, selected_idx = selected_by_frame.get(frame, (None, None))
         for cand in frame_candidates:
             pose_world = np.asarray(cand.pose_world_matrix, dtype=np.float64)
             label_world = pose_world[:3, 3] + pose_world[:3, :3] @ local_offset
             pixel = project_world_point_to_image(camera, intrinsic, label_world, width, height)
             if pixel is None:
                 continue
-            draw_small_candidate_label(image_bgr, f"{arm_name[0].upper()}{int(cand.candidate_idx)}", pixel, border_color)
+            color = (0, 0, 255) if arm_name == selected_arm and int(cand.candidate_idx) == selected_idx else label_color
+            draw_small_candidate_label(image_bgr, str(int(cand.candidate_idx)), pixel, color)
 
 
 def build_display_candidates_per_frame(
@@ -720,7 +718,6 @@ def create_debug_visual_bundle(
     }
     arm_candidate_actors: Dict[str, Dict[int, List[sapien.Entity]]] = {}
     for arm_name, frame_candidates in arm_display_candidates.items():
-        marker_side = "left" if arm_name == "left" else "right"
         arm_candidate_actors[arm_name] = {}
         for frame in keyframes:
             frame = int(frame)
@@ -733,8 +730,8 @@ def create_debug_visual_bundle(
                     create_gripper_candidate_actor(
                         renderer.scene,
                         f"debug_{arm_name}_candidate_{frame}_{rank}",
-                        color=[1.0, 0.1, 0.1] if cand.candidate_idx == selected_idx else [0.15, 0.45, 1.0],
-                        marker_side=marker_side,
+                        color=[1.0, 0.1, 0.1] if cand.candidate_idx == selected_idx else ([0.1, 0.45, 1.0] if arm_name == "left" else [1.0, 0.55, 0.0]),
+                        marker_side="none",
                     )
                 )
             arm_candidate_actors[arm_name][frame] = actors
@@ -795,6 +792,7 @@ def record_frame(
             debug_execution_state.active_frame,
             debug_execution_state.common_candidates_per_frame,
             debug_execution_state.arm_display_candidates,
+            debug_execution_state.selected_keyframes,
         )
         renderer.update_robot_link_cameras()
         renderer.scene.update_render()
@@ -807,9 +805,8 @@ def record_frame(
                     if debug_execution_state.active_frame is not None
                     else "active_keyframe=none"
                 ),
-                "color=green:all blue:arm-top red:selected",
-                "marker=left:+black right:-black",
-                "labels=num=all Lnum=left Rnum=right",
+                "color=green:all blue:left orange:right red:selected",
+                "labels=small colored candidate_idx",
             ]
         )
         debug_rgb, _ = renderer.capture_camera(renderer.zed_camera)
@@ -1103,9 +1100,8 @@ def generate_debug_preview(
                         f"candidate_idx={selected.candidate.candidate_idx}",
                         f"rot_err={selected.candidate.rotation_distance_deg:.2f}deg",
                         f"all_candidates={len(common_candidates_per_frame.get(int(selected.source_frame), []))}",
-                        "color=green:all blue:arm-top red:selected",
-                        "marker=left:+black right:-black",
-                        "labels=num=all Lnum=left Rnum=right",
+                        "color=green:all blue:left orange:right red:selected",
+                        "labels=small colored candidate_idx",
                     ]
                 )
             else:
@@ -1127,6 +1123,7 @@ def generate_debug_preview(
                 int(selected.source_frame) if selected is not None else None,
                 common_candidates_per_frame,
                 arm_display_candidates,
+                selected_keyframes,
             )
             writer.write(debug_bgr)
     finally:
