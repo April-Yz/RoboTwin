@@ -20,6 +20,7 @@ eval_result/
 smoke-results/
 eval-test-decoder/
 results_regression_eval/
+results_posttrain_eval_step5000_fix*/
 
 # Code Generation
 assets/*

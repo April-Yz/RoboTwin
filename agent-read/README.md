@@ -29,3 +29,6 @@ This copy isolates RoboTwin-side evaluation changes needed by LingBot-VA without
 - The worktree now also provides `task_config/demo_clean_large_d435.yml`, which keeps the original `demo_clean` behavior but switches both head and wrist cameras to `Large_D435` (`640x480`).
 - `click_bell` has been smoke-tested end-to-end against the LingBot-VA websocket server with `test_num=1`, producing a successful run and result artifacts under ignored output directories.
 - On March 16, 2026, the LingBot action-only DSRL entry in the separate `lingbot-va` repo completed one full `click_bell` RoboTwin online episode against this worktree, emitted SAC metrics, and exited cleanly with zero task successes.
+- On March 16, 2026, this worktree also completed the first `place_can_basket` post-train LingBot smoke eval result against `checkpoint_step_5000`. The result was `0/1`, but the server-client-task pipeline completed and wrote metrics plus rollout artifacts instead of aborting during setup or planning.
+- `envs/_base_task.py` now converts missing grasp poses into ordinary planning failures instead of constructing `move` actions with `target_pose=None`.
+- `envs/place_can_basket.py` now fills `self.info["info"]` during `setup_demo(...)`, which keeps prompt generation available even when expert pre-check is disabled for smoke debugging.
