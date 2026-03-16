@@ -10,6 +10,7 @@ import torch
 import yaml
 import trimesh
 import math
+import warnings
 from .._GLOBAL_CONFIGS import CONFIGS_PATH
 import os
 from sapien.sensor import StereoDepthSensor, StereoDepthSensorConfig
@@ -33,11 +34,35 @@ try:
         return sampled_points, indices
 
 except:
-    print("missing pytorch3d")
+    warnings.warn(
+        "missing pytorch3d; falling back to a CPU farthest-point sampler",
+        RuntimeWarning,
+    )
 
     def fps(points, num_points=1024, use_cuda=True):
-        print("fps error: missing pytorch3d")
-        exit()
+        points = np.asarray(points)
+        if points.ndim != 2 or points.shape[1] != 3:
+            raise ValueError(f"fps expects shape [N, 3], got {points.shape}")
+
+        num_points = min(int(num_points), len(points))
+        if num_points <= 0 or len(points) == 0:
+            empty_idx = torch.zeros((1, 0), dtype=torch.long)
+            return points[:0], empty_idx
+
+        selected = np.empty(num_points, dtype=np.int64)
+        min_dist = np.full(len(points), np.inf, dtype=np.float64)
+
+        centroid = points.mean(axis=0)
+        farthest = int(np.argmax(np.sum((points - centroid)**2, axis=1)))
+
+        for i in range(num_points):
+            selected[i] = farthest
+            dist = np.sum((points - points[farthest])**2, axis=1)
+            min_dist = np.minimum(min_dist, dist)
+            farthest = int(np.argmax(min_dist))
+
+        indices = torch.from_numpy(selected[None, :])
+        return points[selected], indices
 
 
 class Camera:

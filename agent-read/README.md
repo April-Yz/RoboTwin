@@ -20,9 +20,11 @@ This copy isolates RoboTwin-side evaluation changes needed by LingBot-VA without
 - The environment was cloned from the existing `RoboTwin` conda environment into `RoboTwin-lingbot` and should be treated as the only editable RoboTwin environment for LingBot-VA work in this session.
 - On this machine, upstream `curobo` cannot be used as-is for evaluation because the local NVCC toolchain is CUDA 12.1 while the GPU is Blackwell (`sm_120`). `envs/robot/robot.py` and `envs/robot/planner.py` now fall back to `MplibPlanner` when `CuroboPlanner` import or build fails.
 - The fallback normalizes embodiment planner declarations like `"curobo"` to `"mplib_RRT"` and converts MPLib `TOPP` parameterization exceptions into ordinary planning failures so eval can continue instead of aborting the whole process.
+- `envs/camera/camera.py` now has a CPU farthest-point fallback when `pytorch3d` is unavailable, so RGB-based LingBot online runs no longer hard-exit on this host.
 
 ## Current Assumptions
 
 - RoboTwin assets can be reused from `/home/zaijia001/ssd/RoboTwin/assets` via local links in this worktree.
 - LingBot-VA should point its RoboTwin client code at `/home/zaijia001/vam/RoboTwin-lingbot`.
 - `click_bell` has been smoke-tested end-to-end against the LingBot-VA websocket server with `test_num=1`, producing a successful run and result artifacts under ignored output directories.
+- On March 16, 2026, the LingBot action-only DSRL entry in the separate `lingbot-va` repo completed one full `click_bell` RoboTwin online episode against this worktree, emitted SAC metrics, and exited cleanly with zero task successes.
