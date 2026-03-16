@@ -710,12 +710,17 @@ def project_world_point_to_image(
     return u, v
 
 
-def draw_small_candidate_label(image_bgr: np.ndarray, text: str, pixel_xy: Tuple[int, int], color_bgr: Tuple[int, int, int]) -> None:
+def draw_small_candidate_label(
+    image_bgr: np.ndarray,
+    text: str,
+    pixel_xy: Tuple[int, int],
+    color_bgr: Tuple[int, int, int],
+    font_scale: float = 0.20,
+) -> None:
     font = cv2.FONT_HERSHEY_SIMPLEX
-    font_scale = 0.20
     thickness = 1
     x, y = int(pixel_xy[0]), int(pixel_xy[1])
-    cv2.putText(image_bgr, text, (x, y), font, font_scale, color_bgr, thickness, cv2.LINE_AA)
+    cv2.putText(image_bgr, text, (x, y), font, float(font_scale), color_bgr, thickness, cv2.LINE_AA)
 
 
 def annotate_candidate_labels(
@@ -742,7 +747,7 @@ def annotate_candidate_labels(
         pixel = project_world_point_to_image(camera, intrinsic, origin, width, height)
         if pixel is None:
             continue
-        draw_small_candidate_label(image_bgr, str(int(cand.candidate_idx)), (pixel[0] + 2, pixel[1] - 2), (0, 150, 0))
+        draw_small_candidate_label(image_bgr, str(int(cand.candidate_idx)), (pixel[0] + 2, pixel[1] - 2), (0, 150, 0), font_scale=0.15)
 
     arm_styles = {
         "left": ((220, 120, 20), np.array([0.0, 0.0, 0.018], dtype=np.float64)),

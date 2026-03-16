@@ -43,3 +43,5 @@ Import-chain note:
 - The AnyGrasp keyframe planner now exports stable still-image previews for manual candidate selection. For each keyframe it can write rank-specific PNGs (`rank_previews/keyframe_<frame>_rank_<k>.png`) showing the left rank-k candidate in blue and the right rank-k candidate in orange. This is intended for cases where the interactive SAPIEN viewer cannot be created and the workflow must fall back to offscreen-only debugging.
 
 - The AnyGrasp keyframe planner now supports manual candidate overrides with `--manual_candidate FRAME ARM CANDIDATE_IDX`. This is intended for orientation debugging after reviewing `rank_previews/` still images.
+
+- First-keyframe-only manual inspection can be done by running the AnyGrasp planner with `--keyframes 1 1` together with manual candidate overrides. This keeps the workflow in a single-frame debug loop while preserving the existing viewer/video outputs.
