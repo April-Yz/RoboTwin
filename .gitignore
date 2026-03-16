@@ -19,6 +19,7 @@ task_config/
 eval_result/
 smoke-results/
 eval-test-decoder/
+results_regression_eval/
 
 # Code Generation
 assets/*
