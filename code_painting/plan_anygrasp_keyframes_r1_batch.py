@@ -54,6 +54,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--execute_interp_steps", type=int, default=24)
     parser.add_argument("--reach_pos_tol_m", type=float, default=0.03)
     parser.add_argument("--reach_rot_tol_deg", type=float, default=20.0)
+    parser.add_argument("--reach_error_pose_source", choices=["tcp", "ee"], default="tcp")
     parser.add_argument("--max_stage_replans", type=int, default=3)
     parser.add_argument("--replan_until_reached", type=int, default=0)
     parser.add_argument("--replan_until_reached_max_attempts", type=int, default=20)
@@ -178,6 +179,8 @@ def build_single_command(args: argparse.Namespace, anygrasp_dir: Path, replay_di
         str(args.reach_pos_tol_m),
         "--reach_rot_tol_deg",
         str(args.reach_rot_tol_deg),
+        "--reach_error_pose_source",
+        str(args.reach_error_pose_source),
         "--max_stage_replans",
         str(args.max_stage_replans),
         "--replan_until_reached",

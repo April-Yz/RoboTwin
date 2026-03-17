@@ -158,6 +158,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--execute_interp_steps", type=int, default=24)
     parser.add_argument("--reach_pos_tol_m", type=float, default=0.03)
     parser.add_argument("--reach_rot_tol_deg", type=float, default=20.0)
+    parser.add_argument("--reach_error_pose_source", choices=["tcp", "ee"], default="tcp", help="Which arm pose to use when computing reach error against the target.")
     parser.add_argument("--max_stage_replans", type=int, default=3)
     parser.add_argument("--replan_until_reached", type=int, default=0, help="If 1, keep replanning from the current state until the stage reaches tolerance or the extended attempt budget is exhausted.")
     parser.add_argument("--replan_until_reached_max_attempts", type=int, default=20)
@@ -978,6 +979,72 @@ def pose_with_offset_along_local_x(pose_world_wxyz: np.ndarray, offset_m: float)
     return np.concatenate([pose_world_matrix[:3, 3], quat]).astype(np.float64)
 
 
+def sapien_pose_to_wxyz(pose: sapien.Pose) -> np.ndarray:
+    return np.concatenate([np.asarray(pose.p, dtype=np.float64), np.asarray(pose.q, dtype=np.float64)]).astype(np.float64)
+
+
+def get_current_pose_for_error(renderer: ReplayRenderer, arm: str, pose_source: str) -> np.ndarray:
+    if renderer.robot is None:
+        raise RuntimeError("Robot is unavailable.")
+    if pose_source == "tcp":
+        return renderer.get_current_tcp_pose(arm)
+    if pose_source == "ee":
+        pose = renderer.robot.get_left_ee_pose() if arm == "left" else renderer.robot.get_right_ee_pose()
+        return np.asarray(pose, dtype=np.float64)
+    raise ValueError(f"Unsupported pose_source: {pose_source}")
+
+
+def target_pose_for_error(renderer: ReplayRenderer, arm: str, target_tcp_pose_world_wxyz: np.ndarray, pose_source: str) -> np.ndarray:
+    if renderer.robot is None:
+        raise RuntimeError("Robot is unavailable.")
+    target_tcp_pose_world_wxyz = np.asarray(target_tcp_pose_world_wxyz, dtype=np.float64).reshape(7)
+    if pose_source == "tcp":
+        return target_tcp_pose_world_wxyz
+    if pose_source == "ee":
+        target_pose_base = renderer.world_pose_to_base_pose(target_tcp_pose_world_wxyz)
+        target_pose_ee_base = renderer.robot._trans_from_gripper_to_endlink(target_pose_base.tolist(), arm_tag=arm)
+        base_world = base.pose_to_matrix(renderer._base_pose)
+        ee_base = base.pose_to_matrix(target_pose_ee_base)
+        ee_world = base_world @ ee_base
+        quat = base.quat_xyzw_to_wxyz(R.from_matrix(base.orthonormalize_rotation(ee_world[:3, :3])).as_quat())
+        return np.concatenate([ee_world[:3, 3], quat]).astype(np.float64)
+    raise ValueError(f"Unsupported pose_source: {pose_source}")
+
+
+def build_supervision_targets(
+    arm_display_candidates: Dict[str, Dict[int, List[CandidatePose]]],
+    selected_keyframes: List[SelectedKeyframe],
+) -> Dict[str, np.ndarray]:
+    targets: Dict[str, np.ndarray] = {}
+    active_frame = int(selected_keyframes[0].source_frame)
+    for arm_name, frame_map in arm_display_candidates.items():
+        frame_candidates = frame_map.get(active_frame, [])
+        if frame_candidates:
+            targets[arm_name] = np.asarray(frame_candidates[0].pose_world_wxyz, dtype=np.float64)
+    for item in selected_keyframes:
+        if int(item.source_frame) == active_frame:
+            targets[item.arm] = np.asarray(item.candidate.pose_world_wxyz, dtype=np.float64)
+    return targets
+
+
+def compute_supervision_errors(
+    renderer: ReplayRenderer,
+    supervision_targets: Dict[str, np.ndarray],
+    pose_source: str,
+) -> Dict[str, Dict[str, float]]:
+    errors: Dict[str, Dict[str, float]] = {}
+    for arm_name, target_pose in supervision_targets.items():
+        current_pose = get_current_pose_for_error(renderer, arm_name, pose_source)
+        target_eval_pose = target_pose_for_error(renderer, arm_name, target_pose, pose_source)
+        pos_err, rot_err = tcp_pose_errors(target_eval_pose, current_pose)
+        errors[arm_name] = {
+            "pose_source": pose_source,
+            "pos_err_m": float(pos_err),
+            "rot_err_deg": float(rot_err),
+        }
+    return errors
+
+
 def tcp_pose_errors(target_pose_world_wxyz: np.ndarray, current_pose_world_wxyz: np.ndarray) -> Tuple[float, float]:
     target_pose_world_wxyz = np.asarray(target_pose_world_wxyz, dtype=np.float64).reshape(7)
     current_pose_world_wxyz = np.asarray(current_pose_world_wxyz, dtype=np.float64).reshape(7)
@@ -1083,6 +1150,7 @@ def execute_stage_until_reached(
     target_visual_label: Optional[str] = None,
     debug_visuals: Optional[DebugVisualBundle] = None,
     debug_execution_state: Optional[DebugExecutionState] = None,
+    supervision_targets: Optional[Dict[str, np.ndarray]] = None,
 ) -> Dict[str, object]:
     last_status = "Missing"
     last_pos_err = float("inf")
@@ -1112,14 +1180,17 @@ def execute_stage_until_reached(
             target_visual_label=target_visual_label,
             debug_visuals=debug_visuals,
             debug_execution_state=debug_execution_state,
+            supervision_targets=supervision_targets,
         )
-        current_tcp = renderer.get_current_tcp_pose(arm)
-        last_pos_err, last_rot_err = tcp_pose_errors(target_pose_world_wxyz, current_tcp)
+        current_eval_pose = get_current_pose_for_error(renderer, arm, args.reach_error_pose_source)
+        target_eval_pose = target_pose_for_error(renderer, arm, target_pose_world_wxyz, args.reach_error_pose_source)
+        last_pos_err, last_rot_err = tcp_pose_errors(target_eval_pose, current_eval_pose)
         reached = (
             last_status == "Success"
             and last_pos_err <= float(args.reach_pos_tol_m)
             and last_rot_err <= float(args.reach_rot_tol_deg)
         )
+        supervision_errors = compute_supervision_errors(renderer, supervision_targets or {}, args.reach_error_pose_source) if supervision_targets else {}
         attempt_history.append(
             {
                 "attempt": attempt,
@@ -1127,6 +1198,7 @@ def execute_stage_until_reached(
                 "pos_err_m": last_pos_err,
                 "rot_err_deg": last_rot_err,
                 "reached": bool(reached),
+                "supervision_errors": supervision_errors,
             }
         )
         record_frame(
@@ -1141,6 +1213,7 @@ def execute_stage_until_reached(
                 f"pos_err={last_pos_err:.4f}m",
                 f"rot_err={last_rot_err:.2f}deg",
                 f"reached={int(reached)}",
+                *([f"right_sup_pos={supervision_errors['right']['pos_err_m']:.4f}m", f"right_sup_rot={supervision_errors['right']['rot_err_deg']:.2f}deg"] if "right" in supervision_errors and arm != "right" else []),
             ],
             use_overlay,
             debug_visuals,
@@ -1558,6 +1631,7 @@ def main() -> None:
         active_frame=None,
     )
     use_overlay = bool(args.overlay_text)
+    supervision_targets = build_supervision_targets(arm_display_candidates, selected_keyframes)
 
     try:
         grasp_pose = selected_keyframes[0].candidate.pose_world_wxyz
@@ -1595,6 +1669,7 @@ def main() -> None:
             target_visual_label=f"keyframe_{selected_keyframes[0].source_frame}",
             debug_visuals=debug_visuals,
             debug_execution_state=debug_execution_state,
+            supervision_targets=supervision_targets,
         )
 
         grasp_result = execute_stage_until_reached(
@@ -1610,6 +1685,7 @@ def main() -> None:
             target_visual_label=f"keyframe_{selected_keyframes[0].source_frame}",
             debug_visuals=debug_visuals,
             debug_execution_state=debug_execution_state,
+            supervision_targets=supervision_targets,
         )
 
         set_single_arm_target_visual(renderer, arm, grasp_pose)
@@ -1663,6 +1739,7 @@ def main() -> None:
         "selection_diagnostics": selection_result.diagnostics,
         "candidate_orientation_remap_label": args.candidate_orientation_remap_label,
         "candidate_post_rot_xyz_deg": args.candidate_post_rot_xyz_deg.tolist(),
+        "reach_error_pose_source": args.reach_error_pose_source,
         "manual_candidate_overrides": {arm: {str(frame): idx for frame, idx in frame_map.items()} for arm, frame_map in args.manual_candidate_overrides.items() if frame_map},
         "arm_debugs": {
             arm_name: {
@@ -1685,6 +1762,7 @@ def main() -> None:
             for arm_name, arm_info in arm_debugs.items()
         },
         "selected_object": primary_object_name,
+        "supervision_targets": {arm_name: target.tolist() for arm_name, target in supervision_targets.items()},
         "stages": {
             "pregrasp": pregrasp_result,
             "grasp": grasp_result,

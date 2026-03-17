@@ -35,3 +35,5 @@
 - Added per-candidate axis actors for the headed AnyGrasp viewer, so non-selected manual candidates now keep their own coordinate axes instead of showing only the gripper geometry.
 
 - Added `--replan_until_reached` and `--replan_until_reached_max_attempts` to the AnyGrasp planner. The stage executor can now keep replanning from the current state until the reach tolerance is met or an extended attempt budget is exhausted, and each stage records `attempt_history` in the summary for accuracy debugging.
+
+- Added `--reach_error_pose_source {tcp,ee}` to the AnyGrasp planner and stage summaries. Reach-error computation can now be switched between fingertip TCP and wrist/endlink space. The planner also records non-selected-arm supervision errors (for example the manually chosen right-hand candidate while executing the left hand) inside per-attempt histories.

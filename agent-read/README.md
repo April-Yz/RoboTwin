@@ -51,3 +51,5 @@ Import-chain note:
 - In headed AnyGrasp debug mode, each displayed left/right candidate now has its own coordinate axis actor. This avoids the previous behavior where only the selected arm kept an axis while the other manual candidate showed only the gripper mesh.
 
 - The AnyGrasp planner now supports an extended reach experiment mode via `--replan_until_reached 1`. This is meant for isolating whether poor execution accuracy comes from too few replanning iterations versus a deeper target-pose / orientation-conversion mismatch. Stage summaries now keep per-attempt error histories.
+
+- The AnyGrasp planner now separates execution-arm reach error from auxiliary supervision. You can choose `--reach_error_pose_source tcp` or `ee`, and the summary keeps supervision errors for the non-executed hand when manual candidates are provided for both sides. This is intended for debugging TCP-vs-wrist mismatches and missing right-hand reporting.
