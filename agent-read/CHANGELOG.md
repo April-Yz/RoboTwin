@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-03-18
+
+- Added `agent-read/env-setup-agent.md`, an agent-facing environment setup runbook for this workspace.
+
 ## 2026-03-14
 
 - Created the `RoboTwin-lingbot` worktree from the upstream `baseline` branch.
