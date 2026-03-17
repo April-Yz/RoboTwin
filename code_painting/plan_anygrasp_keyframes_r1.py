@@ -132,6 +132,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output_dir", type=Path, required=True, help="Output dir for planned demo video and metadata.")
     parser.add_argument("--keyframes", type=int, nargs=2, default=[1, 22], metavar=("GRASP_FRAME", "ACTION_FRAME"))
     parser.add_argument("--arm", choices=["auto", "left", "right"], default="auto")
+    parser.add_argument("--execute_both_arms", type=int, default=0, help="If 1 and --arm auto, execute synchronized dual-arm stages and advance only when both arms satisfy reach checks.")
     parser.add_argument("--planner_backend", choices=["urdfik", "curobo"], default="urdfik")
     parser.add_argument("--left_target_object", type=str, default="cup")
     parser.add_argument("--right_target_object", type=str, default="bottle")
@@ -163,6 +164,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--replan_until_reached", type=int, default=0, help="If 1, keep replanning from the current state until the stage reaches tolerance or the extended attempt budget is exhausted.")
     parser.add_argument("--replan_until_reached_max_attempts", type=int, default=20)
     parser.add_argument("--hold_frames_after_stage", type=int, default=2)
+    parser.add_argument("--init_prefix_frames", type=int, default=0, help="Emit fixed init-pose frames before moving to keyframe-1; useful for downstream trimming.")
     parser.add_argument("--save_debug_preview", type=int, default=1)
     parser.add_argument("--debug_preview_fps", type=int, default=10)
     parser.add_argument("--debug_keyframe_hold_frames", type=int, default=12)
@@ -1073,6 +1075,69 @@ def interpolate_joint_trajectory(position: np.ndarray, velocity: np.ndarray, num
     return out_pos_arr, out_vel_arr
 
 
+def apply_robot_init_pose(renderer: ReplayRenderer, open_gripper: float, settle_steps: int) -> Dict[str, object]:
+    left_init = getattr(renderer, "init_left_arm_joints", None)
+    right_init = getattr(renderer, "init_right_arm_joints", None)
+    init_gripper_open = getattr(renderer, "init_gripper_open", None)
+    if init_gripper_open is None:
+        init_gripper_open = float(open_gripper)
+
+    vel = np.zeros(6, dtype=np.float64)
+    left_applied = False
+    right_applied = False
+    if left_init is not None:
+        renderer.robot.set_arm_joints(np.asarray(left_init, dtype=np.float64).reshape(6), vel, "left")
+        left_applied = True
+    if right_init is not None:
+        renderer.robot.set_arm_joints(np.asarray(right_init, dtype=np.float64).reshape(6), vel, "right")
+        right_applied = True
+
+    if left_applied or right_applied:
+        renderer.step_scene(steps=max(int(settle_steps), 1))
+    renderer.set_grippers(float(init_gripper_open), float(init_gripper_open))
+    renderer.step_scene(steps=1)
+
+    return {
+        "left_applied": bool(left_applied),
+        "right_applied": bool(right_applied),
+        "left_joints": None if left_init is None else np.asarray(left_init, dtype=np.float64).reshape(6),
+        "right_joints": None if right_init is None else np.asarray(right_init, dtype=np.float64).reshape(6),
+        "gripper_open": float(init_gripper_open),
+    }
+
+
+def emit_init_prefix_frames(
+    renderer: ReplayRenderer,
+    head_writer: cv2.VideoWriter,
+    third_writer: Optional[cv2.VideoWriter],
+    use_overlay: bool,
+    init_info: Dict[str, object],
+    fixed_frames: int,
+    arm_label: str,
+    debug_visuals: Optional[DebugVisualBundle] = None,
+    debug_execution_state: Optional[DebugExecutionState] = None,
+) -> int:
+    total = max(int(fixed_frames), 0)
+    if total <= 0:
+        return 0
+    for idx in range(total):
+        record_frame(
+            renderer,
+            head_writer,
+            third_writer,
+            [
+                "stage=init_prefix",
+                f"arm={arm_label}",
+                f"fixed_frame={idx + 1}/{total}",
+                f"gripper_open={float(init_info['gripper_open']):.3f}",
+            ],
+            use_overlay,
+            debug_visuals,
+            debug_execution_state,
+        )
+    return total
+
+
 def execute_single_arm_plan(
     renderer: ReplayRenderer,
     arm: str,
@@ -1234,6 +1299,177 @@ def execute_stage_until_reached(
         "reached": False,
         "pos_err_m": last_pos_err,
         "rot_err_deg": last_rot_err,
+        "attempt_history": attempt_history,
+    }
+
+
+def execute_dual_arm_plan(
+    renderer: ReplayRenderer,
+    plans_by_arm: Dict[str, Optional[Dict]],
+    label: str,
+    head_writer: cv2.VideoWriter,
+    third_writer: Optional[cv2.VideoWriter],
+    use_overlay: bool,
+    execute_interp_steps: int = 24,
+    settle_steps: int = 4,
+    hold_frames_after_stage: int = 0,
+    debug_visuals: Optional[DebugVisualBundle] = None,
+    debug_execution_state: Optional[DebugExecutionState] = None,
+    attached_actor_by_arm: Optional[Dict[str, Optional[sapien.Entity]]] = None,
+    tcp_to_object_by_arm: Optional[Dict[str, Optional[np.ndarray]]] = None,
+) -> Dict[str, str]:
+    arms = [arm for arm in ("left", "right") if arm in plans_by_arm]
+    statuses: Dict[str, str] = {arm: renderer._plan_status(plans_by_arm.get(arm)) for arm in arms}
+    overlay_lines = [
+        f"stage={label}",
+        f"left_status={statuses.get('left', 'NA')}",
+        f"right_status={statuses.get('right', 'NA')}",
+    ]
+
+    trajectories: Dict[str, Tuple[np.ndarray, np.ndarray]] = {}
+    max_steps = 0
+    for arm in arms:
+        if statuses[arm] != "Success":
+            continue
+        plan = plans_by_arm[arm]
+        position = np.asarray(plan["position"], dtype=np.float64)
+        velocity = np.asarray(plan["velocity"], dtype=np.float64)
+        position, velocity = interpolate_joint_trajectory(position, velocity, execute_interp_steps)
+        trajectories[arm] = (position, velocity)
+        max_steps = max(max_steps, int(position.shape[0]))
+
+    if max_steps <= 0:
+        record_frame(renderer, head_writer, third_writer, overlay_lines, use_overlay, debug_visuals, debug_execution_state)
+        return statuses
+
+    for step_idx in range(max_steps):
+        for arm in arms:
+            if arm not in trajectories:
+                continue
+            position, velocity = trajectories[arm]
+            local_idx = min(step_idx, int(position.shape[0]) - 1)
+            renderer.robot.set_arm_joints(position[local_idx], velocity[local_idx], arm)
+        for arm in arms:
+            actor = None if attached_actor_by_arm is None else attached_actor_by_arm.get(arm)
+            tcp_to_object = None if tcp_to_object_by_arm is None else tcp_to_object_by_arm.get(arm)
+            if actor is not None and tcp_to_object is not None:
+                tcp_pose = renderer.get_current_tcp_pose(arm)
+                object_world = pose_wxyz_to_matrix(tcp_pose) @ tcp_to_object
+                quat = base.quat_xyzw_to_wxyz(R.from_matrix(object_world[:3, :3]).as_quat())
+                set_actor_pose(actor, np.concatenate([object_world[:3, 3], quat]))
+        renderer.step_scene(steps=1)
+        record_frame(
+            renderer,
+            head_writer,
+            third_writer,
+            overlay_lines + [f"plan_step={step_idx + 1}/{max_steps}"],
+            use_overlay,
+            debug_visuals,
+            debug_execution_state,
+        )
+
+    renderer.step_scene(steps=max(int(settle_steps), 0))
+    record_frame(renderer, head_writer, third_writer, overlay_lines + ["plan_step=done"], use_overlay, debug_visuals, debug_execution_state)
+    for hold_idx in range(max(int(hold_frames_after_stage), 0)):
+        record_frame(
+            renderer,
+            head_writer,
+            third_writer,
+            overlay_lines + [f"hold={hold_idx + 1}/{hold_frames_after_stage}"],
+            use_overlay,
+            debug_visuals,
+            debug_execution_state,
+        )
+    return statuses
+
+
+def execute_dual_stage_until_reached(
+    renderer: ReplayRenderer,
+    target_pose_world_wxyz_by_arm: Dict[str, np.ndarray],
+    label: str,
+    head_writer: cv2.VideoWriter,
+    third_writer: Optional[cv2.VideoWriter],
+    use_overlay: bool,
+    args: argparse.Namespace,
+    debug_visuals: Optional[DebugVisualBundle] = None,
+    debug_execution_state: Optional[DebugExecutionState] = None,
+    attached_actor_by_arm: Optional[Dict[str, Optional[sapien.Entity]]] = None,
+    tcp_to_object_by_arm: Optional[Dict[str, Optional[np.ndarray]]] = None,
+) -> Dict[str, object]:
+    arms = [arm for arm in ("left", "right") if arm in target_pose_world_wxyz_by_arm]
+    max_attempts = max(int(args.max_stage_replans), 1)
+    if bool(args.replan_until_reached):
+        max_attempts = max(max_attempts, int(args.replan_until_reached_max_attempts))
+
+    attempt_history: List[Dict[str, object]] = []
+    last_arm_metrics: Dict[str, Dict[str, object]] = {}
+    for attempt in range(1, max_attempts + 1):
+        plans_by_arm: Dict[str, Optional[Dict]] = {
+            arm: renderer.plan_path(arm, target_pose_world_wxyz_by_arm[arm]) for arm in arms
+        }
+        statuses = execute_dual_arm_plan(
+            renderer=renderer,
+            plans_by_arm=plans_by_arm,
+            label=f"{label}_try{attempt}",
+            head_writer=head_writer,
+            third_writer=third_writer,
+            use_overlay=use_overlay,
+            execute_interp_steps=args.execute_interp_steps,
+            settle_steps=args.settle_steps,
+            hold_frames_after_stage=args.hold_frames_after_stage,
+            debug_visuals=debug_visuals,
+            debug_execution_state=debug_execution_state,
+            attached_actor_by_arm=attached_actor_by_arm,
+            tcp_to_object_by_arm=tcp_to_object_by_arm,
+        )
+
+        arm_metrics: Dict[str, Dict[str, object]] = {}
+        for arm in arms:
+            current_eval_pose = get_current_pose_for_error(renderer, arm, args.reach_error_pose_source)
+            target_eval_pose = target_pose_for_error(renderer, arm, target_pose_world_wxyz_by_arm[arm], args.reach_error_pose_source)
+            pos_err, rot_err = tcp_pose_errors(target_eval_pose, current_eval_pose)
+            reached = (
+                statuses.get(arm, "Missing") == "Success"
+                and pos_err <= float(args.reach_pos_tol_m)
+                and rot_err <= float(args.reach_rot_tol_deg)
+            )
+            arm_metrics[arm] = {
+                "status": statuses.get(arm, "Missing"),
+                "pos_err_m": float(pos_err),
+                "rot_err_deg": float(rot_err),
+                "reached": bool(reached),
+            }
+
+        stage_reached = all(bool(arm_metrics[arm]["reached"]) for arm in arms)
+        attempt_history.append(
+            {
+                "attempt": attempt,
+                "arms": arm_metrics,
+                "reached": bool(stage_reached),
+            }
+        )
+
+        overlay_lines = [
+            f"stage={label}",
+            f"attempt={attempt}/{max_attempts}",
+            f"left_reached={int(arm_metrics.get('left', {}).get('reached', False))}",
+            f"right_reached={int(arm_metrics.get('right', {}).get('reached', False))}",
+            f"both_reached={int(stage_reached)}",
+        ]
+        record_frame(renderer, head_writer, third_writer, overlay_lines, use_overlay, debug_visuals, debug_execution_state)
+        last_arm_metrics = arm_metrics
+        if stage_reached:
+            return {
+                "attempts": attempt,
+                "reached": True,
+                "arms": arm_metrics,
+                "attempt_history": attempt_history,
+            }
+
+    return {
+        "attempts": max_attempts,
+        "reached": False,
+        "arms": last_arm_metrics,
         "attempt_history": attempt_history,
     }
 
@@ -1547,6 +1783,17 @@ def main() -> None:
 
     arm = selected_keyframes[0].arm
     primary_object_name = selected_keyframes[0].candidate.nearest_object
+    execution_sequences: List[Tuple[str, List[SelectedKeyframe]]] = [(arm, selected_keyframes)]
+    if bool(args.execute_both_arms) and args.arm == "auto":
+        for candidate_arm in ("left", "right"):
+            if candidate_arm == arm:
+                continue
+            candidate_info = arm_debugs.get(candidate_arm)
+            if candidate_info is None or candidate_info.selected_keyframes is None:
+                continue
+            execution_sequences.append((candidate_arm, candidate_info.selected_keyframes))
+    if bool(args.execute_both_arms) and len(execution_sequences) < 2:
+        print("[exec-mode] execute_both_arms=1 but only one arm has valid selected keyframes; falling back to single-arm execution")
     debug_visuals = create_debug_visual_bundle(
         renderer,
         args,
@@ -1630,96 +1877,290 @@ def main() -> None:
         active_frame=None,
     )
     use_overlay = bool(args.overlay_text)
-    supervision_targets = build_supervision_targets(arm_display_candidates, selected_keyframes)
+    dual_sync_mode = bool(args.execute_both_arms) and args.arm == "auto" and len(execution_sequences) >= 2
+    stages_by_executed_arm: Dict[str, Dict[str, object]] = {}
+    supervision_targets_by_executed_arm: Dict[str, Dict[str, np.ndarray]] = {}
+    supervision_only_arms_by_executed_arm: Dict[str, List[str]] = {}
+    selected_candidates_by_executed_arm: Dict[str, List[SelectedKeyframe]] = {}
+    selected_objects_by_executed_arm: Dict[str, str] = {}
+    init_pose_info_by_executed_arm: Dict[str, Dict[str, object]] = {}
+    init_prefix_frames_written_by_executed_arm: Dict[str, int] = {}
 
     try:
-        grasp_pose = selected_keyframes[0].candidate.pose_world_wxyz
-        pregrasp_pose = pose_with_offset_along_local_x(grasp_pose, args.approach_offset_m)
-        action_pose = selected_keyframes[1].candidate.pose_world_wxyz
-        debug_execution_state.active_frame = int(selected_keyframes[0].source_frame)
-        set_single_arm_target_visual(renderer, arm, grasp_pose)
-        record_frame(
-            renderer,
-            head_writer,
-            third_writer,
-            [
-                "stage=init",
-                f"arm={arm}",
-                f"object={primary_object_name}",
-                f"goal=keyframe_{selected_keyframes[0].source_frame}",
-                f"selected_f1_candidate={selected_keyframes[0].candidate.candidate_idx}",
-                f"selected_f22_candidate={selected_keyframes[1].candidate.candidate_idx}",
-            ],
-            use_overlay,
-            debug_visuals,
-            debug_execution_state,
-        )
+        if dual_sync_mode:
+            exec_selected_by_arm = {arm_name: seq for arm_name, seq in execution_sequences[:2]}
+            dual_arms = [arm_name for arm_name in ("left", "right") if arm_name in exec_selected_by_arm]
+            for arm_name in dual_arms:
+                seq = exec_selected_by_arm[arm_name]
+                selected_objects_by_executed_arm[arm_name] = seq[0].candidate.nearest_object
+                selected_candidates_by_executed_arm[arm_name] = list(seq)
+                supervision_targets_by_executed_arm[arm_name] = {
+                    "left": np.asarray(exec_selected_by_arm["left"][0].candidate.pose_world_wxyz, dtype=np.float64),
+                    "right": np.asarray(exec_selected_by_arm["right"][0].candidate.pose_world_wxyz, dtype=np.float64),
+                }
+                supervision_only_arms_by_executed_arm[arm_name] = []
 
-        pregrasp_result = execute_stage_until_reached(
-            renderer=renderer,
-            arm=arm,
-            target_pose_world_wxyz=pregrasp_pose,
-            label="pregrasp",
-            head_writer=head_writer,
-            third_writer=third_writer,
-            use_overlay=use_overlay,
-            args=args,
-            target_visual_pose=grasp_pose,
-            target_visual_label=f"keyframe_{selected_keyframes[0].source_frame}",
-            debug_visuals=debug_visuals,
-            debug_execution_state=debug_execution_state,
-            supervision_targets=supervision_targets,
-        )
+            debug_execution_state.selected_keyframes = exec_selected_by_arm[dual_arms[0]]
+            print("[exec-mode] selected_arm=both supervision_only_arms=none")
 
-        grasp_result = execute_stage_until_reached(
-            renderer=renderer,
-            arm=arm,
-            target_pose_world_wxyz=grasp_pose,
-            label="grasp",
-            head_writer=head_writer,
-            third_writer=third_writer,
-            use_overlay=use_overlay,
-            args=args,
-            target_visual_pose=grasp_pose,
-            target_visual_label=f"keyframe_{selected_keyframes[0].source_frame}",
-            debug_visuals=debug_visuals,
-            debug_execution_state=debug_execution_state,
-            supervision_targets=supervision_targets,
-        )
+            init_info = apply_robot_init_pose(renderer, open_gripper=args.open_gripper, settle_steps=args.settle_steps)
+            init_pose_info_by_executed_arm["left"] = init_info
+            init_pose_info_by_executed_arm["right"] = init_info
+            init_prefix_written = emit_init_prefix_frames(
+                renderer=renderer,
+                head_writer=head_writer,
+                third_writer=third_writer,
+                use_overlay=use_overlay,
+                init_info=init_info,
+                fixed_frames=args.init_prefix_frames,
+                arm_label="both",
+                debug_visuals=debug_visuals,
+                debug_execution_state=debug_execution_state,
+            )
+            init_prefix_frames_written_by_executed_arm["left"] = int(init_prefix_written)
+            init_prefix_frames_written_by_executed_arm["right"] = int(init_prefix_written)
+            renderer.set_grippers(args.open_gripper, args.open_gripper)
 
-        set_single_arm_target_visual(renderer, arm, grasp_pose)
-        renderer.set_grippers(args.close_gripper if arm == "left" else None, args.close_gripper if arm == "right" else None)
-        record_frame(
-            renderer,
-            head_writer,
-            third_writer,
-            ["stage=close_gripper", f"arm={arm}", f"goal=keyframe_{selected_keyframes[0].source_frame}"],
-            use_overlay,
-            debug_visuals,
-            debug_execution_state,
-        )
+            record_frame(
+                renderer,
+                head_writer,
+                third_writer,
+                [
+                    "stage=init",
+                    "arm=both",
+                    f"left_object={selected_objects_by_executed_arm['left']}",
+                    f"right_object={selected_objects_by_executed_arm['right']}",
+                    f"left_goal_frame={exec_selected_by_arm['left'][0].source_frame}",
+                    f"right_goal_frame={exec_selected_by_arm['right'][0].source_frame}",
+                ],
+                use_overlay,
+                debug_visuals,
+                debug_execution_state,
+            )
 
-        attached_actor = object_states[primary_object_name].actor
-        tcp_pose = renderer.get_current_tcp_pose(arm)
-        tcp_to_object = np.linalg.inv(pose_wxyz_to_matrix(tcp_pose)) @ object_states[primary_object_name].pose_world_matrix
+            pregrasp_targets = {
+                arm_name: pose_with_offset_along_local_x(seq[0].candidate.pose_world_wxyz, args.approach_offset_m)
+                for arm_name, seq in exec_selected_by_arm.items()
+            }
+            grasp_targets = {arm_name: seq[0].candidate.pose_world_wxyz for arm_name, seq in exec_selected_by_arm.items()}
+            action_targets = {arm_name: seq[1].candidate.pose_world_wxyz for arm_name, seq in exec_selected_by_arm.items()}
 
-        debug_execution_state.active_frame = int(selected_keyframes[1].source_frame)
-        action_result = execute_stage_until_reached(
-            renderer=renderer,
-            arm=arm,
-            target_pose_world_wxyz=action_pose,
-            label="action",
-            head_writer=head_writer,
-            third_writer=third_writer,
-            use_overlay=use_overlay,
-            args=args,
-            attached_actor=attached_actor,
-            tcp_to_object=tcp_to_object,
-            target_visual_pose=action_pose,
-            target_visual_label=f"keyframe_{selected_keyframes[1].source_frame}",
-            debug_visuals=debug_visuals,
-            debug_execution_state=debug_execution_state,
-        )
+            debug_execution_state.active_frame = int(exec_selected_by_arm["left"][0].source_frame)
+            pregrasp_dual = execute_dual_stage_until_reached(
+                renderer=renderer,
+                target_pose_world_wxyz_by_arm=pregrasp_targets,
+                label="pregrasp",
+                head_writer=head_writer,
+                third_writer=third_writer,
+                use_overlay=use_overlay,
+                args=args,
+                debug_visuals=debug_visuals,
+                debug_execution_state=debug_execution_state,
+            )
+
+            debug_execution_state.active_frame = int(exec_selected_by_arm["left"][0].source_frame)
+            grasp_dual = execute_dual_stage_until_reached(
+                renderer=renderer,
+                target_pose_world_wxyz_by_arm=grasp_targets,
+                label="grasp",
+                head_writer=head_writer,
+                third_writer=third_writer,
+                use_overlay=use_overlay,
+                args=args,
+                debug_visuals=debug_visuals,
+                debug_execution_state=debug_execution_state,
+            )
+
+            renderer.set_grippers(args.close_gripper, args.close_gripper)
+            record_frame(
+                renderer,
+                head_writer,
+                third_writer,
+                ["stage=close_gripper", "arm=both"],
+                use_overlay,
+                debug_visuals,
+                debug_execution_state,
+            )
+
+            attached_actor_by_arm: Dict[str, Optional[sapien.Entity]] = {}
+            tcp_to_object_by_arm: Dict[str, Optional[np.ndarray]] = {}
+            for arm_name in dual_arms:
+                obj_name = selected_objects_by_executed_arm[arm_name]
+                attached_actor_by_arm[arm_name] = object_states[obj_name].actor
+                tcp_pose = renderer.get_current_tcp_pose(arm_name)
+                tcp_to_object_by_arm[arm_name] = np.linalg.inv(pose_wxyz_to_matrix(tcp_pose)) @ object_states[obj_name].pose_world_matrix
+
+            debug_execution_state.active_frame = int(exec_selected_by_arm["left"][1].source_frame)
+            action_dual = execute_dual_stage_until_reached(
+                renderer=renderer,
+                target_pose_world_wxyz_by_arm=action_targets,
+                label="action",
+                head_writer=head_writer,
+                third_writer=third_writer,
+                use_overlay=use_overlay,
+                args=args,
+                debug_visuals=debug_visuals,
+                debug_execution_state=debug_execution_state,
+                attached_actor_by_arm=attached_actor_by_arm,
+                tcp_to_object_by_arm=tcp_to_object_by_arm,
+            )
+
+            for arm_name in dual_arms:
+                stages_by_executed_arm[arm_name] = {
+                    "pregrasp": {
+                        "status": str(pregrasp_dual["arms"][arm_name]["status"]),
+                        "attempts": int(pregrasp_dual["attempts"]),
+                        "reached": bool(pregrasp_dual["arms"][arm_name]["reached"]),
+                        "pos_err_m": float(pregrasp_dual["arms"][arm_name]["pos_err_m"]),
+                        "rot_err_deg": float(pregrasp_dual["arms"][arm_name]["rot_err_deg"]),
+                        "attempt_history": pregrasp_dual["attempt_history"],
+                    },
+                    "grasp": {
+                        "status": str(grasp_dual["arms"][arm_name]["status"]),
+                        "attempts": int(grasp_dual["attempts"]),
+                        "reached": bool(grasp_dual["arms"][arm_name]["reached"]),
+                        "pos_err_m": float(grasp_dual["arms"][arm_name]["pos_err_m"]),
+                        "rot_err_deg": float(grasp_dual["arms"][arm_name]["rot_err_deg"]),
+                        "attempt_history": grasp_dual["attempt_history"],
+                    },
+                    "action": {
+                        "status": str(action_dual["arms"][arm_name]["status"]),
+                        "attempts": int(action_dual["attempts"]),
+                        "reached": bool(action_dual["arms"][arm_name]["reached"]),
+                        "pos_err_m": float(action_dual["arms"][arm_name]["pos_err_m"]),
+                        "rot_err_deg": float(action_dual["arms"][arm_name]["rot_err_deg"]),
+                        "attempt_history": action_dual["attempt_history"],
+                    },
+                }
+        else:
+            for exec_arm, exec_selected_keyframes in execution_sequences:
+                exec_object_name = exec_selected_keyframes[0].candidate.nearest_object
+                selected_objects_by_executed_arm[exec_arm] = exec_object_name
+                selected_candidates_by_executed_arm[exec_arm] = list(exec_selected_keyframes)
+                debug_execution_state.selected_keyframes = exec_selected_keyframes
+
+                init_info = apply_robot_init_pose(renderer, open_gripper=args.open_gripper, settle_steps=args.settle_steps)
+                init_pose_info_by_executed_arm[exec_arm] = init_info
+                init_prefix_frames_written_by_executed_arm[exec_arm] = int(
+                    emit_init_prefix_frames(
+                        renderer=renderer,
+                        head_writer=head_writer,
+                        third_writer=third_writer,
+                        use_overlay=use_overlay,
+                        init_info=init_info,
+                        fixed_frames=args.init_prefix_frames,
+                        arm_label=exec_arm,
+                        debug_visuals=debug_visuals,
+                        debug_execution_state=debug_execution_state,
+                    )
+                )
+
+                supervision_targets = build_supervision_targets(arm_display_candidates, exec_selected_keyframes)
+                supervision_targets_by_executed_arm[exec_arm] = supervision_targets
+                supervision_only_arms = sorted([name for name in supervision_targets.keys() if name != exec_arm])
+                supervision_only_arms_by_executed_arm[exec_arm] = supervision_only_arms
+                print(
+                    f"[exec-mode] selected_arm={exec_arm} "
+                    f"supervision_only_arms={supervision_only_arms if supervision_only_arms else 'none'}"
+                )
+
+                renderer.set_grippers(
+                    args.open_gripper if exec_arm == "left" else None,
+                    args.open_gripper if exec_arm == "right" else None,
+                )
+
+                grasp_pose = exec_selected_keyframes[0].candidate.pose_world_wxyz
+                pregrasp_pose = pose_with_offset_along_local_x(grasp_pose, args.approach_offset_m)
+                action_pose = exec_selected_keyframes[1].candidate.pose_world_wxyz
+                debug_execution_state.active_frame = int(exec_selected_keyframes[0].source_frame)
+                set_single_arm_target_visual(renderer, exec_arm, grasp_pose)
+                record_frame(
+                    renderer,
+                    head_writer,
+                    third_writer,
+                    [
+                        "stage=init",
+                        f"arm={exec_arm}",
+                        f"object={exec_object_name}",
+                        f"goal=keyframe_{exec_selected_keyframes[0].source_frame}",
+                        f"selected_f1_candidate={exec_selected_keyframes[0].candidate.candidate_idx}",
+                        f"selected_f22_candidate={exec_selected_keyframes[1].candidate.candidate_idx}",
+                    ],
+                    use_overlay,
+                    debug_visuals,
+                    debug_execution_state,
+                )
+
+                pregrasp_result = execute_stage_until_reached(
+                    renderer=renderer,
+                    arm=exec_arm,
+                    target_pose_world_wxyz=pregrasp_pose,
+                    label="pregrasp",
+                    head_writer=head_writer,
+                    third_writer=third_writer,
+                    use_overlay=use_overlay,
+                    args=args,
+                    target_visual_pose=grasp_pose,
+                    target_visual_label=f"keyframe_{exec_selected_keyframes[0].source_frame}",
+                    debug_visuals=debug_visuals,
+                    debug_execution_state=debug_execution_state,
+                    supervision_targets=supervision_targets,
+                )
+
+                grasp_result = execute_stage_until_reached(
+                    renderer=renderer,
+                    arm=exec_arm,
+                    target_pose_world_wxyz=grasp_pose,
+                    label="grasp",
+                    head_writer=head_writer,
+                    third_writer=third_writer,
+                    use_overlay=use_overlay,
+                    args=args,
+                    target_visual_pose=grasp_pose,
+                    target_visual_label=f"keyframe_{exec_selected_keyframes[0].source_frame}",
+                    debug_visuals=debug_visuals,
+                    debug_execution_state=debug_execution_state,
+                    supervision_targets=supervision_targets,
+                )
+
+                set_single_arm_target_visual(renderer, exec_arm, grasp_pose)
+                renderer.set_grippers(args.close_gripper if exec_arm == "left" else None, args.close_gripper if exec_arm == "right" else None)
+                record_frame(
+                    renderer,
+                    head_writer,
+                    third_writer,
+                    ["stage=close_gripper", f"arm={exec_arm}", f"goal=keyframe_{exec_selected_keyframes[0].source_frame}"],
+                    use_overlay,
+                    debug_visuals,
+                    debug_execution_state,
+                )
+
+                attached_actor = object_states[exec_object_name].actor
+                tcp_pose = renderer.get_current_tcp_pose(exec_arm)
+                tcp_to_object = np.linalg.inv(pose_wxyz_to_matrix(tcp_pose)) @ object_states[exec_object_name].pose_world_matrix
+
+                debug_execution_state.active_frame = int(exec_selected_keyframes[1].source_frame)
+                action_result = execute_stage_until_reached(
+                    renderer=renderer,
+                    arm=exec_arm,
+                    target_pose_world_wxyz=action_pose,
+                    label="action",
+                    head_writer=head_writer,
+                    third_writer=third_writer,
+                    use_overlay=use_overlay,
+                    args=args,
+                    attached_actor=attached_actor,
+                    tcp_to_object=tcp_to_object,
+                    target_visual_pose=action_pose,
+                    target_visual_label=f"keyframe_{exec_selected_keyframes[1].source_frame}",
+                    debug_visuals=debug_visuals,
+                    debug_execution_state=debug_execution_state,
+                )
+                stages_by_executed_arm[exec_arm] = {
+                    "pregrasp": pregrasp_result,
+                    "grasp": grasp_result,
+                    "action": action_result,
+                }
     finally:
         head_writer.release()
         if third_writer is not None:
@@ -1728,17 +2169,27 @@ def main() -> None:
             debug_execution_writer.release()
         renderer.update_target_axis_visuals(None, None)
 
+    primary_exec_arm = execution_sequences[0][0]
+    primary_exec_selected_keyframes = execution_sequences[0][1]
+    primary_object_name = selected_objects_by_executed_arm[primary_exec_arm]
+    primary_stages = stages_by_executed_arm[primary_exec_arm]
+    primary_supervision_targets = supervision_targets_by_executed_arm[primary_exec_arm]
+    primary_supervision_only_arms = supervision_only_arms_by_executed_arm[primary_exec_arm]
+
     summary = {
         "anygrasp_dir": str(args.anygrasp_dir),
         "replay_dir": str(args.replay_dir),
         "hand_npz": str(args.hand_npz),
         "keyframes": keyframes,
-        "selected_arm": arm,
+        "selected_arm": primary_exec_arm,
         "expected_object_for_selected_arm": selection_result.expected_object,
         "selection_diagnostics": selection_result.diagnostics,
         "candidate_orientation_remap_label": args.candidate_orientation_remap_label,
         "candidate_post_rot_xyz_deg": args.candidate_post_rot_xyz_deg.tolist(),
         "reach_error_pose_source": args.reach_error_pose_source,
+        "init_prefix_frames": int(args.init_prefix_frames),
+        "execute_both_arms": int(args.execute_both_arms),
+        "execution_mode": "dual_sync" if dual_sync_mode else "single_or_sequential",
         "manual_candidate_overrides": {arm: {str(frame): idx for frame, idx in frame_map.items()} for arm, frame_map in args.manual_candidate_overrides.items() if frame_map},
         "arm_debugs": {
             arm_name: {
@@ -1761,12 +2212,28 @@ def main() -> None:
             for arm_name, arm_info in arm_debugs.items()
         },
         "selected_object": primary_object_name,
-        "supervision_targets": {arm_name: target.tolist() for arm_name, target in supervision_targets.items()},
-        "stages": {
-            "pregrasp": pregrasp_result,
-            "grasp": grasp_result,
-            "action": action_result,
+        "selected_objects_by_executed_arm": selected_objects_by_executed_arm,
+        "executed_arms": [item[0] for item in execution_sequences],
+        "supervision_only_arms": primary_supervision_only_arms,
+        "supervision_only_arms_by_executed_arm": supervision_only_arms_by_executed_arm,
+        "supervision_targets": {arm_name: target.tolist() for arm_name, target in primary_supervision_targets.items()},
+        "supervision_targets_by_executed_arm": {
+            arm_name: {target_arm: target.tolist() for target_arm, target in targets.items()}
+            for arm_name, targets in supervision_targets_by_executed_arm.items()
         },
+        "init_pose_by_executed_arm": {
+            arm_name: {
+                "left_applied": bool(info["left_applied"]),
+                "right_applied": bool(info["right_applied"]),
+                "left_joints": None if info["left_joints"] is None else np.asarray(info["left_joints"], dtype=np.float64).reshape(6).tolist(),
+                "right_joints": None if info["right_joints"] is None else np.asarray(info["right_joints"], dtype=np.float64).reshape(6).tolist(),
+                "gripper_open": float(info["gripper_open"]),
+            }
+            for arm_name, info in init_pose_info_by_executed_arm.items()
+        },
+        "init_prefix_frames_written_by_executed_arm": init_prefix_frames_written_by_executed_arm,
+        "stages": primary_stages,
+        "stages_by_executed_arm": stages_by_executed_arm,
         "selected_candidates": [
             {
                 "source_frame": item.source_frame,
@@ -1783,8 +2250,29 @@ def main() -> None:
                 "rotation_cam": item.candidate.rotation_cam.tolist(),
                 "hand_rotation_cam": item.hand_rotation_cam.tolist(),
             }
-            for item in selected_keyframes
+            for item in primary_exec_selected_keyframes
         ],
+        "selected_candidates_by_executed_arm": {
+            arm_name: [
+                {
+                    "source_frame": item.source_frame,
+                    "arm": item.arm,
+                    "candidate_idx": item.candidate.candidate_idx,
+                    "score": item.candidate.score,
+                    "rotation_distance_deg": item.candidate.rotation_distance_deg,
+                    "nearest_object": item.candidate.nearest_object,
+                    "nearest_object_distance_m": item.candidate.nearest_object_distance_m,
+                    "width_m": item.candidate.width_m,
+                    "depth_m": item.candidate.depth_m,
+                    "pose_world_wxyz": item.candidate.pose_world_wxyz.tolist(),
+                    "translation_cam": item.candidate.translation_cam.tolist(),
+                    "rotation_cam": item.candidate.rotation_cam.tolist(),
+                    "hand_rotation_cam": item.hand_rotation_cam.tolist(),
+                }
+                for item in candidates
+            ]
+            for arm_name, candidates in selected_candidates_by_executed_arm.items()
+        },
         "top_candidates_per_keyframe": {
             str(frame): [
                 {
@@ -1837,10 +2325,10 @@ def main() -> None:
 
     print(
         "[done] "
-        f"arm={arm} object={primary_object_name} "
-        f"selected_f{selected_keyframes[0].source_frame}=candidate_{selected_keyframes[0].candidate.candidate_idx} "
-        f"selected_f{selected_keyframes[1].source_frame}=candidate_{selected_keyframes[1].candidate.candidate_idx} "
-        f"statuses={summary['stages']} "
+        f"executed_arms={summary['executed_arms']} primary_arm={primary_exec_arm} object={primary_object_name} "
+        f"selected_f{primary_exec_selected_keyframes[0].source_frame}=candidate_{primary_exec_selected_keyframes[0].candidate.candidate_idx} "
+        f"selected_f{primary_exec_selected_keyframes[1].source_frame}=candidate_{primary_exec_selected_keyframes[1].candidate.candidate_idx} "
+        f"statuses_by_arm={summary['stages_by_executed_arm']} "
         f"head_video={head_video_path}"
     )
     renderer.hold_viewer()

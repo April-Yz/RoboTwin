@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## 2026-03-17
+
+- Investigated why right hand appears not to reach target in AnyGrasp keyframe videos while left hand does.
+- Confirmed from code path and summary semantics that current stage execution is single-arm; non-selected arm is supervision-only.
+- Updated `plan_anygrasp_keyframes_r1.py` to export explicit execution-mode metadata in `plan_summary.json`:
+  - `executed_arms`
+  - `supervision_only_arms`
+- Added runtime log line `[exec-mode] selected_arm=... supervision_only_arms=...` to reduce ambiguity during debugging.
+- Added analysis note at `agent-read/2026-03-17_right_hand_supervision_analysis/README.md`.
+- Added versioned documentation note `agent-read/V1.4_anygrasp_execution_mode_supervision.md`.
+- Added `--execute_both_arms` to AnyGrasp planner and batch wrapper. With `--arm auto --execute_both_arms 1`, both arms are executed sequentially and each arm gets independent stage reach results in `stages_by_executed_arm`.
+- Added dual-arm analysis note `agent-read/2026-03-17_dual_arm_execution/README.md` and versioned record `agent-read/V1.5_anygrasp_dual_arm_execution.md`.
+- Updated the above dual-arm feature to synchronized stage execution: each stage now plans/executes both arms together and only advances when both arms reach tolerance (or retries are exhausted).
+- Added init-pose start support in `plan_anygrasp_keyframes_r1.py`: execution now explicitly re-applies renderer init joints before stage planning, and `--init_prefix_frames N` can emit the first N frames as fixed init-pose frames for easier post-trim/deletion.
+
 ## 2026-03-12
 
 ### AnyGrasp planner debug visualization

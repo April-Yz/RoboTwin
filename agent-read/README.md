@@ -53,3 +53,19 @@ Import-chain note:
 - The AnyGrasp planner now supports an extended reach experiment mode via `--replan_until_reached 1`. This is meant for isolating whether poor execution accuracy comes from too few replanning iterations versus a deeper target-pose / orientation-conversion mismatch. Stage summaries now keep per-attempt error histories.
 
 - The AnyGrasp planner now separates execution-arm reach error from auxiliary supervision. You can choose `--reach_error_pose_source tcp` or `ee`, and the summary keeps supervision errors for the non-executed hand when manual candidates are provided for both sides. This is intended for debugging TCP-vs-wrist mismatches and missing right-hand reporting.
+
+- Added explicit execution-mode metadata for AnyGrasp stage runs: `executed_arms` and `supervision_only_arms` in `plan_summary.json`, plus an `[exec-mode]` runtime log line. This makes it explicit that the non-selected hand in single-arm runs is supervision-only and not actuated.
+
+- Added a focused investigation note for the right-hand non-arrival question at `agent-read/2026-03-17_right_hand_supervision_analysis/README.md`.
+
+- Versioned record for this behavior clarification: `agent-read/V1.4_anygrasp_execution_mode_supervision.md`.
+
+- Added dual-arm synchronized stage execution mode for AnyGrasp planning via `--execute_both_arms` (with `--arm auto`). In each stage both arms are planned/executed together, and transition requires both sides to satisfy reach tolerance.
+
+- Detailed investigation note for this change: `agent-read/2026-03-17_dual_arm_execution/README.md`.
+
+- Versioned note for this feature: `agent-read/V1.5_anygrasp_dual_arm_execution.md`.
+
+- Added init-pose prefix execution support in `plan_anygrasp_keyframes_r1.py`: before moving to keyframe-1, the planner now re-applies renderer init joints and can emit fixed init frames via `--init_prefix_frames N` for downstream trimming.
+
+- Versioned note for this update: `agent-read/V1.6_anygrasp_init_prefix.md`.
