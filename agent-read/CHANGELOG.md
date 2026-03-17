@@ -33,3 +33,5 @@
 - Changed the AnyGrasp planner viewer path so debug axes and candidate grippers remain visible persistently in a headed SAPIEN viewer instead of flashing for a single frame. Offscreen video output still hides them unless the debug video is being written.
 
 - Added per-candidate axis actors for the headed AnyGrasp viewer, so non-selected manual candidates now keep their own coordinate axes instead of showing only the gripper geometry.
+
+- Added `--replan_until_reached` and `--replan_until_reached_max_attempts` to the AnyGrasp planner. The stage executor can now keep replanning from the current state until the reach tolerance is met or an extended attempt budget is exhausted, and each stage records `attempt_history` in the summary for accuracy debugging.

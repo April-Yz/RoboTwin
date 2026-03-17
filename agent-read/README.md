@@ -49,3 +49,5 @@ Import-chain note:
 - In headed SAPIEN mode, the AnyGrasp planner now keeps keyframe axes and candidate gripper visuals persistent in the viewer for the current active keyframe. This makes orientation debugging possible directly in the simulator window instead of relying on single-frame flashes.
 
 - In headed AnyGrasp debug mode, each displayed left/right candidate now has its own coordinate axis actor. This avoids the previous behavior where only the selected arm kept an axis while the other manual candidate showed only the gripper mesh.
+
+- The AnyGrasp planner now supports an extended reach experiment mode via `--replan_until_reached 1`. This is meant for isolating whether poor execution accuracy comes from too few replanning iterations versus a deeper target-pose / orientation-conversion mismatch. Stage summaries now keep per-attempt error histories.

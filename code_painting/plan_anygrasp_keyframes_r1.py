@@ -159,6 +159,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--reach_pos_tol_m", type=float, default=0.03)
     parser.add_argument("--reach_rot_tol_deg", type=float, default=20.0)
     parser.add_argument("--max_stage_replans", type=int, default=3)
+    parser.add_argument("--replan_until_reached", type=int, default=0, help="If 1, keep replanning from the current state until the stage reaches tolerance or the extended attempt budget is exhausted.")
+    parser.add_argument("--replan_until_reached_max_attempts", type=int, default=20)
     parser.add_argument("--hold_frames_after_stage", type=int, default=2)
     parser.add_argument("--save_debug_preview", type=int, default=1)
     parser.add_argument("--debug_preview_fps", type=int, default=10)
@@ -1086,7 +1088,11 @@ def execute_stage_until_reached(
     last_pos_err = float("inf")
     last_rot_err = float("inf")
     attempts = 0
-    for attempt in range(1, max(int(args.max_stage_replans), 1) + 1):
+    attempt_history = []
+    max_attempts = max(int(args.max_stage_replans), 1)
+    if bool(args.replan_until_reached):
+        max_attempts = max(max_attempts, int(args.replan_until_reached_max_attempts))
+    for attempt in range(1, max_attempts + 1):
         attempts = attempt
         plan = renderer.plan_path(arm, target_pose_world_wxyz)
         last_status = execute_single_arm_plan(
@@ -1114,6 +1120,15 @@ def execute_stage_until_reached(
             and last_pos_err <= float(args.reach_pos_tol_m)
             and last_rot_err <= float(args.reach_rot_tol_deg)
         )
+        attempt_history.append(
+            {
+                "attempt": attempt,
+                "status": last_status,
+                "pos_err_m": last_pos_err,
+                "rot_err_deg": last_rot_err,
+                "reached": bool(reached),
+            }
+        )
         record_frame(
             renderer,
             head_writer,
@@ -1121,7 +1136,7 @@ def execute_stage_until_reached(
             [
                 f"stage={label}",
                 f"arm={arm}",
-                f"attempt={attempt}/{args.max_stage_replans}",
+                f"attempt={attempt}/{max_attempts}",
                 f"status={last_status}",
                 f"pos_err={last_pos_err:.4f}m",
                 f"rot_err={last_rot_err:.2f}deg",
@@ -1138,6 +1153,7 @@ def execute_stage_until_reached(
                 "reached": True,
                 "pos_err_m": last_pos_err,
                 "rot_err_deg": last_rot_err,
+                "attempt_history": attempt_history,
             }
 
     return {
@@ -1146,6 +1162,7 @@ def execute_stage_until_reached(
         "reached": False,
         "pos_err_m": last_pos_err,
         "rot_err_deg": last_rot_err,
+        "attempt_history": attempt_history,
     }
 
 
