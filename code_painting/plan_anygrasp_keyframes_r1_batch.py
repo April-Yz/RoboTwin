@@ -26,6 +26,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ids", type=str, nargs="*", default=None, help="Optional subset ids like 1 4 22.")
     parser.add_argument("--keyframes", type=int, nargs=2, default=[1, 22], metavar=("GRASP_FRAME", "ACTION_FRAME"))
     parser.add_argument("--arm", choices=["auto", "left", "right"], default="auto")
+    parser.add_argument("--execute_both_arms", type=int, default=0)
     parser.add_argument("--planner_backend", choices=["urdfik", "curobo"], default="urdfik")
     parser.add_argument("--left_target_object", type=str, default="cup")
     parser.add_argument("--right_target_object", type=str, default="bottle")
@@ -59,6 +60,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--replan_until_reached", type=int, default=0)
     parser.add_argument("--replan_until_reached_max_attempts", type=int, default=20)
     parser.add_argument("--hold_frames_after_stage", type=int, default=2)
+    parser.add_argument("--init_prefix_frames", type=int, default=0)
     parser.add_argument("--save_debug_preview", type=int, default=1)
     parser.add_argument("--debug_preview_fps", type=int, default=10)
     parser.add_argument("--debug_keyframe_hold_frames", type=int, default=12)
@@ -130,6 +132,8 @@ def build_single_command(args: argparse.Namespace, anygrasp_dir: Path, replay_di
         *(str(v) for v in args.keyframes),
         "--arm",
         str(args.arm),
+        "--execute_both_arms",
+        str(args.execute_both_arms),
         "--planner_backend",
         str(args.planner_backend),
         "--left_target_object",
@@ -189,6 +193,8 @@ def build_single_command(args: argparse.Namespace, anygrasp_dir: Path, replay_di
         str(args.replan_until_reached_max_attempts),
         "--hold_frames_after_stage",
         str(args.hold_frames_after_stage),
+        "--init_prefix_frames",
+        str(args.init_prefix_frames),
         "--save_debug_preview",
         str(args.save_debug_preview),
         "--debug_preview_fps",
