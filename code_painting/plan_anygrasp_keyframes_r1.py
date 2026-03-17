@@ -1180,7 +1180,6 @@ def execute_stage_until_reached(
             target_visual_label=target_visual_label,
             debug_visuals=debug_visuals,
             debug_execution_state=debug_execution_state,
-            supervision_targets=supervision_targets,
         )
         current_eval_pose = get_current_pose_for_error(renderer, arm, args.reach_error_pose_source)
         target_eval_pose = target_pose_for_error(renderer, arm, target_pose_world_wxyz, args.reach_error_pose_source)
