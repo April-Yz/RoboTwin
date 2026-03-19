@@ -22,6 +22,8 @@ Only stages 2, 4, and 5 are implemented in this repo. Stages 1 and 3 are upstrea
 - Object/FoundationPose replay pipeline (ZH): [V1.7_object_pipeline_ZH.md](/home/zaijia001/ssd/RoboTwin/agent-read/V1.7_object_pipeline_ZH.md)
 - AnyGrasp candidate and execution pipeline: [V1.7_anygrasp_pipeline.md](/home/zaijia001/ssd/RoboTwin/agent-read/V1.7_anygrasp_pipeline.md)
 - AnyGrasp candidate and execution pipeline (ZH): [V1.7_anygrasp_pipeline_ZH.md](/home/zaijia001/ssd/RoboTwin/agent-read/V1.7_anygrasp_pipeline_ZH.md)
+- Command log: [V1.8_command_log.md](/home/zaijia001/ssd/RoboTwin/agent-read/V1.8_command_log.md)
+- Command log (ZH): [V1.8_command_log_ZH.md](/home/zaijia001/ssd/RoboTwin/agent-read/V1.8_command_log_ZH.md)
 
 ## Current State
 
@@ -42,3 +44,5 @@ Only stages 2, 4, and 5 are implemented in this repo. Stages 1 and 3 are upstrea
 - `code_painting/README_anygrasp_orientation_check.md` records the current orientation-conversion investigation for AnyGrasp.
 - `code_painting/replay_r1_h5.py` and `envs/robot/robot.py` were adjusted so `urdfik` workflows do not import `curobo` eagerly during robot construction.
 - In dual-arm AnyGrasp execution, selected keyframe target axes are now tracked per `(frame, arm)` so both hands can keep visible selected targets in the headed viewer during synchronized stage execution.
+- In execution-mode debug rendering, only the currently active keyframe target pair should remain visible; future keyframe targets are hidden until they become active.
+- `code_painting/render_anygrasp_ranked_preview.py` can generate direct AnyGrasp annotated images without starting RoboTwin.

@@ -745,7 +745,9 @@ def annotate_candidate_labels(
     height = int(image_bgr.shape[0])
     frame = int(active_frame)
 
-    selected_by_frame = {int(item.source_frame): (item.arm, int(item.candidate.candidate_idx)) for item in selected_keyframes}
+    selected_by_frame_and_arm = {
+        (int(item.source_frame), item.arm): int(item.candidate.candidate_idx) for item in selected_keyframes
+    }
 
     common_candidates = common_candidates_per_frame.get(frame, [])
     for cand in common_candidates:
@@ -761,15 +763,25 @@ def annotate_candidate_labels(
     }
     for arm_name, (label_color, local_offset) in arm_styles.items():
         frame_candidates = arm_display_candidates.get(arm_name, {}).get(frame, [])
-        selected_arm, selected_idx = selected_by_frame.get(frame, (None, None))
+        selected_idx = selected_by_frame_and_arm.get((frame, arm_name))
         for cand in frame_candidates:
             pose_world = np.asarray(cand.pose_world_matrix, dtype=np.float64)
             label_world = pose_world[:3, 3] + pose_world[:3, :3] @ local_offset
             pixel = project_world_point_to_image(camera, intrinsic, label_world, width, height)
             if pixel is None:
                 continue
-            color = (0, 0, 255) if arm_name == selected_arm and int(cand.candidate_idx) == selected_idx else label_color
+            color = (0, 0, 255) if selected_idx is not None and int(cand.candidate_idx) == selected_idx else label_color
             draw_small_candidate_label(image_bgr, str(int(cand.candidate_idx)), (pixel[0] + 2, pixel[1] - 2), color)
+
+
+def selected_keyframes_for_active_frame(
+    selected_keyframes: Sequence[SelectedKeyframe],
+    active_frame: Optional[int],
+) -> List[SelectedKeyframe]:
+    if active_frame is None:
+        return []
+    frame = int(active_frame)
+    return [item for item in selected_keyframes if int(item.source_frame) == frame]
 
 
 def build_display_candidates_per_frame(
@@ -916,7 +928,10 @@ def record_frame(
                 for actor in actors:
                     hide_actor(actor)
         if debug_execution_state is not None:
-            for item in debug_execution_state.selected_keyframes:
+            for item in selected_keyframes_for_active_frame(
+                debug_execution_state.selected_keyframes,
+                debug_execution_state.active_frame,
+            ):
                 actor = debug_visuals.keyframe_axis_actors.get((int(item.source_frame), item.arm))
                 if actor is not None:
                     set_actor_pose(actor, item.candidate.pose_world_wxyz)
@@ -962,7 +977,10 @@ def record_frame(
             debug_execution_state.active_frame,
             debug_execution_state.common_candidates_per_frame,
             debug_execution_state.arm_display_candidates,
-            debug_execution_state.selected_keyframes,
+            selected_keyframes_for_active_frame(
+                debug_execution_state.selected_keyframes,
+                debug_execution_state.active_frame,
+            ),
         )
         debug_execution_state.writer.write(debug_bgr)
     if debug_visuals is not None and not viewer_active:

@@ -2,6 +2,12 @@
 
 ## 2026-03-19
 
+- Added command-oriented documentation in:
+  - `agent-read/V1.8_command_log.md`
+  - `agent-read/V1.8_command_log_ZH.md`
+- Added a dated debug note `agent-read/2026-03-19_current_target_only_and_raw_preview/README.md` covering:
+  - current-target-only execution visualization
+  - direct AnyGrasp raw preview generation without RoboTwin
 - Added a consolidated workflow documentation set for `code_painting/`:
   - `agent-read/V1.7_pipeline_index.md`
   - `agent-read/V1.7_hand_pipeline.md`
@@ -16,6 +22,8 @@
   - `agent-read/V1.7_anygrasp_pipeline_ZH.md`
 - Investigated the gap between a successful single-keyframe dual-arm AnyGrasp run and a weaker two-keyframe run. Recorded the findings in `agent-read/2026-03-19_two_keyframe_dual_arm_debug/README.md`.
 - Fixed dual-arm AnyGrasp target visualization so selected keyframe axes are tracked per `(frame, arm)` instead of per `frame`, and dual-arm execution now keeps both arms' selected keyframes active in the debug viewer.
+- Tightened execution debug rendering so only the currently active keyframe's selected axes are shown; later keyframe targets are hidden until their stage becomes active.
+- Added `code_painting/render_anygrasp_ranked_preview.py`, a non-RoboTwin preview tool that annotates AnyGrasp's own `vis/grasp_result_*.png` with `candidate_idx` labels while separating left/right outputs and preserving raw-score rank order.
 
 ## 2026-03-17
 
