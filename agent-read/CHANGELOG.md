@@ -86,3 +86,5 @@
 - Validation: `python -m py_compile code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_anygrasp_keyframes_r1_batch.py`
 - Added `--object_mesh_override NAME=/abs/path/to/mesh.obj` to the AnyGrasp planner and batch wrapper so broken replay meshes can be swapped at runtime without regenerating `multi_object_world_poses.npz`. This is intended for cases like `cup.obj` whose `.mtl` references invalid texture paths.
 - Validation: `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_anygrasp_keyframes_r1_batch.py`
+- Added `--save_pose_debug` and `--pose_debug_print_frames` to `render_multi_object_pose_r1_npz.py`. Multi-object replay can now dump per-frame `robot_base_pose_world_wxyz`, `head_camera_pose_world_wxyz`, left/right TCP poses, raw object `pose_cam_matrix`, and converted object `pose_world_wxyz` into `pose_debug.jsonl` for coordinate-frame debugging.
+- Validation: `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/render_multi_object_pose_r1_npz.py`

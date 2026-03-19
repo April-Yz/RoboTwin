@@ -108,6 +108,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--enable_viewer", type=int, default=0)
     parser.add_argument("--viewer_frame_delay", type=float, default=0.0)
     parser.add_argument("--viewer_wait_at_end", type=int, default=0)
+    parser.add_argument("--save_pose_debug", type=int, default=0, help="If 1, dump per-frame object/camera/robot poses to pose_debug.jsonl.")
+    parser.add_argument("--pose_debug_print_frames", type=int, default=3, help="How many initial frames to also print to stdout when --save_pose_debug=1.")
     parser.add_argument("--disable_table", type=int, default=1)
     parser.add_argument("--need_topp", type=int, default=0)
     parser.add_argument("--lighting_mode", choices=["default", "front", "front_no_shadow"], default="default")
@@ -163,6 +165,13 @@ def set_actor_pose(actor: sapien.Entity, pose_world: Optional[np.ndarray]) -> No
     actor.set_pose(sapien.Pose(pose_world[:3], base.normalize_quat_wxyz(pose_world[3:])))
 
 
+def pose_to_list(pose: sapien.Pose) -> List[float]:
+    return (
+        np.asarray(pose.p, dtype=np.float64).reshape(3).tolist()
+        + base.normalize_quat_wxyz(np.asarray(pose.q, dtype=np.float64).reshape(4)).tolist()
+    )
+
+
 def main() -> None:
     args = parse_args()
     args.input_dir = args.input_dir.resolve()
@@ -170,6 +179,10 @@ def main() -> None:
     args.robot_config = args.robot_config.resolve()
     args.output_dir.mkdir(parents=True, exist_ok=True)
     object_mesh_overrides = parse_object_mesh_overrides(args.object)
+    if bool(args.save_pose_debug):
+        pose_debug_path = args.output_dir / "pose_debug.jsonl"
+        if pose_debug_path.exists():
+            pose_debug_path.unlink()
 
     if not args.robot_config.is_file():
         raise FileNotFoundError(f"Robot config not found: {args.robot_config}")
@@ -269,11 +282,14 @@ def main() -> None:
     try:
         for replay_idx, source_frame in enumerate(selected_source_frames):
             visible_names = []
+            debug_objects = []
             for entry in object_entries:
                 pose_world = None
                 npz_idx = entry.frame_to_npz_index.get(int(source_frame))
+                pose_cam_matrix = None
                 if npz_idx is not None:
-                    pose_world = camera_pose_matrix_to_world_pose(renderer, entry.poses_cam[npz_idx])
+                    pose_cam_matrix = np.asarray(entry.poses_cam[npz_idx], dtype=np.float64).reshape(4, 4)
+                    pose_world = camera_pose_matrix_to_world_pose(renderer, pose_cam_matrix)
                     entry.last_pose_world = pose_world.copy()
                 elif args.missing_frame_policy == "hold_last":
                     pose_world = None if entry.last_pose_world is None else entry.last_pose_world.copy()
@@ -286,6 +302,15 @@ def main() -> None:
                     entry.aligned_pose_world.append(np.asarray(pose_world, dtype=np.float64))
                 else:
                     entry.aligned_pose_world.append(np.full(7, np.nan, dtype=np.float64))
+                debug_objects.append(
+                    {
+                        "name": entry.name,
+                        "npz_idx": None if npz_idx is None else int(npz_idx),
+                        "visible": bool(visible),
+                        "pose_cam_matrix": None if pose_cam_matrix is None else pose_cam_matrix.tolist(),
+                        "pose_world_wxyz": None if pose_world is None else np.asarray(pose_world, dtype=np.float64).tolist(),
+                    }
+                )
 
             renderer.update_robot_link_cameras()
             renderer.step_scene(steps=1)
@@ -295,6 +320,29 @@ def main() -> None:
                 f"replay_step={replay_idx + 1}/{len(selected_source_frames)}",
                 f"visible={','.join(visible_names) if visible_names else 'none'}",
             ]
+
+            if bool(args.save_pose_debug):
+                head_pose = renderer.get_head_camera_pose()
+                debug_record = {
+                    "source_frame": int(source_frame),
+                    "replay_step": int(replay_idx + 1),
+                    "robot_base_pose_world_wxyz": None if getattr(renderer, "_base_pose", None) is None else pose_to_list(renderer._base_pose),
+                    "head_camera_pose_world_wxyz": pose_to_list(head_pose),
+                    "left_tcp_pose_world_wxyz": np.asarray(renderer.get_current_tcp_pose("left"), dtype=np.float64).tolist(),
+                    "right_tcp_pose_world_wxyz": np.asarray(renderer.get_current_tcp_pose("right"), dtype=np.float64).tolist(),
+                    "objects": debug_objects,
+                }
+                with (args.output_dir / "pose_debug.jsonl").open("a", encoding="utf-8") as f:
+                    f.write(json.dumps(debug_record, ensure_ascii=False) + "\n")
+                if replay_idx < max(int(args.pose_debug_print_frames), 0):
+                    print(
+                        "[pose-debug] "
+                        f"source_frame={int(source_frame)} "
+                        f"head_world={np.round(np.asarray(debug_record['head_camera_pose_world_wxyz'][:3], dtype=np.float64), 4).tolist()} "
+                        f"left_tcp={np.round(np.asarray(debug_record['left_tcp_pose_world_wxyz'][:3], dtype=np.float64), 4).tolist()} "
+                        f"right_tcp={np.round(np.asarray(debug_record['right_tcp_pose_world_wxyz'][:3], dtype=np.float64), 4).tolist()} "
+                        f"objects={[{'name': item['name'], 'world_xyz': None if item['pose_world_wxyz'] is None else np.round(np.asarray(item['pose_world_wxyz'][:3], dtype=np.float64), 4).tolist()} for item in debug_objects]}"
+                    )
 
             head_rgb, head_depth_mm = renderer.capture_camera(renderer.zed_camera)
             head_bgr = base.overlay_text(head_rgb, overlay_lines) if use_overlay else cv2.cvtColor(head_rgb, cv2.COLOR_RGB2BGR)
