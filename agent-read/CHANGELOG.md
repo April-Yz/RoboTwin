@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## 2026-03-19
+
+- Added a consolidated workflow documentation set for `code_painting/`:
+  - `agent-read/V1.7_pipeline_index.md`
+  - `agent-read/V1.7_hand_pipeline.md`
+  - `agent-read/V1.7_object_pipeline.md`
+  - `agent-read/V1.7_anygrasp_pipeline.md`
+- Updated `agent-read/README.md` so the repo overview now points to the end-to-end pipeline docs instead of only the AnyGrasp planner notes.
+- Documented the current project boundary explicitly: hand extraction and FoundationPose extraction are upstream producers; RoboTwin starts from their outputs and handles replay, export, visualization, and execution.
+
 ## 2026-03-17
 
 - Investigated why right hand appears not to reach target in AnyGrasp keyframe videos while left hand does.
