@@ -7,6 +7,7 @@ import argparse
 import json
 import os
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
@@ -165,6 +166,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--replan_until_reached_max_attempts", type=int, default=20)
     parser.add_argument("--hold_frames_after_stage", type=int, default=2)
     parser.add_argument("--init_prefix_frames", type=int, default=0, help="Emit fixed init-pose frames before moving to keyframe-1; useful for downstream trimming.")
+    parser.add_argument("--pause_after_keyframe1_seconds", type=float, default=0.0, help="After reaching keyframe-1 and closing the gripper, hold the robot at that pose for N seconds before planning/executing the next target.")
     parser.add_argument("--save_debug_preview", type=int, default=1)
     parser.add_argument("--debug_preview_fps", type=int, default=10)
     parser.add_argument("--debug_keyframe_hold_frames", type=int, default=12)
@@ -1501,6 +1503,44 @@ def execute_dual_stage_until_reached(
     }
 
 
+def pause_after_keyframe1(
+    renderer: ReplayRenderer,
+    head_writer: cv2.VideoWriter,
+    third_writer: Optional[cv2.VideoWriter],
+    use_overlay: bool,
+    args: argparse.Namespace,
+    arm_label: str,
+    goal_frame: int,
+    debug_visuals: Optional[DebugVisualBundle] = None,
+    debug_execution_state: Optional[DebugExecutionState] = None,
+) -> int:
+    seconds = max(float(args.pause_after_keyframe1_seconds), 0.0)
+    if seconds <= 0.0:
+        return 0
+    num_frames = max(int(round(seconds * float(args.fps))), 1)
+    viewer_sleep = max(float(args.viewer_frame_delay), 0.0)
+    print(f"[stage] reached keyframe_{int(goal_frame)} arm={arm_label}; pausing for {seconds:.2f}s before next target")
+    for pause_idx in range(num_frames):
+        record_frame(
+            renderer,
+            head_writer,
+            third_writer,
+            [
+                "stage=pause_after_keyframe1",
+                f"arm={arm_label}",
+                f"goal=keyframe_{int(goal_frame)}",
+                f"pause_frame={pause_idx + 1}/{num_frames}",
+                f"pause_seconds={seconds:.2f}",
+            ],
+            use_overlay,
+            debug_visuals,
+            debug_execution_state,
+        )
+        if viewer_sleep > 0.0:
+            time.sleep(viewer_sleep)
+    return num_frames
+
+
 def update_candidate_debug_visuals(
     debug_visuals: DebugVisualBundle,
     active_frame: Optional[int],
@@ -2008,6 +2048,11 @@ def main() -> None:
                 debug_visuals=debug_visuals,
                 debug_execution_state=debug_execution_state,
             )
+            print(
+                "[stage] keyframe_1 grasp finished "
+                f"left_reached={int(bool(grasp_dual['arms'].get('left', {}).get('reached', False)))} "
+                f"right_reached={int(bool(grasp_dual['arms'].get('right', {}).get('reached', False)))}"
+            )
 
             renderer.set_grippers(args.close_gripper, args.close_gripper)
             record_frame(
@@ -2018,6 +2063,17 @@ def main() -> None:
                 use_overlay,
                 debug_visuals,
                 debug_execution_state,
+            )
+            pause_after_keyframe1(
+                renderer=renderer,
+                head_writer=head_writer,
+                third_writer=third_writer,
+                use_overlay=use_overlay,
+                args=args,
+                arm_label="both",
+                goal_frame=int(exec_selected_by_arm["left"][0].source_frame),
+                debug_visuals=debug_visuals,
+                debug_execution_state=debug_execution_state,
             )
 
             attached_actor_by_arm: Dict[str, Optional[sapien.Entity]] = {}
@@ -2165,6 +2221,10 @@ def main() -> None:
                     debug_execution_state=debug_execution_state,
                     supervision_targets=supervision_targets,
                 )
+                print(
+                    "[stage] keyframe_1 grasp finished "
+                    f"arm={exec_arm} reached={int(bool(grasp_result.get('reached', False)))}"
+                )
 
                 set_single_arm_target_visual(renderer, exec_arm, grasp_pose)
                 renderer.set_grippers(args.close_gripper if exec_arm == "left" else None, args.close_gripper if exec_arm == "right" else None)
@@ -2176,6 +2236,17 @@ def main() -> None:
                     use_overlay,
                     debug_visuals,
                     debug_execution_state,
+                )
+                pause_after_keyframe1(
+                    renderer=renderer,
+                    head_writer=head_writer,
+                    third_writer=third_writer,
+                    use_overlay=use_overlay,
+                    args=args,
+                    arm_label=exec_arm,
+                    goal_frame=int(exec_selected_keyframes[0].source_frame),
+                    debug_visuals=debug_visuals,
+                    debug_execution_state=debug_execution_state,
                 )
 
                 attached_actor = object_states[exec_object_name].actor

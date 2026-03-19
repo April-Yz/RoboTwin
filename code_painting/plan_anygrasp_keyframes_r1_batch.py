@@ -61,6 +61,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--replan_until_reached_max_attempts", type=int, default=20)
     parser.add_argument("--hold_frames_after_stage", type=int, default=2)
     parser.add_argument("--init_prefix_frames", type=int, default=0)
+    parser.add_argument("--pause_after_keyframe1_seconds", type=float, default=0.0)
     parser.add_argument("--save_debug_preview", type=int, default=1)
     parser.add_argument("--debug_preview_fps", type=int, default=10)
     parser.add_argument("--debug_keyframe_hold_frames", type=int, default=12)
@@ -195,6 +196,8 @@ def build_single_command(args: argparse.Namespace, anygrasp_dir: Path, replay_di
         str(args.hold_frames_after_stage),
         "--init_prefix_frames",
         str(args.init_prefix_frames),
+        "--pause_after_keyframe1_seconds",
+        str(args.pause_after_keyframe1_seconds),
         "--save_debug_preview",
         str(args.save_debug_preview),
         "--debug_preview_fps",
