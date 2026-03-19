@@ -15,9 +15,13 @@ Only stages 2, 4, and 5 are implemented in this repo. Stages 1 and 3 are upstrea
 ## Reading Order
 
 - Pipeline index: [V1.7_pipeline_index.md](/home/zaijia001/ssd/RoboTwin/agent-read/V1.7_pipeline_index.md)
+- Pipeline index (ZH): [V1.7_pipeline_index_ZH.md](/home/zaijia001/ssd/RoboTwin/agent-read/V1.7_pipeline_index_ZH.md)
 - Hand replay pipeline: [V1.7_hand_pipeline.md](/home/zaijia001/ssd/RoboTwin/agent-read/V1.7_hand_pipeline.md)
+- Hand replay pipeline (ZH): [V1.7_hand_pipeline_ZH.md](/home/zaijia001/ssd/RoboTwin/agent-read/V1.7_hand_pipeline_ZH.md)
 - Object/FoundationPose replay pipeline: [V1.7_object_pipeline.md](/home/zaijia001/ssd/RoboTwin/agent-read/V1.7_object_pipeline.md)
+- Object/FoundationPose replay pipeline (ZH): [V1.7_object_pipeline_ZH.md](/home/zaijia001/ssd/RoboTwin/agent-read/V1.7_object_pipeline_ZH.md)
 - AnyGrasp candidate and execution pipeline: [V1.7_anygrasp_pipeline.md](/home/zaijia001/ssd/RoboTwin/agent-read/V1.7_anygrasp_pipeline.md)
+- AnyGrasp candidate and execution pipeline (ZH): [V1.7_anygrasp_pipeline_ZH.md](/home/zaijia001/ssd/RoboTwin/agent-read/V1.7_anygrasp_pipeline_ZH.md)
 
 ## Current State
 
