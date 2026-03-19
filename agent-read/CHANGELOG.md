@@ -14,6 +14,8 @@
   - `agent-read/V1.7_hand_pipeline_ZH.md`
   - `agent-read/V1.7_object_pipeline_ZH.md`
   - `agent-read/V1.7_anygrasp_pipeline_ZH.md`
+- Investigated the gap between a successful single-keyframe dual-arm AnyGrasp run and a weaker two-keyframe run. Recorded the findings in `agent-read/2026-03-19_two_keyframe_dual_arm_debug/README.md`.
+- Fixed dual-arm AnyGrasp target visualization so selected keyframe axes are tracked per `(frame, arm)` instead of per `frame`, and dual-arm execution now keeps both arms' selected keyframes active in the debug viewer.
 
 ## 2026-03-17
 

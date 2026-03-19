@@ -99,7 +99,7 @@ class ArmDebugInfo:
 
 @dataclass
 class DebugVisualBundle:
-    keyframe_axis_actors: Dict[int, sapien.Entity]
+    keyframe_axis_actors: Dict[Tuple[int, str], sapien.Entity]
     common_candidate_actors: Dict[int, List[sapien.Entity]]
     arm_candidate_actors: Dict[str, Dict[int, List[sapien.Entity]]]
     arm_candidate_axis_actors: Dict[str, Dict[int, List[sapien.Entity]]]
@@ -803,16 +803,19 @@ def create_debug_visual_bundle(
         int(keyframes[1]): ([0.15, 0.85, 1.0], [0.15, 0.45, 1.0], [0.55, 0.25, 1.0]),
     }
     keyframe_axis_actors = {
-        int(frame): create_colored_axis_actor(
+        (int(frame), arm_name): create_colored_axis_actor(
             renderer.scene,
-            f"debug_axis_keyframe_{int(frame)}",
+            f"debug_axis_keyframe_{int(frame)}_{arm_name}",
             axis_length=float(args.debug_target_axis_length),
             thickness=float(args.debug_target_axis_thickness),
             colors=axis_colors[int(frame)],
         )
         for frame in keyframes
+        for arm_name in ("left", "right")
     }
-    selected_by_frame = {int(item.source_frame): item.candidate.candidate_idx for item in selected_keyframes}
+    selected_by_frame_and_arm = {
+        (int(item.source_frame), item.arm): item.candidate.candidate_idx for item in selected_keyframes
+    }
     common_candidate_actors = {
         int(frame): [
             create_gripper_candidate_actor(
@@ -835,9 +838,7 @@ def create_debug_visual_bundle(
         arm_candidate_axis_actors[arm_name] = {}
         for frame in keyframes:
             frame = int(frame)
-            selected_idx = None
-            if arm_name == selected_keyframes[0].arm:
-                selected_idx = selected_by_frame.get(frame)
+            selected_idx = selected_by_frame_and_arm.get((frame, arm_name))
             actors = []
             axis_actors = []
             for rank, cand in enumerate(frame_candidates.get(frame, [])):
@@ -882,6 +883,14 @@ def set_single_arm_target_visual(renderer: ReplayRenderer, arm: str, pose_world_
         renderer.update_target_axis_visuals(None, None)
 
 
+def set_dual_arm_target_visuals(
+    renderer: ReplayRenderer,
+    left_pose_world_wxyz: Optional[np.ndarray],
+    right_pose_world_wxyz: Optional[np.ndarray],
+) -> None:
+    renderer.update_target_axis_visuals(left_pose_world_wxyz, right_pose_world_wxyz)
+
+
 def record_frame(
     renderer: ReplayRenderer,
     head_writer: cv2.VideoWriter,
@@ -908,7 +917,7 @@ def record_frame(
                     hide_actor(actor)
         if debug_execution_state is not None:
             for item in debug_execution_state.selected_keyframes:
-                actor = debug_visuals.keyframe_axis_actors.get(int(item.source_frame))
+                actor = debug_visuals.keyframe_axis_actors.get((int(item.source_frame), item.arm))
                 if actor is not None:
                     set_actor_pose(actor, item.candidate.pose_world_wxyz)
             update_candidate_debug_visuals(
@@ -1649,7 +1658,7 @@ def generate_debug_preview(
     selected_by_frame = {int(item.source_frame): item for item in selected_keyframes}
     selected_frames = sorted(selected_by_frame.keys())
     for item in selected_keyframes:
-        actor = debug_visuals.keyframe_axis_actors.get(int(item.source_frame))
+        actor = debug_visuals.keyframe_axis_actors.get((int(item.source_frame), item.arm))
         if actor is not None:
             set_actor_pose(actor, item.candidate.pose_world_wxyz)
     try:
@@ -1811,7 +1820,7 @@ def main() -> None:
             object_tracks[state.name].actor = state.actor
 
     for item in selected_keyframes:
-        actor = debug_visuals.keyframe_axis_actors.get(int(item.source_frame))
+        actor = debug_visuals.keyframe_axis_actors.get((int(item.source_frame), item.arm))
         if actor is not None:
             set_actor_pose(actor, item.candidate.pose_world_wxyz)
 
@@ -1900,7 +1909,8 @@ def main() -> None:
                 }
                 supervision_only_arms_by_executed_arm[arm_name] = []
 
-            debug_execution_state.selected_keyframes = exec_selected_by_arm[dual_arms[0]]
+            dual_selected_keyframes = [item for arm_name in dual_arms for item in exec_selected_by_arm[arm_name]]
+            debug_execution_state.selected_keyframes = dual_selected_keyframes
             print("[exec-mode] selected_arm=both supervision_only_arms=none")
 
             init_info = apply_robot_init_pose(renderer, open_gripper=args.open_gripper, settle_steps=args.settle_steps)
@@ -1946,6 +1956,11 @@ def main() -> None:
             action_targets = {arm_name: seq[1].candidate.pose_world_wxyz for arm_name, seq in exec_selected_by_arm.items()}
 
             debug_execution_state.active_frame = int(exec_selected_by_arm["left"][0].source_frame)
+            set_dual_arm_target_visuals(
+                renderer,
+                pregrasp_targets.get("left"),
+                pregrasp_targets.get("right"),
+            )
             pregrasp_dual = execute_dual_stage_until_reached(
                 renderer=renderer,
                 target_pose_world_wxyz_by_arm=pregrasp_targets,
@@ -1959,6 +1974,11 @@ def main() -> None:
             )
 
             debug_execution_state.active_frame = int(exec_selected_by_arm["left"][0].source_frame)
+            set_dual_arm_target_visuals(
+                renderer,
+                grasp_targets.get("left"),
+                grasp_targets.get("right"),
+            )
             grasp_dual = execute_dual_stage_until_reached(
                 renderer=renderer,
                 target_pose_world_wxyz_by_arm=grasp_targets,
@@ -1991,6 +2011,11 @@ def main() -> None:
                 tcp_to_object_by_arm[arm_name] = np.linalg.inv(pose_wxyz_to_matrix(tcp_pose)) @ object_states[obj_name].pose_world_matrix
 
             debug_execution_state.active_frame = int(exec_selected_by_arm["left"][1].source_frame)
+            set_dual_arm_target_visuals(
+                renderer,
+                action_targets.get("left"),
+                action_targets.get("right"),
+            )
             action_dual = execute_dual_stage_until_reached(
                 renderer=renderer,
                 target_pose_world_wxyz_by_arm=action_targets,

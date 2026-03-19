@@ -41,3 +41,4 @@ Only stages 2, 4, and 5 are implemented in this repo. Stages 1 and 3 are upstrea
 - The repo currently contains unrelated local changes and many generated outputs. Future edits should continue to avoid committing generated videos, rollouts, logs, tarballs, and batch output folders.
 - `code_painting/README_anygrasp_orientation_check.md` records the current orientation-conversion investigation for AnyGrasp.
 - `code_painting/replay_r1_h5.py` and `envs/robot/robot.py` were adjusted so `urdfik` workflows do not import `curobo` eagerly during robot construction.
+- In dual-arm AnyGrasp execution, selected keyframe target axes are now tracked per `(frame, arm)` so both hands can keep visible selected targets in the headed viewer during synchronized stage execution.
