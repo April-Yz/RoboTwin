@@ -19,6 +19,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output_dir", type=Path, required=True, help="Directory to save annotated preview images.")
     parser.add_argument("--frames", type=int, nargs="+", required=True, help="Source frame ids, e.g. 1 21.")
     parser.add_argument("--top_k", type=int, default=20, help="How many score-ranked candidates to annotate for each arm.")
+    parser.add_argument(
+        "--base_image_dir",
+        type=Path,
+        default=None,
+        help="Optional raw color image directory, e.g. replay/.../head_anygrasp_frames. If provided, use color_<frame>.png instead of AnyGrasp vis/grasp_result_<frame>.png.",
+    )
+    parser.add_argument(
+        "--base_image_mode",
+        choices=["auto", "raw", "vis"],
+        default="auto",
+        help="Choose raw replay image, AnyGrasp vis image, or auto preference.",
+    )
     parser.add_argument("--font_scale", type=float, default=0.35)
     parser.add_argument("--line_height", type=int, default=18)
     parser.add_argument("--panel_width", type=int, default=340)
@@ -38,9 +50,24 @@ def load_grasp_json(anygrasp_dir: Path, frame: int) -> Dict:
         return json.load(f)
 
 
-def load_vis_image(anygrasp_dir: Path, frame: int, width: int, height: int) -> np.ndarray:
+def load_base_image(
+    anygrasp_dir: Path,
+    base_image_dir: Optional[Path],
+    frame: int,
+    width: int,
+    height: int,
+    image_mode: str,
+) -> np.ndarray:
+    if image_mode in ("auto", "raw") and base_image_dir is not None:
+        color_path = base_image_dir / f"color_{int(frame):06d}.png"
+        if color_path.is_file():
+            image = cv2.imread(str(color_path), cv2.IMREAD_COLOR)
+            if image is not None:
+                return image
+        if image_mode == "raw":
+            raise FileNotFoundError(f"Missing raw base image: {color_path}")
     vis_path = anygrasp_dir / "vis" / f"grasp_result_{int(frame):06d}.png"
-    if vis_path.is_file():
+    if image_mode in ("auto", "vis") and vis_path.is_file():
         image = cv2.imread(str(vis_path), cv2.IMREAD_COLOR)
         if image is not None:
             return image
@@ -134,11 +161,10 @@ def annotate_arm_preview(
     panel_width: int,
     line_height: int,
 ) -> np.ndarray:
-    color = (255, 100, 0) if arm_name == "left" else (0, 140, 255)
     title = "LEFT" if arm_name == "left" else "RIGHT"
     image = base_image.copy()
     panel = np.full((image.shape[0], panel_width, 3), 255, dtype=np.uint8)
-    draw_tiny_label(panel, f"{title} score rank", (10, 24), color, 0.55)
+    draw_tiny_label(panel, f"{title} score rank", (10, 24), (0, 0, 0), 0.55)
     draw_tiny_label(panel, "label=candidate_idx", (10, 44), (0, 0, 0), 0.38)
 
     capped = list(ranked if int(top_k) < 0 else ranked[: max(int(top_k), 0)])
@@ -151,7 +177,7 @@ def annotate_arm_preview(
             image,
             str(int(item["candidate_idx"])),
             (pixel[0] + offset[0], pixel[1] + offset[1]),
-            color,
+            (0, 0, 0),
             font_scale,
         )
 
@@ -165,7 +191,7 @@ def annotate_arm_preview(
             f"s={float(item['score']):.3f} "
             f"rot={float(item['rotation_distance_deg']):.1f}"
         )
-        draw_tiny_label(panel, line, (10, y), color if row_idx < 3 else (0, 0, 0), 0.36)
+        draw_tiny_label(panel, line, (10, y), (0, 0, 0), 0.36)
 
     return np.concatenate([image, panel], axis=1)
 
@@ -175,6 +201,7 @@ def main() -> None:
     args.anygrasp_dir = args.anygrasp_dir.resolve()
     args.hand_npz = args.hand_npz.resolve()
     args.output_dir = args.output_dir.resolve()
+    args.base_image_dir = None if args.base_image_dir is None else args.base_image_dir.resolve()
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     hand_data = load_hand_data(args.hand_npz)
@@ -183,7 +210,14 @@ def main() -> None:
         payload = load_grasp_json(args.anygrasp_dir, frame)
         camera_info = dict(payload["camera"])
         grasps = list(payload.get("grasps", []))
-        base_image = load_vis_image(args.anygrasp_dir, frame, int(camera_info["width"]), int(camera_info["height"]))
+        base_image = load_base_image(
+            anygrasp_dir=args.anygrasp_dir,
+            base_image_dir=args.base_image_dir,
+            frame=frame,
+            width=int(camera_info["width"]),
+            height=int(camera_info["height"]),
+            image_mode=str(args.base_image_mode),
+        )
 
         left_ranked, left_ref_frame = build_arm_rank_table(grasps, "left", hand_data, frame)
         right_ranked, right_ref_frame = build_arm_rank_table(grasps, "right", hand_data, frame)
@@ -225,6 +259,8 @@ def main() -> None:
                 "frame": int(frame),
                 "left_reference_hand_frame": int(left_ref_frame),
                 "right_reference_hand_frame": int(right_ref_frame),
+                "base_image_mode": str(args.base_image_mode),
+                "base_image_dir": None if args.base_image_dir is None else str(args.base_image_dir),
                 "left_image": str(left_path),
                 "right_image": str(right_path),
                 "combined_image": str(combined_path),

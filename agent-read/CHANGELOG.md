@@ -24,6 +24,7 @@
 - Fixed dual-arm AnyGrasp target visualization so selected keyframe axes are tracked per `(frame, arm)` instead of per `frame`, and dual-arm execution now keeps both arms' selected keyframes active in the debug viewer.
 - Tightened execution debug rendering so only the currently active keyframe's selected axes are shown; later keyframe targets are hidden until their stage becomes active.
 - Added `code_painting/render_anygrasp_ranked_preview.py`, a non-RoboTwin preview tool that annotates AnyGrasp's own `vis/grasp_result_*.png` with `candidate_idx` labels while separating left/right outputs and preserving raw-score rank order.
+- Refined `render_anygrasp_ranked_preview.py` so it can use raw replay RGB frames as the base image (`--base_image_dir`, `--base_image_mode raw`) instead of the dense AnyGrasp `vis` image. Candidate labels are now plain black text without colored number styling.
 
 ## 2026-03-17
 
