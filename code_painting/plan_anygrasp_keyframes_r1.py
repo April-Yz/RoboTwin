@@ -154,6 +154,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--candidate_orientation_remap_label", type=str, default="identity")
     parser.add_argument("--candidate_post_rot_xyz_deg", type=float, nargs=3, default=[0.0, 0.0, 0.0])
     parser.add_argument("--manual_candidate", type=str, nargs=3, action="append", default=[], metavar=("FRAME", "ARM", "CANDIDATE_IDX"), help="Optional manual candidate override, e.g. --manual_candidate 1 left 5. Partial overrides only reorder debug display; full two-frame overrides for one arm drive selection directly.")
+    parser.add_argument("--object_mesh_override", action="append", default=[], help="Repeatable mesh override in the form NAME=/abs/path/to/mesh.obj, e.g. cup=/.../blue_cup.obj")
     parser.add_argument("--robot_config", type=Path, default=R1_CONFIG)
     parser.add_argument("--image_width", type=int, default=640)
     parser.add_argument("--image_height", type=int, default=360)
@@ -263,7 +264,23 @@ def load_anygrasp_candidates(anygrasp_dir: Path, source_frame: int) -> List[Dict
     return list(data.get("grasps", []))
 
 
-def load_object_states(replay_dir: Path, source_frame: int) -> Dict[str, ObjectState]:
+def parse_object_mesh_overrides(specs: Sequence[str]) -> Dict[str, Path]:
+    overrides: Dict[str, Path] = {}
+    for spec in specs:
+        if "=" not in str(spec):
+            raise ValueError(f"Invalid --object_mesh_override value '{spec}'. Expected NAME=/abs/path/to/mesh.obj")
+        name, mesh_file = str(spec).split("=", 1)
+        obj_name = name.strip()
+        mesh_path = Path(mesh_file.strip()).resolve()
+        if not obj_name:
+            raise ValueError(f"Invalid --object_mesh_override value '{spec}'. Empty object name.")
+        if not mesh_path.is_file():
+            raise FileNotFoundError(f"Override mesh file does not exist: {mesh_path}")
+        overrides[obj_name] = mesh_path
+    return overrides
+
+
+def load_object_states(replay_dir: Path, source_frame: int, mesh_overrides: Optional[Dict[str, Path]] = None) -> Dict[str, ObjectState]:
     pose_path = replay_dir / "multi_object_world_poses.npz"
     if not pose_path.is_file():
         raise FileNotFoundError(f"Missing multi_object_world_poses.npz: {pose_path}")
@@ -282,6 +299,8 @@ def load_object_states(replay_dir: Path, source_frame: int) -> Dict[str, ObjectS
         pose_world_matrix = np.asarray(data[f"{key}__pose_world_matrix"], dtype=np.float64)[idx]
         visible = bool(np.asarray(data[f"{key}__visible"], dtype=bool)[idx])
         mesh_file = Path(str(np.asarray(data[f"{key}__mesh_file"], dtype=object).reshape(()))).resolve()
+        if mesh_overrides and object_name in mesh_overrides:
+            mesh_file = mesh_overrides[object_name]
         states[object_name] = ObjectState(
             name=object_name,
             mesh_file=mesh_file,
@@ -292,7 +311,7 @@ def load_object_states(replay_dir: Path, source_frame: int) -> Dict[str, ObjectS
     return states
 
 
-def load_object_tracks(replay_dir: Path) -> Tuple[np.ndarray, Dict[str, ObjectTrack]]:
+def load_object_tracks(replay_dir: Path, mesh_overrides: Optional[Dict[str, Path]] = None) -> Tuple[np.ndarray, Dict[str, ObjectTrack]]:
     pose_path = replay_dir / "multi_object_world_poses.npz"
     if not pose_path.is_file():
         raise FileNotFoundError(f"Missing multi_object_world_poses.npz: {pose_path}")
@@ -303,6 +322,8 @@ def load_object_tracks(replay_dir: Path) -> Tuple[np.ndarray, Dict[str, ObjectTr
     for object_name in object_names:
         key = object_name
         mesh_file = Path(str(np.asarray(data[f"{key}__mesh_file"], dtype=object).reshape(()))).resolve()
+        if mesh_overrides and object_name in mesh_overrides:
+            mesh_file = mesh_overrides[object_name]
         tracks[object_name] = ObjectTrack(
             name=object_name,
             mesh_file=mesh_file,
@@ -1868,6 +1889,7 @@ def main() -> None:
         raise FileNotFoundError(f"hand_npz not found: {args.hand_npz}")
 
     args.manual_candidate_overrides = parse_manual_candidate_overrides(args.manual_candidate)
+    args.object_mesh_overrides = parse_object_mesh_overrides(args.object_mesh_override)
     args.candidate_orientation_remap_label, args.candidate_orientation_remap_matrix = base.resolve_orientation_remap(args.candidate_orientation_remap_label)
     args.candidate_post_rot_xyz_deg = np.asarray(args.candidate_post_rot_xyz_deg, dtype=np.float64)
     args.candidate_post_rot_matrix = base.orthonormalize_rotation(
@@ -1877,8 +1899,8 @@ def main() -> None:
     renderer = build_renderer(args)
     hand_data = load_hand_data(args.hand_npz)
     keyframes = [int(v) for v in args.keyframes]
-    replay_frame_indices, object_tracks = load_object_tracks(args.replay_dir)
-    object_states_per_frame = {frame: load_object_states(args.replay_dir, frame) for frame in keyframes}
+    replay_frame_indices, object_tracks = load_object_tracks(args.replay_dir, args.object_mesh_overrides)
+    object_states_per_frame = {frame: load_object_states(args.replay_dir, frame, args.object_mesh_overrides) for frame in keyframes}
     selection_result, arm_debugs = choose_keyframes(
         renderer=renderer,
         args=args,
