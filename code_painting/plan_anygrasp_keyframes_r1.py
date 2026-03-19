@@ -125,6 +125,14 @@ class RankPreviewRecord:
     right_candidate_idx: Optional[int]
 
 
+@dataclass
+class ExecutionObjectReplayConfig:
+    replay_frame_indices: np.ndarray
+    object_tracks: Dict[str, ObjectTrack]
+    start_frame: int
+    end_frame: int
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Use AnyGrasp keyframes + hand orientation to plan a two-keyframe RoboTwin demo.")
     parser.add_argument("--anygrasp_dir", type=Path, required=True, help="Per-video AnyGrasp result dir, e.g. anygrasp_batch_results/d_pour_blue_1.")
@@ -167,6 +175,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--hold_frames_after_stage", type=int, default=2)
     parser.add_argument("--init_prefix_frames", type=int, default=0, help="Emit fixed init-pose frames before moving to keyframe-1; useful for downstream trimming.")
     parser.add_argument("--pause_after_keyframe1_seconds", type=float, default=0.0, help="After reaching keyframe-1 and closing the gripper, hold the robot at that pose for N seconds before planning/executing the next target.")
+    parser.add_argument("--replay_objects_during_action", type=int, default=0, help="If 1, replay object tracks from keyframe-1 to keyframe-2 during the action stage instead of attaching selected objects to the TCP.")
+    parser.add_argument("--replay_objects_ignore_collision", type=int, default=1, help="If 1, replayed objects are created as visual-only kinematic actors without collision.")
     parser.add_argument("--save_debug_preview", type=int, default=1)
     parser.add_argument("--debug_preview_fps", type=int, default=10)
     parser.add_argument("--debug_keyframe_hold_frames", type=int, default=12)
@@ -302,6 +312,38 @@ def load_object_tracks(replay_dir: Path) -> Tuple[np.ndarray, Dict[str, ObjectTr
             visible=np.asarray(data[f"{key}__visible"], dtype=bool),
         )
     return frame_indices, tracks
+
+
+def create_execution_object_actor(scene: sapien.Scene, mesh_file: Path, actor_name: str, ignore_collision: bool) -> sapien.Entity:
+    if not bool(ignore_collision):
+        return create_object_actor(scene, mesh_file, actor_name)
+    builder = scene.create_actor_builder()
+    try:
+        builder.add_visual_from_file(str(mesh_file))
+    except Exception as exc:
+        raise RuntimeError(f"Failed to load mesh visual: {mesh_file}") from exc
+    return builder.build_kinematic(name=actor_name)
+
+
+def nearest_track_index(replay_frame_indices: np.ndarray, source_frame: int) -> int:
+    frame_indices = np.asarray(replay_frame_indices, dtype=np.int32).reshape(-1)
+    if frame_indices.size == 0:
+        raise ValueError("replay_frame_indices is empty.")
+    return int(np.argmin(np.abs(frame_indices - int(source_frame))))
+
+
+def update_execution_object_replay(config: ExecutionObjectReplayConfig, progress_01: float) -> int:
+    alpha = float(np.clip(progress_01, 0.0, 1.0))
+    source_frame = int(round(float(config.start_frame) + alpha * float(config.end_frame - config.start_frame)))
+    idx = nearest_track_index(config.replay_frame_indices, source_frame)
+    for track in config.object_tracks.values():
+        if track.actor is None:
+            continue
+        if bool(track.visible[idx]):
+            set_actor_pose(track.actor, track.pose_world_wxyz[idx])
+        else:
+            hide_actor(track.actor)
+    return int(config.replay_frame_indices[idx])
 
 
 def expected_object_for_arm(args: argparse.Namespace, arm: str) -> Optional[str]:
@@ -1184,6 +1226,7 @@ def execute_single_arm_plan(
     target_visual_label: Optional[str] = None,
     debug_visuals: Optional[DebugVisualBundle] = None,
     debug_execution_state: Optional[DebugExecutionState] = None,
+    object_replay: Optional[ExecutionObjectReplayConfig] = None,
 ) -> str:
     status = renderer._plan_status(plan)
     overlay_lines = [f"stage={label}", f"arm={arm}", f"status={status}"]
@@ -1199,7 +1242,9 @@ def execute_single_arm_plan(
     position, velocity = interpolate_joint_trajectory(position, velocity, execute_interp_steps)
     for idx in range(position.shape[0]):
         renderer.robot.set_arm_joints(position[idx], velocity[idx], arm)
-        if attached_actor is not None and tcp_to_object is not None:
+        if object_replay is not None:
+            update_execution_object_replay(object_replay, 0.0 if position.shape[0] <= 1 else float(idx) / float(position.shape[0] - 1))
+        elif attached_actor is not None and tcp_to_object is not None:
             tcp_pose = renderer.get_current_tcp_pose(arm)
             object_world = pose_wxyz_to_matrix(tcp_pose) @ tcp_to_object
             quat = base.quat_xyzw_to_wxyz(R.from_matrix(object_world[:3, :3]).as_quat())
@@ -1215,6 +1260,8 @@ def execute_single_arm_plan(
             debug_execution_state,
         )
     renderer.step_scene(steps=max(int(settle_steps), 0))
+    if object_replay is not None:
+        update_execution_object_replay(object_replay, 1.0)
     record_frame(renderer, head_writer, third_writer, overlay_lines + ["plan_step=done"], use_overlay, debug_visuals, debug_execution_state)
     for hold_idx in range(max(int(hold_frames_after_stage), 0)):
         record_frame(
@@ -1245,6 +1292,7 @@ def execute_stage_until_reached(
     debug_visuals: Optional[DebugVisualBundle] = None,
     debug_execution_state: Optional[DebugExecutionState] = None,
     supervision_targets: Optional[Dict[str, np.ndarray]] = None,
+    object_replay: Optional[ExecutionObjectReplayConfig] = None,
 ) -> Dict[str, object]:
     last_status = "Missing"
     last_pos_err = float("inf")
@@ -1274,6 +1322,7 @@ def execute_stage_until_reached(
             target_visual_label=target_visual_label,
             debug_visuals=debug_visuals,
             debug_execution_state=debug_execution_state,
+            object_replay=object_replay,
         )
         current_eval_pose = get_current_pose_for_error(renderer, arm, args.reach_error_pose_source)
         target_eval_pose = target_pose_for_error(renderer, arm, target_pose_world_wxyz, args.reach_error_pose_source)
@@ -1346,6 +1395,7 @@ def execute_dual_arm_plan(
     debug_execution_state: Optional[DebugExecutionState] = None,
     attached_actor_by_arm: Optional[Dict[str, Optional[sapien.Entity]]] = None,
     tcp_to_object_by_arm: Optional[Dict[str, Optional[np.ndarray]]] = None,
+    object_replay: Optional[ExecutionObjectReplayConfig] = None,
 ) -> Dict[str, str]:
     arms = [arm for arm in ("left", "right") if arm in plans_by_arm]
     statuses: Dict[str, str] = {arm: renderer._plan_status(plans_by_arm.get(arm)) for arm in arms}
@@ -1381,11 +1431,15 @@ def execute_dual_arm_plan(
         for arm in arms:
             actor = None if attached_actor_by_arm is None else attached_actor_by_arm.get(arm)
             tcp_to_object = None if tcp_to_object_by_arm is None else tcp_to_object_by_arm.get(arm)
+            if object_replay is not None:
+                continue
             if actor is not None and tcp_to_object is not None:
                 tcp_pose = renderer.get_current_tcp_pose(arm)
                 object_world = pose_wxyz_to_matrix(tcp_pose) @ tcp_to_object
                 quat = base.quat_xyzw_to_wxyz(R.from_matrix(object_world[:3, :3]).as_quat())
                 set_actor_pose(actor, np.concatenate([object_world[:3, 3], quat]))
+        if object_replay is not None:
+            update_execution_object_replay(object_replay, 0.0 if max_steps <= 1 else float(step_idx) / float(max_steps - 1))
         renderer.step_scene(steps=1)
         record_frame(
             renderer,
@@ -1398,6 +1452,8 @@ def execute_dual_arm_plan(
         )
 
     renderer.step_scene(steps=max(int(settle_steps), 0))
+    if object_replay is not None:
+        update_execution_object_replay(object_replay, 1.0)
     record_frame(renderer, head_writer, third_writer, overlay_lines + ["plan_step=done"], use_overlay, debug_visuals, debug_execution_state)
     for hold_idx in range(max(int(hold_frames_after_stage), 0)):
         record_frame(
@@ -1424,6 +1480,7 @@ def execute_dual_stage_until_reached(
     debug_execution_state: Optional[DebugExecutionState] = None,
     attached_actor_by_arm: Optional[Dict[str, Optional[sapien.Entity]]] = None,
     tcp_to_object_by_arm: Optional[Dict[str, Optional[np.ndarray]]] = None,
+    object_replay: Optional[ExecutionObjectReplayConfig] = None,
 ) -> Dict[str, object]:
     arms = [arm for arm in ("left", "right") if arm in target_pose_world_wxyz_by_arm]
     max_attempts = max(int(args.max_stage_replans), 1)
@@ -1450,6 +1507,7 @@ def execute_dual_stage_until_reached(
             debug_execution_state=debug_execution_state,
             attached_actor_by_arm=attached_actor_by_arm,
             tcp_to_object_by_arm=tcp_to_object_by_arm,
+            object_replay=object_replay,
         )
 
         arm_metrics: Dict[str, Dict[str, object]] = {}
@@ -1872,7 +1930,12 @@ def main() -> None:
 
     object_states = object_states_per_frame[keyframes[0]]
     for state in object_states.values():
-        state.actor = create_object_actor(renderer.scene, state.mesh_file, f"planned_object_{state.name}")
+        state.actor = create_execution_object_actor(
+            renderer.scene,
+            state.mesh_file,
+            f"planned_object_{state.name}",
+            ignore_collision=bool(args.replay_objects_ignore_collision),
+        )
         set_actor_pose(state.actor, state.pose_world_wxyz)
         if state.name in object_tracks:
             object_tracks[state.name].actor = state.actor
@@ -2012,6 +2075,14 @@ def main() -> None:
             }
             grasp_targets = {arm_name: seq[0].candidate.pose_world_wxyz for arm_name, seq in exec_selected_by_arm.items()}
             action_targets = {arm_name: seq[1].candidate.pose_world_wxyz for arm_name, seq in exec_selected_by_arm.items()}
+            action_object_replay = None
+            if bool(args.replay_objects_during_action):
+                action_object_replay = ExecutionObjectReplayConfig(
+                    replay_frame_indices=np.asarray(replay_frame_indices, dtype=np.int32),
+                    object_tracks=object_tracks,
+                    start_frame=int(exec_selected_by_arm["left"][0].source_frame),
+                    end_frame=int(exec_selected_by_arm["left"][1].source_frame),
+                )
 
             debug_execution_state.active_frame = int(exec_selected_by_arm["left"][0].source_frame)
             set_dual_arm_target_visuals(
@@ -2078,11 +2149,12 @@ def main() -> None:
 
             attached_actor_by_arm: Dict[str, Optional[sapien.Entity]] = {}
             tcp_to_object_by_arm: Dict[str, Optional[np.ndarray]] = {}
-            for arm_name in dual_arms:
-                obj_name = selected_objects_by_executed_arm[arm_name]
-                attached_actor_by_arm[arm_name] = object_states[obj_name].actor
-                tcp_pose = renderer.get_current_tcp_pose(arm_name)
-                tcp_to_object_by_arm[arm_name] = np.linalg.inv(pose_wxyz_to_matrix(tcp_pose)) @ object_states[obj_name].pose_world_matrix
+            if not bool(args.replay_objects_during_action):
+                for arm_name in dual_arms:
+                    obj_name = selected_objects_by_executed_arm[arm_name]
+                    attached_actor_by_arm[arm_name] = object_states[obj_name].actor
+                    tcp_pose = renderer.get_current_tcp_pose(arm_name)
+                    tcp_to_object_by_arm[arm_name] = np.linalg.inv(pose_wxyz_to_matrix(tcp_pose)) @ object_states[obj_name].pose_world_matrix
 
             debug_execution_state.active_frame = int(exec_selected_by_arm["left"][1].source_frame)
             set_dual_arm_target_visuals(
@@ -2102,6 +2174,7 @@ def main() -> None:
                 debug_execution_state=debug_execution_state,
                 attached_actor_by_arm=attached_actor_by_arm,
                 tcp_to_object_by_arm=tcp_to_object_by_arm,
+                object_replay=action_object_replay,
             )
 
             for arm_name in dual_arms:
@@ -2171,6 +2244,14 @@ def main() -> None:
                 grasp_pose = exec_selected_keyframes[0].candidate.pose_world_wxyz
                 pregrasp_pose = pose_with_offset_along_local_x(grasp_pose, args.approach_offset_m)
                 action_pose = exec_selected_keyframes[1].candidate.pose_world_wxyz
+                action_object_replay = None
+                if bool(args.replay_objects_during_action):
+                    action_object_replay = ExecutionObjectReplayConfig(
+                        replay_frame_indices=np.asarray(replay_frame_indices, dtype=np.int32),
+                        object_tracks=object_tracks,
+                        start_frame=int(exec_selected_keyframes[0].source_frame),
+                        end_frame=int(exec_selected_keyframes[1].source_frame),
+                    )
                 debug_execution_state.active_frame = int(exec_selected_keyframes[0].source_frame)
                 set_single_arm_target_visual(renderer, exec_arm, grasp_pose)
                 record_frame(
@@ -2249,9 +2330,12 @@ def main() -> None:
                     debug_execution_state=debug_execution_state,
                 )
 
-                attached_actor = object_states[exec_object_name].actor
-                tcp_pose = renderer.get_current_tcp_pose(exec_arm)
-                tcp_to_object = np.linalg.inv(pose_wxyz_to_matrix(tcp_pose)) @ object_states[exec_object_name].pose_world_matrix
+                attached_actor = None
+                tcp_to_object = None
+                if not bool(args.replay_objects_during_action):
+                    attached_actor = object_states[exec_object_name].actor
+                    tcp_pose = renderer.get_current_tcp_pose(exec_arm)
+                    tcp_to_object = np.linalg.inv(pose_wxyz_to_matrix(tcp_pose)) @ object_states[exec_object_name].pose_world_matrix
 
                 debug_execution_state.active_frame = int(exec_selected_keyframes[1].source_frame)
                 action_result = execute_stage_until_reached(
@@ -2269,6 +2353,7 @@ def main() -> None:
                     target_visual_label=f"keyframe_{exec_selected_keyframes[1].source_frame}",
                     debug_visuals=debug_visuals,
                     debug_execution_state=debug_execution_state,
+                    object_replay=action_object_replay,
                 )
                 stages_by_executed_arm[exec_arm] = {
                     "pregrasp": pregrasp_result,
