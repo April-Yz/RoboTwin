@@ -19,6 +19,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output_dir", type=Path, required=True, help="Directory to save annotated preview images.")
     parser.add_argument("--frames", type=int, nargs="+", required=True, help="Source frame ids, e.g. 1 21.")
     parser.add_argument("--top_k", type=int, default=20, help="How many score-ranked candidates to annotate for each arm.")
+    parser.add_argument("--draw_grasp_boxes", type=int, default=1, help="If 1, draw a lightweight grasp wireframe for each displayed candidate.")
+    parser.add_argument("--box_thickness", type=int, default=1)
     parser.add_argument(
         "--base_image_dir",
         type=Path,
@@ -120,6 +122,57 @@ def draw_tiny_label(image: np.ndarray, text: str, xy: Tuple[int, int], color: Tu
     )
 
 
+def draw_grasp_wireframe(
+    image: np.ndarray,
+    camera_info: Dict,
+    translation: np.ndarray,
+    rotation_matrix: np.ndarray,
+    width_m: float,
+    depth_m: float,
+    color: Tuple[int, int, int],
+    thickness: int,
+) -> None:
+    translation = np.asarray(translation, dtype=np.float64).reshape(3)
+    rotation_matrix = np.asarray(rotation_matrix, dtype=np.float64).reshape(3, 3)
+    x_axis = rotation_matrix[:, 0]
+    y_axis = rotation_matrix[:, 1]
+
+    grip_width = float(np.clip(width_m, 0.01, 0.12))
+    grip_depth = float(np.clip(depth_m, 0.01, 0.08))
+    palm_back = float(min(0.018, grip_depth * 0.7))
+    finger_len = float(max(0.018, grip_depth))
+
+    center = translation
+    back_center = center - x_axis * palm_back
+    left_base = center + y_axis * (grip_width * 0.5)
+    right_base = center - y_axis * (grip_width * 0.5)
+    left_back = back_center + y_axis * (grip_width * 0.5)
+    right_back = back_center - y_axis * (grip_width * 0.5)
+    left_tip = left_base + x_axis * finger_len
+    right_tip = right_base + x_axis * finger_len
+
+    segments = [
+        (left_back, right_back),
+        (left_back, left_base),
+        (right_back, right_base),
+        (left_base, left_tip),
+        (right_base, right_tip),
+    ]
+    for start, end in segments:
+        start_px = project_camera_point(start, camera_info)
+        end_px = project_camera_point(end, camera_info)
+        if start_px is None or end_px is None:
+            continue
+        cv2.line(
+            image,
+            (int(start_px[0]), int(start_px[1])),
+            (int(end_px[0]), int(end_px[1])),
+            color,
+            int(thickness),
+            cv2.LINE_AA,
+        )
+
+
 def build_arm_rank_table(
     grasps: Sequence[Dict],
     arm_name: str,
@@ -157,11 +210,14 @@ def annotate_arm_preview(
     ranked: Sequence[Dict],
     camera_info: Dict,
     top_k: int,
+    draw_grasp_boxes: bool,
+    box_thickness: int,
     font_scale: float,
     panel_width: int,
     line_height: int,
 ) -> np.ndarray:
     title = "LEFT" if arm_name == "left" else "RIGHT"
+    box_color = (255, 100, 0) if arm_name == "left" else (0, 140, 255)
     image = base_image.copy()
     panel = np.full((image.shape[0], panel_width, 3), 255, dtype=np.uint8)
     draw_tiny_label(panel, f"{title} score rank", (10, 24), (0, 0, 0), 0.55)
@@ -169,6 +225,17 @@ def annotate_arm_preview(
 
     capped = list(ranked if int(top_k) < 0 else ranked[: max(int(top_k), 0)])
     for item in capped:
+        if bool(draw_grasp_boxes):
+            draw_grasp_wireframe(
+                image=image,
+                camera_info=camera_info,
+                translation=item["translation"],
+                rotation_matrix=item["rotation_matrix"],
+                width_m=float(item["width"]),
+                depth_m=float(item["depth"]),
+                color=box_color,
+                thickness=int(box_thickness),
+            )
         pixel = project_camera_point(item["translation"], camera_info)
         if pixel is None:
             continue
@@ -228,6 +295,8 @@ def main() -> None:
             ranked=left_ranked,
             camera_info=camera_info,
             top_k=int(args.top_k),
+            draw_grasp_boxes=bool(args.draw_grasp_boxes),
+            box_thickness=int(args.box_thickness),
             font_scale=float(args.font_scale),
             panel_width=int(args.panel_width),
             line_height=int(args.line_height),
@@ -238,6 +307,8 @@ def main() -> None:
             ranked=right_ranked,
             camera_info=camera_info,
             top_k=int(args.top_k),
+            draw_grasp_boxes=bool(args.draw_grasp_boxes),
+            box_thickness=int(args.box_thickness),
             font_scale=float(args.font_scale),
             panel_width=int(args.panel_width),
             line_height=int(args.line_height),
@@ -261,6 +332,7 @@ def main() -> None:
                 "right_reference_hand_frame": int(right_ref_frame),
                 "base_image_mode": str(args.base_image_mode),
                 "base_image_dir": None if args.base_image_dir is None else str(args.base_image_dir),
+                "draw_grasp_boxes": int(args.draw_grasp_boxes),
                 "left_image": str(left_path),
                 "right_image": str(right_path),
                 "combined_image": str(combined_path),

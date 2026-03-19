@@ -25,6 +25,7 @@
 - Tightened execution debug rendering so only the currently active keyframe's selected axes are shown; later keyframe targets are hidden until their stage becomes active.
 - Added `code_painting/render_anygrasp_ranked_preview.py`, a non-RoboTwin preview tool that annotates AnyGrasp's own `vis/grasp_result_*.png` with `candidate_idx` labels while separating left/right outputs and preserving raw-score rank order.
 - Refined `render_anygrasp_ranked_preview.py` so it can use raw replay RGB frames as the base image (`--base_image_dir`, `--base_image_mode raw`) instead of the dense AnyGrasp `vis` image. Candidate labels are now plain black text without colored number styling.
+- Added lightweight grasp wireframe rendering to `render_anygrasp_ranked_preview.py` via `--draw_grasp_boxes 1`, so raw-image previews can still show a simple grasp shape without inheriting the dense AnyGrasp visualization.
 
 ## 2026-03-17
 
