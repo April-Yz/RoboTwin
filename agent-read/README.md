@@ -24,6 +24,7 @@ Only stages 2, 4, and 5 are implemented in this repo. Stages 1 and 3 are upstrea
 - AnyGrasp candidate and execution pipeline (ZH): [V1.7_anygrasp_pipeline_ZH.md](/home/zaijia001/ssd/RoboTwin/agent-read/V1.7_anygrasp_pipeline_ZH.md)
 - Command log: [V1.8_command_log.md](/home/zaijia001/ssd/RoboTwin/agent-read/V1.8_command_log.md)
 - Command log (ZH): [V1.8_command_log_ZH.md](/home/zaijia001/ssd/RoboTwin/agent-read/V1.8_command_log_ZH.md)
+- AnyGrasp IK/execution logic (ZH): [V1.9_anygrasp_ik_execution_logic_ZH.md](/home/zaijia001/ssd/RoboTwin/agent-read/V1.9_anygrasp_ik_execution_logic_ZH.md)
 
 ## Current State
 

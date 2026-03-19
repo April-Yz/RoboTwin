@@ -27,6 +27,7 @@
 - Refined `render_anygrasp_ranked_preview.py` so it can use raw replay RGB frames as the base image (`--base_image_dir`, `--base_image_mode raw`) instead of the dense AnyGrasp `vis` image. Candidate labels are now plain black text without colored number styling.
 - Added lightweight grasp wireframe rendering to `render_anygrasp_ranked_preview.py` via `--draw_grasp_boxes 1`, so raw-image previews can still show a simple grasp shape without inheriting the dense AnyGrasp visualization.
 - Added `--pause_after_keyframe1_seconds` to the AnyGrasp planner and batch wrapper. After keyframe-1 is reached and the gripper is closed, the robot can now hold that pose for a fixed duration before starting keyframe-2. The planner also prints an explicit terminal log when keyframe-1 has been reached and when the pause begins.
+- Added `agent-read/V1.9_anygrasp_ik_execution_logic_ZH.md`, documenting the current `urdfik` chain, the TCP->endlink conversion, why execution shows about 25 interpolated plan steps, and what would happen in the viewer if interpolation were removed.
 
 ## 2026-03-17
 
