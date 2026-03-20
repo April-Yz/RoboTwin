@@ -1,5 +1,21 @@
 # CHANGELOG
 
+## 2026-03-20
+
+- Added `--candidate_keep_camera_up` and `--candidate_camera_top_axis` to the AnyGrasp planner and batch wrapper.
+- The new rule keeps local gripper `+X` fixed, treats the configured local top axis (`z` by default) as the camera/top direction, and resolves only the redundant roll around the forward axis so the mounted camera stays upward.
+- Extended `plan_summary.json` to record:
+  - `candidate_keep_camera_up`
+  - `candidate_camera_top_axis`
+  - per-candidate `top_axis_up_dot`
+- Added paired analysis docs:
+  - `agent-read/V1.10_anygrasp_camera_up_rule.md`
+  - `agent-read/V1.10_anygrasp_camera_up_rule_ZH.md`
+- Documented the distinction between recent behavior-changing commits (`d877396`, `830f057`) and recent debug-only commits (`27a4bc9`, `6a0974f`) so future debugging can separate motion changes from pure instrumentation.
+- Validation:
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_anygrasp_keyframes_r1_batch.py`
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python - <<'PY' ... constrain_roll_keep_top_axis_up(...) ... PY`
+
 ## 2026-03-19
 
 - Added command-oriented documentation in:

@@ -68,6 +68,7 @@ class CandidatePose:
     nearest_object: str
     nearest_object_distance_m: float
     rotation_distance_deg: float
+    top_axis_up_dot: float
 
 
 @dataclass
@@ -156,6 +157,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--debug_common_candidate_top_k", type=int, default=0, help="How many raw-score candidates to show in green per keyframe. 0 hides them.")
     parser.add_argument("--candidate_orientation_remap_label", type=str, default="identity")
     parser.add_argument("--candidate_post_rot_xyz_deg", type=float, nargs=3, default=[0.0, 0.0, 0.0])
+    parser.add_argument("--candidate_keep_camera_up", type=int, default=0, help="If 1, remove free roll about the gripper forward axis by aligning the gripper top axis with world +Z as much as possible.")
+    parser.add_argument("--candidate_camera_top_axis", choices=["y", "z"], default="z", help="Which local gripper axis should be treated as the camera/top direction when --candidate_keep_camera_up=1.")
     parser.add_argument("--manual_candidate", type=str, nargs=3, action="append", default=[], metavar=("FRAME", "ARM", "CANDIDATE_IDX"), help="Optional manual candidate override, e.g. --manual_candidate 1 left 5. Partial overrides only reorder debug display; full two-frame overrides for one arm drive selection directly.")
     parser.add_argument("--object_mesh_override", action="append", default=[], help="Repeatable mesh override in the form NAME=/abs/path/to/mesh.obj, e.g. cup=/.../blue_cup.obj")
     parser.add_argument("--robot_config", type=Path, default=R1_CONFIG)
@@ -408,7 +411,44 @@ def candidate_to_world_pose(renderer: ReplayRenderer, args: argparse.Namespace, 
     )
     pose_world_wxyz = renderer.camera_to_world_pose(trans_cam, remapped_rotation)
     pose_world_matrix = pose_wxyz_to_matrix(pose_world_wxyz)
+    if bool(args.candidate_keep_camera_up):
+        pose_world_matrix[:3, :3] = constrain_roll_keep_top_axis_up(
+            pose_world_matrix[:3, :3],
+            top_axis=args.candidate_camera_top_axis,
+        )
+        quat = base.quat_xyzw_to_wxyz(R.from_matrix(base.orthonormalize_rotation(pose_world_matrix[:3, :3])).as_quat())
+        pose_world_wxyz = np.concatenate([pose_world_matrix[:3, 3], quat]).astype(np.float64)
     return pose_world_wxyz, pose_world_matrix
+
+
+def top_axis_up_dot(rotation_world: np.ndarray, top_axis: str) -> float:
+    axis_idx = 1 if top_axis == "y" else 2
+    axis_vec = np.asarray(rotation_world, dtype=np.float64).reshape(3, 3)[:, axis_idx]
+    return float(np.dot(axis_vec, np.array([0.0, 0.0, 1.0], dtype=np.float64)))
+
+
+def constrain_roll_keep_top_axis_up(rotation_world: np.ndarray, top_axis: str) -> np.ndarray:
+    rot = base.orthonormalize_rotation(rotation_world)
+    x_axis = rot[:, 0].copy()
+    x_axis = x_axis / max(np.linalg.norm(x_axis), 1e-12)
+    world_up = np.array([0.0, 0.0, 1.0], dtype=np.float64)
+    top_proj = world_up - x_axis * float(np.dot(world_up, x_axis))
+    if np.linalg.norm(top_proj) <= 1e-6:
+        return rot
+    top_proj = top_proj / np.linalg.norm(top_proj)
+    if top_axis == "y":
+        y_axis = top_proj
+        z_axis = np.cross(x_axis, y_axis)
+        z_axis = z_axis / max(np.linalg.norm(z_axis), 1e-12)
+        y_axis = np.cross(z_axis, x_axis)
+        y_axis = y_axis / max(np.linalg.norm(y_axis), 1e-12)
+    else:
+        z_axis = top_proj
+        y_axis = np.cross(z_axis, x_axis)
+        y_axis = y_axis / max(np.linalg.norm(y_axis), 1e-12)
+        z_axis = np.cross(x_axis, y_axis)
+        z_axis = z_axis / max(np.linalg.norm(z_axis), 1e-12)
+    return base.orthonormalize_rotation(np.column_stack([x_axis, y_axis, z_axis]))
 
 
 def nearest_object_name(candidate_world_matrix: np.ndarray, object_states: Dict[str, ObjectState]) -> Tuple[str, float]:
@@ -478,6 +518,7 @@ def build_ranked_candidates_for_arm(
                 nearest_object=nearest_name,
                 nearest_object_distance_m=nearest_dist,
                 rotation_distance_deg=rotation_distance_deg(ref_rotation, grasp["rotation_matrix"]),
+                top_axis_up_dot=top_axis_up_dot(pose_world_matrix[:3, :3], args.candidate_camera_top_axis),
             )
             raw_candidates.append(candidate)
             object_ok = expected_object is None or nearest_name == expected_object
@@ -2469,6 +2510,8 @@ def main() -> None:
         "selection_diagnostics": selection_result.diagnostics,
         "candidate_orientation_remap_label": args.candidate_orientation_remap_label,
         "candidate_post_rot_xyz_deg": args.candidate_post_rot_xyz_deg.tolist(),
+        "candidate_keep_camera_up": int(args.candidate_keep_camera_up),
+        "candidate_camera_top_axis": str(args.candidate_camera_top_axis),
         "reach_error_pose_source": args.reach_error_pose_source,
         "init_prefix_frames": int(args.init_prefix_frames),
         "execute_both_arms": int(args.execute_both_arms),
@@ -2485,6 +2528,7 @@ def main() -> None:
                             "candidate_idx": item.candidate.candidate_idx,
                             "nearest_object": item.candidate.nearest_object,
                             "rotation_distance_deg": item.candidate.rotation_distance_deg,
+                            "top_axis_up_dot": item.candidate.top_axis_up_dot,
                         }
                         for item in arm_info.selected_keyframes
                     ]
@@ -2528,6 +2572,7 @@ def main() -> None:
                 "nearest_object_distance_m": item.candidate.nearest_object_distance_m,
                 "width_m": item.candidate.width_m,
                 "depth_m": item.candidate.depth_m,
+                "top_axis_up_dot": item.candidate.top_axis_up_dot,
                 "pose_world_wxyz": item.candidate.pose_world_wxyz.tolist(),
                 "translation_cam": item.candidate.translation_cam.tolist(),
                 "rotation_cam": item.candidate.rotation_cam.tolist(),
@@ -2547,6 +2592,7 @@ def main() -> None:
                     "nearest_object_distance_m": item.candidate.nearest_object_distance_m,
                     "width_m": item.candidate.width_m,
                     "depth_m": item.candidate.depth_m,
+                    "top_axis_up_dot": item.candidate.top_axis_up_dot,
                     "pose_world_wxyz": item.candidate.pose_world_wxyz.tolist(),
                     "translation_cam": item.candidate.translation_cam.tolist(),
                     "rotation_cam": item.candidate.rotation_cam.tolist(),
@@ -2566,6 +2612,7 @@ def main() -> None:
                     "rotation_distance_deg": cand.rotation_distance_deg,
                     "width_m": cand.width_m,
                     "depth_m": cand.depth_m,
+                    "top_axis_up_dot": cand.top_axis_up_dot,
                     "pose_world_wxyz": cand.pose_world_wxyz.tolist(),
                 }
                 for cand in ranked_candidates_per_frame.get(int(frame), [])[: max(int(args.debug_candidate_top_k), 0)]
@@ -2582,6 +2629,7 @@ def main() -> None:
                     "rotation_distance_deg": cand.rotation_distance_deg,
                     "width_m": cand.width_m,
                     "depth_m": cand.depth_m,
+                    "top_axis_up_dot": cand.top_axis_up_dot,
                     "pose_world_wxyz": cand.pose_world_wxyz.tolist(),
                 }
                 for cand in all_candidates_per_frame.get(int(frame), [])
