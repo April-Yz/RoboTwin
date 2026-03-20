@@ -2,6 +2,14 @@
 
 ## 2026-03-20
 
+- Added `--candidate_target_local_x_offset_m` to the AnyGrasp planner and batch wrapper. This applies an explicit local-`+X` translation to each imported AnyGrasp target pose before visualization and planning, so the workflow can switch cleanly between "raw candidate behaves like wrist/endlink" and "planner input should represent fingertip TCP" without rewriting the TCP->endlink chain.
+- Extended `plan_summary.json` so selected and ranked candidates now record both `raw_pose_world_wxyz` and the final planning/visualization `pose_world_wxyz`, plus the top-level `candidate_target_local_x_offset_m` used for the run.
+- Added paired analysis docs:
+  - `agent-read/V1.11_anygrasp_target_pose_offset.md`
+  - `agent-read/V1.11_anygrasp_target_pose_offset_ZH.md`
+- Validation:
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_anygrasp_keyframes_r1_batch.py`
+
 - Added `--candidate_keep_camera_up` and `--candidate_camera_top_axis` to the AnyGrasp planner and batch wrapper.
 - The initial camera-up rule over-constrained roll by trying to align the configured top axis too aggressively with world up. This could distort sideward grasps visually even though the forward axis stayed fixed.
 - Refined the camera-up rule so it now keeps local gripper `+X` fixed and only chooses between the original orientation and a `180`-degree roll flip around local `+X`, whichever places the configured top axis more upward. This matches the intended semantics: keep the camera on the upper side overall, not pin the gripper to one exact roll.

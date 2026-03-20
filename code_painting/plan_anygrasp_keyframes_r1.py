@@ -63,6 +63,8 @@ class CandidatePose:
     rotation_cam: np.ndarray
     width_m: float
     depth_m: float
+    raw_pose_world_wxyz: np.ndarray
+    raw_pose_world_matrix: np.ndarray
     pose_world_wxyz: np.ndarray
     pose_world_matrix: np.ndarray
     nearest_object: str
@@ -162,6 +164,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--candidate_post_rot_xyz_deg", type=float, nargs=3, default=[0.0, 0.0, 0.0])
     parser.add_argument("--candidate_keep_camera_up", type=int, default=0, help="If 1, keep the gripper/camera top side facing upward overall while preserving the original grasp direction. The planner only resolves the redundant roll about the gripper forward axis.")
     parser.add_argument("--candidate_camera_top_axis", choices=["y", "z"], default="z", help="Which local gripper axis should be treated as the camera/top direction when --candidate_keep_camera_up=1.")
+    parser.add_argument("--candidate_target_local_x_offset_m", type=float, default=0.0, help="Additional translation applied to each AnyGrasp world target along the gripper local +X axis before planning/visualization. Use -0.12 if the raw candidate behaves like a wrist/endlink pose and you want a fingertip TCP target.")
     parser.add_argument("--manual_candidate", type=str, nargs=3, action="append", default=[], metavar=("FRAME", "ARM", "CANDIDATE_IDX"), help="Optional manual candidate override, e.g. --manual_candidate 1 left 5. Partial overrides only reorder debug display; full two-frame overrides for one arm drive selection directly.")
     parser.add_argument("--object_mesh_override", action="append", default=[], help="Repeatable mesh override in the form NAME=/abs/path/to/mesh.obj, e.g. cup=/.../blue_cup.obj")
     parser.add_argument("--robot_config", type=Path, default=R1_CONFIG)
@@ -406,15 +409,31 @@ def rotation_distance_deg(rot_a: np.ndarray, rot_b: np.ndarray) -> float:
     return float(np.rad2deg(delta.magnitude()))
 
 
-def candidate_to_world_pose(renderer: ReplayRenderer, args: argparse.Namespace, grasp: Dict) -> Tuple[np.ndarray, np.ndarray]:
+def shift_pose_along_local_x(pose_world_wxyz: np.ndarray, delta_m: float) -> np.ndarray:
+    pose_world_wxyz = np.asarray(pose_world_wxyz, dtype=np.float64).reshape(7)
+    pose_world_matrix = pose_wxyz_to_matrix(pose_world_wxyz)
+    pose_world_matrix[:3, 3] += pose_world_matrix[:3, 0] * float(delta_m)
+    quat = base.quat_xyzw_to_wxyz(R.from_matrix(base.orthonormalize_rotation(pose_world_matrix[:3, :3])).as_quat())
+    return np.concatenate([pose_world_matrix[:3, 3], quat]).astype(np.float64)
+
+
+def candidate_to_world_pose(
+    renderer: ReplayRenderer,
+    args: argparse.Namespace,
+    grasp: Dict,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, Dict[str, float]]:
     rot_cam = np.asarray(grasp["rotation_matrix"], dtype=np.float64).reshape(3, 3)
     trans_cam = np.asarray(grasp["translation"], dtype=np.float64).reshape(3)
     remapped_rotation = base.orthonormalize_rotation(
         base.orthonormalize_rotation(rot_cam) @ args.candidate_post_rot_matrix @ args.candidate_orientation_remap_matrix
     )
-    pose_world_wxyz = renderer.camera_to_world_pose(trans_cam, remapped_rotation)
+    raw_pose_world_wxyz = renderer.camera_to_world_pose(trans_cam, remapped_rotation)
+    raw_pose_world_matrix = pose_wxyz_to_matrix(raw_pose_world_wxyz)
+    pose_world_wxyz = raw_pose_world_wxyz.copy()
+    if abs(float(args.candidate_target_local_x_offset_m)) > 1e-12:
+        pose_world_wxyz = shift_pose_along_local_x(pose_world_wxyz, float(args.candidate_target_local_x_offset_m))
     pose_world_matrix = pose_wxyz_to_matrix(pose_world_wxyz)
-    original_rotation_world = pose_world_matrix[:3, :3].copy()
+    original_rotation_world = raw_pose_world_matrix[:3, :3].copy()
     roll_debug = {
         "original_top_axis_up_dot": top_axis_up_dot(original_rotation_world, args.candidate_camera_top_axis),
         "camera_up_flip_applied": 0,
@@ -427,7 +446,7 @@ def candidate_to_world_pose(renderer: ReplayRenderer, args: argparse.Namespace, 
         )
         quat = base.quat_xyzw_to_wxyz(R.from_matrix(base.orthonormalize_rotation(pose_world_matrix[:3, :3])).as_quat())
         pose_world_wxyz = np.concatenate([pose_world_matrix[:3, 3], quat]).astype(np.float64)
-    return pose_world_wxyz, pose_world_matrix, roll_debug
+    return raw_pose_world_wxyz, raw_pose_world_matrix, pose_world_wxyz, pose_world_matrix, roll_debug
 
 
 def top_axis_up_dot(rotation_world: np.ndarray, top_axis: str) -> float:
@@ -515,7 +534,7 @@ def build_ranked_candidates_for_arm(
         distance_pass = 0
         for candidate_idx, grasp in enumerate(load_anygrasp_candidates(anygrasp_dir, frame)):
             total += 1
-            pose_world_wxyz, pose_world_matrix, roll_debug = candidate_to_world_pose(renderer, args, grasp)
+            raw_pose_world_wxyz, raw_pose_world_matrix, pose_world_wxyz, pose_world_matrix, roll_debug = candidate_to_world_pose(renderer, args, grasp)
             nearest_name, nearest_dist = nearest_object_name(pose_world_matrix, object_states_per_frame[frame])
             candidate = CandidatePose(
                 candidate_idx=candidate_idx,
@@ -524,6 +543,8 @@ def build_ranked_candidates_for_arm(
                 rotation_cam=np.asarray(grasp["rotation_matrix"], dtype=np.float64).reshape(3, 3),
                 width_m=float(grasp.get("width", 0.08)),
                 depth_m=float(grasp.get("depth", 0.04)),
+                raw_pose_world_wxyz=raw_pose_world_wxyz,
+                raw_pose_world_matrix=raw_pose_world_matrix,
                 pose_world_wxyz=pose_world_wxyz,
                 pose_world_matrix=pose_world_matrix,
                 nearest_object=nearest_name,
@@ -2526,6 +2547,7 @@ def main() -> None:
         "candidate_post_rot_xyz_deg": args.candidate_post_rot_xyz_deg.tolist(),
         "candidate_keep_camera_up": int(args.candidate_keep_camera_up),
         "candidate_camera_top_axis": str(args.candidate_camera_top_axis),
+        "candidate_target_local_x_offset_m": float(args.candidate_target_local_x_offset_m),
         "reach_error_pose_source": args.reach_error_pose_source,
         "init_prefix_frames": int(args.init_prefix_frames),
         "execute_both_arms": int(args.execute_both_arms),
@@ -2593,6 +2615,7 @@ def main() -> None:
                 "original_top_axis_up_dot": item.candidate.original_top_axis_up_dot,
                 "camera_up_flip_applied": item.candidate.camera_up_flip_applied,
                 "forward_axis_change_deg": item.candidate.forward_axis_change_deg,
+                "raw_pose_world_wxyz": item.candidate.raw_pose_world_wxyz.tolist(),
                 "pose_world_wxyz": item.candidate.pose_world_wxyz.tolist(),
                 "translation_cam": item.candidate.translation_cam.tolist(),
                 "rotation_cam": item.candidate.rotation_cam.tolist(),
@@ -2616,6 +2639,7 @@ def main() -> None:
                     "original_top_axis_up_dot": item.candidate.original_top_axis_up_dot,
                     "camera_up_flip_applied": item.candidate.camera_up_flip_applied,
                     "forward_axis_change_deg": item.candidate.forward_axis_change_deg,
+                    "raw_pose_world_wxyz": item.candidate.raw_pose_world_wxyz.tolist(),
                     "pose_world_wxyz": item.candidate.pose_world_wxyz.tolist(),
                     "translation_cam": item.candidate.translation_cam.tolist(),
                     "rotation_cam": item.candidate.rotation_cam.tolist(),
@@ -2639,6 +2663,7 @@ def main() -> None:
                     "original_top_axis_up_dot": cand.original_top_axis_up_dot,
                     "camera_up_flip_applied": cand.camera_up_flip_applied,
                     "forward_axis_change_deg": cand.forward_axis_change_deg,
+                    "raw_pose_world_wxyz": cand.raw_pose_world_wxyz.tolist(),
                     "pose_world_wxyz": cand.pose_world_wxyz.tolist(),
                 }
                 for cand in ranked_candidates_per_frame.get(int(frame), [])[: max(int(args.debug_candidate_top_k), 0)]
@@ -2659,6 +2684,7 @@ def main() -> None:
                     "original_top_axis_up_dot": cand.original_top_axis_up_dot,
                     "camera_up_flip_applied": cand.camera_up_flip_applied,
                     "forward_axis_change_deg": cand.forward_axis_change_deg,
+                    "raw_pose_world_wxyz": cand.raw_pose_world_wxyz.tolist(),
                     "pose_world_wxyz": cand.pose_world_wxyz.tolist(),
                 }
                 for cand in all_candidates_per_frame.get(int(frame), [])
