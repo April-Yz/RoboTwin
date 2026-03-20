@@ -158,6 +158,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--arm", choices=["auto", "left", "right"], default="auto")
     parser.add_argument("--execute_both_arms", type=int, default=0, help="If 1 and --arm auto, execute synchronized dual-arm stages and advance only when both arms satisfy reach checks.")
     parser.add_argument("--planner_backend", choices=["urdfik", "curobo"], default="urdfik")
+    parser.add_argument(
+        "--urdfik_trajectory_mode",
+        choices=["joint_interp", "cartesian_interp_ik"],
+        default="joint_interp",
+        help="When planner_backend=urdfik: 'joint_interp' does one IK solve at the final target then interpolates in joint space; 'cartesian_interp_ik' first interpolates TCP poses in Cartesian space then solves IK waypoint by waypoint.",
+    )
+    parser.add_argument(
+        "--urdfik_cartesian_interp_steps",
+        type=int,
+        default=8,
+        help="Number of Cartesian TCP waypoints for urdfik_trajectory_mode=cartesian_interp_ik, including start and goal.",
+    )
     parser.add_argument("--left_target_object", type=str, default="cup")
     parser.add_argument("--right_target_object", type=str, default="bottle")
     parser.add_argument("--candidate_object_max_distance_m", type=float, default=0.12)
@@ -223,7 +235,7 @@ def parse_args() -> argparse.Namespace:
 def build_renderer(args: argparse.Namespace) -> ReplayRenderer:
     renderer_cls = ReplayRenderer if args.planner_backend == "curobo" else urdfik_base.HandRetargetR1URDFIKRenderer
     attach_planner = args.planner_backend == "curobo"
-    return renderer_cls(
+    renderer_kwargs = dict(
         robot_config_path=args.robot_config,
         image_width=args.image_width,
         image_height=args.image_height,
@@ -267,6 +279,10 @@ def build_renderer(args: argparse.Namespace) -> ReplayRenderer:
         attach_planner=attach_planner,
         hide_robot=False,
     )
+    if args.planner_backend == "urdfik":
+        renderer_kwargs["urdfik_trajectory_mode"] = str(args.urdfik_trajectory_mode)
+        renderer_kwargs["urdfik_cartesian_interp_steps"] = int(args.urdfik_cartesian_interp_steps)
+    return renderer_cls(**renderer_kwargs)
 
 
 def load_hand_data(hand_npz: Path) -> Dict[str, np.ndarray]:
@@ -2871,6 +2887,9 @@ def main() -> None:
         "selection_diagnostics": selection_result.diagnostics,
         "candidate_orientation_remap_label": args.candidate_orientation_remap_label,
         "candidate_post_rot_xyz_deg": args.candidate_post_rot_xyz_deg.tolist(),
+        "planner_backend": str(args.planner_backend),
+        "urdfik_trajectory_mode": str(args.urdfik_trajectory_mode),
+        "urdfik_cartesian_interp_steps": int(args.urdfik_cartesian_interp_steps),
         "candidate_keep_camera_up": int(args.candidate_keep_camera_up),
         "candidate_camera_top_axis": str(args.candidate_camera_top_axis),
         "candidate_target_local_x_offset_m": float(args.candidate_target_local_x_offset_m),

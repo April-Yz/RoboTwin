@@ -2,6 +2,28 @@
 
 ## 2026-03-20
 
+- Added explicit Backend-A trajectory submodes to the AnyGrasp planner:
+  - `--urdfik_trajectory_mode joint_interp`
+  - `--urdfik_trajectory_mode cartesian_interp_ik`
+  - `--urdfik_cartesian_interp_steps`
+- `joint_interp` preserves the original behavior: solve one endpoint IK, then interpolate in joint space.
+- `cartesian_interp_ik` is the new behavior: interpolate TCP waypoints in Cartesian space, solve IK waypoint by waypoint with the previous solution as the seed, then execute the resulting multi-point joint trajectory.
+- Exposed the new parameters in both:
+  - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - `code_painting/plan_anygrasp_keyframes_r1_batch.py`
+- Extended `plan_summary.json` to record:
+  - `planner_backend`
+  - `urdfik_trajectory_mode`
+  - `urdfik_cartesian_interp_steps`
+- Updated `agent-read/ik_analyze/anygrasp_keyframe_ik_planning_analysis.md`
+- Updated `agent-read/ik_analyze/anygrasp_keyframe_ik_planning_analysis.en.md`
+- Updated command docs so there are now explicit runnable command examples for:
+  - Backend A original mode
+  - Backend A Cartesian-waypoint IK mode
+  - Backend B cuRobo mode
+- Validation:
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/render_hand_retarget_r1_npz_urdfik.py code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_anygrasp_keyframes_r1_batch.py`
+
 - Added per-frame execution diagnostics to the AnyGrasp planner debug path.
 - `debug_execution_preview.mp4` now renders a colored metric panel for left/right arms, including:
   - target minus current end-effector pose

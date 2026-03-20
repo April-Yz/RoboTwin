@@ -28,6 +28,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--arm", choices=["auto", "left", "right"], default="auto")
     parser.add_argument("--execute_both_arms", type=int, default=0)
     parser.add_argument("--planner_backend", choices=["urdfik", "curobo"], default="urdfik")
+    parser.add_argument("--urdfik_trajectory_mode", choices=["joint_interp", "cartesian_interp_ik"], default="joint_interp")
+    parser.add_argument("--urdfik_cartesian_interp_steps", type=int, default=8)
     parser.add_argument("--left_target_object", type=str, default="cup")
     parser.add_argument("--right_target_object", type=str, default="bottle")
     parser.add_argument("--candidate_object_max_distance_m", type=float, default=0.12)
@@ -144,6 +146,10 @@ def build_single_command(args: argparse.Namespace, anygrasp_dir: Path, replay_di
         str(args.execute_both_arms),
         "--planner_backend",
         str(args.planner_backend),
+        "--urdfik_trajectory_mode",
+        str(args.urdfik_trajectory_mode),
+        "--urdfik_cartesian_interp_steps",
+        str(args.urdfik_cartesian_interp_steps),
         "--left_target_object",
         str(args.left_target_object),
         "--right_target_object",
