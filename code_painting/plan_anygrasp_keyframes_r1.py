@@ -114,6 +114,9 @@ class DebugExecutionState:
     arm_display_candidates: Dict[str, Dict[int, List[CandidatePose]]]
     head_intrinsic: np.ndarray
     active_frame: Optional[int] = None
+    pose_debug_path: Optional[Path] = None
+    replay_head_camera_pose_by_frame: Optional[Dict[int, np.ndarray]] = None
+    object_tracks: Optional[Dict[str, ObjectTrack]] = None
 
 
 @dataclass
@@ -183,6 +186,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--debug_keyframe_hold_frames", type=int, default=12)
     parser.add_argument("--save_debug_execution_preview", type=int, default=1)
     parser.add_argument("--debug_execution_fps", type=int, default=10)
+    parser.add_argument("--save_pose_debug", type=int, default=0, help="If 1, dump per-frame planner camera/TCP/object poses to pose_debug.jsonl.")
     parser.add_argument("--save_rank_preview_images", type=int, default=1)
     parser.add_argument("--rank_preview_top_n", type=int, default=3, help="Save per-keyframe rank preview PNGs for left/right rank 1..N.")
     parser.add_argument("--debug_target_axis_length", type=float, default=0.08)
@@ -333,6 +337,18 @@ def load_object_tracks(replay_dir: Path, mesh_overrides: Optional[Dict[str, Path
             visible=np.asarray(data[f"{key}__visible"], dtype=bool),
         )
     return frame_indices, tracks
+
+
+def load_replay_head_camera_poses(replay_dir: Path) -> Dict[int, np.ndarray]:
+    pose_path = replay_dir / "multi_object_world_poses.npz"
+    if not pose_path.is_file():
+        raise FileNotFoundError(f"Missing multi_object_world_poses.npz: {pose_path}")
+    data = np.load(str(pose_path), allow_pickle=True)
+    if "head_camera_pose_world_wxyz" not in data.files:
+        return {}
+    frame_indices = np.asarray(data["selected_source_frame_indices"], dtype=np.int32).reshape(-1)
+    head_poses = np.asarray(data["head_camera_pose_world_wxyz"], dtype=np.float64).reshape(-1, 7)
+    return {int(frame): head_poses[idx] for idx, frame in enumerate(frame_indices.tolist())}
 
 
 def create_execution_object_actor(scene: sapien.Scene, mesh_file: Path, actor_name: str, ignore_collision: bool) -> sapien.Entity:
@@ -1048,6 +1064,44 @@ def record_frame(
             ),
         )
         debug_execution_state.writer.write(debug_bgr)
+    if debug_execution_state is not None and debug_execution_state.pose_debug_path is not None:
+        current_head_pose = renderer.get_head_camera_pose()
+        object_actor_poses = {}
+        if debug_execution_state.object_tracks is not None:
+            for name, track in debug_execution_state.object_tracks.items():
+                if track.actor is None:
+                    continue
+                actor_pose = track.actor.get_pose()
+                object_actor_poses[name] = {
+                    "actor_pose_world_wxyz": (
+                        np.asarray(actor_pose.p, dtype=np.float64).reshape(3).tolist()
+                        + base.normalize_quat_wxyz(np.asarray(actor_pose.q, dtype=np.float64).reshape(4)).tolist()
+                    )
+                }
+                if debug_execution_state.active_frame is not None:
+                    frame_to_idx = {int(frame): idx for idx, frame in enumerate(track.frame_indices.tolist())}
+                    idx = frame_to_idx.get(int(debug_execution_state.active_frame))
+                    if idx is not None:
+                        object_actor_poses[name]["replay_pose_world_wxyz"] = np.asarray(track.pose_world_wxyz[idx], dtype=np.float64).tolist()
+        pose_debug = {
+            "active_frame": None if debug_execution_state.active_frame is None else int(debug_execution_state.active_frame),
+            "overlay_lines": list(overlay_lines),
+            "current_head_camera_pose_world_wxyz": (
+                np.asarray(current_head_pose.p, dtype=np.float64).reshape(3).tolist()
+                + base.normalize_quat_wxyz(np.asarray(current_head_pose.q, dtype=np.float64).reshape(4)).tolist()
+            ),
+            "current_left_tcp_pose_world_wxyz": np.asarray(renderer.get_current_tcp_pose("left"), dtype=np.float64).tolist(),
+            "current_right_tcp_pose_world_wxyz": np.asarray(renderer.get_current_tcp_pose("right"), dtype=np.float64).tolist(),
+            "replay_head_camera_pose_world_wxyz": None
+            if debug_execution_state.replay_head_camera_pose_by_frame is None or debug_execution_state.active_frame is None
+            else np.asarray(
+                debug_execution_state.replay_head_camera_pose_by_frame.get(int(debug_execution_state.active_frame), np.full(7, np.nan)),
+                dtype=np.float64,
+            ).tolist(),
+            "object_actor_poses": object_actor_poses,
+        }
+        with debug_execution_state.pose_debug_path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(pose_debug, ensure_ascii=False) + "\n")
     if debug_visuals is not None and not viewer_active:
         for actors in debug_visuals.common_candidate_actors.values():
             for actor in actors:
@@ -1887,6 +1941,10 @@ def main() -> None:
         raise NotADirectoryError(f"replay_dir not found: {args.replay_dir}")
     if not args.hand_npz.is_file():
         raise FileNotFoundError(f"hand_npz not found: {args.hand_npz}")
+    if bool(args.save_pose_debug):
+        pose_debug_path = args.output_dir / "pose_debug.jsonl"
+        if pose_debug_path.exists():
+            pose_debug_path.unlink()
 
     args.manual_candidate_overrides = parse_manual_candidate_overrides(args.manual_candidate)
     args.object_mesh_overrides = parse_object_mesh_overrides(args.object_mesh_override)
@@ -1900,6 +1958,7 @@ def main() -> None:
     hand_data = load_hand_data(args.hand_npz)
     keyframes = [int(v) for v in args.keyframes]
     replay_frame_indices, object_tracks = load_object_tracks(args.replay_dir, args.object_mesh_overrides)
+    replay_head_camera_pose_by_frame = load_replay_head_camera_poses(args.replay_dir)
     object_states_per_frame = {frame: load_object_states(args.replay_dir, frame, args.object_mesh_overrides) for frame in keyframes}
     selection_result, arm_debugs = choose_keyframes(
         renderer=renderer,
@@ -2027,6 +2086,9 @@ def main() -> None:
         arm_display_candidates=arm_display_candidates,
         head_intrinsic=head_intrinsic,
         active_frame=None,
+        pose_debug_path=(args.output_dir / "pose_debug.jsonl") if bool(args.save_pose_debug) else None,
+        replay_head_camera_pose_by_frame=replay_head_camera_pose_by_frame,
+        object_tracks=object_tracks,
     )
     use_overlay = bool(args.overlay_text)
     dual_sync_mode = bool(args.execute_both_arms) and args.arm == "auto" and len(execution_sequences) >= 2

@@ -280,6 +280,7 @@ def main() -> None:
         )
 
     try:
+        aligned_head_camera_pose_world: List[np.ndarray] = []
         for replay_idx, source_frame in enumerate(selected_source_frames):
             visible_names = []
             debug_objects = []
@@ -314,6 +315,8 @@ def main() -> None:
 
             renderer.update_robot_link_cameras()
             renderer.step_scene(steps=1)
+            head_pose_world = pose_to_list(renderer.get_head_camera_pose())
+            aligned_head_camera_pose_world.append(np.asarray(head_pose_world, dtype=np.float64))
 
             overlay_lines = [
                 f"source_frame={source_frame}",
@@ -327,7 +330,7 @@ def main() -> None:
                     "source_frame": int(source_frame),
                     "replay_step": int(replay_idx + 1),
                     "robot_base_pose_world_wxyz": None if getattr(renderer, "_base_pose", None) is None else pose_to_list(renderer._base_pose),
-                    "head_camera_pose_world_wxyz": pose_to_list(head_pose),
+                    "head_camera_pose_world_wxyz": head_pose_world,
                     "left_tcp_pose_world_wxyz": np.asarray(renderer.get_current_tcp_pose("left"), dtype=np.float64).tolist(),
                     "right_tcp_pose_world_wxyz": np.asarray(renderer.get_current_tcp_pose("right"), dtype=np.float64).tolist(),
                     "objects": debug_objects,
@@ -373,6 +376,7 @@ def main() -> None:
         "input_dir": str(args.input_dir),
         "selected_source_frame_indices": np.asarray(selected_source_frames, dtype=np.int32),
         "object_names": np.asarray([entry.name for entry in object_entries], dtype=object),
+        "head_camera_pose_world_wxyz": np.asarray(aligned_head_camera_pose_world, dtype=np.float64),
     }
     for entry in object_entries:
         key = to_npz_key(entry.name)
