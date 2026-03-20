@@ -2,6 +2,26 @@
 
 ## 2026-03-20
 
+- Added per-frame execution diagnostics to the AnyGrasp planner debug path.
+- `debug_execution_preview.mp4` now renders a colored metric panel for left/right arms, including:
+  - target minus current end-effector pose
+  - planned object pose minus actual object pose
+  - target pose minus actual object pose
+  - current end-effector pose minus actual object pose
+- Added `debug_execution_metrics.jsonl` to the planner output directory. This file is written alongside execution preview frames and records, per frame:
+  - current planner stage
+  - active keyframe
+  - current head-camera pose
+  - replay-export head-camera pose for the same active frame
+  - per-arm target object name
+  - target pose, current evaluated pose, current TCP pose
+  - target/current xyz deltas
+  - planned-object/actual-object xyz deltas
+  - target-object and current-object xyz deltas
+- This change is meant to make coordinate-frame and object-follow debugging easier than reading only stage-level `attempt_history` summaries.
+- Validation:
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_anygrasp_keyframes_r1_batch.py`
+
 - Added `--candidate_target_local_x_offset_m` to the AnyGrasp planner and batch wrapper. This applies an explicit local-`+X` translation to each imported AnyGrasp target pose before visualization and planning, so the workflow can switch cleanly between "raw candidate behaves like wrist/endlink" and "planner input should represent fingertip TCP" without rewriting the TCP->endlink chain.
 - Extended `plan_summary.json` so selected and ranked candidates now record both `raw_pose_world_wxyz` and the final planning/visualization `pose_world_wxyz`, plus the top-level `candidate_target_local_x_offset_m` used for the run.
 - Added paired analysis docs:

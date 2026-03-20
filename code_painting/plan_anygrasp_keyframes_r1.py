@@ -121,8 +121,14 @@ class DebugExecutionState:
     head_intrinsic: np.ndarray
     active_frame: Optional[int] = None
     pose_debug_path: Optional[Path] = None
+    metrics_debug_path: Optional[Path] = None
     replay_head_camera_pose_by_frame: Optional[Dict[int, np.ndarray]] = None
     object_tracks: Optional[Dict[str, ObjectTrack]] = None
+    current_stage: Optional[str] = None
+    target_pose_by_arm: Optional[Dict[str, np.ndarray]] = None
+    target_object_by_arm: Optional[Dict[str, str]] = None
+    goal_label_by_arm: Optional[Dict[str, str]] = None
+    reach_error_pose_source: str = "tcp"
 
 
 @dataclass
@@ -1109,6 +1115,9 @@ def record_frame(
         third_rgb, _ = renderer.capture_camera(renderer.third_camera)
         third_bgr = base.overlay_text(third_rgb, overlay_lines) if use_overlay else cv2.cvtColor(third_rgb, cv2.COLOR_RGB2BGR)
         third_writer.write(third_bgr)
+    frame_metrics = None
+    if debug_execution_state is not None:
+        frame_metrics = build_execution_frame_metrics(renderer, debug_execution_state)
     if debug_execution_state is not None and debug_execution_state.writer is not None and debug_visuals is not None:
         renderer.update_robot_link_cameras()
         renderer.scene.update_render()
@@ -1139,6 +1148,8 @@ def record_frame(
                 debug_execution_state.active_frame,
             ),
         )
+        if frame_metrics is not None:
+            draw_execution_metric_panel(debug_bgr, frame_metrics)
         debug_execution_state.writer.write(debug_bgr)
     if debug_execution_state is not None and debug_execution_state.pose_debug_path is not None:
         current_head_pose = renderer.get_head_camera_pose()
@@ -1175,9 +1186,13 @@ def record_frame(
                 dtype=np.float64,
             ).tolist(),
             "object_actor_poses": object_actor_poses,
+            "frame_metrics": frame_metrics,
         }
         with debug_execution_state.pose_debug_path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(pose_debug, ensure_ascii=False) + "\n")
+    if debug_execution_state is not None and debug_execution_state.metrics_debug_path is not None and frame_metrics is not None:
+        with debug_execution_state.metrics_debug_path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(frame_metrics, ensure_ascii=False) + "\n")
     if debug_visuals is not None and not viewer_active:
         for actors in debug_visuals.common_candidate_actors.values():
             for actor in actors:
@@ -1201,6 +1216,125 @@ def pose_with_offset_along_local_x(pose_world_wxyz: np.ndarray, offset_m: float)
     rot = pose_world_matrix[:3, :3]
     quat = base.quat_xyzw_to_wxyz(R.from_matrix(rot).as_quat())
     return np.concatenate([pose_world_matrix[:3, 3], quat]).astype(np.float64)
+
+
+def vector_with_distance(vec_xyz: np.ndarray) -> Dict[str, object]:
+    vec_xyz = np.asarray(vec_xyz, dtype=np.float64).reshape(3)
+    return {
+        "xyz_m": vec_xyz.tolist(),
+        "distance_m": float(np.linalg.norm(vec_xyz)),
+    }
+
+
+def build_execution_frame_metrics(
+    renderer: ReplayRenderer,
+    debug_execution_state: DebugExecutionState,
+) -> Dict[str, object]:
+    current_head_pose = renderer.get_head_camera_pose()
+    metrics: Dict[str, object] = {
+        "active_frame": None if debug_execution_state.active_frame is None else int(debug_execution_state.active_frame),
+        "stage": debug_execution_state.current_stage,
+        "reach_error_pose_source": str(debug_execution_state.reach_error_pose_source),
+        "current_head_camera_pose_world_wxyz": (
+            np.asarray(current_head_pose.p, dtype=np.float64).reshape(3).tolist()
+            + base.normalize_quat_wxyz(np.asarray(current_head_pose.q, dtype=np.float64).reshape(4)).tolist()
+        ),
+        "replay_head_camera_pose_world_wxyz": None,
+        "arms": {},
+    }
+    if debug_execution_state.replay_head_camera_pose_by_frame is not None and debug_execution_state.active_frame is not None:
+        replay_head_pose = debug_execution_state.replay_head_camera_pose_by_frame.get(int(debug_execution_state.active_frame))
+        if replay_head_pose is not None:
+            metrics["replay_head_camera_pose_world_wxyz"] = np.asarray(replay_head_pose, dtype=np.float64).tolist()
+
+    target_pose_by_arm = debug_execution_state.target_pose_by_arm or {}
+    target_object_by_arm = debug_execution_state.target_object_by_arm or {}
+    goal_label_by_arm = debug_execution_state.goal_label_by_arm or {}
+    object_tracks = debug_execution_state.object_tracks or {}
+
+    for arm_name, target_pose_world in target_pose_by_arm.items():
+        target_pose_world = np.asarray(target_pose_world, dtype=np.float64).reshape(7)
+        current_eval_pose = get_current_pose_for_error(renderer, arm_name, debug_execution_state.reach_error_pose_source)
+        target_eval_pose = target_pose_for_error(renderer, arm_name, target_pose_world, debug_execution_state.reach_error_pose_source)
+        current_tcp_pose = np.asarray(renderer.get_current_tcp_pose(arm_name), dtype=np.float64).reshape(7)
+        arm_metrics: Dict[str, object] = {
+            "goal_label": goal_label_by_arm.get(arm_name),
+            "target_object": target_object_by_arm.get(arm_name),
+            "target_pose_world_wxyz": target_pose_world.tolist(),
+            "target_eval_pose_world_wxyz": target_eval_pose.tolist(),
+            "current_eval_pose_world_wxyz": current_eval_pose.tolist(),
+            "current_tcp_pose_world_wxyz": current_tcp_pose.tolist(),
+            "target_minus_current": vector_with_distance(target_eval_pose[:3] - current_eval_pose[:3]),
+        }
+
+        obj_name = target_object_by_arm.get(arm_name)
+        track = None if obj_name is None else object_tracks.get(obj_name)
+        actual_obj_pose = None
+        replay_obj_pose = None
+        if track is not None and track.actor is not None:
+            actor_pose = track.actor.get_pose()
+            actual_obj_pose = np.concatenate(
+                [
+                    np.asarray(actor_pose.p, dtype=np.float64).reshape(3),
+                    base.normalize_quat_wxyz(np.asarray(actor_pose.q, dtype=np.float64).reshape(4)),
+                ]
+            ).astype(np.float64)
+            arm_metrics["actual_object_pose_world_wxyz"] = actual_obj_pose.tolist()
+            if debug_execution_state.active_frame is not None:
+                frame_to_idx = {int(frame): idx for idx, frame in enumerate(track.frame_indices.tolist())}
+                replay_idx = frame_to_idx.get(int(debug_execution_state.active_frame))
+                if replay_idx is not None:
+                    replay_obj_pose = np.asarray(track.pose_world_wxyz[replay_idx], dtype=np.float64).reshape(7)
+                    arm_metrics["planned_object_pose_world_wxyz"] = replay_obj_pose.tolist()
+        if actual_obj_pose is not None and replay_obj_pose is not None:
+            arm_metrics["planned_minus_actual_object"] = vector_with_distance(replay_obj_pose[:3] - actual_obj_pose[:3])
+        if actual_obj_pose is not None:
+            arm_metrics["target_minus_actual_object"] = vector_with_distance(target_eval_pose[:3] - actual_obj_pose[:3])
+            arm_metrics["actual_pose_minus_actual_object"] = vector_with_distance(current_eval_pose[:3] - actual_obj_pose[:3])
+        metrics["arms"][arm_name] = arm_metrics
+    return metrics
+
+
+def draw_execution_metric_panel(image_bgr: np.ndarray, frame_metrics: Dict[str, object]) -> None:
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    font_scale = 0.42
+    thickness = 1
+    line_h = 15
+    left_col_x = 8
+    right_col_x = max(int(image_bgr.shape[1] * 0.53), 320)
+    top_y = max(int(image_bgr.shape[0] * 0.42), 150)
+    colors = {
+        "header": (0, 255, 255),
+        "target": (255, 255, 0),
+        "actual": (0, 255, 0),
+        "error": (0, 0, 255),
+        "object": (0, 165, 255),
+    }
+
+    def short_xyz(vec_entry: Optional[Dict[str, object]]) -> str:
+        if not vec_entry:
+            return "n/a"
+        xyz = np.asarray(vec_entry.get("xyz_m", [np.nan, np.nan, np.nan]), dtype=np.float64).reshape(3)
+        dist = float(vec_entry.get("distance_m", np.nan))
+        return f"[{xyz[0]:+.3f},{xyz[1]:+.3f},{xyz[2]:+.3f}] d={dist:.3f}"
+
+    arm_columns = [("left", left_col_x), ("right", right_col_x)]
+    for arm_name, col_x in arm_columns:
+        arm_metrics = frame_metrics.get("arms", {}).get(arm_name)
+        if not arm_metrics:
+            continue
+        lines = [
+            (f"{arm_name.upper()} stage={frame_metrics.get('stage', 'n/a')} obj={arm_metrics.get('target_object', 'n/a')}", colors["header"]),
+            (f"goal={arm_metrics.get('goal_label', 'n/a')}", colors["header"]),
+            (f"tgt-cur {short_xyz(arm_metrics.get('target_minus_current'))}", colors["target"]),
+            (f"obj plan-act {short_xyz(arm_metrics.get('planned_minus_actual_object'))}", colors["error"]),
+            (f"tgt-obj {short_xyz(arm_metrics.get('target_minus_actual_object'))}", colors["object"]),
+            (f"cur-obj {short_xyz(arm_metrics.get('actual_pose_minus_actual_object'))}", colors["actual"]),
+        ]
+        y = top_y
+        for text, color in lines:
+            cv2.putText(image_bgr, text, (col_x, y), font, font_scale, color, thickness, cv2.LINE_AA)
+            y += line_h
 
 
 def sapien_pose_to_wxyz(pose: sapien.Pose) -> np.ndarray:
@@ -1729,6 +1863,8 @@ def pause_after_keyframe1(
     num_frames = max(int(round(seconds * float(args.fps))), 1)
     viewer_sleep = max(float(args.viewer_frame_delay), 0.0)
     print(f"[stage] reached keyframe_{int(goal_frame)} arm={arm_label}; pausing for {seconds:.2f}s before next target")
+    if debug_execution_state is not None:
+        debug_execution_state.current_stage = "pause_after_keyframe1"
     for pause_idx in range(num_frames):
         record_frame(
             renderer,
@@ -2021,6 +2157,9 @@ def main() -> None:
         pose_debug_path = args.output_dir / "pose_debug.jsonl"
         if pose_debug_path.exists():
             pose_debug_path.unlink()
+    metrics_debug_path = args.output_dir / "debug_execution_metrics.jsonl"
+    if metrics_debug_path.exists():
+        metrics_debug_path.unlink()
 
     args.manual_candidate_overrides = parse_manual_candidate_overrides(args.manual_candidate)
     args.object_mesh_overrides = parse_object_mesh_overrides(args.object_mesh_override)
@@ -2163,8 +2302,14 @@ def main() -> None:
         head_intrinsic=head_intrinsic,
         active_frame=None,
         pose_debug_path=(args.output_dir / "pose_debug.jsonl") if bool(args.save_pose_debug) else None,
+        metrics_debug_path=metrics_debug_path,
         replay_head_camera_pose_by_frame=replay_head_camera_pose_by_frame,
         object_tracks=object_tracks,
+        current_stage="init",
+        target_pose_by_arm={},
+        target_object_by_arm={},
+        goal_label_by_arm={},
+        reach_error_pose_source=str(args.reach_error_pose_source),
     )
     use_overlay = bool(args.overlay_text)
     dual_sync_mode = bool(args.execute_both_arms) and args.arm == "auto" and len(execution_sequences) >= 2
@@ -2245,6 +2390,12 @@ def main() -> None:
                 )
 
             debug_execution_state.active_frame = int(exec_selected_by_arm["left"][0].source_frame)
+            debug_execution_state.current_stage = "pregrasp"
+            debug_execution_state.target_pose_by_arm = {k: np.asarray(v, dtype=np.float64) for k, v in pregrasp_targets.items()}
+            debug_execution_state.target_object_by_arm = dict(selected_objects_by_executed_arm)
+            debug_execution_state.goal_label_by_arm = {
+                arm_name: f"keyframe_{int(seq[0].source_frame)}_pregrasp" for arm_name, seq in exec_selected_by_arm.items()
+            }
             set_dual_arm_target_visuals(
                 renderer,
                 pregrasp_targets.get("left"),
@@ -2263,6 +2414,11 @@ def main() -> None:
             )
 
             debug_execution_state.active_frame = int(exec_selected_by_arm["left"][0].source_frame)
+            debug_execution_state.current_stage = "grasp"
+            debug_execution_state.target_pose_by_arm = {k: np.asarray(v, dtype=np.float64) for k, v in grasp_targets.items()}
+            debug_execution_state.goal_label_by_arm = {
+                arm_name: f"keyframe_{int(seq[0].source_frame)}_grasp" for arm_name, seq in exec_selected_by_arm.items()
+            }
             set_dual_arm_target_visuals(
                 renderer,
                 grasp_targets.get("left"),
@@ -2286,6 +2442,7 @@ def main() -> None:
             )
 
             renderer.set_grippers(args.close_gripper, args.close_gripper)
+            debug_execution_state.current_stage = "close_gripper"
             record_frame(
                 renderer,
                 head_writer,
@@ -2317,6 +2474,11 @@ def main() -> None:
                     tcp_to_object_by_arm[arm_name] = np.linalg.inv(pose_wxyz_to_matrix(tcp_pose)) @ object_states[obj_name].pose_world_matrix
 
             debug_execution_state.active_frame = int(exec_selected_by_arm["left"][1].source_frame)
+            debug_execution_state.current_stage = "action"
+            debug_execution_state.target_pose_by_arm = {k: np.asarray(v, dtype=np.float64) for k, v in action_targets.items()}
+            debug_execution_state.goal_label_by_arm = {
+                arm_name: f"keyframe_{int(seq[1].source_frame)}_action" for arm_name, seq in exec_selected_by_arm.items()
+            }
             set_dual_arm_target_visuals(
                 renderer,
                 action_targets.get("left"),
@@ -2413,6 +2575,10 @@ def main() -> None:
                         end_frame=int(exec_selected_keyframes[1].source_frame),
                     )
                 debug_execution_state.active_frame = int(exec_selected_keyframes[0].source_frame)
+                debug_execution_state.current_stage = "init"
+                debug_execution_state.target_object_by_arm = {exec_arm: exec_object_name}
+                debug_execution_state.goal_label_by_arm = {exec_arm: f"keyframe_{int(exec_selected_keyframes[0].source_frame)}_grasp"}
+                debug_execution_state.target_pose_by_arm = {exec_arm: np.asarray(grasp_pose, dtype=np.float64)}
                 set_single_arm_target_visual(renderer, exec_arm, grasp_pose)
                 record_frame(
                     renderer,
@@ -2431,6 +2597,9 @@ def main() -> None:
                     debug_execution_state,
                 )
 
+                debug_execution_state.current_stage = "pregrasp"
+                debug_execution_state.target_pose_by_arm = {exec_arm: np.asarray(pregrasp_pose, dtype=np.float64)}
+                debug_execution_state.goal_label_by_arm = {exec_arm: f"keyframe_{int(exec_selected_keyframes[0].source_frame)}_pregrasp"}
                 pregrasp_result = execute_stage_until_reached(
                     renderer=renderer,
                     arm=exec_arm,
@@ -2447,6 +2616,9 @@ def main() -> None:
                     supervision_targets=supervision_targets,
                 )
 
+                debug_execution_state.current_stage = "grasp"
+                debug_execution_state.target_pose_by_arm = {exec_arm: np.asarray(grasp_pose, dtype=np.float64)}
+                debug_execution_state.goal_label_by_arm = {exec_arm: f"keyframe_{int(exec_selected_keyframes[0].source_frame)}_grasp"}
                 grasp_result = execute_stage_until_reached(
                     renderer=renderer,
                     arm=exec_arm,
@@ -2469,6 +2641,7 @@ def main() -> None:
 
                 set_single_arm_target_visual(renderer, exec_arm, grasp_pose)
                 renderer.set_grippers(args.close_gripper if exec_arm == "left" else None, args.close_gripper if exec_arm == "right" else None)
+                debug_execution_state.current_stage = "close_gripper"
                 record_frame(
                     renderer,
                     head_writer,
@@ -2498,6 +2671,9 @@ def main() -> None:
                     tcp_to_object = np.linalg.inv(pose_wxyz_to_matrix(tcp_pose)) @ object_states[exec_object_name].pose_world_matrix
 
                 debug_execution_state.active_frame = int(exec_selected_keyframes[1].source_frame)
+                debug_execution_state.current_stage = "action"
+                debug_execution_state.target_pose_by_arm = {exec_arm: np.asarray(action_pose, dtype=np.float64)}
+                debug_execution_state.goal_label_by_arm = {exec_arm: f"keyframe_{int(exec_selected_keyframes[1].source_frame)}_action"}
                 action_result = execute_stage_until_reached(
                     renderer=renderer,
                     arm=exec_arm,
@@ -2703,6 +2879,7 @@ def main() -> None:
             for item in rank_preview_records
         ],
         "debug_execution_video": str(debug_execution_video_path) if debug_execution_writer is not None else None,
+        "debug_execution_metrics": str(metrics_debug_path),
         "head_video": str(head_video_path),
         "third_video": str(third_video_path) if third_writer is not None else None,
     }
