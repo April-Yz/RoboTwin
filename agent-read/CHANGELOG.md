@@ -3,11 +3,15 @@
 ## 2026-03-20
 
 - Added `--candidate_keep_camera_up` and `--candidate_camera_top_axis` to the AnyGrasp planner and batch wrapper.
-- The new rule keeps local gripper `+X` fixed, treats the configured local top axis (`z` by default) as the camera/top direction, and resolves only the redundant roll around the forward axis so the mounted camera stays upward.
+- The initial camera-up rule over-constrained roll by trying to align the configured top axis too aggressively with world up. This could distort sideward grasps visually even though the forward axis stayed fixed.
+- Refined the camera-up rule so it now keeps local gripper `+X` fixed and only chooses between the original orientation and a `180`-degree roll flip around local `+X`, whichever places the configured top axis more upward. This matches the intended semantics: keep the camera on the upper side overall, not pin the gripper to one exact roll.
 - Extended `plan_summary.json` to record:
   - `candidate_keep_camera_up`
   - `candidate_camera_top_axis`
   - per-candidate `top_axis_up_dot`
+  - `original_top_axis_up_dot`
+  - `camera_up_flip_applied`
+  - `forward_axis_change_deg`
 - Added paired analysis docs:
   - `agent-read/V1.10_anygrasp_camera_up_rule.md`
   - `agent-read/V1.10_anygrasp_camera_up_rule_ZH.md`

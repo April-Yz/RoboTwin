@@ -69,6 +69,9 @@ class CandidatePose:
     nearest_object_distance_m: float
     rotation_distance_deg: float
     top_axis_up_dot: float
+    original_top_axis_up_dot: float
+    camera_up_flip_applied: int
+    forward_axis_change_deg: float
 
 
 @dataclass
@@ -157,7 +160,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--debug_common_candidate_top_k", type=int, default=0, help="How many raw-score candidates to show in green per keyframe. 0 hides them.")
     parser.add_argument("--candidate_orientation_remap_label", type=str, default="identity")
     parser.add_argument("--candidate_post_rot_xyz_deg", type=float, nargs=3, default=[0.0, 0.0, 0.0])
-    parser.add_argument("--candidate_keep_camera_up", type=int, default=0, help="If 1, remove free roll about the gripper forward axis by aligning the gripper top axis with world +Z as much as possible.")
+    parser.add_argument("--candidate_keep_camera_up", type=int, default=0, help="If 1, keep the gripper/camera top side facing upward overall while preserving the original grasp direction. The planner only resolves the redundant roll about the gripper forward axis.")
     parser.add_argument("--candidate_camera_top_axis", choices=["y", "z"], default="z", help="Which local gripper axis should be treated as the camera/top direction when --candidate_keep_camera_up=1.")
     parser.add_argument("--manual_candidate", type=str, nargs=3, action="append", default=[], metavar=("FRAME", "ARM", "CANDIDATE_IDX"), help="Optional manual candidate override, e.g. --manual_candidate 1 left 5. Partial overrides only reorder debug display; full two-frame overrides for one arm drive selection directly.")
     parser.add_argument("--object_mesh_override", action="append", default=[], help="Repeatable mesh override in the form NAME=/abs/path/to/mesh.obj, e.g. cup=/.../blue_cup.obj")
@@ -411,14 +414,20 @@ def candidate_to_world_pose(renderer: ReplayRenderer, args: argparse.Namespace, 
     )
     pose_world_wxyz = renderer.camera_to_world_pose(trans_cam, remapped_rotation)
     pose_world_matrix = pose_wxyz_to_matrix(pose_world_wxyz)
+    original_rotation_world = pose_world_matrix[:3, :3].copy()
+    roll_debug = {
+        "original_top_axis_up_dot": top_axis_up_dot(original_rotation_world, args.candidate_camera_top_axis),
+        "camera_up_flip_applied": 0,
+        "forward_axis_change_deg": 0.0,
+    }
     if bool(args.candidate_keep_camera_up):
-        pose_world_matrix[:3, :3] = constrain_roll_keep_top_axis_up(
+        pose_world_matrix[:3, :3], roll_debug = constrain_roll_keep_top_axis_up(
             pose_world_matrix[:3, :3],
             top_axis=args.candidate_camera_top_axis,
         )
         quat = base.quat_xyzw_to_wxyz(R.from_matrix(base.orthonormalize_rotation(pose_world_matrix[:3, :3])).as_quat())
         pose_world_wxyz = np.concatenate([pose_world_matrix[:3, 3], quat]).astype(np.float64)
-    return pose_world_wxyz, pose_world_matrix
+    return pose_world_wxyz, pose_world_matrix, roll_debug
 
 
 def top_axis_up_dot(rotation_world: np.ndarray, top_axis: str) -> float:
@@ -427,28 +436,30 @@ def top_axis_up_dot(rotation_world: np.ndarray, top_axis: str) -> float:
     return float(np.dot(axis_vec, np.array([0.0, 0.0, 1.0], dtype=np.float64)))
 
 
-def constrain_roll_keep_top_axis_up(rotation_world: np.ndarray, top_axis: str) -> np.ndarray:
+def forward_axis_change_deg(rotation_a: np.ndarray, rotation_b: np.ndarray) -> float:
+    x_a = np.asarray(rotation_a, dtype=np.float64).reshape(3, 3)[:, 0]
+    x_b = np.asarray(rotation_b, dtype=np.float64).reshape(3, 3)[:, 0]
+    dot = float(np.clip(np.dot(x_a, x_b) / max(np.linalg.norm(x_a) * np.linalg.norm(x_b), 1e-12), -1.0, 1.0))
+    return float(np.rad2deg(np.arccos(dot)))
+
+
+def constrain_roll_keep_top_axis_up(rotation_world: np.ndarray, top_axis: str) -> Tuple[np.ndarray, Dict[str, float]]:
     rot = base.orthonormalize_rotation(rotation_world)
-    x_axis = rot[:, 0].copy()
-    x_axis = x_axis / max(np.linalg.norm(x_axis), 1e-12)
-    world_up = np.array([0.0, 0.0, 1.0], dtype=np.float64)
-    top_proj = world_up - x_axis * float(np.dot(world_up, x_axis))
-    if np.linalg.norm(top_proj) <= 1e-6:
-        return rot
-    top_proj = top_proj / np.linalg.norm(top_proj)
-    if top_axis == "y":
-        y_axis = top_proj
-        z_axis = np.cross(x_axis, y_axis)
-        z_axis = z_axis / max(np.linalg.norm(z_axis), 1e-12)
-        y_axis = np.cross(z_axis, x_axis)
-        y_axis = y_axis / max(np.linalg.norm(y_axis), 1e-12)
+    roll_flip_180 = np.diag([1.0, -1.0, -1.0]).astype(np.float64)
+    rot_flipped = base.orthonormalize_rotation(rot @ roll_flip_180)
+    base_dot = top_axis_up_dot(rot, top_axis)
+    flipped_dot = top_axis_up_dot(rot_flipped, top_axis)
+    if flipped_dot > base_dot + 1e-9:
+        chosen = rot_flipped
+        flip_applied = 1
     else:
-        z_axis = top_proj
-        y_axis = np.cross(z_axis, x_axis)
-        y_axis = y_axis / max(np.linalg.norm(y_axis), 1e-12)
-        z_axis = np.cross(x_axis, y_axis)
-        z_axis = z_axis / max(np.linalg.norm(z_axis), 1e-12)
-    return base.orthonormalize_rotation(np.column_stack([x_axis, y_axis, z_axis]))
+        chosen = rot
+        flip_applied = 0
+    return chosen, {
+        "original_top_axis_up_dot": float(base_dot),
+        "camera_up_flip_applied": int(flip_applied),
+        "forward_axis_change_deg": float(forward_axis_change_deg(rot, chosen)),
+    }
 
 
 def nearest_object_name(candidate_world_matrix: np.ndarray, object_states: Dict[str, ObjectState]) -> Tuple[str, float]:
@@ -504,7 +515,7 @@ def build_ranked_candidates_for_arm(
         distance_pass = 0
         for candidate_idx, grasp in enumerate(load_anygrasp_candidates(anygrasp_dir, frame)):
             total += 1
-            pose_world_wxyz, pose_world_matrix = candidate_to_world_pose(renderer, args, grasp)
+            pose_world_wxyz, pose_world_matrix, roll_debug = candidate_to_world_pose(renderer, args, grasp)
             nearest_name, nearest_dist = nearest_object_name(pose_world_matrix, object_states_per_frame[frame])
             candidate = CandidatePose(
                 candidate_idx=candidate_idx,
@@ -519,6 +530,9 @@ def build_ranked_candidates_for_arm(
                 nearest_object_distance_m=nearest_dist,
                 rotation_distance_deg=rotation_distance_deg(ref_rotation, grasp["rotation_matrix"]),
                 top_axis_up_dot=top_axis_up_dot(pose_world_matrix[:3, :3], args.candidate_camera_top_axis),
+                original_top_axis_up_dot=float(roll_debug["original_top_axis_up_dot"]),
+                camera_up_flip_applied=int(roll_debug["camera_up_flip_applied"]),
+                forward_axis_change_deg=float(roll_debug["forward_axis_change_deg"]),
             )
             raw_candidates.append(candidate)
             object_ok = expected_object is None or nearest_name == expected_object
@@ -2529,6 +2543,9 @@ def main() -> None:
                             "nearest_object": item.candidate.nearest_object,
                             "rotation_distance_deg": item.candidate.rotation_distance_deg,
                             "top_axis_up_dot": item.candidate.top_axis_up_dot,
+                            "original_top_axis_up_dot": item.candidate.original_top_axis_up_dot,
+                            "camera_up_flip_applied": item.candidate.camera_up_flip_applied,
+                            "forward_axis_change_deg": item.candidate.forward_axis_change_deg,
                         }
                         for item in arm_info.selected_keyframes
                     ]
@@ -2573,6 +2590,9 @@ def main() -> None:
                 "width_m": item.candidate.width_m,
                 "depth_m": item.candidate.depth_m,
                 "top_axis_up_dot": item.candidate.top_axis_up_dot,
+                "original_top_axis_up_dot": item.candidate.original_top_axis_up_dot,
+                "camera_up_flip_applied": item.candidate.camera_up_flip_applied,
+                "forward_axis_change_deg": item.candidate.forward_axis_change_deg,
                 "pose_world_wxyz": item.candidate.pose_world_wxyz.tolist(),
                 "translation_cam": item.candidate.translation_cam.tolist(),
                 "rotation_cam": item.candidate.rotation_cam.tolist(),
@@ -2593,6 +2613,9 @@ def main() -> None:
                     "width_m": item.candidate.width_m,
                     "depth_m": item.candidate.depth_m,
                     "top_axis_up_dot": item.candidate.top_axis_up_dot,
+                    "original_top_axis_up_dot": item.candidate.original_top_axis_up_dot,
+                    "camera_up_flip_applied": item.candidate.camera_up_flip_applied,
+                    "forward_axis_change_deg": item.candidate.forward_axis_change_deg,
                     "pose_world_wxyz": item.candidate.pose_world_wxyz.tolist(),
                     "translation_cam": item.candidate.translation_cam.tolist(),
                     "rotation_cam": item.candidate.rotation_cam.tolist(),
@@ -2613,6 +2636,9 @@ def main() -> None:
                     "width_m": cand.width_m,
                     "depth_m": cand.depth_m,
                     "top_axis_up_dot": cand.top_axis_up_dot,
+                    "original_top_axis_up_dot": cand.original_top_axis_up_dot,
+                    "camera_up_flip_applied": cand.camera_up_flip_applied,
+                    "forward_axis_change_deg": cand.forward_axis_change_deg,
                     "pose_world_wxyz": cand.pose_world_wxyz.tolist(),
                 }
                 for cand in ranked_candidates_per_frame.get(int(frame), [])[: max(int(args.debug_candidate_top_k), 0)]
@@ -2630,6 +2656,9 @@ def main() -> None:
                     "width_m": cand.width_m,
                     "depth_m": cand.depth_m,
                     "top_axis_up_dot": cand.top_axis_up_dot,
+                    "original_top_axis_up_dot": cand.original_top_axis_up_dot,
+                    "camera_up_flip_applied": cand.camera_up_flip_applied,
+                    "forward_axis_change_deg": cand.forward_axis_change_deg,
                     "pose_world_wxyz": cand.pose_world_wxyz.tolist(),
                 }
                 for cand in all_candidates_per_frame.get(int(frame), [])
