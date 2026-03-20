@@ -1337,6 +1337,151 @@ def draw_execution_metric_panel(image_bgr: np.ndarray, frame_metrics: Dict[str, 
             y += line_h
 
 
+def load_jsonl_records(path: Path) -> List[Dict[str, object]]:
+    records: List[Dict[str, object]] = []
+    if not path.is_file():
+        return records
+    with path.open("r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            records.append(json.loads(line))
+    return records
+
+
+def iter_stage_spans(stage_names: Sequence[str]) -> List[Tuple[int, int, str]]:
+    if not stage_names:
+        return []
+    spans: List[Tuple[int, int, str]] = []
+    start_idx = 0
+    current = str(stage_names[0])
+    for idx in range(1, len(stage_names)):
+        stage = str(stage_names[idx])
+        if stage != current:
+            spans.append((start_idx, idx - 1, current))
+            start_idx = idx
+            current = stage
+    spans.append((start_idx, len(stage_names) - 1, current))
+    return spans
+
+
+def generate_execution_analysis_plots(
+    metrics_path: Path,
+    output_dir: Path,
+    fps: float,
+) -> List[str]:
+    records = load_jsonl_records(metrics_path)
+    if not records:
+        return []
+
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    time_s = np.arange(len(records), dtype=np.float64) / max(float(fps), 1e-6)
+    stages = [str(record.get("stage", "unknown")) for record in records]
+    stage_spans = iter_stage_spans(stages)
+    stage_colors = {
+        "init": "#f0f0f0",
+        "pregrasp": "#dceeff",
+        "grasp": "#dff7df",
+        "close_gripper": "#fff2cc",
+        "pause_after_keyframe1": "#f5e1ff",
+        "action": "#ffe4d6",
+    }
+
+    def arm_series(arm_name: str, metric_name: str) -> np.ndarray:
+        values = []
+        for record in records:
+            arm_metrics = record.get("arms", {}).get(arm_name, {})
+            metric = arm_metrics.get(metric_name)
+            if not metric:
+                values.append([np.nan, np.nan, np.nan])
+                continue
+            if isinstance(metric, dict) and "xyz_m" in metric:
+                xyz = np.asarray(metric.get("xyz_m", [np.nan, np.nan, np.nan]), dtype=np.float64).reshape(3)
+                values.append(xyz)
+            else:
+                values.append([np.nan, np.nan, np.nan])
+        return np.asarray(values, dtype=np.float64)
+
+    def arm_distance_series(arm_name: str, metric_name: str) -> np.ndarray:
+        values = []
+        for record in records:
+            arm_metrics = record.get("arms", {}).get(arm_name, {})
+            metric = arm_metrics.get(metric_name)
+            values.append(float(metric.get("distance_m", np.nan)) if isinstance(metric, dict) else np.nan)
+        return np.asarray(values, dtype=np.float64)
+
+    def shade_stage_background(ax) -> None:
+        for start_idx, end_idx, stage_name in stage_spans:
+            color = stage_colors.get(stage_name, "#eeeeee")
+            ax.axvspan(time_s[start_idx], time_s[end_idx], color=color, alpha=0.18, linewidth=0.0)
+
+    written: List[str] = []
+    for arm_name in ("left", "right"):
+        arm_present = any(arm_name in record.get("arms", {}) for record in records)
+        if not arm_present:
+            continue
+
+        target_current_xyz = arm_series(arm_name, "target_minus_current")
+        target_current_d = arm_distance_series(arm_name, "target_minus_current")
+        fig, axes = plt.subplots(2, 1, figsize=(11, 7), sharex=True)
+        shade_stage_background(axes[0])
+        axes[0].plot(time_s, target_current_d, color="black", linewidth=1.8, label="distance")
+        axes[0].set_ylabel("meters")
+        axes[0].set_title(f"{arm_name} target-current error vs time")
+        axes[0].grid(True, alpha=0.3)
+        axes[0].legend(loc="upper right")
+
+        shade_stage_background(axes[1])
+        axes[1].plot(time_s, target_current_xyz[:, 0], color="#d62728", linewidth=1.2, label="dx")
+        axes[1].plot(time_s, target_current_xyz[:, 1], color="#2ca02c", linewidth=1.2, label="dy")
+        axes[1].plot(time_s, target_current_xyz[:, 2], color="#1f77b4", linewidth=1.2, label="dz")
+        axes[1].set_ylabel("meters")
+        axes[1].set_xlabel("time (s)")
+        axes[1].grid(True, alpha=0.3)
+        axes[1].legend(loc="upper right")
+        fig.tight_layout()
+        out_path = output_dir / f"{arm_name}_target_current_error_vs_time.png"
+        fig.savefig(out_path, dpi=180)
+        plt.close(fig)
+        written.append(str(out_path))
+
+        planned_actual_d = arm_distance_series(arm_name, "planned_minus_actual_object")
+        target_object_d = arm_distance_series(arm_name, "target_minus_actual_object")
+        current_object_d = arm_distance_series(arm_name, "actual_pose_minus_actual_object")
+        fig, axes = plt.subplots(2, 1, figsize=(11, 7), sharex=True)
+        shade_stage_background(axes[0])
+        axes[0].plot(time_s, planned_actual_d, color="#d62728", linewidth=1.4, label="planned-actual object")
+        axes[0].plot(time_s, target_object_d, color="#ff7f0e", linewidth=1.4, label="target-object")
+        axes[0].plot(time_s, current_object_d, color="#2ca02c", linewidth=1.4, label="current-object")
+        axes[0].set_ylabel("meters")
+        axes[0].set_title(f"{arm_name} object distance diagnostics vs time")
+        axes[0].grid(True, alpha=0.3)
+        axes[0].legend(loc="upper right")
+
+        target_object_xyz = arm_series(arm_name, "target_minus_actual_object")
+        shade_stage_background(axes[1])
+        axes[1].plot(time_s, target_object_xyz[:, 0], color="#d62728", linewidth=1.2, label="dx")
+        axes[1].plot(time_s, target_object_xyz[:, 1], color="#2ca02c", linewidth=1.2, label="dy")
+        axes[1].plot(time_s, target_object_xyz[:, 2], color="#1f77b4", linewidth=1.2, label="dz")
+        axes[1].set_ylabel("meters")
+        axes[1].set_xlabel("time (s)")
+        axes[1].grid(True, alpha=0.3)
+        axes[1].legend(loc="upper right")
+        fig.tight_layout()
+        out_path = output_dir / f"{arm_name}_object_distance_vs_time.png"
+        fig.savefig(out_path, dpi=180)
+        plt.close(fig)
+        written.append(str(out_path))
+
+    return written
+
+
 def sapien_pose_to_wxyz(pose: sapien.Pose) -> np.ndarray:
     return np.concatenate([np.asarray(pose.p, dtype=np.float64), np.asarray(pose.q, dtype=np.float64)]).astype(np.float64)
 
@@ -2710,6 +2855,11 @@ def main() -> None:
     primary_stages = stages_by_executed_arm[primary_exec_arm]
     primary_supervision_targets = supervision_targets_by_executed_arm[primary_exec_arm]
     primary_supervision_only_arms = supervision_only_arms_by_executed_arm[primary_exec_arm]
+    analysis_plot_paths = generate_execution_analysis_plots(
+        metrics_path=metrics_debug_path,
+        output_dir=args.output_dir / "analysis_plots",
+        fps=float(args.debug_execution_fps),
+    )
 
     summary = {
         "anygrasp_dir": str(args.anygrasp_dir),
@@ -2880,6 +3030,7 @@ def main() -> None:
         ],
         "debug_execution_video": str(debug_execution_video_path) if debug_execution_writer is not None else None,
         "debug_execution_metrics": str(metrics_debug_path),
+        "analysis_plots": analysis_plot_paths,
         "head_video": str(head_video_path),
         "third_video": str(third_video_path) if third_writer is not None else None,
     }

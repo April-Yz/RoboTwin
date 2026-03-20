@@ -18,6 +18,10 @@
   - target/current xyz deltas
   - planned-object/actual-object xyz deltas
   - target-object and current-object xyz deltas
+- Added automatic PNG chart export under `output_dir/analysis_plots/`:
+  - `{left,right}_target_current_error_vs_time.png`
+  - `{left,right}_object_distance_vs_time.png`
+- The new charts are generated from `debug_execution_metrics.jsonl` and focus on time-vs-error inspection, especially the relationship between target/current pose error and object-relative distances.
 - This change is meant to make coordinate-frame and object-follow debugging easier than reading only stage-level `attempt_history` summaries.
 - Validation:
   - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_anygrasp_keyframes_r1_batch.py`
