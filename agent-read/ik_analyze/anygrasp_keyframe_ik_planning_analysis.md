@@ -287,3 +287,17 @@ CUDA_VISIBLE_DEVICES=3 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_
 1. Backend A old mode is still available and unchanged in semantics.
 2. Backend A new mode makes the TCP path explicit before IK, which is usually a better match for your current debugging goal.
 3. Backend B is still the better answer when you need true planning quality rather than just smoother IK execution.
+
+## 10. Selected-keyframe camera-up rule
+
+For `--candidate_keep_camera_up 1`, the current behavior is now sequential instead of independent per keyframe:
+
+1. keyframe 1 still resolves the roll ambiguity by comparing:
+   - the original pose
+   - the pose rolled by `180` degrees around local `+X`
+   and keeping the more upward-facing one.
+2. later keyframes still compare only those same two equivalent roll states,
+   but they now choose the variant whose rotation change from the previous selected keyframe is smaller.
+3. if the difference is nearly tied, the more upward-facing variant is preferred.
+
+This change is intended to stop keyframe 22 from making a full extra roll around the forward axis when keyframe 1 already established a good camera-up baseline.

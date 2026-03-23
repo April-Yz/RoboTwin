@@ -164,3 +164,11 @@
 - Validation: `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/render_multi_object_pose_r1_npz.py`
 - Extended multi-object replay export so `multi_object_world_poses.npz` now also stores `head_camera_pose_world_wxyz` for each exported frame. Added planner-side `--save_pose_debug` support so `plan_anygrasp_keyframes_r1.py` can dump current planner head-camera pose, left/right TCP poses, current object actor poses, and replay-export head-camera poses into `pose_debug.jsonl`.
 - Validation: `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/render_multi_object_pose_r1_npz.py code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_anygrasp_keyframes_r1_batch.py`
+
+## 2026-03-23
+
+- Added `agent-read/V1.12_object_and_gripper_replay_logic_ZH.md` and `agent-read/V1.12_object_and_gripper_replay_logic.md` to document the current combined AnyGrasp keyframe execution plus object-track replay logic.
+- Updated selected-keyframe camera-up behavior in `code_painting/plan_anygrasp_keyframes_r1.py`: keyframe 1 still resolves the local-`+X` 180-degree roll ambiguity using the upward-facing rule, while later keyframes now choose the equivalent roll variant with the smaller rotation change relative to the previous selected keyframe. This prevents large extra roll spins between keyframe 1 and keyframe 22.
+- Added `camera_up_selection_mode` to selected-candidate debug / summary outputs so it is explicit whether a keyframe used `keyframe1_keep_up`, `follow_previous_base`, or `follow_previous_flip180`.
+- Updated `agent-read/ik_analyze/anygrasp_keyframe_ik_planning_analysis.md` and `.en.md` with the new sequential camera-up rule.
+- Validation: `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/plan_anygrasp_keyframes_r1.py`

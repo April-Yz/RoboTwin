@@ -8,7 +8,7 @@ import json
 import os
 import sys
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
@@ -74,6 +74,7 @@ class CandidatePose:
     original_top_axis_up_dot: float
     camera_up_flip_applied: int
     forward_axis_change_deg: float
+    camera_up_selection_mode: str = "none"
 
 
 @dataclass
@@ -503,6 +504,101 @@ def constrain_roll_keep_top_axis_up(rotation_world: np.ndarray, top_axis: str) -
     }
 
 
+def build_candidate_pose_variant(
+    candidate: CandidatePose,
+    args: argparse.Namespace,
+    *,
+    flip_roll_180: bool,
+    selection_mode: str,
+) -> CandidatePose:
+    pose_world_wxyz = np.asarray(candidate.raw_pose_world_wxyz, dtype=np.float64).reshape(7).copy()
+    if abs(float(args.candidate_target_local_x_offset_m)) > 1e-12:
+        pose_world_wxyz = shift_pose_along_local_x(pose_world_wxyz, float(args.candidate_target_local_x_offset_m))
+    pose_world_matrix = pose_wxyz_to_matrix(pose_world_wxyz)
+    rot = base.orthonormalize_rotation(pose_world_matrix[:3, :3])
+    if bool(flip_roll_180):
+        rot = base.orthonormalize_rotation(rot @ np.diag([1.0, -1.0, -1.0]).astype(np.float64))
+    pose_world_matrix[:3, :3] = rot
+    quat = base.quat_xyzw_to_wxyz(R.from_matrix(rot).as_quat())
+    pose_world_wxyz = np.concatenate([pose_world_matrix[:3, 3], quat]).astype(np.float64)
+    return replace(
+        candidate,
+        pose_world_wxyz=pose_world_wxyz,
+        pose_world_matrix=pose_world_matrix,
+        top_axis_up_dot=top_axis_up_dot(rot, args.candidate_camera_top_axis),
+        original_top_axis_up_dot=top_axis_up_dot(base.orthonormalize_rotation(candidate.raw_pose_world_matrix[:3, :3]), args.candidate_camera_top_axis),
+        camera_up_flip_applied=int(bool(flip_roll_180)),
+        forward_axis_change_deg=float(
+            forward_axis_change_deg(
+                base.orthonormalize_rotation(candidate.raw_pose_world_matrix[:3, :3]),
+                rot,
+            )
+        ),
+        camera_up_selection_mode=selection_mode,
+    )
+
+
+def choose_roll_variant_with_previous(
+    previous_rotation_world: np.ndarray,
+    candidate: CandidatePose,
+    args: argparse.Namespace,
+) -> CandidatePose:
+    variants = [
+        build_candidate_pose_variant(candidate, args, flip_roll_180=False, selection_mode="follow_previous_base"),
+        build_candidate_pose_variant(candidate, args, flip_roll_180=True, selection_mode="follow_previous_flip180"),
+    ]
+    prev_rot = base.orthonormalize_rotation(previous_rotation_world)
+    variants.sort(
+        key=lambda cand: (
+            rotation_distance_deg_matrix(prev_rot, cand.pose_world_matrix[:3, :3]),
+            -float(cand.top_axis_up_dot),
+        )
+    )
+    return variants[0]
+
+
+def postprocess_selected_keyframe_rolls(
+    selected_keyframes: Sequence[SelectedKeyframe],
+    args: argparse.Namespace,
+) -> List[SelectedKeyframe]:
+    if not bool(args.candidate_keep_camera_up):
+        return list(selected_keyframes)
+    processed: List[SelectedKeyframe] = []
+    previous_rotation_world: Optional[np.ndarray] = None
+    for idx, item in enumerate(selected_keyframes):
+        if idx == 0:
+            chosen_rot, roll_debug = constrain_roll_keep_top_axis_up(
+                item.candidate.pose_world_matrix[:3, :3],
+                top_axis=args.candidate_camera_top_axis,
+            )
+            chosen_matrix = np.asarray(item.candidate.pose_world_matrix, dtype=np.float64).copy()
+            chosen_matrix[:3, :3] = chosen_rot
+            quat = base.quat_xyzw_to_wxyz(R.from_matrix(chosen_rot).as_quat())
+            chosen_pose = np.concatenate([chosen_matrix[:3, 3], quat]).astype(np.float64)
+            chosen_candidate = replace(
+                item.candidate,
+                pose_world_wxyz=chosen_pose,
+                pose_world_matrix=chosen_matrix,
+                top_axis_up_dot=top_axis_up_dot(chosen_rot, args.candidate_camera_top_axis),
+                original_top_axis_up_dot=float(roll_debug["original_top_axis_up_dot"]),
+                camera_up_flip_applied=int(roll_debug["camera_up_flip_applied"]),
+                forward_axis_change_deg=float(roll_debug["forward_axis_change_deg"]),
+                camera_up_selection_mode="keyframe1_keep_up",
+            )
+        else:
+            chosen_candidate = choose_roll_variant_with_previous(previous_rotation_world, item.candidate, args)
+        processed.append(
+            SelectedKeyframe(
+                source_frame=item.source_frame,
+                arm=item.arm,
+                candidate=chosen_candidate,
+                hand_rotation_cam=item.hand_rotation_cam,
+            )
+        )
+        previous_rotation_world = np.asarray(chosen_candidate.pose_world_matrix[:3, :3], dtype=np.float64)
+    return processed
+
+
 def nearest_object_name(candidate_world_matrix: np.ndarray, object_states: Dict[str, ObjectState]) -> Tuple[str, float]:
     pos = np.asarray(candidate_world_matrix[:3, 3], dtype=np.float64)
     best_name = ""
@@ -681,6 +777,7 @@ def select_keyframes_for_arm(
                     hand_rotation_cam=np.asarray(hand_rotations[frame], dtype=np.float64),
                 )
             )
+        manual_selection = postprocess_selected_keyframe_rolls(manual_selection, args)
         return ArmSelectionResult(
             arm=arm,
             expected_object=expected_object_for_arm(args, arm),
@@ -721,6 +818,7 @@ def select_keyframes_for_arm(
             ]
     if best_selection is None:
         return None
+    best_selection = postprocess_selected_keyframe_rolls(best_selection, args)
     return ArmSelectionResult(
         arm=arm,
         expected_object=expected_object_for_arm(args, arm),
@@ -2960,6 +3058,7 @@ def main() -> None:
                 "original_top_axis_up_dot": item.candidate.original_top_axis_up_dot,
                 "camera_up_flip_applied": item.candidate.camera_up_flip_applied,
                 "forward_axis_change_deg": item.candidate.forward_axis_change_deg,
+                "camera_up_selection_mode": item.candidate.camera_up_selection_mode,
                 "raw_pose_world_wxyz": item.candidate.raw_pose_world_wxyz.tolist(),
                 "pose_world_wxyz": item.candidate.pose_world_wxyz.tolist(),
                 "translation_cam": item.candidate.translation_cam.tolist(),
@@ -2984,6 +3083,7 @@ def main() -> None:
                     "original_top_axis_up_dot": item.candidate.original_top_axis_up_dot,
                     "camera_up_flip_applied": item.candidate.camera_up_flip_applied,
                     "forward_axis_change_deg": item.candidate.forward_axis_change_deg,
+                    "camera_up_selection_mode": item.candidate.camera_up_selection_mode,
                     "raw_pose_world_wxyz": item.candidate.raw_pose_world_wxyz.tolist(),
                     "pose_world_wxyz": item.candidate.pose_world_wxyz.tolist(),
                     "translation_cam": item.candidate.translation_cam.tolist(),
@@ -3008,6 +3108,7 @@ def main() -> None:
                     "original_top_axis_up_dot": cand.original_top_axis_up_dot,
                     "camera_up_flip_applied": cand.camera_up_flip_applied,
                     "forward_axis_change_deg": cand.forward_axis_change_deg,
+                    "camera_up_selection_mode": cand.camera_up_selection_mode,
                     "raw_pose_world_wxyz": cand.raw_pose_world_wxyz.tolist(),
                     "pose_world_wxyz": cand.pose_world_wxyz.tolist(),
                 }
@@ -3029,6 +3130,7 @@ def main() -> None:
                     "original_top_axis_up_dot": cand.original_top_axis_up_dot,
                     "camera_up_flip_applied": cand.camera_up_flip_applied,
                     "forward_axis_change_deg": cand.forward_axis_change_deg,
+                    "camera_up_selection_mode": cand.camera_up_selection_mode,
                     "raw_pose_world_wxyz": cand.raw_pose_world_wxyz.tolist(),
                     "pose_world_wxyz": cand.pose_world_wxyz.tolist(),
                 }
