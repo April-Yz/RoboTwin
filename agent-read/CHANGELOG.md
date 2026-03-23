@@ -311,3 +311,19 @@
 - Validation:
   - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/render_anygrasp_ranked_preview.py`
   - `bash /home/zaijia001/ssd/RoboTwin/code_painting/run_render_anygrasp_ranked_preview_batch.sh /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_batch_results /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_d_pour_blue_norobot /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis /tmp/anygrasp_aligned_orientation_check --ids 1 --frames 1 --top_k 3 --left_target_object cup --right_target_object bottle --draw_grasp_boxes 1`
+
+- Extended the preview "select" stage and summary export.
+- Added negative frame indexing support:
+  - `--frames 1 22 -10` now means "frame 1, frame 22, and the 10th frame from the end of available grasp frames"
+  - resolved mappings are printed as `frame-resolve` and written into `summary.json`
+- Added a red warning banner to output images when either arm has zero candidates after the staged select/filter chain.
+- `summary.json` now records per frame:
+  - `requested_frame`
+  - `object_world_positions`
+  - `warning_messages`
+  - `top_candidates.left/right_orientation`
+  - `top_candidates.left/right_fused`
+  - candidate position, rotation, object distance, and score fields for those top-N entries
+- Validation:
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/render_anygrasp_ranked_preview.py`
+  - `bash /home/zaijia001/ssd/RoboTwin/code_painting/run_render_anygrasp_ranked_preview_batch.sh /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_batch_results /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_d_pour_blue_norobot /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis /tmp/anygrasp_select_doc_check --ids 1 --frames 1 22 -10 --top_k 2 --left_target_object cup --right_target_object bottle --draw_grasp_boxes 1`

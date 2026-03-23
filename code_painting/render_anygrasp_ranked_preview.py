@@ -10,6 +10,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
+import re
 
 import cv2
 import numpy as np
@@ -137,6 +138,38 @@ def load_grasp_json(anygrasp_dir: Path, frame: int) -> Dict:
         raise FileNotFoundError(f"Missing AnyGrasp JSON: {grasp_path}")
     with grasp_path.open("r", encoding="utf-8") as f:
         return json.load(f)
+
+
+def list_available_grasp_frames(anygrasp_dir: Path) -> List[int]:
+    grasp_dir = anygrasp_dir / "grasps"
+    if not grasp_dir.is_dir():
+        raise FileNotFoundError(f"Missing grasp directory: {grasp_dir}")
+    pattern = re.compile(r"^grasp_(\d+)\.json$")
+    frames: List[int] = []
+    for path in grasp_dir.iterdir():
+        match = pattern.match(path.name)
+        if match is None:
+            continue
+        frames.append(int(match.group(1)))
+    if not frames:
+        raise RuntimeError(f"No grasp_*.json files found in {grasp_dir}")
+    return sorted(frames)
+
+
+def resolve_requested_frames(requested_frames: Sequence[int], available_frames: Sequence[int]) -> List[Tuple[int, int]]:
+    available = [int(v) for v in available_frames]
+    resolved: List[Tuple[int, int]] = []
+    for requested in [int(v) for v in requested_frames]:
+        if requested >= 0:
+            resolved.append((requested, requested))
+            continue
+        if abs(int(requested)) > len(available):
+            raise IndexError(
+                f"Requested relative frame {requested} is out of range for {len(available)} available grasp frames."
+            )
+        resolved_frame = int(available[int(requested)])
+        resolved.append((requested, resolved_frame))
+    return resolved
 
 
 def load_base_image(
@@ -359,6 +392,21 @@ def draw_tiny_label(image: np.ndarray, text: str, xy: Tuple[int, int], color: Tu
         float(font_scale),
         color,
         1,
+        cv2.LINE_AA,
+    )
+
+
+def draw_warning_banner(image: np.ndarray, text: str) -> None:
+    h, w = image.shape[:2]
+    cv2.rectangle(image, (0, 0), (w - 1, 40), (0, 0, 180), -1, cv2.LINE_AA)
+    cv2.putText(
+        image,
+        text,
+        (10, 26),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.62,
+        (255, 255, 255),
+        2,
         cv2.LINE_AA,
     )
 
@@ -662,6 +710,7 @@ def annotate_arm_preview(
     line_height: int,
     stage_title: str,
     formula_lines: Sequence[str],
+    warning_text: Optional[str],
     line_builder,
 ) -> np.ndarray:
     title = "LEFT" if arm_name == "left" else "RIGHT"
@@ -675,6 +724,8 @@ def annotate_arm_preview(
             hand_reference=hand_reference,
             color=hand_color,
         )
+    if warning_text:
+        draw_warning_banner(image, str(warning_text))
     if object_world_positions is not None and camera_pose_world_wxyz is not None:
         draw_object_overlay(
             image=image,
@@ -687,8 +738,10 @@ def annotate_arm_preview(
     draw_tiny_label(panel, f"{title} {stage_title}", (10, 24), (0, 0, 0), 0.55)
     if hand_reference is not None:
         draw_tiny_label(panel, f"hand ref idx={hand_reference.ref_frame}", (10, 40), hand_color, 0.36)
+    if warning_text:
+        draw_tiny_label(panel, str(warning_text), (10, 56), (0, 0, 200), 0.36)
     for formula_idx, formula_line in enumerate(list(formula_lines)[:3], start=0):
-        draw_tiny_label(panel, formula_line, (10, 58 + formula_idx * 16), (0, 0, 0), 0.34)
+        draw_tiny_label(panel, formula_line, (10, 74 + formula_idx * 16), (0, 0, 0), 0.34)
 
     capped = list(ranked if int(top_k) < 0 else ranked[: max(int(top_k), 0)])
     for item in capped:
@@ -716,7 +769,7 @@ def annotate_arm_preview(
         )
 
     for row_idx, item in enumerate(capped, start=0):
-        y = 112 + row_idx * int(line_height)
+        y = 128 + row_idx * int(line_height)
         if y >= panel.shape[0] - 8:
             break
         draw_tiny_label(panel, line_builder(row_idx, item), (10, y), (0, 0, 0), 0.36)
@@ -781,6 +834,30 @@ def fused_formula_lines(anygrasp_weight: float, orientation_weight: float, max_r
     return lines
 
 
+def summarize_top_candidates(ranked: Sequence[CandidateRecord], top_n: int) -> List[Dict[str, object]]:
+    capped = list(ranked if int(top_n) < 0 else ranked[: max(int(top_n), 0)])
+    summary: List[Dict[str, object]] = []
+    for item in capped:
+        summary.append(
+            {
+                "candidate_idx": int(item.candidate_idx),
+                "anygrasp_score": float(item.anygrasp_score),
+                "orientation_score": float(item.orientation_score),
+                "fused_score": float(item.fused_score),
+                "rotation_distance_deg": float(item.rotation_distance_deg),
+                "raw_rotation_distance_deg": float(item.raw_rotation_distance_deg),
+                "nearest_object": str(item.nearest_object),
+                "nearest_object_distance_m": float(item.nearest_object_distance_m),
+                "translation_cam": np.asarray(item.translation, dtype=np.float64).reshape(3).tolist(),
+                "translation_world": np.asarray(item.translation_world, dtype=np.float64).reshape(3).tolist(),
+                "rotation_matrix": np.asarray(item.rotation_matrix, dtype=np.float64).reshape(3, 3).tolist(),
+                "width": float(item.width),
+                "depth": float(item.depth),
+            }
+        )
+    return summary
+
+
 def main() -> None:
     args = parse_args()
     args.anygrasp_dir = args.anygrasp_dir.resolve()
@@ -795,9 +872,13 @@ def main() -> None:
     candidate_orientation_remap_matrix = resolve_orientation_remap(args.candidate_orientation_remap_label)
 
     hand_data = load_hand_data(args.hand_npz)
+    available_frames = list_available_grasp_frames(args.anygrasp_dir)
+    resolved_frame_pairs = resolve_requested_frames(args.frames, available_frames)
     fixed_camera_pose_world_wxyz: Optional[np.ndarray] = None
     summary = []
-    for frame in [int(v) for v in args.frames]:
+    for requested_frame, frame in resolved_frame_pairs:
+        if int(requested_frame) != int(frame):
+            print(f"[frame-resolve] requested={int(requested_frame)} resolved={int(frame)}")
         payload = load_grasp_json(args.anygrasp_dir, frame)
         camera_info = dict(payload["camera"])
         grasps = list(payload.get("grasps", []))
@@ -834,6 +915,7 @@ def main() -> None:
                     line_height=int(args.line_height),
                     stage_title="score rank",
                     formula_lines=["score rank only"],
+                    warning_text=None,
                     line_builder=score_line,
                 ),
                 annotate_arm_preview(
@@ -853,6 +935,7 @@ def main() -> None:
                     line_height=int(args.line_height),
                     stage_title="score rank",
                     formula_lines=["score rank only"],
+                    warning_text=None,
                     line_builder=score_line,
                 ),
             )
@@ -862,6 +945,7 @@ def main() -> None:
             summary.append(
                 {
                     "frame": int(frame),
+                    "requested_frame": int(requested_frame),
                     "mode": "score_only",
                     "left_reference_hand_frame": int(left_ref_frame),
                     "right_reference_hand_frame": int(right_ref_frame),
@@ -934,9 +1018,17 @@ def main() -> None:
             f"right_before={right_target_count} right_after={len(right_object_filtered)} "
             f"max_rot_deg={float(args.max_rotation_distance_deg):.1f}"
         )
+        warning_messages: List[str] = []
+        if len(left_object_filtered) == 0:
+            warning_messages.append(f"LEFT WARNING: no candidate after select for {args.left_target_object}")
+        if len(right_object_filtered) == 0:
+            warning_messages.append(f"RIGHT WARNING: no candidate after select for {args.right_target_object}")
+        for warning_message in warning_messages:
+            print(f"[frame {frame:06d}][warning] {warning_message}")
         if bool(args.debug_dump_object_distances):
             debug_payload = {
                 "frame": int(frame),
+                "requested_frame": int(requested_frame),
                 "camera_pose_world_wxyz": np.asarray(camera_pose_world_wxyz, dtype=np.float64).tolist(),
                 "camera_pose_source": str(camera_pose_source),
                 "camera_cv_axis_mode": str(args.camera_cv_axis_mode),
@@ -959,6 +1051,7 @@ def main() -> None:
                     "right_before": int(right_target_count),
                     "right_after": int(len(right_object_filtered)),
                 },
+                "warning_messages": [str(v) for v in warning_messages],
                 "object_candidates": object_debug_records,
             }
             debug_path = args.output_dir / f"frame_{frame:06d}_object_distance_debug.json"
@@ -1031,6 +1124,7 @@ def main() -> None:
                 line_height=int(args.line_height),
                 stage_title="orientation rank",
                 formula_lines=orientation_formula_lines(float(args.max_rotation_distance_deg)),
+                warning_text=None if len(left_object_filtered) > 0 else f"NO LEFT CANDIDATE ({args.left_target_object})",
                 line_builder=orientation_line,
             ),
             annotate_arm_preview(
@@ -1050,6 +1144,7 @@ def main() -> None:
                 line_height=int(args.line_height),
                 stage_title="orientation rank",
                 formula_lines=orientation_formula_lines(float(args.max_rotation_distance_deg)),
+                warning_text=None if len(right_object_filtered) > 0 else f"NO RIGHT CANDIDATE ({args.right_target_object})",
                 line_builder=orientation_line,
             ),
         )
@@ -1075,6 +1170,7 @@ def main() -> None:
                 line_height=int(args.line_height),
                 stage_title="fused rank",
                 formula_lines=fused_formula_lines(float(args.anygrasp_score_weight), float(args.orientation_score_weight), float(args.max_rotation_distance_deg)),
+                warning_text=None if len(left_object_filtered) > 0 else f"NO LEFT CANDIDATE ({args.left_target_object})",
                 line_builder=fused_line,
             ),
             annotate_arm_preview(
@@ -1094,6 +1190,7 @@ def main() -> None:
                 line_height=int(args.line_height),
                 stage_title="fused rank",
                 formula_lines=fused_formula_lines(float(args.anygrasp_score_weight), float(args.orientation_score_weight), float(args.max_rotation_distance_deg)),
+                warning_text=None if len(right_object_filtered) > 0 else f"NO RIGHT CANDIDATE ({args.right_target_object})",
                 line_builder=fused_line,
             ),
         )
@@ -1108,6 +1205,7 @@ def main() -> None:
         summary.append(
             {
                 "frame": int(frame),
+                "requested_frame": int(requested_frame),
                 "left_reference_hand_frame": int(left_ref_frame),
                 "right_reference_hand_frame": int(right_ref_frame),
                 "base_image_mode": str(args.base_image_mode),
@@ -1117,6 +1215,11 @@ def main() -> None:
                 "draw_object_overlay": int(args.draw_object_overlay),
                 "camera_pose_world_wxyz": np.asarray(camera_pose_world_wxyz, dtype=np.float64).tolist(),
                 "camera_pose_source": str(camera_pose_source),
+                "object_world_positions": {
+                    name: np.asarray(point, dtype=np.float64).reshape(3).tolist()
+                    for name, point in sorted(object_world_positions.items())
+                },
+                "warning_messages": [str(v) for v in warning_messages],
                 "object_filter_counts": {
                     "before_total": int(len(grasps)),
                     "object_partition_counts": {name: int(count) for name, count in sorted(object_partition_counts.items())},
@@ -1135,13 +1238,27 @@ def main() -> None:
                     "anygrasp": float(args.anygrasp_score_weight),
                     "orientation": float(args.orientation_score_weight),
                 },
+                "top_candidates": {
+                    "left_orientation": summarize_top_candidates(left_orientation_ranked, int(args.top_k)),
+                    "right_orientation": summarize_top_candidates(right_orientation_ranked, int(args.top_k)),
+                    "left_fused": summarize_top_candidates(left_fused_ranked, int(args.top_k)),
+                    "right_fused": summarize_top_candidates(right_fused_ranked, int(args.top_k)),
+                },
                 "object_distance_debug_path": None if not bool(args.debug_dump_object_distances) else str(args.output_dir / f"frame_{frame:06d}_object_distance_debug.json"),
             }
         )
 
     summary_path = args.output_dir / "summary.json"
     with summary_path.open("w", encoding="utf-8") as f:
-        json.dump({"frames": summary}, f, indent=2)
+        json.dump(
+            {
+                "requested_frames": [int(v) for v in args.frames],
+                "resolved_frames": [{"requested": int(req), "resolved": int(res)} for req, res in resolved_frame_pairs],
+                "frames": summary,
+            },
+            f,
+            indent=2,
+        )
     print(f"[done] wrote {len(summary)} frame preview groups to {args.output_dir}")
 
 
