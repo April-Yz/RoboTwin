@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
@@ -12,6 +14,19 @@ from typing import Dict, List, Optional, Sequence, Tuple
 import cv2
 import numpy as np
 from scipy.spatial.transform import Rotation as R
+
+THIS_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = THIS_DIR.parent
+os.chdir(PROJECT_ROOT)
+if str(THIS_DIR) not in sys.path:
+    sys.path.insert(0, str(THIS_DIR))
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+import render_hand_retarget_r1_npz as hand_base
+from replay_r1_h5 import ReplayRenderer, parse_optional_base_pose
+
+R1_CONFIG = PROJECT_ROOT / "robot_config_R1.json"
 
 
 @dataclass
@@ -43,6 +58,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--right_target_object", type=str, default="bottle")
     parser.add_argument("--anygrasp_score_weight", type=float, default=0.5)
     parser.add_argument("--orientation_score_weight", type=float, default=0.5)
+    parser.add_argument("--robot_config", type=Path, default=R1_CONFIG)
+    parser.add_argument("--torso_qpos", type=float, nargs=4, default=hand_base.DEFAULT_TORSO_QPOS.tolist())
+    parser.add_argument("--robot_base_pose", type=float, nargs=7, default=None, metavar=("X", "Y", "Z", "QW", "QX", "QY", "QZ"))
+    parser.add_argument("--head_camera_local_pos", type=float, nargs=3, default=hand_base.DEFAULT_HEAD_CAMERA_LOCAL_POS.tolist())
+    parser.add_argument("--head_camera_local_quat_wxyz", type=float, nargs=4, default=hand_base.DEFAULT_HEAD_CAMERA_LOCAL_QUAT_WXYZ.tolist())
     parser.add_argument(
         "--base_image_dir",
         type=Path,
@@ -98,17 +118,75 @@ def load_base_image(
     return np.full((height, width, 3), 255, dtype=np.uint8)
 
 
-def load_replay_frame_data(replay_dir: Path, frame: int) -> Tuple[Dict[str, np.ndarray], np.ndarray]:
+def compute_fixed_head_camera_pose_world_wxyz(args: argparse.Namespace) -> np.ndarray:
+    print("[head-pose-fallback] computing fixed head camera pose from robot config and torso_qpos")
+    renderer = ReplayRenderer(
+        robot_config_path=args.robot_config,
+        image_width=16,
+        image_height=16,
+        fovy_deg=90.0,
+        torso_qpos=np.asarray(args.torso_qpos, dtype=np.float64).reshape(4),
+        robot_base_pose_override=parse_optional_base_pose(args.robot_base_pose),
+        third_person_view=False,
+        need_topp=False,
+        link_cam_debug_enable=False,
+        link_cam_axis_mode="none",
+        link_cam_debug_rot_xyz_deg=[0.0, 0.0, 0.0],
+        link_cam_debug_shift_fru=[0.0, 0.0, 0.0],
+        camera_cv_axis_mode="legacy_r1",
+        head_camera_local_pos=np.asarray(args.head_camera_local_pos, dtype=np.float64).reshape(3),
+        head_camera_local_quat_wxyz=np.asarray(args.head_camera_local_quat_wxyz, dtype=np.float64).reshape(4),
+        wrist_camera_local_pos=hand_base.DEFAULT_WRIST_CAMERA_LOCAL_POS,
+        wrist_camera_local_quat_wxyz=hand_base.DEFAULT_WRIST_CAMERA_LOCAL_QUAT_WXYZ,
+        camera_debug_target="head",
+        enable_viewer=False,
+        viewer_frame_delay=0.0,
+        viewer_wait_at_end=False,
+        debug_mode=False,
+        debug_force_orientation="none",
+        debug_visualize_targets=False,
+        debug_target_axis_length=0.08,
+        debug_target_axis_thickness=0.004,
+        orientation_remap_label="identity",
+        orientation_remap_matrix=np.eye(3, dtype=np.float64),
+        stored_orientation_post_rot_xyz_deg=[0.0, 0.0, 0.0],
+        target_world_offset_xyz=[0.0, 0.0, 0.0],
+        left_target_world_offset_xyz=[0.0, 0.0, 0.0],
+        right_target_world_offset_xyz=[0.0, 0.0, 0.0],
+        target_world_z_offset=0.0,
+        disable_table=True,
+        camera_sweep_enable=False,
+        camera_sweep_steps_deg=[0.0],
+        init_left_arm_joints=None,
+        init_right_arm_joints=None,
+        init_gripper_open=None,
+        lighting_mode="front_no_shadow",
+        attach_planner=False,
+        hide_robot=False,
+    )
+    head_pose = renderer.get_head_camera_pose()
+    pose_world_wxyz = np.concatenate(
+        [
+            np.asarray(head_pose.p, dtype=np.float64).reshape(3),
+            hand_base.normalize_quat_wxyz(np.asarray(head_pose.q, dtype=np.float64).reshape(4)),
+        ]
+    ).astype(np.float64)
+    print(
+        "[head-pose-fallback] fixed head pose world wxyz="
+        f"{np.round(pose_world_wxyz, 6).tolist()}"
+    )
+    return pose_world_wxyz
+
+
+def load_replay_frame_data(
+    replay_dir: Path,
+    frame: int,
+    fixed_camera_pose_world_wxyz: Optional[np.ndarray],
+) -> Tuple[Dict[str, np.ndarray], np.ndarray]:
     pose_path = replay_dir / "multi_object_world_poses.npz"
     if not pose_path.is_file():
         raise FileNotFoundError(f"Missing multi_object_world_poses.npz: {pose_path}")
     data = np.load(str(pose_path), allow_pickle=True)
-    if "head_camera_pose_world_wxyz" not in data.files:
-        raise RuntimeError(
-            "Object filtering in render_anygrasp_ranked_preview.py requires replay exports that contain "
-            f"'head_camera_pose_world_wxyz'. Missing in {pose_path}. "
-            "Regenerate the replay with the newer render_multi_object_pose_r1_npz.py export path first."
-        )
     frame_indices = np.asarray(data["selected_source_frame_indices"], dtype=np.int32).reshape(-1)
     matches = np.where(frame_indices == int(frame))[0]
     if matches.size == 0:
@@ -122,7 +200,14 @@ def load_replay_frame_data(replay_dir: Path, frame: int) -> Tuple[Dict[str, np.n
             continue
         pose_world_wxyz = np.asarray(data[f"{object_name}__pose_world_wxyz"], dtype=np.float64)[idx]
         object_world_positions[object_name] = np.asarray(pose_world_wxyz[:3], dtype=np.float64).reshape(3)
-    camera_pose_world_wxyz = np.asarray(data["head_camera_pose_world_wxyz"], dtype=np.float64)[idx]
+    if "head_camera_pose_world_wxyz" in data.files:
+        camera_pose_world_wxyz = np.asarray(data["head_camera_pose_world_wxyz"], dtype=np.float64)[idx]
+    else:
+        if fixed_camera_pose_world_wxyz is None:
+            raise RuntimeError(
+                "Replay export does not contain head_camera_pose_world_wxyz and no fixed fallback pose was provided."
+            )
+        camera_pose_world_wxyz = np.asarray(fixed_camera_pose_world_wxyz, dtype=np.float64).reshape(7)
     return object_world_positions, np.asarray(camera_pose_world_wxyz, dtype=np.float64).reshape(7)
 
 
@@ -412,10 +497,12 @@ def main() -> None:
     args.replay_dir = args.replay_dir.resolve()
     args.hand_npz = args.hand_npz.resolve()
     args.output_dir = args.output_dir.resolve()
+    args.robot_config = args.robot_config.resolve()
     args.base_image_dir = None if args.base_image_dir is None else args.base_image_dir.resolve()
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     hand_data = load_hand_data(args.hand_npz)
+    fixed_camera_pose_world_wxyz: Optional[np.ndarray] = None
     summary = []
     for frame in [int(v) for v in args.frames]:
         payload = load_grasp_json(args.anygrasp_dir, frame)
@@ -429,7 +516,17 @@ def main() -> None:
             height=int(camera_info["height"]),
             image_mode=str(args.base_image_mode),
         )
-        object_world_positions, camera_pose_world_wxyz = load_replay_frame_data(args.replay_dir, frame)
+        if fixed_camera_pose_world_wxyz is None:
+            pose_path = args.replay_dir / "multi_object_world_poses.npz"
+            if pose_path.is_file():
+                data = np.load(str(pose_path), allow_pickle=True)
+                if "head_camera_pose_world_wxyz" not in data.files:
+                    fixed_camera_pose_world_wxyz = compute_fixed_head_camera_pose_world_wxyz(args)
+        object_world_positions, camera_pose_world_wxyz = load_replay_frame_data(
+            args.replay_dir,
+            frame,
+            fixed_camera_pose_world_wxyz,
+        )
 
         _, left_object_filtered, left_ref_frame = build_candidates_for_arm(
             grasps=grasps,
