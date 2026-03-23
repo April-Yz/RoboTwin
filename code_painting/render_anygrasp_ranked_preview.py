@@ -23,10 +23,15 @@ if str(THIS_DIR) not in sys.path:
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-import render_hand_retarget_r1_npz as hand_base
-from replay_r1_h5 import ReplayRenderer, parse_optional_base_pose
-
-R1_CONFIG = PROJECT_ROOT / "robot_config_R1.json"
+DEFAULT_FALLBACK_HEAD_CAMERA_POSE_WORLD_WXYZ = [
+    -0.06000501662492752,
+    -0.2077939808368683,
+    1.383233666419983,
+    0.6120354008062044,
+    -0.3541386764550369,
+    0.3541382592225186,
+    0.6120331358296768,
+]
 
 
 @dataclass
@@ -58,11 +63,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--right_target_object", type=str, default="bottle")
     parser.add_argument("--anygrasp_score_weight", type=float, default=0.5)
     parser.add_argument("--orientation_score_weight", type=float, default=0.5)
-    parser.add_argument("--robot_config", type=Path, default=R1_CONFIG)
-    parser.add_argument("--torso_qpos", type=float, nargs=4, default=hand_base.DEFAULT_TORSO_QPOS.tolist())
-    parser.add_argument("--robot_base_pose", type=float, nargs=7, default=None, metavar=("X", "Y", "Z", "QW", "QX", "QY", "QZ"))
-    parser.add_argument("--head_camera_local_pos", type=float, nargs=3, default=hand_base.DEFAULT_HEAD_CAMERA_LOCAL_POS.tolist())
-    parser.add_argument("--head_camera_local_quat_wxyz", type=float, nargs=4, default=hand_base.DEFAULT_HEAD_CAMERA_LOCAL_QUAT_WXYZ.tolist())
+    parser.add_argument("--draw_object_overlay", type=int, default=0, help="If 1, overlay replay object center markers and labels in staged mode.")
+    parser.add_argument(
+        "--fallback_head_camera_pose_world_wxyz",
+        type=float,
+        nargs=7,
+        default=DEFAULT_FALLBACK_HEAD_CAMERA_POSE_WORLD_WXYZ,
+        metavar=("X", "Y", "Z", "QW", "QX", "QY", "QZ"),
+        help="Used only when replay export does not contain head_camera_pose_world_wxyz.",
+    )
     parser.add_argument(
         "--base_image_dir",
         type=Path,
@@ -119,58 +128,8 @@ def load_base_image(
 
 
 def compute_fixed_head_camera_pose_world_wxyz(args: argparse.Namespace) -> np.ndarray:
-    print("[head-pose-fallback] computing fixed head camera pose from robot config and torso_qpos")
-    renderer = ReplayRenderer(
-        robot_config_path=args.robot_config,
-        image_width=16,
-        image_height=16,
-        fovy_deg=90.0,
-        torso_qpos=np.asarray(args.torso_qpos, dtype=np.float64).reshape(4),
-        robot_base_pose_override=parse_optional_base_pose(args.robot_base_pose),
-        third_person_view=False,
-        need_topp=False,
-        link_cam_debug_enable=False,
-        link_cam_axis_mode="none",
-        link_cam_debug_rot_xyz_deg=[0.0, 0.0, 0.0],
-        link_cam_debug_shift_fru=[0.0, 0.0, 0.0],
-        camera_cv_axis_mode="legacy_r1",
-        head_camera_local_pos=np.asarray(args.head_camera_local_pos, dtype=np.float64).reshape(3),
-        head_camera_local_quat_wxyz=np.asarray(args.head_camera_local_quat_wxyz, dtype=np.float64).reshape(4),
-        wrist_camera_local_pos=hand_base.DEFAULT_WRIST_CAMERA_LOCAL_POS,
-        wrist_camera_local_quat_wxyz=hand_base.DEFAULT_WRIST_CAMERA_LOCAL_QUAT_WXYZ,
-        camera_debug_target="head",
-        enable_viewer=False,
-        viewer_frame_delay=0.0,
-        viewer_wait_at_end=False,
-        debug_mode=False,
-        debug_force_orientation="none",
-        debug_visualize_targets=False,
-        debug_target_axis_length=0.08,
-        debug_target_axis_thickness=0.004,
-        orientation_remap_label="identity",
-        orientation_remap_matrix=np.eye(3, dtype=np.float64),
-        stored_orientation_post_rot_xyz_deg=[0.0, 0.0, 0.0],
-        target_world_offset_xyz=[0.0, 0.0, 0.0],
-        left_target_world_offset_xyz=[0.0, 0.0, 0.0],
-        right_target_world_offset_xyz=[0.0, 0.0, 0.0],
-        target_world_z_offset=0.0,
-        disable_table=True,
-        camera_sweep_enable=False,
-        camera_sweep_steps_deg=[0.0],
-        init_left_arm_joints=None,
-        init_right_arm_joints=None,
-        init_gripper_open=None,
-        lighting_mode="front_no_shadow",
-        attach_planner=False,
-        hide_robot=False,
-    )
-    head_pose = renderer.get_head_camera_pose()
-    pose_world_wxyz = np.concatenate(
-        [
-            np.asarray(head_pose.p, dtype=np.float64).reshape(3),
-            hand_base.normalize_quat_wxyz(np.asarray(head_pose.q, dtype=np.float64).reshape(4)),
-        ]
-    ).astype(np.float64)
+    print("[head-pose-fallback] using fixed fallback head camera pose from CLI/default constant")
+    pose_world_wxyz = np.asarray(args.fallback_head_camera_pose_world_wxyz, dtype=np.float64).reshape(7).copy()
     print(
         "[head-pose-fallback] fixed head pose world wxyz="
         f"{np.round(pose_world_wxyz, 6).tolist()}"
@@ -594,7 +553,6 @@ def main() -> None:
     args.replay_dir = None if args.replay_dir is None else args.replay_dir.resolve()
     args.hand_npz = args.hand_npz.resolve()
     args.output_dir = args.output_dir.resolve()
-    args.robot_config = args.robot_config.resolve()
     args.base_image_dir = None if args.base_image_dir is None else args.base_image_dir.resolve()
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -723,8 +681,8 @@ def main() -> None:
                 arm_name="left",
                 ranked=left_orientation_ranked,
                 camera_info=camera_info,
-                object_world_positions=object_world_positions,
-                camera_pose_world_wxyz=camera_pose_world_wxyz,
+                object_world_positions=object_world_positions if bool(args.draw_object_overlay) else None,
+                camera_pose_world_wxyz=camera_pose_world_wxyz if bool(args.draw_object_overlay) else None,
                 top_k=int(args.top_k),
                 draw_grasp_boxes=bool(args.draw_grasp_boxes),
                 box_thickness=int(args.box_thickness),
@@ -739,8 +697,8 @@ def main() -> None:
                 arm_name="right",
                 ranked=right_orientation_ranked,
                 camera_info=camera_info,
-                object_world_positions=object_world_positions,
-                camera_pose_world_wxyz=camera_pose_world_wxyz,
+                object_world_positions=object_world_positions if bool(args.draw_object_overlay) else None,
+                camera_pose_world_wxyz=camera_pose_world_wxyz if bool(args.draw_object_overlay) else None,
                 top_k=int(args.top_k),
                 draw_grasp_boxes=bool(args.draw_grasp_boxes),
                 box_thickness=int(args.box_thickness),
@@ -761,8 +719,8 @@ def main() -> None:
                 arm_name="left",
                 ranked=left_fused_ranked,
                 camera_info=camera_info,
-                object_world_positions=object_world_positions,
-                camera_pose_world_wxyz=camera_pose_world_wxyz,
+                object_world_positions=object_world_positions if bool(args.draw_object_overlay) else None,
+                camera_pose_world_wxyz=camera_pose_world_wxyz if bool(args.draw_object_overlay) else None,
                 top_k=int(args.top_k),
                 draw_grasp_boxes=bool(args.draw_grasp_boxes),
                 box_thickness=int(args.box_thickness),
@@ -777,8 +735,8 @@ def main() -> None:
                 arm_name="right",
                 ranked=right_fused_ranked,
                 camera_info=camera_info,
-                object_world_positions=object_world_positions,
-                camera_pose_world_wxyz=camera_pose_world_wxyz,
+                object_world_positions=object_world_positions if bool(args.draw_object_overlay) else None,
+                camera_pose_world_wxyz=camera_pose_world_wxyz if bool(args.draw_object_overlay) else None,
                 top_k=int(args.top_k),
                 draw_grasp_boxes=bool(args.draw_grasp_boxes),
                 box_thickness=int(args.box_thickness),
@@ -805,6 +763,7 @@ def main() -> None:
                 "base_image_mode": str(args.base_image_mode),
                 "base_image_dir": None if args.base_image_dir is None else str(args.base_image_dir),
                 "draw_grasp_boxes": int(args.draw_grasp_boxes),
+                "draw_object_overlay": int(args.draw_object_overlay),
                 "camera_pose_world_wxyz": np.asarray(camera_pose_world_wxyz, dtype=np.float64).tolist(),
                 "camera_pose_source": str(camera_pose_source),
                 "object_filter_counts": {

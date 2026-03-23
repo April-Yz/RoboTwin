@@ -167,6 +167,13 @@
 
 ## 2026-03-23
 
+- Simplified `code_painting/render_anygrasp_ranked_preview.py` again so staged mode no longer launches SAPIEN / `ReplayRenderer` just to get a fallback head pose.
+- The script now uses a fixed fallback `head_camera_pose_world_wxyz` constant or CLI override directly.
+- Added `--draw_object_overlay` and set it to off by default, so staged mode now matches score-only mode visually by default: both use the same base image and only add grasp overlays unless object overlay is explicitly requested.
+- Validation:
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python /home/zaijia001/ssd/RoboTwin/code_painting/render_anygrasp_ranked_preview.py --anygrasp_dir /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_batch_results/d_pour_blue_1 --hand_npz /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis/hand_detections_1.npz --base_image_dir /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_d_pour_blue_norobot/d_pour_blue_1/head_anygrasp_frames --base_image_mode raw --output_dir /tmp/anygrasp_score_only_realcheck2 --frames 1 21 --top_k 5`
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python /home/zaijia001/ssd/RoboTwin/code_painting/render_anygrasp_ranked_preview.py --anygrasp_dir /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_batch_results/d_pour_blue_1 --replay_dir /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_d_pour_blue/d_pour_blue_1 --hand_npz /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis/hand_detections_1.npz --base_image_dir /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_d_pour_blue/d_pour_blue_1/head_anygrasp_frames --base_image_mode raw --output_dir /tmp/anygrasp_staged_realcheck2 --frames 1 21 --top_k 5 --left_target_object cup --right_target_object bottle --draw_grasp_boxes 0`
+
 - Updated `code_painting/render_anygrasp_ranked_preview.py` so staged previews now also overlay replay object center markers and object-name labels.
 - Validation:
   - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/render_anygrasp_ranked_preview.py`
