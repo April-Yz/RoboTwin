@@ -606,11 +606,23 @@ def draw_hand_reference(
     hand_reference: HandReference,
     color: Tuple[int, int, int],
 ) -> None:
+    hand_rotation = np.asarray(hand_reference.rotation_matrix, dtype=np.float64).reshape(3, 3)
+    # detect_hands_realr1.py uses local +Z as the retreat/approach axis, while the
+    # AnyGrasp wireframe helper expects local +X as the forward finger direction.
+    # Remap only for visualization so the human reference is drawn in the same
+    # gripper-axis convention as the AnyGrasp candidates.
+    wireframe_rotation = np.column_stack(
+        [
+            hand_rotation[:, 2],
+            hand_rotation[:, 1],
+            -hand_rotation[:, 0],
+        ]
+    )
     draw_grasp_wireframe(
         image=image,
         camera_info=camera_info,
         translation=np.asarray(hand_reference.position, dtype=np.float64).reshape(3),
-        rotation_matrix=np.asarray(hand_reference.rotation_matrix, dtype=np.float64).reshape(3, 3),
+        rotation_matrix=wireframe_rotation,
         width_m=float(np.clip(hand_reference.finger_distance, 0.01, 0.12)),
         depth_m=0.035,
         color=color,

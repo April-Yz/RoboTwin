@@ -292,3 +292,12 @@
 - Validation:
   - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/render_anygrasp_ranked_preview.py`
   - `bash /home/zaijia001/ssd/RoboTwin/code_painting/run_render_anygrasp_ranked_preview_batch.sh /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_batch_results /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_d_pour_blue_norobot /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis /tmp/anygrasp_hand_overlay_check --ids 1 --frames 1 --top_k 3 --left_target_object cup --right_target_object bottle --draw_grasp_boxes 1`
+
+- Fixed the human-hand overlay axis convention in `code_painting/render_anygrasp_ranked_preview.py`.
+- Root cause:
+  - `detect_hands_realr1.py` constructs human gripper poses with local `+Y` as the opening axis and local `+Z` as the retreat/approach axis
+  - the preview wireframe helper reused from AnyGrasp assumes local `+X` is the forward finger direction
+- The preview now remaps the hand-reference rotation before drawing the wireframe, so a visually forward human grasp no longer appears spuriously downward because of mismatched local-axis semantics.
+- Validation:
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/render_anygrasp_ranked_preview.py`
+  - `bash /home/zaijia001/ssd/RoboTwin/code_painting/run_render_anygrasp_ranked_preview_batch.sh /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_batch_results /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_d_pour_blue_norobot /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis /tmp/anygrasp_hand_axis_fix_check --ids 1 --frames 1 --top_k 3 --left_target_object cup --right_target_object bottle --draw_grasp_boxes 1`
