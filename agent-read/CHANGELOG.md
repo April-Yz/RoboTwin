@@ -167,6 +167,15 @@
 
 ## 2026-03-23
 
+- Updated `code_painting/render_anygrasp_ranked_preview.py` so staged-mode object matching is now closer to `plan_anygrasp_keyframes_r1.py`.
+- The preview tool now:
+  - uses the same `legacy_r1` camera CV-axis transform when mapping camera-frame candidates into world space
+  - supports `--candidate_target_local_x_offset_m` in staged-mode distance matching
+  - adds `--debug_dump_object_distances 1` to dump per-candidate world-space distances to every visible object
+- Validation:
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/render_anygrasp_ranked_preview.py`
+  - staged-mode synthetic fixture with `--debug_dump_object_distances 1`
+
 - Simplified `code_painting/render_anygrasp_ranked_preview.py` again so staged mode no longer launches SAPIEN / `ReplayRenderer` just to get a fallback head pose.
 - The script now uses a fixed fallback `head_camera_pose_world_wxyz` constant or CLI override directly.
 - Added `--draw_object_overlay` and set it to off by default, so staged mode now matches score-only mode visually by default: both use the same base image and only add grasp overlays unless object overlay is explicitly requested.

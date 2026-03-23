@@ -32,6 +32,9 @@ DEFAULT_FALLBACK_HEAD_CAMERA_POSE_WORLD_WXYZ = [
     0.3541382592225186,
     0.6120331358296768,
 ]
+CV_TO_WORLD_CAMERA_PRESETS = {
+    "legacy_r1": np.array([[0.0, 0.0, 1.0], [-1.0, 0.0, 0.0], [0.0, -1.0, 0.0]], dtype=np.float64),
+}
 
 
 @dataclass
@@ -47,6 +50,7 @@ class CandidateRecord:
     depth: float
     nearest_object: str
     nearest_object_distance_m: float
+    translation_world: np.ndarray
 
 
 def parse_args() -> argparse.Namespace:
@@ -64,6 +68,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--anygrasp_score_weight", type=float, default=0.5)
     parser.add_argument("--orientation_score_weight", type=float, default=0.5)
     parser.add_argument("--draw_object_overlay", type=int, default=0, help="If 1, overlay replay object center markers and labels in staged mode.")
+    parser.add_argument("--debug_dump_object_distances", type=int, default=0, help="If 1, dump per-candidate distances to every visible object in staged mode.")
+    parser.add_argument("--camera_cv_axis_mode", choices=sorted(CV_TO_WORLD_CAMERA_PRESETS.keys()), default="legacy_r1")
+    parser.add_argument("--candidate_target_local_x_offset_m", type=float, default=0.0)
+    parser.add_argument("--candidate_post_rot_xyz_deg", type=float, nargs=3, default=[0.0, 0.0, 0.0])
+    parser.add_argument("--candidate_orientation_remap_label", type=str, default="identity")
     parser.add_argument(
         "--fallback_head_camera_pose_world_wxyz",
         type=float,
@@ -191,6 +200,16 @@ def orientation_score_from_rotation_distance(rotation_distance: float) -> float:
     return float(np.clip(1.0 - float(rotation_distance) / 180.0, 0.0, 1.0))
 
 
+def orthonormalize_rotation(rot: np.ndarray) -> np.ndarray:
+    rot = np.asarray(rot, dtype=np.float64).reshape(3, 3)
+    u, _, vh = np.linalg.svd(rot)
+    rot_ortho = u @ vh
+    if np.linalg.det(rot_ortho) < 0:
+        u[:, -1] *= -1.0
+        rot_ortho = u @ vh
+    return rot_ortho
+
+
 def pose_wxyz_to_matrix(pose_world_wxyz: np.ndarray) -> np.ndarray:
     pose_world_wxyz = np.asarray(pose_world_wxyz, dtype=np.float64).reshape(7)
     rotation = R.from_quat(
@@ -207,34 +226,68 @@ def pose_wxyz_to_matrix(pose_world_wxyz: np.ndarray) -> np.ndarray:
     return matrix
 
 
-def world_point_to_camera(point_world: np.ndarray, camera_pose_world_wxyz: np.ndarray) -> np.ndarray:
+def resolve_orientation_remap(label: str) -> np.ndarray:
+    normalized = str(label).strip().lower()
+    if normalized in ("", "identity", "default", "robot_default"):
+        return np.eye(3, dtype=np.float64)
+    raise ValueError(
+        f"Unsupported candidate_orientation_remap_label '{label}' in render_anygrasp_ranked_preview.py. "
+        "This lightweight preview currently supports identity only."
+    )
+
+
+def camera_cv_rotation(camera_cv_axis_mode: str) -> np.ndarray:
+    return np.asarray(CV_TO_WORLD_CAMERA_PRESETS[str(camera_cv_axis_mode)], dtype=np.float64).reshape(3, 3)
+
+
+def world_point_to_camera(point_world: np.ndarray, camera_pose_world_wxyz: np.ndarray, camera_cv_axis_mode: str) -> np.ndarray:
     camera_world = pose_wxyz_to_matrix(camera_pose_world_wxyz)
-    world_camera = np.linalg.inv(camera_world)
-    point_h = np.ones(4, dtype=np.float64)
-    point_h[:3] = np.asarray(point_world, dtype=np.float64).reshape(3)
-    point_cam = world_camera @ point_h
-    return np.asarray(point_cam[:3], dtype=np.float64)
+    rot_world_from_head = np.asarray(camera_world[:3, :3], dtype=np.float64)
+    point_local = rot_world_from_head.T @ (np.asarray(point_world, dtype=np.float64).reshape(3) - camera_world[:3, 3])
+    return camera_cv_rotation(camera_cv_axis_mode).T @ point_local
 
 
-def nearest_object_name_in_camera(
+def camera_pose_to_world_pose(
     translation_cam: np.ndarray,
-    object_world_positions: Dict[str, np.ndarray],
+    rotation_cam: np.ndarray,
     camera_pose_world_wxyz: np.ndarray,
-) -> Tuple[str, float]:
-    pos = np.asarray(translation_cam, dtype=np.float64).reshape(3)
+    camera_cv_axis_mode: str,
+    candidate_post_rot_matrix: np.ndarray,
+    candidate_orientation_remap_matrix: np.ndarray,
+    candidate_target_local_x_offset_m: float,
+) -> Tuple[np.ndarray, np.ndarray]:
+    translation_cam = np.asarray(translation_cam, dtype=np.float64).reshape(3)
+    rotation_cam = np.asarray(rotation_cam, dtype=np.float64).reshape(3, 3)
+    camera_world = pose_wxyz_to_matrix(camera_pose_world_wxyz)
+    rot_world_from_head = np.asarray(camera_world[:3, :3], dtype=np.float64)
+    cam_cv_to_local = camera_cv_rotation(camera_cv_axis_mode)
+    remapped_rotation = orthonormalize_rotation(
+        orthonormalize_rotation(rotation_cam) @ np.asarray(candidate_post_rot_matrix, dtype=np.float64).reshape(3, 3) @ np.asarray(candidate_orientation_remap_matrix, dtype=np.float64).reshape(3, 3)
+    )
+    pos_world = np.asarray(camera_world[:3, 3], dtype=np.float64) + rot_world_from_head @ (cam_cv_to_local @ translation_cam)
+    rot_world = orthonormalize_rotation(rot_world_from_head @ cam_cv_to_local @ remapped_rotation)
+    if abs(float(candidate_target_local_x_offset_m)) > 1e-12:
+        pos_world = pos_world + rot_world[:, 0] * float(candidate_target_local_x_offset_m)
+    return pos_world.astype(np.float64), rot_world.astype(np.float64)
+
+
+def object_distances_world(
+    candidate_world_position: np.ndarray,
+    object_world_positions: Dict[str, np.ndarray],
+) -> Tuple[str, float, Dict[str, float]]:
+    pos_world = np.asarray(candidate_world_position, dtype=np.float64).reshape(3)
     best_name = ""
     best_dist = float("inf")
+    per_object: Dict[str, float] = {}
     for name, point_world in object_world_positions.items():
-        obj_cam = world_point_to_camera(point_world, camera_pose_world_wxyz)
-        if not np.isfinite(obj_cam).all():
-            continue
-        dist = float(np.linalg.norm(pos - obj_cam))
+        dist = float(np.linalg.norm(pos_world - np.asarray(point_world, dtype=np.float64).reshape(3)))
+        per_object[str(name)] = dist
         if dist < best_dist:
             best_dist = dist
-            best_name = name
+            best_name = str(name)
     if not best_name:
         raise RuntimeError("No visible objects found for nearest-object matching.")
-    return best_name, best_dist
+    return best_name, best_dist, per_object
 
 
 def project_camera_point(point_cam: np.ndarray, camera_info: Dict) -> Optional[Tuple[int, int]]:
@@ -288,9 +341,10 @@ def draw_object_overlay(
     camera_info: Dict,
     object_world_positions: Dict[str, np.ndarray],
     camera_pose_world_wxyz: np.ndarray,
+    camera_cv_axis_mode: str,
 ) -> None:
     for object_name, point_world in sorted(object_world_positions.items()):
-        point_cam = world_point_to_camera(point_world, camera_pose_world_wxyz)
+        point_cam = world_point_to_camera(point_world, camera_pose_world_wxyz, camera_cv_axis_mode)
         pixel = project_camera_point(point_cam, camera_info)
         if pixel is None:
             continue
@@ -368,7 +422,11 @@ def build_candidates_for_arm(
     target_object: str,
     anygrasp_score_weight: float,
     orientation_score_weight: float,
-) -> Tuple[List[CandidateRecord], List[CandidateRecord], int]:
+    camera_cv_axis_mode: str,
+    candidate_post_rot_matrix: np.ndarray,
+    candidate_orientation_remap_matrix: np.ndarray,
+    candidate_target_local_x_offset_m: float,
+) -> Tuple[List[CandidateRecord], List[CandidateRecord], int, List[Dict[str, object]]]:
     hand_valid = np.asarray(hand_data[f"{arm_name}_gripper_valid"], dtype=bool)
     hand_rotations = np.asarray(hand_data[f"{arm_name}_gripper_rotation_matrix"], dtype=np.float64)
     ref_frame = int(frame) if frame < hand_valid.shape[0] and bool(hand_valid[frame]) else nearest_valid_hand_frame(int(frame), hand_valid)
@@ -378,13 +436,22 @@ def build_candidates_for_arm(
 
     all_candidates: List[CandidateRecord] = []
     filtered_candidates: List[CandidateRecord] = []
+    debug_records: List[Dict[str, object]] = []
     for candidate_idx, grasp in enumerate(grasps):
         translation = np.asarray(grasp["translation"], dtype=np.float64).reshape(3)
         rotation_matrix = np.asarray(grasp["rotation_matrix"], dtype=np.float64).reshape(3, 3)
-        nearest_object, nearest_dist = nearest_object_name_in_camera(
+        translation_world, rotation_world = camera_pose_to_world_pose(
             translation_cam=translation,
-            object_world_positions=object_world_positions,
+            rotation_cam=rotation_matrix,
             camera_pose_world_wxyz=camera_pose_world_wxyz,
+            camera_cv_axis_mode=camera_cv_axis_mode,
+            candidate_post_rot_matrix=candidate_post_rot_matrix,
+            candidate_orientation_remap_matrix=candidate_orientation_remap_matrix,
+            candidate_target_local_x_offset_m=candidate_target_local_x_offset_m,
+        )
+        nearest_object, nearest_dist, distances_world = object_distances_world(
+            candidate_world_position=translation_world,
+            object_world_positions=object_world_positions,
         )
         anygrasp_score = float(grasp["score"])
         rotation_distance = rotation_distance_deg(ref_rot, rotation_matrix)
@@ -402,11 +469,23 @@ def build_candidates_for_arm(
             depth=float(grasp.get("depth", 0.0)),
             nearest_object=str(nearest_object),
             nearest_object_distance_m=float(nearest_dist),
+            translation_world=translation_world,
         )
         all_candidates.append(candidate)
+        debug_records.append(
+            {
+                "candidate_idx": int(candidate_idx),
+                "candidate_translation_cam": translation.tolist(),
+                "candidate_translation_world": translation_world.tolist(),
+                "nearest_object": str(nearest_object),
+                "nearest_object_distance_m": float(nearest_dist),
+                "distances_to_objects_world_m": {name: float(dist) for name, dist in sorted(distances_world.items())},
+                "object_world_positions": {name: np.asarray(point, dtype=np.float64).reshape(3).tolist() for name, point in sorted(object_world_positions.items())},
+            }
+        )
         if str(nearest_object) == str(target_object):
             filtered_candidates.append(candidate)
-    return all_candidates, filtered_candidates, int(ref_frame)
+    return all_candidates, filtered_candidates, int(ref_frame), debug_records
 
 
 def build_score_ranked_candidates_for_arm(
@@ -441,6 +520,7 @@ def build_score_ranked_candidates_for_arm(
                 depth=float(grasp.get("depth", 0.0)),
                 nearest_object="",
                 nearest_object_distance_m=float("nan"),
+                translation_world=np.full(3, np.nan, dtype=np.float64),
             )
         )
     ranked.sort(key=lambda item: (-float(item.anygrasp_score), float(item.rotation_distance_deg)))
@@ -454,6 +534,7 @@ def annotate_arm_preview(
     camera_info: Dict,
     object_world_positions: Optional[Dict[str, np.ndarray]],
     camera_pose_world_wxyz: Optional[np.ndarray],
+    camera_cv_axis_mode: str,
     top_k: int,
     draw_grasp_boxes: bool,
     box_thickness: int,
@@ -472,6 +553,7 @@ def annotate_arm_preview(
             camera_info=camera_info,
             object_world_positions=object_world_positions,
             camera_pose_world_wxyz=camera_pose_world_wxyz,
+            camera_cv_axis_mode=camera_cv_axis_mode,
         )
     panel = np.full((image.shape[0], panel_width, 3), 255, dtype=np.uint8)
     draw_tiny_label(panel, f"{title} {stage_title}", (10, 24), (0, 0, 0), 0.55)
@@ -555,6 +637,10 @@ def main() -> None:
     args.output_dir = args.output_dir.resolve()
     args.base_image_dir = None if args.base_image_dir is None else args.base_image_dir.resolve()
     args.output_dir.mkdir(parents=True, exist_ok=True)
+    candidate_post_rot_matrix = orthonormalize_rotation(
+        R.from_euler("xyz", np.deg2rad(np.asarray(args.candidate_post_rot_xyz_deg, dtype=np.float64).reshape(3))).as_matrix()
+    )
+    candidate_orientation_remap_matrix = resolve_orientation_remap(args.candidate_orientation_remap_label)
 
     hand_data = load_hand_data(args.hand_npz)
     fixed_camera_pose_world_wxyz: Optional[np.ndarray] = None
@@ -579,9 +665,10 @@ def main() -> None:
                 base_image=base_image,
                 arm_name="left",
                 ranked=left_score_ranked,
-                camera_info=camera_info,
-                object_world_positions=None,
-                camera_pose_world_wxyz=None,
+                    camera_info=camera_info,
+                    object_world_positions=None,
+                    camera_pose_world_wxyz=None,
+                    camera_cv_axis_mode=str(args.camera_cv_axis_mode),
                 top_k=int(args.top_k),
                     draw_grasp_boxes=bool(args.draw_grasp_boxes),
                     box_thickness=int(args.box_thickness),
@@ -595,9 +682,10 @@ def main() -> None:
                 base_image=base_image,
                 arm_name="right",
                 ranked=right_score_ranked,
-                camera_info=camera_info,
-                object_world_positions=None,
-                camera_pose_world_wxyz=None,
+                    camera_info=camera_info,
+                    object_world_positions=None,
+                    camera_pose_world_wxyz=None,
+                    camera_cv_axis_mode=str(args.camera_cv_axis_mode),
                 top_k=int(args.top_k),
                     draw_grasp_boxes=bool(args.draw_grasp_boxes),
                     box_thickness=int(args.box_thickness),
@@ -637,7 +725,7 @@ def main() -> None:
             fixed_camera_pose_world_wxyz,
         )
 
-        _, left_object_filtered, left_ref_frame = build_candidates_for_arm(
+        _, left_object_filtered, left_ref_frame, left_debug_records = build_candidates_for_arm(
             grasps=grasps,
             arm_name="left",
             hand_data=hand_data,
@@ -647,8 +735,12 @@ def main() -> None:
             target_object=str(args.left_target_object),
             anygrasp_score_weight=float(args.anygrasp_score_weight),
             orientation_score_weight=float(args.orientation_score_weight),
+            camera_cv_axis_mode=str(args.camera_cv_axis_mode),
+            candidate_post_rot_matrix=candidate_post_rot_matrix,
+            candidate_orientation_remap_matrix=candidate_orientation_remap_matrix,
+            candidate_target_local_x_offset_m=float(args.candidate_target_local_x_offset_m),
         )
-        _, right_object_filtered, right_ref_frame = build_candidates_for_arm(
+        _, right_object_filtered, right_ref_frame, right_debug_records = build_candidates_for_arm(
             grasps=grasps,
             arm_name="right",
             hand_data=hand_data,
@@ -658,6 +750,10 @@ def main() -> None:
             target_object=str(args.right_target_object),
             anygrasp_score_weight=float(args.anygrasp_score_weight),
             orientation_score_weight=float(args.orientation_score_weight),
+            camera_cv_axis_mode=str(args.camera_cv_axis_mode),
+            candidate_post_rot_matrix=candidate_post_rot_matrix,
+            candidate_orientation_remap_matrix=candidate_orientation_remap_matrix,
+            candidate_target_local_x_offset_m=float(args.candidate_target_local_x_offset_m),
         )
 
         print(
@@ -668,6 +764,33 @@ def main() -> None:
             f"left_after={len(left_object_filtered)} target={args.left_target_object} "
             f"right_after={len(right_object_filtered)} target={args.right_target_object}"
         )
+        if bool(args.debug_dump_object_distances):
+            debug_payload = {
+                "frame": int(frame),
+                "camera_pose_world_wxyz": np.asarray(camera_pose_world_wxyz, dtype=np.float64).tolist(),
+                "camera_pose_source": str(camera_pose_source),
+                "camera_cv_axis_mode": str(args.camera_cv_axis_mode),
+                "candidate_target_local_x_offset_m": float(args.candidate_target_local_x_offset_m),
+                "candidate_post_rot_xyz_deg": np.asarray(args.candidate_post_rot_xyz_deg, dtype=np.float64).reshape(3).tolist(),
+                "candidate_orientation_remap_label": str(args.candidate_orientation_remap_label),
+                "left": left_debug_records,
+                "right": right_debug_records,
+            }
+            debug_path = args.output_dir / f"frame_{frame:06d}_object_distance_debug.json"
+            with debug_path.open("w", encoding="utf-8") as f:
+                json.dump(debug_payload, f, indent=2)
+            for arm_name, records in (("left", left_debug_records), ("right", right_debug_records)):
+                for record in records:
+                    dist_text = ", ".join(
+                        f"{name}:{dist:.4f}"
+                        for name, dist in sorted(record["distances_to_objects_world_m"].items())
+                    )
+                    print(
+                        f"[frame {frame:06d}][{arm_name}][cand {int(record['candidate_idx']):02d}] "
+                        f"nearest={record['nearest_object']} "
+                        f"nearest_dist={float(record['nearest_object_distance_m']):.4f} "
+                        f"world_dists={{ {dist_text} }}"
+                    )
 
         left_orientation_ranked = sorted(left_object_filtered, key=lambda item: (-float(item.orientation_score), float(item.rotation_distance_deg), -float(item.anygrasp_score)))
         right_orientation_ranked = sorted(right_object_filtered, key=lambda item: (-float(item.orientation_score), float(item.rotation_distance_deg), -float(item.anygrasp_score)))
@@ -683,6 +806,7 @@ def main() -> None:
                 camera_info=camera_info,
                 object_world_positions=object_world_positions if bool(args.draw_object_overlay) else None,
                 camera_pose_world_wxyz=camera_pose_world_wxyz if bool(args.draw_object_overlay) else None,
+                camera_cv_axis_mode=str(args.camera_cv_axis_mode),
                 top_k=int(args.top_k),
                 draw_grasp_boxes=bool(args.draw_grasp_boxes),
                 box_thickness=int(args.box_thickness),
@@ -699,6 +823,7 @@ def main() -> None:
                 camera_info=camera_info,
                 object_world_positions=object_world_positions if bool(args.draw_object_overlay) else None,
                 camera_pose_world_wxyz=camera_pose_world_wxyz if bool(args.draw_object_overlay) else None,
+                camera_cv_axis_mode=str(args.camera_cv_axis_mode),
                 top_k=int(args.top_k),
                 draw_grasp_boxes=bool(args.draw_grasp_boxes),
                 box_thickness=int(args.box_thickness),
@@ -721,6 +846,7 @@ def main() -> None:
                 camera_info=camera_info,
                 object_world_positions=object_world_positions if bool(args.draw_object_overlay) else None,
                 camera_pose_world_wxyz=camera_pose_world_wxyz if bool(args.draw_object_overlay) else None,
+                camera_cv_axis_mode=str(args.camera_cv_axis_mode),
                 top_k=int(args.top_k),
                 draw_grasp_boxes=bool(args.draw_grasp_boxes),
                 box_thickness=int(args.box_thickness),
@@ -737,6 +863,7 @@ def main() -> None:
                 camera_info=camera_info,
                 object_world_positions=object_world_positions if bool(args.draw_object_overlay) else None,
                 camera_pose_world_wxyz=camera_pose_world_wxyz if bool(args.draw_object_overlay) else None,
+                camera_cv_axis_mode=str(args.camera_cv_axis_mode),
                 top_k=int(args.top_k),
                 draw_grasp_boxes=bool(args.draw_grasp_boxes),
                 box_thickness=int(args.box_thickness),
@@ -780,6 +907,7 @@ def main() -> None:
                     "anygrasp": float(args.anygrasp_score_weight),
                     "orientation": float(args.orientation_score_weight),
                 },
+                "object_distance_debug_path": None if not bool(args.debug_dump_object_distances) else str(args.output_dir / f"frame_{frame:06d}_object_distance_debug.json"),
             }
         )
 
