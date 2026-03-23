@@ -81,6 +81,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--right_target_object", type=str, default="bottle")
     parser.add_argument("--anygrasp_score_weight", type=float, default=0.5)
     parser.add_argument("--orientation_score_weight", type=float, default=0.5)
+    parser.add_argument("--max_rotation_distance_deg", type=float, default=90.0, help="If >= 0, drop arm-specific candidates whose hand-orientation rotation distance exceeds this threshold.")
     parser.add_argument("--draw_object_overlay", type=int, default=0, help="If 1, overlay replay object center markers and labels in staged mode.")
     parser.add_argument("--debug_dump_object_distances", type=int, default=0, help="If 1, dump per-candidate distances to every visible object in staged mode.")
     parser.add_argument("--camera_cv_axis_mode", choices=sorted(CV_TO_WORLD_CAMERA_PRESETS.keys()), default="legacy_r1")
@@ -490,7 +491,8 @@ def build_candidates_for_arm(
     target_object: str,
     anygrasp_score_weight: float,
     orientation_score_weight: float,
-) -> Tuple[List[CandidateRecord], int]:
+    max_rotation_distance_deg: float,
+) -> Tuple[List[CandidateRecord], int, int]:
     hand_valid = np.asarray(hand_data[f"{arm_name}_gripper_valid"], dtype=bool)
     hand_rotations = np.asarray(hand_data[f"{arm_name}_gripper_rotation_matrix"], dtype=np.float64)
     ref_frame = int(frame) if frame < hand_valid.shape[0] and bool(hand_valid[frame]) else nearest_valid_hand_frame(int(frame), hand_valid)
@@ -499,10 +501,14 @@ def build_candidates_for_arm(
     ref_rot = np.asarray(hand_rotations[ref_frame], dtype=np.float64)
 
     filtered_candidates: List[CandidateRecord] = []
+    target_object_candidates = 0
     for candidate in shared_candidates:
         if str(candidate.nearest_object) != str(target_object):
             continue
+        target_object_candidates += 1
         rotation_distance = rotation_distance_deg(ref_rot, candidate.rotation_matrix)
+        if float(max_rotation_distance_deg) >= 0.0 and float(rotation_distance) > float(max_rotation_distance_deg):
+            continue
         orientation_score = orientation_score_from_rotation_distance(rotation_distance)
         fused_score = float(anygrasp_score_weight) * float(candidate.anygrasp_score) + float(orientation_score_weight) * orientation_score
         filtered_candidates.append(
@@ -521,7 +527,7 @@ def build_candidates_for_arm(
                 translation_world=np.asarray(candidate.translation_world, dtype=np.float64).reshape(3),
             )
         )
-    return filtered_candidates, int(ref_frame)
+    return filtered_candidates, int(ref_frame), int(target_object_candidates)
 
 
 def build_score_ranked_candidates_for_arm(
@@ -578,6 +584,7 @@ def annotate_arm_preview(
     panel_width: int,
     line_height: int,
     stage_title: str,
+    formula_lines: Sequence[str],
     line_builder,
 ) -> np.ndarray:
     title = "LEFT" if arm_name == "left" else "RIGHT"
@@ -593,7 +600,8 @@ def annotate_arm_preview(
         )
     panel = np.full((image.shape[0], panel_width, 3), 255, dtype=np.uint8)
     draw_tiny_label(panel, f"{title} {stage_title}", (10, 24), (0, 0, 0), 0.55)
-    draw_tiny_label(panel, "label=candidate_idx", (10, 44), (0, 0, 0), 0.38)
+    for formula_idx, formula_line in enumerate(list(formula_lines)[:3], start=0):
+        draw_tiny_label(panel, formula_line, (10, 44 + formula_idx * 16), (0, 0, 0), 0.34)
 
     capped = list(ranked if int(top_k) < 0 else ranked[: max(int(top_k), 0)])
     for item in capped:
@@ -621,7 +629,7 @@ def annotate_arm_preview(
         )
 
     for row_idx, item in enumerate(capped, start=0):
-        y = 70 + row_idx * int(line_height)
+        y = 96 + row_idx * int(line_height)
         if y >= panel.shape[0] - 8:
             break
         draw_tiny_label(panel, line_builder(row_idx, item), (10, y), (0, 0, 0), 0.36)
@@ -637,9 +645,8 @@ def orientation_line(row_idx: int, item: CandidateRecord) -> str:
     return (
         f"#{row_idx + 1:02d} "
         f"idx={item.candidate_idx:02d} "
-        f"ori={item.orientation_score:.3f} "
-        f"rot={item.rotation_distance_deg:.1f} "
-        f"obj={item.nearest_object}"
+        f"1-{item.rotation_distance_deg:.1f}/180="
+        f"{item.orientation_score:.3f}"
     )
 
 
@@ -663,6 +670,25 @@ def make_fused_line_builder(anygrasp_weight: float, orientation_weight: float):
         )
 
     return fused_line
+
+
+def orientation_formula_lines(max_rotation_distance_deg: float) -> List[str]:
+    lines = [
+        "ori = max(0, 1 - rot/180)",
+    ]
+    if float(max_rotation_distance_deg) >= 0.0:
+        lines.append(f"keep if rot <= {float(max_rotation_distance_deg):.1f} deg")
+    return lines
+
+
+def fused_formula_lines(anygrasp_weight: float, orientation_weight: float, max_rotation_distance_deg: float) -> List[str]:
+    lines = [
+        f"total = anygrasp*{float(anygrasp_weight):.2f} + ori*{float(orientation_weight):.2f}",
+        "ori = max(0, 1 - rot/180)",
+    ]
+    if float(max_rotation_distance_deg) >= 0.0:
+        lines.append(f"keep if rot <= {float(max_rotation_distance_deg):.1f} deg")
+    return lines
 
 
 def main() -> None:
@@ -712,6 +738,7 @@ def main() -> None:
                     panel_width=int(args.panel_width),
                     line_height=int(args.line_height),
                     stage_title="score rank",
+                    formula_lines=["score rank only"],
                     line_builder=score_line,
                 ),
                 annotate_arm_preview(
@@ -729,6 +756,7 @@ def main() -> None:
                     panel_width=int(args.panel_width),
                     line_height=int(args.line_height),
                     stage_title="score rank",
+                    formula_lines=["score rank only"],
                     line_builder=score_line,
                 ),
             )
@@ -770,7 +798,7 @@ def main() -> None:
             candidate_orientation_remap_matrix=candidate_orientation_remap_matrix,
             candidate_target_local_x_offset_m=float(args.candidate_target_local_x_offset_m),
         )
-        left_object_filtered, left_ref_frame = build_candidates_for_arm(
+        left_object_filtered, left_ref_frame, left_target_count = build_candidates_for_arm(
             shared_candidates=shared_candidates,
             arm_name="left",
             hand_data=hand_data,
@@ -778,8 +806,9 @@ def main() -> None:
             target_object=str(args.left_target_object),
             anygrasp_score_weight=float(args.anygrasp_score_weight),
             orientation_score_weight=float(args.orientation_score_weight),
+            max_rotation_distance_deg=float(args.max_rotation_distance_deg),
         )
-        right_object_filtered, right_ref_frame = build_candidates_for_arm(
+        right_object_filtered, right_ref_frame, right_target_count = build_candidates_for_arm(
             shared_candidates=shared_candidates,
             arm_name="right",
             hand_data=hand_data,
@@ -787,6 +816,7 @@ def main() -> None:
             target_object=str(args.right_target_object),
             anygrasp_score_weight=float(args.anygrasp_score_weight),
             orientation_score_weight=float(args.orientation_score_weight),
+            max_rotation_distance_deg=float(args.max_rotation_distance_deg),
         )
         object_count_text = " ".join(
             f"{name}={int(count)}"
@@ -802,8 +832,14 @@ def main() -> None:
         )
         print(
             f"[frame {frame:06d}][arm-map] "
-            f"left<-{args.left_target_object}:{len(left_object_filtered)} "
-            f"right<-{args.right_target_object}:{len(right_object_filtered)}"
+            f"left<-{args.left_target_object}:{left_target_count} "
+            f"right<-{args.right_target_object}:{right_target_count}"
+        )
+        print(
+            f"[frame {frame:06d}][orientation-filter] "
+            f"left_before={left_target_count} left_after={len(left_object_filtered)} "
+            f"right_before={right_target_count} right_after={len(right_object_filtered)} "
+            f"max_rot_deg={float(args.max_rotation_distance_deg):.1f}"
         )
         if bool(args.debug_dump_object_distances):
             debug_payload = {
@@ -822,6 +858,13 @@ def main() -> None:
                 "arm_target_mapping": {
                     "left": str(args.left_target_object),
                     "right": str(args.right_target_object),
+                },
+                "orientation_filter": {
+                    "max_rotation_distance_deg": float(args.max_rotation_distance_deg),
+                    "left_before": int(left_target_count),
+                    "left_after": int(len(left_object_filtered)),
+                    "right_before": int(right_target_count),
+                    "right_after": int(len(right_object_filtered)),
                 },
                 "object_candidates": object_debug_records,
             }
@@ -893,6 +936,7 @@ def main() -> None:
                 panel_width=int(args.panel_width),
                 line_height=int(args.line_height),
                 stage_title="orientation rank",
+                formula_lines=orientation_formula_lines(float(args.max_rotation_distance_deg)),
                 line_builder=orientation_line,
             ),
             annotate_arm_preview(
@@ -910,6 +954,7 @@ def main() -> None:
                 panel_width=int(args.panel_width),
                 line_height=int(args.line_height),
                 stage_title="orientation rank",
+                formula_lines=orientation_formula_lines(float(args.max_rotation_distance_deg)),
                 line_builder=orientation_line,
             ),
         )
@@ -933,6 +978,7 @@ def main() -> None:
                 panel_width=int(args.panel_width),
                 line_height=int(args.line_height),
                 stage_title="fused rank",
+                formula_lines=fused_formula_lines(float(args.anygrasp_score_weight), float(args.orientation_score_weight), float(args.max_rotation_distance_deg)),
                 line_builder=fused_line,
             ),
             annotate_arm_preview(
@@ -950,6 +996,7 @@ def main() -> None:
                 panel_width=int(args.panel_width),
                 line_height=int(args.line_height),
                 stage_title="fused rank",
+                formula_lines=fused_formula_lines(float(args.anygrasp_score_weight), float(args.orientation_score_weight), float(args.max_rotation_distance_deg)),
                 line_builder=fused_line,
             ),
         )
@@ -975,7 +1022,10 @@ def main() -> None:
                 "object_filter_counts": {
                     "before_total": int(len(grasps)),
                     "object_partition_counts": {name: int(count) for name, count in sorted(object_partition_counts.items())},
+                    "max_rotation_distance_deg": float(args.max_rotation_distance_deg),
+                    "left_before_orientation_filter": int(left_target_count),
                     "left_after": int(len(left_object_filtered)),
+                    "right_before_orientation_filter": int(right_target_count),
                     "right_after": int(len(right_object_filtered)),
                     "left_target_object": str(args.left_target_object),
                     "right_target_object": str(args.right_target_object),

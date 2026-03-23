@@ -268,3 +268,16 @@
 - Documented that the recommended replay root for this preview workflow is `replay_m_obj_pose_d_pour_blue_norobot`; the older non-`norobot` replay root was part of the earlier preview mismatch/debugging issues.
 - Validation:
   - `bash /home/zaijia001/ssd/RoboTwin/code_painting/run_render_anygrasp_ranked_preview_batch.sh /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_batch_results /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_d_pour_blue_norobot /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis /tmp/anygrasp_preview_batch_check --ids 1 --frames 1 22 --top_k 2 --left_target_object cup --right_target_object bottle --draw_grasp_boxes 1`
+
+- Updated `code_painting/render_anygrasp_ranked_preview.py` panel formatting and staged filtering again.
+- The right-side ranking panel now prints formulas instead of compact `ori / rot` labels:
+  - orientation panel header shows `ori = max(0, 1 - rot/180)`
+  - fused panel header shows `total = anygrasp*wA + ori*wB`
+  - each row now writes the substituted arithmetic expression directly
+- Added a new staged filter `--max_rotation_distance_deg`, default `90.0`.
+- Candidates whose hand-orientation rotation distance is larger than this threshold are now dropped after object partitioning and before orientation/fused ranking.
+- Terminal logs now include an `orientation-filter` line with before/after counts for each hand-target mapping.
+- `summary.json` now records the orientation-filter threshold and before/after counts.
+- Validation:
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/render_anygrasp_ranked_preview.py`
+  - `bash /home/zaijia001/ssd/RoboTwin/code_painting/run_render_anygrasp_ranked_preview_batch.sh /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_batch_results /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_d_pour_blue_norobot /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis /tmp/anygrasp_preview_formula_check --ids 1 --frames 1 --top_k 3 --left_target_object cup --right_target_object bottle --draw_grasp_boxes 1`
