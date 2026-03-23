@@ -53,6 +53,20 @@ class CandidateRecord:
     translation_world: np.ndarray
 
 
+@dataclass
+class SharedCandidateRecord:
+    candidate_idx: int
+    anygrasp_score: float
+    translation: np.ndarray
+    rotation_matrix: np.ndarray
+    width: float
+    depth: float
+    nearest_object: str
+    nearest_object_distance_m: float
+    translation_world: np.ndarray
+    distances_to_objects_world_m: Dict[str, float]
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Annotate AnyGrasp result images with planner-style staged filtering.")
     parser.add_argument("--anygrasp_dir", type=Path, required=True, help="Per-video AnyGrasp result dir.")
@@ -412,31 +426,18 @@ def draw_grasp_wireframe(
         )
 
 
-def build_candidates_for_arm(
+def build_object_partitioned_candidates(
     grasps: Sequence[Dict],
-    arm_name: str,
-    hand_data: Dict[str, np.ndarray],
-    frame: int,
     object_world_positions: Dict[str, np.ndarray],
     camera_pose_world_wxyz: np.ndarray,
-    target_object: str,
-    anygrasp_score_weight: float,
-    orientation_score_weight: float,
     camera_cv_axis_mode: str,
     candidate_post_rot_matrix: np.ndarray,
     candidate_orientation_remap_matrix: np.ndarray,
     candidate_target_local_x_offset_m: float,
-) -> Tuple[List[CandidateRecord], List[CandidateRecord], int, List[Dict[str, object]]]:
-    hand_valid = np.asarray(hand_data[f"{arm_name}_gripper_valid"], dtype=bool)
-    hand_rotations = np.asarray(hand_data[f"{arm_name}_gripper_rotation_matrix"], dtype=np.float64)
-    ref_frame = int(frame) if frame < hand_valid.shape[0] and bool(hand_valid[frame]) else nearest_valid_hand_frame(int(frame), hand_valid)
-    if ref_frame is None:
-        raise RuntimeError(f"No valid {arm_name} hand rotation exists for frame {frame}.")
-    ref_rot = np.asarray(hand_rotations[ref_frame], dtype=np.float64)
-
-    all_candidates: List[CandidateRecord] = []
-    filtered_candidates: List[CandidateRecord] = []
+) -> Tuple[List[SharedCandidateRecord], List[Dict[str, object]], Dict[str, int]]:
+    all_candidates: List[SharedCandidateRecord] = []
     debug_records: List[Dict[str, object]] = []
+    object_partition_counts: Dict[str, int] = {}
     for candidate_idx, grasp in enumerate(grasps):
         translation = np.asarray(grasp["translation"], dtype=np.float64).reshape(3)
         rotation_matrix = np.asarray(grasp["rotation_matrix"], dtype=np.float64).reshape(3, 3)
@@ -453,16 +454,9 @@ def build_candidates_for_arm(
             candidate_world_position=translation_world,
             object_world_positions=object_world_positions,
         )
-        anygrasp_score = float(grasp["score"])
-        rotation_distance = rotation_distance_deg(ref_rot, rotation_matrix)
-        orientation_score = orientation_score_from_rotation_distance(rotation_distance)
-        fused_score = float(anygrasp_score_weight) * anygrasp_score + float(orientation_score_weight) * orientation_score
-        candidate = CandidateRecord(
+        candidate = SharedCandidateRecord(
             candidate_idx=int(candidate_idx),
-            anygrasp_score=anygrasp_score,
-            orientation_score=orientation_score,
-            fused_score=fused_score,
-            rotation_distance_deg=rotation_distance,
+            anygrasp_score=float(grasp["score"]),
             translation=translation,
             rotation_matrix=rotation_matrix,
             width=float(grasp.get("width", 0.0)),
@@ -470,8 +464,10 @@ def build_candidates_for_arm(
             nearest_object=str(nearest_object),
             nearest_object_distance_m=float(nearest_dist),
             translation_world=translation_world,
+            distances_to_objects_world_m={name: float(dist) for name, dist in sorted(distances_world.items())},
         )
         all_candidates.append(candidate)
+        object_partition_counts[str(nearest_object)] = int(object_partition_counts.get(str(nearest_object), 0)) + 1
         debug_records.append(
             {
                 "candidate_idx": int(candidate_idx),
@@ -483,9 +479,49 @@ def build_candidates_for_arm(
                 "object_world_positions": {name: np.asarray(point, dtype=np.float64).reshape(3).tolist() for name, point in sorted(object_world_positions.items())},
             }
         )
-        if str(nearest_object) == str(target_object):
-            filtered_candidates.append(candidate)
-    return all_candidates, filtered_candidates, int(ref_frame), debug_records
+    return all_candidates, debug_records, object_partition_counts
+
+
+def build_candidates_for_arm(
+    shared_candidates: Sequence[SharedCandidateRecord],
+    arm_name: str,
+    hand_data: Dict[str, np.ndarray],
+    frame: int,
+    target_object: str,
+    anygrasp_score_weight: float,
+    orientation_score_weight: float,
+) -> Tuple[List[CandidateRecord], int]:
+    hand_valid = np.asarray(hand_data[f"{arm_name}_gripper_valid"], dtype=bool)
+    hand_rotations = np.asarray(hand_data[f"{arm_name}_gripper_rotation_matrix"], dtype=np.float64)
+    ref_frame = int(frame) if frame < hand_valid.shape[0] and bool(hand_valid[frame]) else nearest_valid_hand_frame(int(frame), hand_valid)
+    if ref_frame is None:
+        raise RuntimeError(f"No valid {arm_name} hand rotation exists for frame {frame}.")
+    ref_rot = np.asarray(hand_rotations[ref_frame], dtype=np.float64)
+
+    filtered_candidates: List[CandidateRecord] = []
+    for candidate in shared_candidates:
+        if str(candidate.nearest_object) != str(target_object):
+            continue
+        rotation_distance = rotation_distance_deg(ref_rot, candidate.rotation_matrix)
+        orientation_score = orientation_score_from_rotation_distance(rotation_distance)
+        fused_score = float(anygrasp_score_weight) * float(candidate.anygrasp_score) + float(orientation_score_weight) * orientation_score
+        filtered_candidates.append(
+            CandidateRecord(
+                candidate_idx=int(candidate.candidate_idx),
+                anygrasp_score=float(candidate.anygrasp_score),
+                orientation_score=orientation_score,
+                fused_score=fused_score,
+                rotation_distance_deg=rotation_distance,
+                translation=np.asarray(candidate.translation, dtype=np.float64).reshape(3),
+                rotation_matrix=np.asarray(candidate.rotation_matrix, dtype=np.float64).reshape(3, 3),
+                width=float(candidate.width),
+                depth=float(candidate.depth),
+                nearest_object=str(candidate.nearest_object),
+                nearest_object_distance_m=float(candidate.nearest_object_distance_m),
+                translation_world=np.asarray(candidate.translation_world, dtype=np.float64).reshape(3),
+            )
+        )
+    return filtered_candidates, int(ref_frame)
 
 
 def build_score_ranked_candidates_for_arm(
@@ -725,44 +761,49 @@ def main() -> None:
             fixed_camera_pose_world_wxyz,
         )
 
-        _, left_object_filtered, left_ref_frame, left_debug_records = build_candidates_for_arm(
+        shared_candidates, object_debug_records, object_partition_counts = build_object_partitioned_candidates(
             grasps=grasps,
+            object_world_positions=object_world_positions,
+            camera_pose_world_wxyz=camera_pose_world_wxyz,
+            camera_cv_axis_mode=str(args.camera_cv_axis_mode),
+            candidate_post_rot_matrix=candidate_post_rot_matrix,
+            candidate_orientation_remap_matrix=candidate_orientation_remap_matrix,
+            candidate_target_local_x_offset_m=float(args.candidate_target_local_x_offset_m),
+        )
+        left_object_filtered, left_ref_frame = build_candidates_for_arm(
+            shared_candidates=shared_candidates,
             arm_name="left",
             hand_data=hand_data,
             frame=frame,
-            object_world_positions=object_world_positions,
-            camera_pose_world_wxyz=camera_pose_world_wxyz,
             target_object=str(args.left_target_object),
             anygrasp_score_weight=float(args.anygrasp_score_weight),
             orientation_score_weight=float(args.orientation_score_weight),
-            camera_cv_axis_mode=str(args.camera_cv_axis_mode),
-            candidate_post_rot_matrix=candidate_post_rot_matrix,
-            candidate_orientation_remap_matrix=candidate_orientation_remap_matrix,
-            candidate_target_local_x_offset_m=float(args.candidate_target_local_x_offset_m),
         )
-        _, right_object_filtered, right_ref_frame, right_debug_records = build_candidates_for_arm(
-            grasps=grasps,
+        right_object_filtered, right_ref_frame = build_candidates_for_arm(
+            shared_candidates=shared_candidates,
             arm_name="right",
             hand_data=hand_data,
             frame=frame,
-            object_world_positions=object_world_positions,
-            camera_pose_world_wxyz=camera_pose_world_wxyz,
             target_object=str(args.right_target_object),
             anygrasp_score_weight=float(args.anygrasp_score_weight),
             orientation_score_weight=float(args.orientation_score_weight),
-            camera_cv_axis_mode=str(args.camera_cv_axis_mode),
-            candidate_post_rot_matrix=candidate_post_rot_matrix,
-            candidate_orientation_remap_matrix=candidate_orientation_remap_matrix,
-            candidate_target_local_x_offset_m=float(args.candidate_target_local_x_offset_m),
         )
+        object_count_text = " ".join(
+            f"{name}={int(count)}"
+            for name, count in sorted(object_partition_counts.items())
+        )
+        if not object_count_text:
+            object_count_text = "none=0"
 
         print(
-            f"[frame {frame:06d}][object-filter] "
+            f"[frame {frame:06d}][object-partition] "
             f"before_total={len(grasps)} "
-            f"left_before={len(grasps)} "
-            f"right_before={len(grasps)} "
-            f"left_after={len(left_object_filtered)} target={args.left_target_object} "
-            f"right_after={len(right_object_filtered)} target={args.right_target_object}"
+            f"{object_count_text}"
+        )
+        print(
+            f"[frame {frame:06d}][arm-map] "
+            f"left<-{args.left_target_object}:{len(left_object_filtered)} "
+            f"right<-{args.right_target_object}:{len(right_object_filtered)}"
         )
         if bool(args.debug_dump_object_distances):
             debug_payload = {
@@ -777,8 +818,12 @@ def main() -> None:
                     name: np.asarray(point, dtype=np.float64).reshape(3).tolist()
                     for name, point in sorted(object_world_positions.items())
                 },
-                "left": left_debug_records,
-                "right": right_debug_records,
+                "object_partition_counts": {name: int(count) for name, count in sorted(object_partition_counts.items())},
+                "arm_target_mapping": {
+                    "left": str(args.left_target_object),
+                    "right": str(args.right_target_object),
+                },
+                "object_candidates": object_debug_records,
             }
             debug_path = args.output_dir / f"frame_{frame:06d}_object_distance_debug.json"
             with debug_path.open("w", encoding="utf-8") as f:
@@ -806,19 +851,25 @@ def main() -> None:
                     f"detected suspicious object world poses: max_norm={max_object_norm:.4f}m min_z={min_object_z:.4f}m. "
                     f"Check whether --replay_dir matches the planner replay export."
                 )
-            for arm_name, records in (("left", left_debug_records), ("right", right_debug_records)):
-                for record in records:
-                    dist_text = ", ".join(
-                        f"{name}:{dist:.4f}"
-                        for name, dist in sorted(record["distances_to_objects_world_m"].items())
-                    )
-                    print(
-                        f"[frame {frame:06d}][{arm_name}][cand {int(record['candidate_idx']):02d}] "
-                        f"gripper_world={np.asarray(record['candidate_translation_world'], dtype=np.float64).reshape(3).tolist()} "
-                        f"nearest={record['nearest_object']} "
-                        f"nearest_dist={float(record['nearest_object_distance_m']):.4f} "
-                        f"world_dists={{ {dist_text} }}"
-                    )
+            for record in object_debug_records:
+                dist_text = ", ".join(
+                    f"{name}:{dist:.4f}"
+                    for name, dist in sorted(record["distances_to_objects_world_m"].items())
+                )
+                hand_tags: List[str] = []
+                if str(record["nearest_object"]) == str(args.left_target_object):
+                    hand_tags.append("left")
+                if str(record["nearest_object"]) == str(args.right_target_object):
+                    hand_tags.append("right")
+                hand_text = ",".join(hand_tags) if hand_tags else "unassigned"
+                print(
+                    f"[frame {frame:06d}][cand {int(record['candidate_idx']):02d}] "
+                    f"object={record['nearest_object']} "
+                    f"arms={hand_text} "
+                    f"gripper_world={np.asarray(record['candidate_translation_world'], dtype=np.float64).reshape(3).tolist()} "
+                    f"nearest_dist={float(record['nearest_object_distance_m']):.4f} "
+                    f"world_dists={{ {dist_text} }}"
+                )
 
         left_orientation_ranked = sorted(left_object_filtered, key=lambda item: (-float(item.orientation_score), float(item.rotation_distance_deg), -float(item.anygrasp_score)))
         right_orientation_ranked = sorted(right_object_filtered, key=lambda item: (-float(item.orientation_score), float(item.rotation_distance_deg), -float(item.anygrasp_score)))
@@ -923,6 +974,7 @@ def main() -> None:
                 "camera_pose_source": str(camera_pose_source),
                 "object_filter_counts": {
                     "before_total": int(len(grasps)),
+                    "object_partition_counts": {name: int(count) for name, count in sorted(object_partition_counts.items())},
                     "left_after": int(len(left_object_filtered)),
                     "right_after": int(len(right_object_filtered)),
                     "left_target_object": str(args.left_target_object),

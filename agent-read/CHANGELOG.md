@@ -249,3 +249,15 @@
 - This helps catch replay directories whose object tracks are in an off-scene / hidden pose space such as `z≈-10`, which would otherwise make every nearest-object distance look wrong.
 - Validation:
   - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/render_anygrasp_ranked_preview.py`
+
+- Refactored staged preview candidate assignment to separate object partitioning from left/right arm mapping.
+- The staged flow now does:
+  - one shared nearest-object pass over all AnyGrasp candidates
+  - one `object-partition` log such as `cup=12 bottle=8`
+  - one `arm-map` log such as `left<-cup:12 right<-bottle:8`
+  - per-arm orientation/fused ranking only after that object partition is complete
+- This removes the previous ambiguity where left/right debug output repeated the same candidate pool and made object-to-arm assignment look duplicated.
+- Updated `frame_<frame>_object_distance_debug.json` to store shared `object_candidates`, `object_partition_counts`, and `arm_target_mapping`.
+- Validation:
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/render_anygrasp_ranked_preview.py`
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python /home/zaijia001/ssd/RoboTwin/code_painting/render_anygrasp_ranked_preview.py --anygrasp_dir /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_batch_results/d_pour_blue_1 --replay_dir /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_debug/d_pour_blue_1 --hand_npz /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis/hand_detections_1.npz --base_image_dir /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_d_pour_blue/d_pour_blue_1/head_anygrasp_frames --base_image_mode raw --output_dir /tmp/anygrasp_partition_check --frames 1 --top_k 2 --left_target_object cup --right_target_object bottle --candidate_target_local_x_offset_m -0.05 --debug_dump_object_distances 1`
