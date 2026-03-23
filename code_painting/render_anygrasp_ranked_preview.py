@@ -67,6 +67,15 @@ class SharedCandidateRecord:
     distances_to_objects_world_m: Dict[str, float]
 
 
+@dataclass
+class HandReference:
+    arm_name: str
+    ref_frame: int
+    position: np.ndarray
+    rotation_matrix: np.ndarray
+    finger_distance: float
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Annotate AnyGrasp result images with planner-style staged filtering.")
     parser.add_argument("--anygrasp_dir", type=Path, required=True, help="Per-video AnyGrasp result dir.")
@@ -83,6 +92,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--orientation_score_weight", type=float, default=0.5)
     parser.add_argument("--max_rotation_distance_deg", type=float, default=90.0, help="If >= 0, drop arm-specific candidates whose hand-orientation rotation distance exceeds this threshold.")
     parser.add_argument("--draw_object_overlay", type=int, default=0, help="If 1, overlay replay object center markers and labels in staged mode.")
+    parser.add_argument("--draw_hand_reference", type=int, default=1, help="If 1, overlay the reference human-hand gripper pose using a distinct color.")
     parser.add_argument("--debug_dump_object_distances", type=int, default=0, help="If 1, dump per-candidate distances to every visible object in staged mode.")
     parser.add_argument("--camera_cv_axis_mode", choices=sorted(CV_TO_WORLD_CAMERA_PRESETS.keys()), default="legacy_r1")
     parser.add_argument("--candidate_target_local_x_offset_m", type=float, default=0.0)
@@ -569,10 +579,61 @@ def build_score_ranked_candidates_for_arm(
     return ranked, int(ref_frame)
 
 
+def resolve_hand_reference(
+    hand_data: Dict[str, np.ndarray],
+    arm_name: str,
+    frame: int,
+) -> HandReference:
+    hand_valid = np.asarray(hand_data[f"{arm_name}_gripper_valid"], dtype=bool)
+    ref_frame = int(frame) if frame < hand_valid.shape[0] and bool(hand_valid[frame]) else nearest_valid_hand_frame(int(frame), hand_valid)
+    if ref_frame is None:
+        raise RuntimeError(f"No valid {arm_name} hand pose exists for frame {frame}.")
+    position = np.asarray(hand_data[f"{arm_name}_gripper_position"], dtype=np.float64)[ref_frame].reshape(3)
+    rotation_matrix = np.asarray(hand_data[f"{arm_name}_gripper_rotation_matrix"], dtype=np.float64)[ref_frame].reshape(3, 3)
+    finger_distance = float(np.asarray(hand_data[f"{arm_name}_gripper_finger_distance"], dtype=np.float64)[ref_frame])
+    return HandReference(
+        arm_name=str(arm_name),
+        ref_frame=int(ref_frame),
+        position=position,
+        rotation_matrix=rotation_matrix,
+        finger_distance=finger_distance,
+    )
+
+
+def draw_hand_reference(
+    image: np.ndarray,
+    camera_info: Dict,
+    hand_reference: HandReference,
+    color: Tuple[int, int, int],
+) -> None:
+    draw_grasp_wireframe(
+        image=image,
+        camera_info=camera_info,
+        translation=np.asarray(hand_reference.position, dtype=np.float64).reshape(3),
+        rotation_matrix=np.asarray(hand_reference.rotation_matrix, dtype=np.float64).reshape(3, 3),
+        width_m=float(np.clip(hand_reference.finger_distance, 0.01, 0.12)),
+        depth_m=0.035,
+        color=color,
+        thickness=2,
+    )
+    center_px = project_camera_point(np.asarray(hand_reference.position, dtype=np.float64).reshape(3), camera_info)
+    if center_px is None:
+        return
+    cv2.circle(image, (int(center_px[0]), int(center_px[1])), 5, color, -1, cv2.LINE_AA)
+    draw_tiny_label(
+        image,
+        f"{hand_reference.arm_name[0].upper()}H",
+        (int(center_px[0]) + 6, int(center_px[1]) - 6),
+        color,
+        0.42,
+    )
+
+
 def annotate_arm_preview(
     base_image: np.ndarray,
     arm_name: str,
     ranked: Sequence[CandidateRecord],
+    hand_reference: Optional[HandReference],
     camera_info: Dict,
     object_world_positions: Optional[Dict[str, np.ndarray]],
     camera_pose_world_wxyz: Optional[np.ndarray],
@@ -589,7 +650,15 @@ def annotate_arm_preview(
 ) -> np.ndarray:
     title = "LEFT" if arm_name == "left" else "RIGHT"
     box_color = (255, 100, 0) if arm_name == "left" else (0, 140, 255)
+    hand_color = (60, 255, 120) if arm_name == "left" else (255, 80, 180)
     image = base_image.copy()
+    if hand_reference is not None:
+        draw_hand_reference(
+            image=image,
+            camera_info=camera_info,
+            hand_reference=hand_reference,
+            color=hand_color,
+        )
     if object_world_positions is not None and camera_pose_world_wxyz is not None:
         draw_object_overlay(
             image=image,
@@ -600,8 +669,10 @@ def annotate_arm_preview(
         )
     panel = np.full((image.shape[0], panel_width, 3), 255, dtype=np.uint8)
     draw_tiny_label(panel, f"{title} {stage_title}", (10, 24), (0, 0, 0), 0.55)
+    if hand_reference is not None:
+        draw_tiny_label(panel, f"hand ref idx={hand_reference.ref_frame}", (10, 40), hand_color, 0.36)
     for formula_idx, formula_line in enumerate(list(formula_lines)[:3], start=0):
-        draw_tiny_label(panel, formula_line, (10, 44 + formula_idx * 16), (0, 0, 0), 0.34)
+        draw_tiny_label(panel, formula_line, (10, 58 + formula_idx * 16), (0, 0, 0), 0.34)
 
     capped = list(ranked if int(top_k) < 0 else ranked[: max(int(top_k), 0)])
     for item in capped:
@@ -629,7 +700,7 @@ def annotate_arm_preview(
         )
 
     for row_idx, item in enumerate(capped, start=0):
-        y = 96 + row_idx * int(line_height)
+        y = 112 + row_idx * int(line_height)
         if y >= panel.shape[0] - 8:
             break
         draw_tiny_label(panel, line_builder(row_idx, item), (10, y), (0, 0, 0), 0.36)
@@ -719,6 +790,8 @@ def main() -> None:
             height=int(camera_info["height"]),
             image_mode=str(args.base_image_mode),
         )
+        left_hand_reference = resolve_hand_reference(hand_data, "left", frame) if bool(args.draw_hand_reference) else None
+        right_hand_reference = resolve_hand_reference(hand_data, "right", frame) if bool(args.draw_hand_reference) else None
         if args.replay_dir is None:
             left_score_ranked, left_ref_frame = build_score_ranked_candidates_for_arm(grasps, "left", hand_data, frame)
             right_score_ranked, right_ref_frame = build_score_ranked_candidates_for_arm(grasps, "right", hand_data, frame)
@@ -727,6 +800,7 @@ def main() -> None:
                 base_image=base_image,
                 arm_name="left",
                 ranked=left_score_ranked,
+                    hand_reference=left_hand_reference,
                     camera_info=camera_info,
                     object_world_positions=None,
                     camera_pose_world_wxyz=None,
@@ -745,6 +819,7 @@ def main() -> None:
                 base_image=base_image,
                 arm_name="right",
                 ranked=right_score_ranked,
+                    hand_reference=right_hand_reference,
                     camera_info=camera_info,
                     object_world_positions=None,
                     camera_pose_world_wxyz=None,
@@ -772,6 +847,7 @@ def main() -> None:
                     "base_image_mode": str(args.base_image_mode),
                     "base_image_dir": None if args.base_image_dir is None else str(args.base_image_dir),
                     "draw_grasp_boxes": int(args.draw_grasp_boxes),
+                    "draw_hand_reference": int(args.draw_hand_reference),
                     "score_image": str(score_path),
                     "top_k": int(args.top_k),
                 }
@@ -925,6 +1001,7 @@ def main() -> None:
                 base_image=base_image,
                 arm_name="left",
                 ranked=left_orientation_ranked,
+                hand_reference=left_hand_reference,
                 camera_info=camera_info,
                 object_world_positions=object_world_positions if bool(args.draw_object_overlay) else None,
                 camera_pose_world_wxyz=camera_pose_world_wxyz if bool(args.draw_object_overlay) else None,
@@ -943,6 +1020,7 @@ def main() -> None:
                 base_image=base_image,
                 arm_name="right",
                 ranked=right_orientation_ranked,
+                hand_reference=right_hand_reference,
                 camera_info=camera_info,
                 object_world_positions=object_world_positions if bool(args.draw_object_overlay) else None,
                 camera_pose_world_wxyz=camera_pose_world_wxyz if bool(args.draw_object_overlay) else None,
@@ -967,6 +1045,7 @@ def main() -> None:
                 base_image=base_image,
                 arm_name="left",
                 ranked=left_fused_ranked,
+                hand_reference=left_hand_reference,
                 camera_info=camera_info,
                 object_world_positions=object_world_positions if bool(args.draw_object_overlay) else None,
                 camera_pose_world_wxyz=camera_pose_world_wxyz if bool(args.draw_object_overlay) else None,
@@ -985,6 +1064,7 @@ def main() -> None:
                 base_image=base_image,
                 arm_name="right",
                 ranked=right_fused_ranked,
+                hand_reference=right_hand_reference,
                 camera_info=camera_info,
                 object_world_positions=object_world_positions if bool(args.draw_object_overlay) else None,
                 camera_pose_world_wxyz=camera_pose_world_wxyz if bool(args.draw_object_overlay) else None,
@@ -1016,6 +1096,7 @@ def main() -> None:
                 "base_image_mode": str(args.base_image_mode),
                 "base_image_dir": None if args.base_image_dir is None else str(args.base_image_dir),
                 "draw_grasp_boxes": int(args.draw_grasp_boxes),
+                "draw_hand_reference": int(args.draw_hand_reference),
                 "draw_object_overlay": int(args.draw_object_overlay),
                 "camera_pose_world_wxyz": np.asarray(camera_pose_world_wxyz, dtype=np.float64).tolist(),
                 "camera_pose_source": str(camera_pose_source),

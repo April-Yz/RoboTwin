@@ -281,3 +281,14 @@
 - Validation:
   - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/render_anygrasp_ranked_preview.py`
   - `bash /home/zaijia001/ssd/RoboTwin/code_painting/run_render_anygrasp_ranked_preview_batch.sh /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_batch_results /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_d_pour_blue_norobot /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis /tmp/anygrasp_preview_formula_check --ids 1 --frames 1 --top_k 3 --left_target_object cup --right_target_object bottle --draw_grasp_boxes 1`
+
+- Added human-hand reference orientation overlay to `code_painting/render_anygrasp_ranked_preview.py`.
+- The preview now draws a distinct-color human gripper reference for each arm using:
+  - `left/right_gripper_position`
+  - `left/right_gripper_rotation_matrix`
+  - `left/right_gripper_finger_distance`
+- This overlay is enabled by default through `--draw_hand_reference 1`.
+- The panel header now also shows the actual hand-reference frame index used for that arm.
+- Validation:
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/render_anygrasp_ranked_preview.py`
+  - `bash /home/zaijia001/ssd/RoboTwin/code_painting/run_render_anygrasp_ranked_preview_batch.sh /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_batch_results /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_d_pour_blue_norobot /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis /tmp/anygrasp_hand_overlay_check --ids 1 --frames 1 --top_k 3 --left_target_object cup --right_target_object bottle --draw_grasp_boxes 1`
