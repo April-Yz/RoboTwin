@@ -167,6 +167,31 @@
 
 ## 2026-03-23
 
+- Updated `code_painting/render_anygrasp_ranked_preview.py` from a raw-score-only preview tool into a staged candidate-inspection tool.
+- The script now supports:
+  - replay-backed left/right target-object filtering
+  - per-arm orientation-only ranking after object filtering
+  - fused ranking with `0.5 * anygrasp_score + 0.5 * orientation_score` by default
+  - combined-only preview outputs instead of saving separate left/right images
+  - terminal count logs before/after object filtering for each frame
+- Added a replay-export prerequisite note: object filtering requires `multi_object_world_poses.npz` to contain `head_camera_pose_world_wxyz`.
+- Updated:
+  - `agent-read/V1.13_anygrasp_candidate_ranking_logic.md`
+  - `agent-read/V1.13_anygrasp_candidate_ranking_logic_ZH.md`
+- Validation:
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/render_anygrasp_ranked_preview.py`
+
+- Added paired ranking-logic notes for the AnyGrasp candidate pipeline:
+  - `agent-read/V1.13_anygrasp_candidate_ranking_logic.md`
+  - `agent-read/V1.13_anygrasp_candidate_ranking_logic_ZH.md`
+- Documented the exact code path behind candidate ranking and preview generation, including:
+  - the wrapper role of `code_painting/run_plan_anygrasp_keyframes_r1_batch.sh`
+  - the raw-score-only visualization semantics of `code_painting/render_anygrasp_ranked_preview.py`
+  - the actual planner-side ranking and cross-keyframe selection logic in `code_painting/plan_anygrasp_keyframes_r1.py`
+  - the distinction between `ranked_candidates_per_frame`, `all_candidates_per_frame`, manual overrides, and final selected keyframes
+- Validation:
+  - `git -C /home/zaijia001/ssd/RoboTwin diff --check -- agent-read/V1.13_anygrasp_candidate_ranking_logic.md agent-read/V1.13_anygrasp_candidate_ranking_logic_ZH.md agent-read/CHANGELOG.md`
+
 - Added `agent-read/V1.12_object_and_gripper_replay_logic_ZH.md` and `agent-read/V1.12_object_and_gripper_replay_logic.md` to document the current combined AnyGrasp keyframe execution plus object-track replay logic.
 - Updated selected-keyframe camera-up behavior in `code_painting/plan_anygrasp_keyframes_r1.py`: keyframe 1 still resolves the local-`+X` 180-degree roll ambiguity using the upward-facing rule, while later keyframes now choose the equivalent roll variant with the smaller rotation change relative to the previous selected keyframe. This prevents large extra roll spins between keyframe 1 and keyframe 22.
 - Added `camera_up_selection_mode` to selected-candidate debug / summary outputs so it is explicit whether a keyframe used `keyframe1_keep_up`, `follow_previous_base`, or `follow_previous_flip180`.
