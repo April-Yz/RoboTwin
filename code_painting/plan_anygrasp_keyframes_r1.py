@@ -550,7 +550,7 @@ def choose_roll_variant_with_previous(
     prev_rot = base.orthonormalize_rotation(previous_rotation_world)
     variants.sort(
         key=lambda cand: (
-            rotation_distance_deg_matrix(prev_rot, cand.pose_world_matrix[:3, :3]),
+            rotation_distance_deg(prev_rot, cand.pose_world_matrix[:3, :3]),
             -float(cand.top_axis_up_dot),
         )
     )

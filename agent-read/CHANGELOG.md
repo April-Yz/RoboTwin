@@ -171,4 +171,5 @@
 - Updated selected-keyframe camera-up behavior in `code_painting/plan_anygrasp_keyframes_r1.py`: keyframe 1 still resolves the local-`+X` 180-degree roll ambiguity using the upward-facing rule, while later keyframes now choose the equivalent roll variant with the smaller rotation change relative to the previous selected keyframe. This prevents large extra roll spins between keyframe 1 and keyframe 22.
 - Added `camera_up_selection_mode` to selected-candidate debug / summary outputs so it is explicit whether a keyframe used `keyframe1_keep_up`, `follow_previous_base`, or `follow_previous_flip180`.
 - Updated `agent-read/ik_analyze/anygrasp_keyframe_ik_planning_analysis.md` and `.en.md` with the new sequential camera-up rule.
+- Fixed a regression in the sequential keyframe camera-up rule: the new follow-previous branch referenced `rotation_distance_deg_matrix(...)`, but the file only defines `rotation_distance_deg(...)`. The roll-continuity path now uses the existing helper and no longer crashes during keyframe selection.
 - Validation: `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/plan_anygrasp_keyframes_r1.py`
