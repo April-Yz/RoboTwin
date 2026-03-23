@@ -261,3 +261,10 @@
 - Validation:
   - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/render_anygrasp_ranked_preview.py`
   - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python /home/zaijia001/ssd/RoboTwin/code_painting/render_anygrasp_ranked_preview.py --anygrasp_dir /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_batch_results/d_pour_blue_1 --replay_dir /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_debug/d_pour_blue_1 --hand_npz /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis/hand_detections_1.npz --base_image_dir /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_d_pour_blue/d_pour_blue_1/head_anygrasp_frames --base_image_mode raw --output_dir /tmp/anygrasp_partition_check --frames 1 --top_k 2 --left_target_object cup --right_target_object bottle --candidate_target_local_x_offset_m -0.05 --debug_dump_object_distances 1`
+
+- Added `code_painting/run_render_anygrasp_ranked_preview_batch.sh` as a batch wrapper for the staged AnyGrasp preview path.
+- The new wrapper loops over `d_pour_blue_{id}` directories, resolves per-video paths automatically, and forwards the remaining preview arguments into `render_anygrasp_ranked_preview.py`.
+- Added shell-level `--ids ...` filtering so batch preview can run only selected videos.
+- Documented that the recommended replay root for this preview workflow is `replay_m_obj_pose_d_pour_blue_norobot`; the older non-`norobot` replay root was part of the earlier preview mismatch/debugging issues.
+- Validation:
+  - `bash /home/zaijia001/ssd/RoboTwin/code_painting/run_render_anygrasp_ranked_preview_batch.sh /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_batch_results /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_d_pour_blue_norobot /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis /tmp/anygrasp_preview_batch_check --ids 1 --frames 1 22 --top_k 2 --left_target_object cup --right_target_object bottle --draw_grasp_boxes 1`
