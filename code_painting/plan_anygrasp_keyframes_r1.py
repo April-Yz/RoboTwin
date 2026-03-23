@@ -155,10 +155,26 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--replay_dir", type=Path, required=True, help="Per-video replay dir containing multi_object_world_poses.npz.")
     parser.add_argument("--hand_npz", type=Path, required=True, help="Per-video hand_detections_*.npz with gripper pose fields.")
     parser.add_argument("--output_dir", type=Path, required=True, help="Output dir for planned demo video and metadata.")
+    parser.add_argument("--reuse_plan_summary_json", type=Path, default=None, help="Optional previous plan_summary.json. If set, skip AnyGrasp candidate recomputation and execute the already selected candidates from that JSON directly.")
+    parser.add_argument("--reuse_preview_summary_json", type=Path, default=None, help="Optional previous preview summary.json from render_anygrasp_ranked_preview.py. If set, load top-ranked preview candidates directly instead of recomputing AnyGrasp selection.")
+    parser.add_argument("--reuse_preview_candidate_group", choices=["orientation", "fused"], default="orientation", help="Which preview ranking list to use when --reuse_preview_summary_json is set.")
+    parser.add_argument("--reuse_preview_top_rank", type=int, default=1, help="1-based rank to read from the preview summary candidate list when --reuse_preview_summary_json is set.")
     parser.add_argument("--keyframes", type=int, nargs=2, default=[1, 22], metavar=("GRASP_FRAME", "ACTION_FRAME"))
     parser.add_argument("--arm", choices=["auto", "left", "right"], default="auto")
     parser.add_argument("--execute_both_arms", type=int, default=0, help="If 1 and --arm auto, execute synchronized dual-arm stages and advance only when both arms satisfy reach checks.")
     parser.add_argument("--planner_backend", choices=["urdfik", "curobo"], default="urdfik")
+    parser.add_argument(
+        "--candidate_selection_mode",
+        choices=["planner", "top_score_auto"],
+        default="planner",
+        help="How to choose the two keyframe candidates. 'planner' keeps the original orientation-first two-keyframe selection; 'top_score_auto' picks the highest AnyGrasp score candidate at the resolved frame-1 and resolved frame-2 for each arm after filtering.",
+    )
+    parser.add_argument(
+        "--candidate_selection_relative_frame",
+        type=int,
+        default=None,
+        help="Optional extra frame spec used only by --candidate_selection_mode top_score_auto. If set, resolve it against available grasp frames and use max(resolved_keyframe2, resolved_relative_frame) as the second execution keyframe.",
+    )
     parser.add_argument(
         "--urdfik_trajectory_mode",
         choices=["joint_interp", "cartesian_interp_ik"],
@@ -173,6 +189,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--left_target_object", type=str, default="cup")
     parser.add_argument("--right_target_object", type=str, default="bottle")
+    parser.add_argument("--candidate_max_rotation_distance_deg", type=float, default=-1.0, help="If >= 0, drop planner candidates whose hand-orientation rotation distance exceeds this threshold before selection.")
     parser.add_argument("--candidate_object_max_distance_m", type=float, default=0.12)
     parser.add_argument("--enforce_target_object_constraint", type=int, default=1)
     parser.add_argument("--enforce_candidate_distance_constraint", type=int, default=1)
@@ -231,6 +248,304 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--head_camera_local_pos", type=float, nargs=3, default=base.DEFAULT_HEAD_CAMERA_LOCAL_POS.tolist())
     parser.add_argument("--head_camera_local_quat_wxyz", type=float, nargs=4, default=base.DEFAULT_HEAD_CAMERA_LOCAL_QUAT_WXYZ.tolist())
     return parser.parse_args()
+
+
+def candidate_pose_from_summary_entry(entry: Dict[str, object]) -> CandidatePose:
+    raw_pose_world_wxyz = np.asarray(entry["raw_pose_world_wxyz"], dtype=np.float64).reshape(7)
+    pose_world_wxyz = np.asarray(entry["pose_world_wxyz"], dtype=np.float64).reshape(7)
+    translation_cam = np.asarray(entry.get("translation_cam", [0.0, 0.0, 0.0]), dtype=np.float64).reshape(3)
+    rotation_cam = np.asarray(entry.get("rotation_cam", np.eye(3, dtype=np.float64).tolist()), dtype=np.float64).reshape(3, 3)
+    return CandidatePose(
+        candidate_idx=int(entry["candidate_idx"]),
+        score=float(entry.get("score", 0.0)),
+        translation_cam=translation_cam,
+        rotation_cam=rotation_cam,
+        width_m=float(entry.get("width_m", 0.08)),
+        depth_m=float(entry.get("depth_m", 0.04)),
+        raw_pose_world_wxyz=raw_pose_world_wxyz,
+        raw_pose_world_matrix=pose_wxyz_to_matrix(raw_pose_world_wxyz),
+        pose_world_wxyz=pose_world_wxyz,
+        pose_world_matrix=pose_wxyz_to_matrix(pose_world_wxyz),
+        nearest_object=str(entry.get("nearest_object", "")),
+        nearest_object_distance_m=float(entry.get("nearest_object_distance_m", 0.0)),
+        rotation_distance_deg=float(entry.get("rotation_distance_deg", 0.0)),
+        top_axis_up_dot=float(entry.get("top_axis_up_dot", 0.0)),
+        original_top_axis_up_dot=float(entry.get("original_top_axis_up_dot", 0.0)),
+        camera_up_flip_applied=int(entry.get("camera_up_flip_applied", 0)),
+        forward_axis_change_deg=float(entry.get("forward_axis_change_deg", 0.0)),
+        camera_up_selection_mode=str(entry.get("camera_up_selection_mode", "none")),
+    )
+
+
+def selected_keyframe_from_summary_entry(entry: Dict[str, object]) -> SelectedKeyframe:
+    return SelectedKeyframe(
+        source_frame=int(entry["source_frame"]),
+        arm=str(entry["arm"]),
+        candidate=candidate_pose_from_summary_entry(entry),
+        hand_rotation_cam=np.asarray(entry.get("hand_rotation_cam", np.eye(3, dtype=np.float64).tolist()), dtype=np.float64).reshape(3, 3),
+    )
+
+
+def preview_candidate_entry_to_pose(
+    renderer: ReplayRenderer,
+    args: argparse.Namespace,
+    arm: str,
+    frame: int,
+    entry: Dict[str, object],
+) -> CandidatePose:
+    grasp = {
+        "score": float(entry.get("anygrasp_score", 0.0)),
+        "translation": np.asarray(entry["translation_cam"], dtype=np.float64).reshape(3),
+        "rotation_matrix": np.asarray(entry["rotation_matrix"], dtype=np.float64).reshape(3, 3),
+        "width": float(entry.get("width", 0.08)),
+        "depth": float(entry.get("depth", 0.04)),
+    }
+    raw_pose_world_wxyz, raw_pose_world_matrix, pose_world_wxyz, pose_world_matrix, roll_debug = candidate_to_world_pose(renderer, args, grasp)
+    return CandidatePose(
+        candidate_idx=int(entry["candidate_idx"]),
+        score=float(entry.get("anygrasp_score", 0.0)),
+        translation_cam=np.asarray(entry["translation_cam"], dtype=np.float64).reshape(3),
+        rotation_cam=np.asarray(entry["rotation_matrix"], dtype=np.float64).reshape(3, 3),
+        width_m=float(entry.get("width", 0.08)),
+        depth_m=float(entry.get("depth", 0.04)),
+        raw_pose_world_wxyz=raw_pose_world_wxyz,
+        raw_pose_world_matrix=raw_pose_world_matrix,
+        pose_world_wxyz=pose_world_wxyz,
+        pose_world_matrix=pose_world_matrix,
+        nearest_object=str(entry.get("nearest_object", "")),
+        nearest_object_distance_m=float(entry.get("nearest_object_distance_m", 0.0)),
+        rotation_distance_deg=float(entry.get("rotation_distance_deg", 0.0)),
+        top_axis_up_dot=top_axis_up_dot(pose_world_matrix[:3, :3], args.candidate_camera_top_axis),
+        original_top_axis_up_dot=float(roll_debug["original_top_axis_up_dot"]),
+        camera_up_flip_applied=int(roll_debug["camera_up_flip_applied"]),
+        forward_axis_change_deg=float(roll_debug["forward_axis_change_deg"]),
+        camera_up_selection_mode=f"preview_{args.reuse_preview_candidate_group}_rank_{int(args.reuse_preview_top_rank)}",
+    )
+
+
+def load_reused_plan_summary(
+    path: Path,
+    requested_arm_mode: str,
+) -> Tuple[ArmSelectionResult, Dict[str, ArmDebugInfo], List[Tuple[str, List[SelectedKeyframe]]], Dict]:
+    with path.open("r", encoding="utf-8") as f:
+        summary = json.load(f)
+
+    selected_by_arm_payload = summary.get("selected_candidates_by_executed_arm")
+    execution_sequences: List[Tuple[str, List[SelectedKeyframe]]] = []
+    if isinstance(selected_by_arm_payload, dict) and selected_by_arm_payload:
+        for arm_name, items in selected_by_arm_payload.items():
+            if not items:
+                continue
+            execution_sequences.append((str(arm_name), [selected_keyframe_from_summary_entry(item) for item in items]))
+    else:
+        primary_items = summary.get("selected_candidates", [])
+        if not primary_items:
+            raise ValueError(f"reuse_plan_summary_json has no selected_candidates: {path}")
+        arm_name = str(primary_items[0]["arm"])
+        execution_sequences = [(arm_name, [selected_keyframe_from_summary_entry(item) for item in primary_items])]
+
+    if requested_arm_mode in ("left", "right"):
+        execution_sequences = [item for item in execution_sequences if item[0] == requested_arm_mode]
+        if not execution_sequences:
+            raise ValueError(
+                f"reuse_plan_summary_json={path} does not contain selected candidates for requested arm={requested_arm_mode}"
+            )
+
+    primary_arm_name = str(summary.get("selected_arm", execution_sequences[0][0]))
+    primary_sequence = None
+    for arm_name, seq in execution_sequences:
+        if arm_name == primary_arm_name:
+            primary_sequence = seq
+            break
+    if primary_sequence is None:
+        primary_arm_name, primary_sequence = execution_sequences[0]
+
+    keyframes = [int(item.source_frame) for item in primary_sequence]
+    primary_expected_object = summary.get("expected_object_for_selected_arm")
+    if primary_expected_object is None and primary_sequence:
+        primary_expected_object = primary_sequence[0].candidate.nearest_object
+
+    ranked_candidates_per_frame = {int(item.source_frame): [item.candidate] for item in primary_sequence}
+    all_candidates_per_frame = {int(item.source_frame): [item.candidate] for item in primary_sequence}
+    diagnostics_raw = summary.get("selection_diagnostics", {})
+    diagnostics = {int(frame): info for frame, info in diagnostics_raw.items()} if isinstance(diagnostics_raw, dict) else {}
+
+    selection_result = ArmSelectionResult(
+        arm=primary_arm_name,
+        expected_object=None if primary_expected_object is None else str(primary_expected_object),
+        selected_keyframes=primary_sequence,
+        ranked_candidates_per_frame=ranked_candidates_per_frame,
+        all_candidates_per_frame=all_candidates_per_frame,
+        diagnostics=diagnostics,
+    )
+
+    arm_debugs: Dict[str, ArmDebugInfo] = {}
+    for arm_name, seq in execution_sequences:
+        frame_map = {int(item.source_frame): [item.candidate] for item in seq}
+        arm_debugs[arm_name] = ArmDebugInfo(
+            arm=arm_name,
+            expected_object=(seq[0].candidate.nearest_object if seq else None),
+            ranked_candidates_per_frame=frame_map,
+            all_candidates_per_frame=frame_map,
+            diagnostics={int(item.source_frame): {"reused_from_plan_summary": 1} for item in seq},
+            selected_keyframes=seq,
+        )
+    return selection_result, arm_debugs, execution_sequences, summary
+
+
+def resolve_frames_from_preview_summary(
+    preview_summary: Dict[str, object],
+    requested_keyframes: Sequence[int],
+    requested_relative_frame: Optional[int],
+) -> Tuple[List[int], List[Tuple[int, int]], Optional[int]]:
+    resolved_pairs_raw = preview_summary.get("resolved_frames", [])
+    resolved_map: Dict[int, int] = {}
+    for item in resolved_pairs_raw:
+        if not isinstance(item, dict):
+            continue
+        resolved_map[int(item["requested"])] = int(item["resolved"])
+
+    resolved_keyframe_pairs: List[Tuple[int, int]] = []
+    for requested in [int(v) for v in requested_keyframes]:
+        resolved = resolved_map.get(int(requested), int(requested))
+        resolved_keyframe_pairs.append((int(requested), int(resolved)))
+
+    keyframes = [int(resolved) for _, resolved in resolved_keyframe_pairs]
+    resolved_relative_frame = None
+    if requested_relative_frame is not None:
+        requested_relative_frame = int(requested_relative_frame)
+        resolved_relative_frame = int(resolved_map.get(requested_relative_frame, requested_relative_frame))
+        if len(keyframes) >= 2:
+            keyframes[1] = max(int(keyframes[1]), int(resolved_relative_frame))
+            resolved_keyframe_pairs[1] = (int(requested_keyframes[1]), int(keyframes[1]))
+    return keyframes, resolved_keyframe_pairs, resolved_relative_frame
+
+
+def load_reused_preview_summary(
+    renderer: ReplayRenderer,
+    args: argparse.Namespace,
+    hand_data: Dict[str, np.ndarray],
+    path: Path,
+    requested_arm_mode: str,
+    requested_keyframes: Sequence[int],
+    requested_relative_frame: Optional[int],
+) -> Tuple[ArmSelectionResult, Dict[str, ArmDebugInfo], List[Tuple[str, List[SelectedKeyframe]]], Dict, List[int], List[Tuple[int, int]], Optional[int]]:
+    with path.open("r", encoding="utf-8") as f:
+        summary = json.load(f)
+
+    keyframes, resolved_keyframe_pairs, resolved_relative_frame = resolve_frames_from_preview_summary(
+        preview_summary=summary,
+        requested_keyframes=requested_keyframes,
+        requested_relative_frame=requested_relative_frame,
+    )
+    frame_entries = {
+        int(item["frame"]): item for item in summary.get("frames", []) if isinstance(item, dict) and "frame" in item
+    }
+    if int(args.reuse_preview_top_rank) <= 0:
+        raise ValueError(f"reuse_preview_top_rank must be >= 1, got {args.reuse_preview_top_rank}")
+    rank_index = int(args.reuse_preview_top_rank) - 1
+
+    candidate_arms = [requested_arm_mode] if requested_arm_mode in ("left", "right") else ["left", "right"]
+    arm_debugs: Dict[str, ArmDebugInfo] = {}
+    execution_sequences: List[Tuple[str, List[SelectedKeyframe]]] = []
+    best_selection: Optional[ArmSelectionResult] = None
+    best_metric: Optional[Tuple[float, float]] = None
+    group_suffix = str(args.reuse_preview_candidate_group)
+
+    for arm in candidate_arms:
+        hand_rotations = np.asarray(hand_data[f"{arm}_gripper_rotation_matrix"], dtype=np.float64)
+        hand_valid = np.asarray(hand_data[f"{arm}_gripper_valid"], dtype=bool)
+        selected_keyframes: List[SelectedKeyframe] = []
+        diagnostics: Dict[int, Dict[str, int]] = {}
+        failed = False
+        for frame in keyframes:
+            frame_entry = frame_entries.get(int(frame))
+            if frame_entry is None:
+                failed = True
+                diagnostics[int(frame)] = {"preview_frame_present": 0}
+                break
+            candidate_key = f"{arm}_{group_suffix}"
+            ranked_entries = list(frame_entry.get("top_candidates", {}).get(candidate_key, []))
+            if rank_index >= len(ranked_entries):
+                failed = True
+                diagnostics[int(frame)] = {
+                    "preview_frame_present": 1,
+                    "preview_candidate_count": int(len(ranked_entries)),
+                    "requested_rank": int(args.reuse_preview_top_rank),
+                }
+                break
+            ref_key = f"{arm}_reference_hand_frame"
+            ref_frame = int(frame_entry.get(ref_key, int(frame)))
+            if ref_frame < 0 or ref_frame >= hand_rotations.shape[0] or (hand_valid.shape[0] > ref_frame and not bool(hand_valid[ref_frame])):
+                fallback_ref = nearest_valid_hand_frame(int(frame), hand_valid)
+                ref_frame = int(frame if fallback_ref is None else fallback_ref)
+            candidate = preview_candidate_entry_to_pose(
+                renderer=renderer,
+                args=args,
+                arm=arm,
+                frame=int(frame),
+                entry=ranked_entries[rank_index],
+            )
+            selected_keyframes.append(
+                SelectedKeyframe(
+                    source_frame=int(frame),
+                    arm=arm,
+                    candidate=candidate,
+                    hand_rotation_cam=np.asarray(hand_rotations[int(ref_frame)], dtype=np.float64),
+                )
+            )
+            diagnostics[int(frame)] = {
+                "preview_frame_present": 1,
+                "preview_candidate_count": int(len(ranked_entries)),
+                "selected_preview_rank": int(args.reuse_preview_top_rank),
+                "reference_hand_frame": int(ref_frame),
+            }
+        if failed:
+            arm_debugs[arm] = ArmDebugInfo(
+                arm=arm,
+                expected_object=expected_object_for_arm(args, arm),
+                ranked_candidates_per_frame={},
+                all_candidates_per_frame={},
+                diagnostics=diagnostics,
+                selected_keyframes=None,
+            )
+            continue
+
+        selected_keyframes = postprocess_selected_keyframe_rolls(selected_keyframes, args)
+        frame_map = {int(item.source_frame): [item.candidate] for item in selected_keyframes}
+        selection = ArmSelectionResult(
+            arm=arm,
+            expected_object=expected_object_for_arm(args, arm),
+            selected_keyframes=selected_keyframes,
+            ranked_candidates_per_frame=frame_map,
+            all_candidates_per_frame=frame_map,
+            diagnostics=diagnostics,
+        )
+        execution_sequences.append((arm, selected_keyframes))
+        arm_debugs[arm] = ArmDebugInfo(
+            arm=arm,
+            expected_object=selection.expected_object,
+            ranked_candidates_per_frame=frame_map,
+            all_candidates_per_frame=frame_map,
+            diagnostics=diagnostics,
+            selected_keyframes=selected_keyframes,
+        )
+        total_rotation = float(sum(item.candidate.rotation_distance_deg for item in selected_keyframes))
+        total_score = float(sum(item.candidate.score for item in selected_keyframes))
+        if str(args.candidate_selection_mode) == "top_score_auto":
+            metric = (-total_score, total_rotation)
+        else:
+            metric = (total_rotation, -total_score)
+        if best_metric is None or metric < best_metric:
+            best_metric = metric
+            best_selection = selection
+
+    if best_selection is None:
+        raise RuntimeError(
+            f"Failed to reuse preview summary candidates from {path}. "
+            f"group={args.reuse_preview_candidate_group} rank={args.reuse_preview_top_rank}"
+        )
+    return best_selection, arm_debugs, execution_sequences, summary, keyframes, resolved_keyframe_pairs, resolved_relative_frame
 
 
 def build_renderer(args: argparse.Namespace) -> ReplayRenderer:
@@ -298,6 +613,39 @@ def load_anygrasp_candidates(anygrasp_dir: Path, source_frame: int) -> List[Dict
     with grasp_json.open("r", encoding="utf-8") as f:
         data = json.load(f)
     return list(data.get("grasps", []))
+
+
+def list_available_grasp_frames(anygrasp_dir: Path) -> List[int]:
+    grasp_dir = anygrasp_dir / "grasps"
+    if not grasp_dir.is_dir():
+        raise FileNotFoundError(f"Missing grasp directory: {grasp_dir}")
+    frames: List[int] = []
+    for path in grasp_dir.iterdir():
+        name = path.name
+        if not name.startswith("grasp_") or not name.endswith(".json"):
+            continue
+        try:
+            frames.append(int(name[len("grasp_") : -len(".json")]))
+        except ValueError:
+            continue
+    if not frames:
+        raise RuntimeError(f"No grasp_*.json files found in {grasp_dir}")
+    return sorted(frames)
+
+
+def resolve_requested_frames(requested_frames: Sequence[int], available_frames: Sequence[int]) -> List[Tuple[int, int]]:
+    available = [int(v) for v in available_frames]
+    resolved: List[Tuple[int, int]] = []
+    for requested in [int(v) for v in requested_frames]:
+        if requested >= 0:
+            resolved.append((requested, requested))
+            continue
+        if abs(int(requested)) > len(available):
+            raise IndexError(
+                f"Requested relative frame {requested} is out of range for {len(available)} available grasp frames."
+            )
+        resolved.append((requested, int(available[int(requested)])))
+    return resolved
 
 
 def parse_object_mesh_overrides(specs: Sequence[str]) -> Dict[str, Path]:
@@ -681,6 +1029,8 @@ def build_ranked_candidates_for_arm(
             if bool(args.enforce_candidate_distance_constraint) and nearest_dist > float(args.candidate_object_max_distance_m):
                 continue
             distance_pass += 1
+            if float(args.candidate_max_rotation_distance_deg) >= 0.0 and float(candidate.rotation_distance_deg) > float(args.candidate_max_rotation_distance_deg):
+                continue
             all_candidates.append(candidate)
         raw_candidates.sort(key=lambda cand: (cand.rotation_distance_deg, cand.nearest_object_distance_m, -cand.score))
         all_candidates.sort(key=lambda cand: (cand.rotation_distance_deg, cand.nearest_object_distance_m, -cand.score))
@@ -692,6 +1042,7 @@ def build_ranked_candidates_for_arm(
             "total_candidates": total,
             "object_pass": object_pass,
             "distance_pass": distance_pass,
+            "rotation_pass": len(all_candidates),
             "raw_candidates": len(raw_candidates),
             "final_ranked": len(all_candidates),
         }
@@ -729,6 +1080,38 @@ def reorder_candidates_with_manual_choice(candidates: Sequence[CandidatePose], c
     if chosen is None:
         return ordered
     return [chosen] + [cand for cand in ordered if int(cand.candidate_idx) != int(candidate_idx)]
+
+
+def select_top_score_candidates_for_frames(
+    candidates_per_frame: Dict[int, List[CandidatePose]],
+    hand_rotations: np.ndarray,
+    keyframes: Sequence[int],
+    arm: str,
+    args: argparse.Namespace,
+) -> Optional[List[SelectedKeyframe]]:
+    selected: List[SelectedKeyframe] = []
+    for frame in keyframes:
+        frame_candidates = list(candidates_per_frame.get(int(frame), []))
+        if not frame_candidates:
+            return None
+        frame_candidates.sort(
+            key=lambda cand: (
+                -float(cand.score),
+                float(cand.rotation_distance_deg),
+                float(cand.nearest_object_distance_m),
+                int(cand.candidate_idx),
+            )
+        )
+        chosen = frame_candidates[0]
+        selected.append(
+            SelectedKeyframe(
+                source_frame=int(frame),
+                arm=arm,
+                candidate=chosen,
+                hand_rotation_cam=np.asarray(hand_rotations[int(frame)], dtype=np.float64),
+            )
+        )
+    return postprocess_selected_keyframe_rolls(selected, args)
 
 
 def select_keyframes_for_arm(
@@ -787,6 +1170,27 @@ def select_keyframes_for_arm(
             diagnostics=diagnostics,
         )
 
+    if str(args.candidate_selection_mode) == "top_score_auto":
+        top_score_selection = select_top_score_candidates_for_frames(
+            candidates_per_frame=candidates_per_frame,
+            hand_rotations=hand_rotations,
+            keyframes=keyframes,
+            arm=arm,
+            args=args,
+        )
+        if top_score_selection is None:
+            return None
+        for item in top_score_selection:
+            diagnostics.setdefault(int(item.source_frame), {})["top_score_auto_candidate_idx"] = int(item.candidate.candidate_idx)
+        return ArmSelectionResult(
+            arm=arm,
+            expected_object=expected_object_for_arm(args, arm),
+            selected_keyframes=top_score_selection,
+            ranked_candidates_per_frame=candidates_per_frame,
+            all_candidates_per_frame=all_candidates_per_frame,
+            diagnostics=diagnostics,
+        )
+
     best_selection: Optional[List[SelectedKeyframe]] = None
     best_cost = float("inf")
     for first_candidate in candidates_per_frame[keyframes[0]]:
@@ -840,7 +1244,7 @@ def choose_keyframes(
 ) -> Tuple[ArmSelectionResult, Dict[str, ArmDebugInfo]]:
     candidate_arms = [arm_mode] if arm_mode in ("left", "right") else ["left", "right"]
     best: Optional[ArmSelectionResult] = None
-    best_cost = float("inf")
+    best_metric: Optional[Tuple[float, float]] = None
     diagnostic_lines: List[str] = []
     arm_debugs: Dict[str, ArmDebugInfo] = {}
     for arm in candidate_arms:
@@ -886,9 +1290,14 @@ def choose_keyframes(
             diagnostics=selection.diagnostics,
             selected_keyframes=selection.selected_keyframes,
         )
-        total_cost = sum(item.candidate.rotation_distance_deg for item in selection.selected_keyframes)
-        if total_cost < best_cost:
-            best_cost = total_cost
+        total_rotation = float(sum(item.candidate.rotation_distance_deg for item in selection.selected_keyframes))
+        total_score = float(sum(item.candidate.score for item in selection.selected_keyframes))
+        if str(args.candidate_selection_mode) == "top_score_auto":
+            metric = (-total_score, total_rotation)
+        else:
+            metric = (total_rotation, -total_score)
+        if best_metric is None or metric < best_metric:
+            best_metric = metric
             best = selection
     if best is None:
         diag_msg = "; ".join(diagnostic_lines) if diagnostic_lines else "no diagnostics"
@@ -2404,6 +2813,10 @@ def main() -> None:
     args.hand_npz = args.hand_npz.resolve()
     args.output_dir = args.output_dir.resolve()
     args.robot_config = args.robot_config.resolve()
+    if args.reuse_plan_summary_json is not None:
+        args.reuse_plan_summary_json = args.reuse_plan_summary_json.resolve()
+    if args.reuse_preview_summary_json is not None:
+        args.reuse_preview_summary_json = args.reuse_preview_summary_json.resolve()
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     if not args.anygrasp_dir.is_dir():
@@ -2412,6 +2825,12 @@ def main() -> None:
         raise NotADirectoryError(f"replay_dir not found: {args.replay_dir}")
     if not args.hand_npz.is_file():
         raise FileNotFoundError(f"hand_npz not found: {args.hand_npz}")
+    if args.reuse_plan_summary_json is not None and not args.reuse_plan_summary_json.is_file():
+        raise FileNotFoundError(f"reuse_plan_summary_json not found: {args.reuse_plan_summary_json}")
+    if args.reuse_preview_summary_json is not None and not args.reuse_preview_summary_json.is_file():
+        raise FileNotFoundError(f"reuse_preview_summary_json not found: {args.reuse_preview_summary_json}")
+    if args.reuse_plan_summary_json is not None and args.reuse_preview_summary_json is not None:
+        raise ValueError("Specify only one of --reuse_plan_summary_json or --reuse_preview_summary_json")
     if bool(args.save_pose_debug):
         pose_debug_path = args.output_dir / "pose_debug.jsonl"
         if pose_debug_path.exists():
@@ -2427,25 +2846,123 @@ def main() -> None:
     args.candidate_post_rot_matrix = base.orthonormalize_rotation(
         R.from_euler("xyz", np.deg2rad(args.candidate_post_rot_xyz_deg)).as_matrix()
     )
+    requested_keyframes = [int(v) for v in args.keyframes]
+    if args.reuse_preview_summary_json is not None:
+        with args.reuse_preview_summary_json.open("r", encoding="utf-8") as f:
+            preview_summary_for_resolution = json.load(f)
+        keyframes, resolved_keyframe_pairs, resolved_relative_frame = resolve_frames_from_preview_summary(
+            preview_summary=preview_summary_for_resolution,
+            requested_keyframes=requested_keyframes,
+            requested_relative_frame=(None if args.candidate_selection_relative_frame is None else int(args.candidate_selection_relative_frame)),
+        )
+        args.resolved_candidate_selection_relative_frame = resolved_relative_frame
+    else:
+        available_grasp_frames = list_available_grasp_frames(args.anygrasp_dir)
+        resolved_keyframe_pairs = resolve_requested_frames(requested_keyframes, available_grasp_frames)
+        keyframes = [int(resolved) for _, resolved in resolved_keyframe_pairs]
+        args.resolved_candidate_selection_relative_frame = None
+        if str(args.candidate_selection_mode) == "top_score_auto" and args.candidate_selection_relative_frame is not None:
+            resolved_rel = resolve_requested_frames([int(args.candidate_selection_relative_frame)], available_grasp_frames)[0][1]
+            args.resolved_candidate_selection_relative_frame = int(resolved_rel)
+            if len(keyframes) >= 2:
+                keyframes[1] = max(int(keyframes[1]), int(resolved_rel))
+                args.resolved_keyframes = list(keyframes)
+    args.requested_keyframes = requested_keyframes
+    args.resolved_keyframes = list(keyframes)
+    args.resolved_keyframe_pairs = [(int(req), int(res)) for req, res in resolved_keyframe_pairs]
+    if args.resolved_keyframes != requested_keyframes:
+        print(
+            "[frame-resolve] "
+            f"requested_keyframes={requested_keyframes} "
+            f"resolved_keyframes={args.resolved_keyframes}"
+        )
+    if args.resolved_candidate_selection_relative_frame is not None:
+        print(
+            "[candidate-selection] "
+            f"mode={args.candidate_selection_mode} "
+            f"requested_relative_frame={int(args.candidate_selection_relative_frame)} "
+            f"resolved_relative_frame={int(args.resolved_candidate_selection_relative_frame)} "
+            f"final_keyframes={args.resolved_keyframes}"
+        )
 
     renderer = build_renderer(args)
     hand_data = load_hand_data(args.hand_npz)
-    keyframes = [int(v) for v in args.keyframes]
     replay_frame_indices, object_tracks = load_object_tracks(args.replay_dir, args.object_mesh_overrides)
     replay_head_camera_pose_by_frame = load_replay_head_camera_poses(args.replay_dir)
     object_states_per_frame = {frame: load_object_states(args.replay_dir, frame, args.object_mesh_overrides) for frame in keyframes}
-    selection_result, arm_debugs = choose_keyframes(
-        renderer=renderer,
-        args=args,
-        anygrasp_dir=args.anygrasp_dir,
-        hand_data=hand_data,
-        keyframes=keyframes,
-        arm_mode=args.arm,
-        object_states_per_frame=object_states_per_frame,
-    )
-    selected_keyframes = selection_result.selected_keyframes
-    ranked_candidates_per_frame = selection_result.ranked_candidates_per_frame
-    all_candidates_per_frame = selection_result.all_candidates_per_frame
+    reused_plan_summary: Optional[Dict] = None
+    reused_preview_summary: Optional[Dict] = None
+    if args.reuse_preview_summary_json is not None:
+        selection_result, arm_debugs, execution_sequences, reused_preview_summary, keyframes, resolved_keyframe_pairs, resolved_relative_frame = load_reused_preview_summary(
+            renderer=renderer,
+            args=args,
+            hand_data=hand_data,
+            path=args.reuse_preview_summary_json,
+            requested_arm_mode=str(args.arm),
+            requested_keyframes=requested_keyframes,
+            requested_relative_frame=(None if args.candidate_selection_relative_frame is None else int(args.candidate_selection_relative_frame)),
+        )
+        if not (bool(args.execute_both_arms) and args.arm == "auto"):
+            execution_sequences = [(selection_result.arm, selection_result.selected_keyframes)]
+        selected_keyframes = selection_result.selected_keyframes
+        args.resolved_keyframes = list(keyframes)
+        args.resolved_keyframe_pairs = [(int(req), int(res)) for req, res in resolved_keyframe_pairs]
+        args.resolved_candidate_selection_relative_frame = None if resolved_relative_frame is None else int(resolved_relative_frame)
+        object_states_per_frame = {frame: load_object_states(args.replay_dir, frame, args.object_mesh_overrides) for frame in keyframes}
+        ranked_candidates_per_frame = selection_result.ranked_candidates_per_frame
+        all_candidates_per_frame = selection_result.all_candidates_per_frame
+        print(
+            "[reuse-preview-summary] "
+            f"path={args.reuse_preview_summary_json} "
+            f"group={args.reuse_preview_candidate_group} "
+            f"rank={int(args.reuse_preview_top_rank)} "
+            f"executed_arms={[arm_name for arm_name, _ in execution_sequences]} "
+            f"keyframes={keyframes}"
+        )
+    elif args.reuse_plan_summary_json is not None:
+        selection_result, arm_debugs, execution_sequences, reused_plan_summary = load_reused_plan_summary(
+            path=args.reuse_plan_summary_json,
+            requested_arm_mode=str(args.arm),
+        )
+        if not (bool(args.execute_both_arms) and args.arm == "auto"):
+            execution_sequences = [(selection_result.arm, selection_result.selected_keyframes)]
+        selected_keyframes = selection_result.selected_keyframes
+        keyframes = [int(item.source_frame) for item in selected_keyframes]
+        args.requested_keyframes = list(keyframes)
+        args.resolved_keyframes = list(keyframes)
+        args.resolved_keyframe_pairs = [(int(frame), int(frame)) for frame in keyframes]
+        object_states_per_frame = {frame: load_object_states(args.replay_dir, frame, args.object_mesh_overrides) for frame in keyframes}
+        ranked_candidates_per_frame = selection_result.ranked_candidates_per_frame
+        all_candidates_per_frame = selection_result.all_candidates_per_frame
+        print(
+            "[reuse-plan-summary] "
+            f"path={args.reuse_plan_summary_json} "
+            f"executed_arms={[arm_name for arm_name, _ in execution_sequences]} "
+            f"keyframes={keyframes}"
+        )
+    else:
+        selection_result, arm_debugs = choose_keyframes(
+            renderer=renderer,
+            args=args,
+            anygrasp_dir=args.anygrasp_dir,
+            hand_data=hand_data,
+            keyframes=keyframes,
+            arm_mode=args.arm,
+            object_states_per_frame=object_states_per_frame,
+        )
+        selected_keyframes = selection_result.selected_keyframes
+        ranked_candidates_per_frame = selection_result.ranked_candidates_per_frame
+        all_candidates_per_frame = selection_result.all_candidates_per_frame
+        arm = selected_keyframes[0].arm
+        execution_sequences = [(arm, selected_keyframes)]
+        if bool(args.execute_both_arms) and args.arm == "auto":
+            for candidate_arm in ("left", "right"):
+                if candidate_arm == arm:
+                    continue
+                candidate_info = arm_debugs.get(candidate_arm)
+                if candidate_info is None or candidate_info.selected_keyframes is None:
+                    continue
+                execution_sequences.append((candidate_arm, candidate_info.selected_keyframes))
     common_candidates_per_frame = build_display_candidates_per_frame(
         args,
         keyframes,
@@ -2463,15 +2980,6 @@ def main() -> None:
 
     arm = selected_keyframes[0].arm
     primary_object_name = selected_keyframes[0].candidate.nearest_object
-    execution_sequences: List[Tuple[str, List[SelectedKeyframe]]] = [(arm, selected_keyframes)]
-    if bool(args.execute_both_arms) and args.arm == "auto":
-        for candidate_arm in ("left", "right"):
-            if candidate_arm == arm:
-                continue
-            candidate_info = arm_debugs.get(candidate_arm)
-            if candidate_info is None or candidate_info.selected_keyframes is None:
-                continue
-            execution_sequences.append((candidate_arm, candidate_info.selected_keyframes))
     if bool(args.execute_both_arms) and len(execution_sequences) < 2:
         print("[exec-mode] execute_both_arms=1 but only one arm has valid selected keyframes; falling back to single-arm execution")
     debug_visuals = create_debug_visual_bundle(
@@ -2979,6 +3487,18 @@ def main() -> None:
         "anygrasp_dir": str(args.anygrasp_dir),
         "replay_dir": str(args.replay_dir),
         "hand_npz": str(args.hand_npz),
+        "reuse_plan_summary_json": None if args.reuse_plan_summary_json is None else str(args.reuse_plan_summary_json),
+        "reuse_preview_summary_json": None if args.reuse_preview_summary_json is None else str(args.reuse_preview_summary_json),
+        "reuse_preview_candidate_group": str(args.reuse_preview_candidate_group),
+        "reuse_preview_top_rank": int(args.reuse_preview_top_rank),
+        "selection_source": (
+            "reused_preview_summary_json"
+            if args.reuse_preview_summary_json is not None
+            else ("reused_plan_summary_json" if args.reuse_plan_summary_json is not None else "recomputed_from_anygrasp")
+        ),
+        "requested_keyframes": [int(v) for v in args.requested_keyframes],
+        "resolved_keyframes": [int(v) for v in args.resolved_keyframes],
+        "resolved_keyframe_pairs": [{"requested": int(req), "resolved": int(res)} for req, res in args.resolved_keyframe_pairs],
         "keyframes": keyframes,
         "selected_arm": primary_exec_arm,
         "expected_object_for_selected_arm": selection_result.expected_object,
@@ -2986,6 +3506,10 @@ def main() -> None:
         "candidate_orientation_remap_label": args.candidate_orientation_remap_label,
         "candidate_post_rot_xyz_deg": args.candidate_post_rot_xyz_deg.tolist(),
         "planner_backend": str(args.planner_backend),
+        "candidate_selection_mode": str(args.candidate_selection_mode),
+        "candidate_selection_relative_frame": None if args.candidate_selection_relative_frame is None else int(args.candidate_selection_relative_frame),
+        "resolved_candidate_selection_relative_frame": None if args.resolved_candidate_selection_relative_frame is None else int(args.resolved_candidate_selection_relative_frame),
+        "candidate_max_rotation_distance_deg": float(args.candidate_max_rotation_distance_deg),
         "urdfik_trajectory_mode": str(args.urdfik_trajectory_mode),
         "urdfik_cartesian_interp_steps": int(args.urdfik_cartesian_interp_steps),
         "candidate_keep_camera_up": int(args.candidate_keep_camera_up),

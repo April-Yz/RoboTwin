@@ -23,6 +23,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--replay_root", type=Path, required=True, help="Root containing per-video replay dirs like d_pour_blue_1.")
     parser.add_argument("--hand_dir", type=Path, required=True, help="Directory containing hand_detections_<id>.npz files.")
     parser.add_argument("--output_root", type=Path, required=True, help="Root for per-video planned demo outputs.")
+    parser.add_argument("--reuse_preview_summary_root", type=Path, default=None, help="Optional root containing per-video preview summary.json files, e.g. anygrasp_direct_preview/d_pour_blue_batch_fi60.")
+    parser.add_argument("--reuse_preview_candidate_group", choices=["orientation", "fused"], default="orientation")
+    parser.add_argument("--reuse_preview_top_rank", type=int, default=1)
     parser.add_argument("--ids", type=str, nargs="*", default=None, help="Optional subset ids like 1 4 22.")
     parser.add_argument("--keyframes", type=int, nargs=2, default=[1, 22], metavar=("GRASP_FRAME", "ACTION_FRAME"))
     parser.add_argument("--arm", choices=["auto", "left", "right"], default="auto")
@@ -30,6 +33,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--planner_backend", choices=["urdfik", "curobo"], default="urdfik")
     parser.add_argument("--urdfik_trajectory_mode", choices=["joint_interp", "cartesian_interp_ik"], default="joint_interp")
     parser.add_argument("--urdfik_cartesian_interp_steps", type=int, default=8)
+    parser.add_argument("--candidate_selection_mode", choices=["planner", "top_score_auto"], default="planner")
+    parser.add_argument("--candidate_selection_relative_frame", type=int, default=None)
+    parser.add_argument("--candidate_max_rotation_distance_deg", type=float, default=-1.0)
     parser.add_argument("--left_target_object", type=str, default="cup")
     parser.add_argument("--right_target_object", type=str, default="bottle")
     parser.add_argument("--candidate_object_max_distance_m", type=float, default=0.12)
@@ -138,6 +144,11 @@ def build_single_command(args: argparse.Namespace, anygrasp_dir: Path, replay_di
         str(hand_npz.resolve()),
         "--output_dir",
         str(output_dir.resolve()),
+        *(["--reuse_preview_summary_json", str((args.reuse_preview_summary_root / anygrasp_dir.name / "summary.json").resolve())] if args.reuse_preview_summary_root is not None else []),
+        "--reuse_preview_candidate_group",
+        str(args.reuse_preview_candidate_group),
+        "--reuse_preview_top_rank",
+        str(args.reuse_preview_top_rank),
         "--keyframes",
         *(str(v) for v in args.keyframes),
         "--arm",
@@ -150,10 +161,14 @@ def build_single_command(args: argparse.Namespace, anygrasp_dir: Path, replay_di
         str(args.urdfik_trajectory_mode),
         "--urdfik_cartesian_interp_steps",
         str(args.urdfik_cartesian_interp_steps),
+        "--candidate_selection_mode",
+        str(args.candidate_selection_mode),
         "--left_target_object",
         str(args.left_target_object),
         "--right_target_object",
         str(args.right_target_object),
+        "--candidate_max_rotation_distance_deg",
+        str(args.candidate_max_rotation_distance_deg),
         "--candidate_object_max_distance_m",
         str(args.candidate_object_max_distance_m),
         "--enforce_target_object_constraint",
@@ -176,6 +191,7 @@ def build_single_command(args: argparse.Namespace, anygrasp_dir: Path, replay_di
         str(args.candidate_camera_top_axis),
         "--candidate_target_local_x_offset_m",
         str(args.candidate_target_local_x_offset_m),
+        *(["--candidate_selection_relative_frame", str(args.candidate_selection_relative_frame)] if args.candidate_selection_relative_frame is not None else []),
         *(sum((["--manual_candidate", str(spec[0]), str(spec[1]), str(spec[2])] for spec in args.manual_candidate), [])),
         *(sum((["--object_mesh_override", str(spec)] for spec in args.object_mesh_override), [])),
         "--robot_config",
@@ -278,12 +294,15 @@ def main() -> None:
     args.hand_dir = args.hand_dir.resolve()
     args.output_root = args.output_root.resolve()
     args.robot_config = args.robot_config.resolve()
+    args.reuse_preview_summary_root = None if args.reuse_preview_summary_root is None else args.reuse_preview_summary_root.resolve()
     args.output_root.mkdir(parents=True, exist_ok=True)
 
     if not args.hand_dir.is_dir():
         raise NotADirectoryError(f"hand_dir not found: {args.hand_dir}")
     if not args.robot_config.is_file():
         raise FileNotFoundError(f"robot_config not found: {args.robot_config}")
+    if args.reuse_preview_summary_root is not None and not args.reuse_preview_summary_root.is_dir():
+        raise NotADirectoryError(f"reuse_preview_summary_root not found: {args.reuse_preview_summary_root}")
 
     all_dirs = discover_anygrasp_dirs(args.anygrasp_root)
     selected_dirs = filter_dirs(all_dirs, args.ids)
@@ -323,6 +342,14 @@ def main() -> None:
             if not bool(args.continue_on_error):
                 break
             continue
+        if args.reuse_preview_summary_root is not None:
+            preview_summary_path = args.reuse_preview_summary_root / video_name / "summary.json"
+            if not preview_summary_path.is_file():
+                failures.append((video_name, f"missing_preview_summary:{preview_summary_path}"))
+                logging.error("Missing preview summary for %s: %s", video_name, preview_summary_path)
+                if not bool(args.continue_on_error):
+                    break
+                continue
 
         output_dir.mkdir(parents=True, exist_ok=True)
         cmd = build_single_command(args, anygrasp_dir, replay_dir, hand_npz, output_dir)
@@ -342,7 +369,13 @@ def main() -> None:
         "replay_root": str(args.replay_root),
         "hand_dir": str(args.hand_dir),
         "output_root": str(args.output_root),
+        "reuse_preview_summary_root": None if args.reuse_preview_summary_root is None else str(args.reuse_preview_summary_root),
+        "reuse_preview_candidate_group": str(args.reuse_preview_candidate_group),
+        "reuse_preview_top_rank": int(args.reuse_preview_top_rank),
         "keyframes": [int(v) for v in args.keyframes],
+        "candidate_selection_mode": str(args.candidate_selection_mode),
+        "candidate_selection_relative_frame": None if args.candidate_selection_relative_frame is None else int(args.candidate_selection_relative_frame),
+        "candidate_max_rotation_distance_deg": float(args.candidate_max_rotation_distance_deg),
         "selected_ids": list(args.ids) if args.ids else None,
         "successes": successes,
         "failures": failures,

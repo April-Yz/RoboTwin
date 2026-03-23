@@ -80,6 +80,42 @@ hand_detections_2.npz
 
 ## 最常用命令
 
+### 直接复用 preview `summary.json` 的 top1，并使用 `frame 1` 和 `max(22, -10)`
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_r1_batch.sh \
+  /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_batch_results \
+  /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_d_pour_blue_norobot \
+  /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis \
+  /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_from_preview_fi60 \
+  --reuse_preview_summary_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_direct_preview/d_pour_blue_batch_fi60 \
+  --reuse_preview_candidate_group orientation \
+  --reuse_preview_top_rank 1 \
+  --keyframes 1 22 \
+  --candidate_selection_mode top_score_auto \
+  --candidate_selection_relative_frame -10 \
+  --planner_backend urdfik \
+  --urdfik_trajectory_mode cartesian_interp_ik \
+  --urdfik_cartesian_interp_steps 30 \
+  --candidate_max_rotation_distance_deg 60 \
+  --left_target_object cup \
+  --right_target_object bottle
+```
+
+这条命令的含义：
+
+- 直接读取 preview 批处理输出根目录里每个视频的 `summary.json`
+- 使用 preview 的 `resolved_frames`
+- 实际执行关键帧是：
+  - 第 1 帧
+  - `max(22, resolved(-10))`
+- 候选直接取 preview JSON 里的 top1：
+  - 左手 `top_candidates.left_orientation[0]`
+  - 右手 `top_candidates.right_orientation[0]`
+- 中间轨迹平滑使用：
+  - `--planner_backend urdfik`
+  - `--urdfik_trajectory_mode cartesian_interp_ik`
+
 ### 先跑 `id=1` demo
 
 ```bash

@@ -258,6 +258,31 @@
   - per-arm orientation/fused ranking only after that object partition is complete
 - This removes the previous ambiguity where left/right debug output repeated the same candidate pool and made object-to-arm assignment look duplicated.
 - Updated `frame_<frame>_object_distance_debug.json` to store shared `object_candidates`, `object_partition_counts`, and `arm_target_mapping`.
+
+- Added a new planner-side candidate-selection mode for the AnyGrasp keyframe pipeline:
+  - `--candidate_selection_mode top_score_auto`
+  - `--candidate_selection_relative_frame`
+  - `--candidate_max_rotation_distance_deg`
+- The new mode preserves the old `--keyframes 1 22` workflow, but can additionally resolve a relative frame such as `-10` from available grasp JSONs and use `max(resolved_keyframe2, resolved_relative_frame)` as the final second keyframe.
+- After planner-side filtering, `top_score_auto` now picks the highest AnyGrasp `score` candidate at each selected frame instead of using the original orientation-first two-keyframe combination search.
+- This only changes candidate selection. Execution still uses the requested backend, so with:
+  - `--planner_backend urdfik`
+  - `--urdfik_trajectory_mode cartesian_interp_ik`
+  the run still follows the Backend-A2 path: Cartesian EE/TCP smoothing first, then waypoint IK.
+- The planner summary now records:
+  - `requested_keyframes`
+  - `resolved_keyframes`
+  - `resolved_keyframe_pairs`
+  - `candidate_selection_mode`
+  - `candidate_selection_relative_frame`
+  - `resolved_candidate_selection_relative_frame`
+  - `candidate_max_rotation_distance_deg`
+- The batch summary now also records the new candidate-selection arguments.
+- Updated:
+  - `agent-read/V1.13_anygrasp_candidate_ranking_logic.md`
+  - `agent-read/V1.13_anygrasp_candidate_ranking_logic_ZH.md`
+  - `agent-read/V1.8_command_log.md`
+  - `agent-read/V1.8_command_log_ZH.md`
 - Validation:
   - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/render_anygrasp_ranked_preview.py`
   - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python /home/zaijia001/ssd/RoboTwin/code_painting/render_anygrasp_ranked_preview.py --anygrasp_dir /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_batch_results/d_pour_blue_1 --replay_dir /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_debug/d_pour_blue_1 --hand_npz /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis/hand_detections_1.npz --base_image_dir /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_d_pour_blue/d_pour_blue_1/head_anygrasp_frames --base_image_mode raw --output_dir /tmp/anygrasp_partition_check --frames 1 --top_k 2 --left_target_object cup --right_target_object bottle --candidate_target_local_x_offset_m -0.05 --debug_dump_object_distances 1`
@@ -337,3 +362,37 @@
 - Validation:
   - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/render_anygrasp_ranked_preview.py`
   - `bash /home/zaijia001/ssd/RoboTwin/code_painting/run_render_anygrasp_ranked_preview_batch.sh /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_batch_results /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_d_pour_blue_norobot /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis /tmp/anygrasp_warnings_json_check --ids 1 --frames 1 22 -10 --top_k 1 --left_target_object cup --right_target_object bottle --draw_grasp_boxes 1`
+
+- Added direct selected-candidate reuse mode to `code_painting/plan_anygrasp_keyframes_r1.py`.
+- New argument:
+  - `--reuse_plan_summary_json /path/to/previous/plan_summary.json`
+- When this argument is provided, the planner skips AnyGrasp candidate recomputation entirely:
+  - no fresh candidate loading from `anygrasp_dir`
+  - no object/distance/orientation filtering step
+  - no `candidate_max_rotation_distance_deg` gating during selection
+- Execution now rebuilds `SelectedKeyframe` / `CandidatePose` directly from the previous `plan_summary.json` and uses those world poses as-is.
+- The new output `plan_summary.json` records:
+  - `reuse_plan_summary_json`
+  - `selection_source = reused_plan_summary_json | recomputed_from_anygrasp`
+- Validation:
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/plan_anygrasp_keyframes_r1.py`
+  - `git -C /home/zaijia001/ssd/RoboTwin diff --check -- code_painting/plan_anygrasp_keyframes_r1.py`
+
+- Added direct preview-summary reuse mode for the AnyGrasp keyframe planner.
+- New single-video arguments:
+  - `--reuse_preview_summary_json /path/to/preview/summary.json`
+  - `--reuse_preview_candidate_group orientation|fused`
+  - `--reuse_preview_top_rank 1`
+- New batch argument:
+  - `--reuse_preview_summary_root /path/to/anygrasp_direct_preview/d_pour_blue_batch_fi60`
+- In this mode the planner reads the preview output JSON directly:
+  - frame selection is resolved from preview `resolved_frames`
+  - if `--candidate_selection_relative_frame -10` is provided, the planner uses `max(keyframe_2, resolved(-10))`
+  - per frame and per arm, the planner reads preview top-k entries from `top_candidates.<arm>_<group>`
+  - `--reuse_preview_top_rank 1` means use top1 directly from the JSON
+- Recommended path for EE/TCP smoothing in this mode remains:
+  - `--planner_backend urdfik`
+  - `--urdfik_trajectory_mode cartesian_interp_ik`
+- Validation:
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_anygrasp_keyframes_r1_batch.py`
+  - `git -C /home/zaijia001/ssd/RoboTwin diff --check -- code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_anygrasp_keyframes_r1_batch.py agent-read/CHANGELOG.md agent-read/V1.8_command_log.md agent-read/V1.8_command_log_ZH.md code_painting/README_anygrasp_keyframe_planner.md`
