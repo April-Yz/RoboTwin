@@ -773,12 +773,39 @@ def main() -> None:
                 "candidate_target_local_x_offset_m": float(args.candidate_target_local_x_offset_m),
                 "candidate_post_rot_xyz_deg": np.asarray(args.candidate_post_rot_xyz_deg, dtype=np.float64).reshape(3).tolist(),
                 "candidate_orientation_remap_label": str(args.candidate_orientation_remap_label),
+                "object_world_positions": {
+                    name: np.asarray(point, dtype=np.float64).reshape(3).tolist()
+                    for name, point in sorted(object_world_positions.items())
+                },
                 "left": left_debug_records,
                 "right": right_debug_records,
             }
             debug_path = args.output_dir / f"frame_{frame:06d}_object_distance_debug.json"
             with debug_path.open("w", encoding="utf-8") as f:
                 json.dump(debug_payload, f, indent=2)
+            object_pos_text = ", ".join(
+                f"{name}:{np.asarray(point, dtype=np.float64).reshape(3).tolist()}"
+                for name, point in sorted(object_world_positions.items())
+            )
+            print(
+                f"[frame {frame:06d}][object-world] "
+                f"camera_world={np.asarray(camera_pose_world_wxyz[:3], dtype=np.float64).reshape(3).tolist()} "
+                f"objects={{ {object_pos_text} }}"
+            )
+            max_object_norm = max(
+                float(np.linalg.norm(np.asarray(point, dtype=np.float64).reshape(3)))
+                for point in object_world_positions.values()
+            ) if object_world_positions else 0.0
+            min_object_z = min(
+                float(np.asarray(point, dtype=np.float64).reshape(3)[2])
+                for point in object_world_positions.values()
+            ) if object_world_positions else 0.0
+            if max_object_norm > 5.0 or min_object_z < -2.0:
+                print(
+                    f"[frame {frame:06d}][object-world-warning] "
+                    f"detected suspicious object world poses: max_norm={max_object_norm:.4f}m min_z={min_object_z:.4f}m. "
+                    f"Check whether --replay_dir matches the planner replay export."
+                )
             for arm_name, records in (("left", left_debug_records), ("right", right_debug_records)):
                 for record in records:
                     dist_text = ", ".join(
@@ -787,6 +814,7 @@ def main() -> None:
                     )
                     print(
                         f"[frame {frame:06d}][{arm_name}][cand {int(record['candidate_idx']):02d}] "
+                        f"gripper_world={np.asarray(record['candidate_translation_world'], dtype=np.float64).reshape(3).tolist()} "
                         f"nearest={record['nearest_object']} "
                         f"nearest_dist={float(record['nearest_object_distance_m']):.4f} "
                         f"world_dists={{ {dist_text} }}"

@@ -238,3 +238,14 @@
 - Updated `agent-read/ik_analyze/anygrasp_keyframe_ik_planning_analysis.md` and `.en.md` with the new sequential camera-up rule.
 - Fixed a regression in the sequential keyframe camera-up rule: the new follow-previous branch referenced `rotation_distance_deg_matrix(...)`, but the file only defines `rotation_distance_deg(...)`. The roll-continuity path now uses the existing helper and no longer crashes during keyframe selection.
 - Validation: `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/plan_anygrasp_keyframes_r1.py`
+
+- Updated `code_painting/render_anygrasp_ranked_preview.py` debug output for staged candidate-object filtering.
+- `--debug_dump_object_distances 1` now writes top-level `object_world_positions` into `frame_<frame>_object_distance_debug.json`.
+- Terminal debug output now prints:
+  - frame-level `camera_world=[x,y,z]`
+  - frame-level `objects={ name:[x,y,z], ... }`
+  - per-candidate `gripper_world=[x,y,z]`
+- Added an explicit staged-preview warning when replay object world poses look suspicious, for example `min_z < -2m` or object norm larger than `5m`.
+- This helps catch replay directories whose object tracks are in an off-scene / hidden pose space such as `z≈-10`, which would otherwise make every nearest-object distance look wrong.
+- Validation:
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/render_anygrasp_ranked_preview.py`
