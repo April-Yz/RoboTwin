@@ -327,3 +327,13 @@
 - Validation:
   - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/render_anygrasp_ranked_preview.py`
   - `bash /home/zaijia001/ssd/RoboTwin/code_painting/run_render_anygrasp_ranked_preview_batch.sh /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_batch_results /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_d_pour_blue_norobot /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis /tmp/anygrasp_select_doc_check --ids 1 --frames 1 22 -10 --top_k 2 --left_target_object cup --right_target_object bottle --draw_grasp_boxes 1`
+
+- Added `warnings.json` export alongside `summary.json`.
+- `warnings.json` aggregates lightweight alert records such as:
+  - `frame_resolve`
+  - `no_candidate_after_select`
+  - `object_world_warning`
+- This makes it easier to scan a batch output directory for problematic frames without opening the full `summary.json`.
+- Validation:
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/render_anygrasp_ranked_preview.py`
+  - `bash /home/zaijia001/ssd/RoboTwin/code_painting/run_render_anygrasp_ranked_preview_batch.sh /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_batch_results /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_d_pour_blue_norobot /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis /tmp/anygrasp_warnings_json_check --ids 1 --frames 1 22 -10 --top_k 1 --left_target_object cup --right_target_object bottle --draw_grasp_boxes 1`

@@ -876,9 +876,18 @@ def main() -> None:
     resolved_frame_pairs = resolve_requested_frames(args.frames, available_frames)
     fixed_camera_pose_world_wxyz: Optional[np.ndarray] = None
     summary = []
+    warnings_log: List[Dict[str, object]] = []
     for requested_frame, frame in resolved_frame_pairs:
         if int(requested_frame) != int(frame):
             print(f"[frame-resolve] requested={int(requested_frame)} resolved={int(frame)}")
+            warnings_log.append(
+                {
+                    "type": "frame_resolve",
+                    "requested_frame": int(requested_frame),
+                    "resolved_frame": int(frame),
+                    "message": f"requested frame {int(requested_frame)} resolved to available frame {int(frame)}",
+                }
+            )
         payload = load_grasp_json(args.anygrasp_dir, frame)
         camera_info = dict(payload["camera"])
         grasps = list(payload.get("grasps", []))
@@ -1025,6 +1034,14 @@ def main() -> None:
             warning_messages.append(f"RIGHT WARNING: no candidate after select for {args.right_target_object}")
         for warning_message in warning_messages:
             print(f"[frame {frame:06d}][warning] {warning_message}")
+            warnings_log.append(
+                {
+                    "type": "no_candidate_after_select",
+                    "frame": int(frame),
+                    "requested_frame": int(requested_frame),
+                    "message": str(warning_message),
+                }
+            )
         if bool(args.debug_dump_object_distances):
             debug_payload = {
                 "frame": int(frame),
@@ -1066,6 +1083,7 @@ def main() -> None:
                 f"camera_world={np.asarray(camera_pose_world_wxyz[:3], dtype=np.float64).reshape(3).tolist()} "
                 f"objects={{ {object_pos_text} }}"
             )
+            suspicious_object_world_warning: Optional[str] = None
             max_object_norm = max(
                 float(np.linalg.norm(np.asarray(point, dtype=np.float64).reshape(3)))
                 for point in object_world_positions.values()
@@ -1075,10 +1093,21 @@ def main() -> None:
                 for point in object_world_positions.values()
             ) if object_world_positions else 0.0
             if max_object_norm > 5.0 or min_object_z < -2.0:
+                suspicious_object_world_warning = (
+                    f"detected suspicious object world poses: max_norm={max_object_norm:.4f}m min_z={min_object_z:.4f}m"
+                )
                 print(
                     f"[frame {frame:06d}][object-world-warning] "
-                    f"detected suspicious object world poses: max_norm={max_object_norm:.4f}m min_z={min_object_z:.4f}m. "
+                    f"{suspicious_object_world_warning}. "
                     f"Check whether --replay_dir matches the planner replay export."
+                )
+                warnings_log.append(
+                    {
+                        "type": "object_world_warning",
+                        "frame": int(frame),
+                        "requested_frame": int(requested_frame),
+                        "message": str(suspicious_object_world_warning),
+                    }
                 )
             for record in object_debug_records:
                 dist_text = ", ".join(
@@ -1255,6 +1284,17 @@ def main() -> None:
                 "requested_frames": [int(v) for v in args.frames],
                 "resolved_frames": [{"requested": int(req), "resolved": int(res)} for req, res in resolved_frame_pairs],
                 "frames": summary,
+            },
+            f,
+            indent=2,
+        )
+    warnings_path = args.output_dir / "warnings.json"
+    with warnings_path.open("w", encoding="utf-8") as f:
+        json.dump(
+            {
+                "requested_frames": [int(v) for v in args.frames],
+                "resolved_frames": [{"requested": int(req), "resolved": int(res)} for req, res in resolved_frame_pairs],
+                "warnings": warnings_log,
             },
             f,
             indent=2,
