@@ -296,6 +296,21 @@ def project_camera_point(point_cam: np.ndarray, camera_info: Dict) -> Optional[T
     return u, v
 
 
+def object_display_color(object_name: str) -> Tuple[int, int, int]:
+    name = str(object_name).strip().lower()
+    if name == "cup":
+        return (60, 220, 60)
+    if name == "bottle":
+        return (255, 200, 0)
+    palette = [
+        (255, 120, 0),
+        (180, 80, 255),
+        (0, 180, 255),
+        (120, 255, 120),
+    ]
+    return palette[sum(ord(ch) for ch in name) % len(palette)]
+
+
 def draw_tiny_label(image: np.ndarray, text: str, xy: Tuple[int, int], color: Tuple[int, int, int], font_scale: float) -> None:
     cv2.putText(
         image,
@@ -307,6 +322,30 @@ def draw_tiny_label(image: np.ndarray, text: str, xy: Tuple[int, int], color: Tu
         1,
         cv2.LINE_AA,
     )
+
+
+def draw_object_overlay(
+    image: np.ndarray,
+    camera_info: Dict,
+    object_world_positions: Dict[str, np.ndarray],
+    camera_pose_world_wxyz: np.ndarray,
+) -> None:
+    for object_name, point_world in sorted(object_world_positions.items()):
+        point_cam = world_point_to_camera(point_world, camera_pose_world_wxyz)
+        pixel = project_camera_point(point_cam, camera_info)
+        if pixel is None:
+            continue
+        color = object_display_color(object_name)
+        center = (int(pixel[0]), int(pixel[1]))
+        cv2.circle(image, center, 6, color, -1, cv2.LINE_AA)
+        cv2.circle(image, center, 9, (255, 255, 255), 1, cv2.LINE_AA)
+        draw_tiny_label(
+            image,
+            str(object_name),
+            (center[0] + 10, center[1] - 6),
+            color,
+            0.38,
+        )
 
 
 def draw_grasp_wireframe(
@@ -454,6 +493,8 @@ def annotate_arm_preview(
     arm_name: str,
     ranked: Sequence[CandidateRecord],
     camera_info: Dict,
+    object_world_positions: Optional[Dict[str, np.ndarray]],
+    camera_pose_world_wxyz: Optional[np.ndarray],
     top_k: int,
     draw_grasp_boxes: bool,
     box_thickness: int,
@@ -466,6 +507,13 @@ def annotate_arm_preview(
     title = "LEFT" if arm_name == "left" else "RIGHT"
     box_color = (255, 100, 0) if arm_name == "left" else (0, 140, 255)
     image = base_image.copy()
+    if object_world_positions is not None and camera_pose_world_wxyz is not None:
+        draw_object_overlay(
+            image=image,
+            camera_info=camera_info,
+            object_world_positions=object_world_positions,
+            camera_pose_world_wxyz=camera_pose_world_wxyz,
+        )
     panel = np.full((image.shape[0], panel_width, 3), 255, dtype=np.uint8)
     draw_tiny_label(panel, f"{title} {stage_title}", (10, 24), (0, 0, 0), 0.55)
     draw_tiny_label(panel, "label=candidate_idx", (10, 44), (0, 0, 0), 0.38)
@@ -570,11 +618,13 @@ def main() -> None:
             right_score_ranked, right_ref_frame = build_score_ranked_candidates_for_arm(grasps, "right", hand_data, frame)
             score_image = build_combined_image(
                 annotate_arm_preview(
-                    base_image=base_image,
-                    arm_name="left",
-                    ranked=left_score_ranked,
-                    camera_info=camera_info,
-                    top_k=int(args.top_k),
+                base_image=base_image,
+                arm_name="left",
+                ranked=left_score_ranked,
+                camera_info=camera_info,
+                object_world_positions=None,
+                camera_pose_world_wxyz=None,
+                top_k=int(args.top_k),
                     draw_grasp_boxes=bool(args.draw_grasp_boxes),
                     box_thickness=int(args.box_thickness),
                     font_scale=float(args.font_scale),
@@ -584,11 +634,13 @@ def main() -> None:
                     line_builder=score_line,
                 ),
                 annotate_arm_preview(
-                    base_image=base_image,
-                    arm_name="right",
-                    ranked=right_score_ranked,
-                    camera_info=camera_info,
-                    top_k=int(args.top_k),
+                base_image=base_image,
+                arm_name="right",
+                ranked=right_score_ranked,
+                camera_info=camera_info,
+                object_world_positions=None,
+                camera_pose_world_wxyz=None,
+                top_k=int(args.top_k),
                     draw_grasp_boxes=bool(args.draw_grasp_boxes),
                     box_thickness=int(args.box_thickness),
                     font_scale=float(args.font_scale),
@@ -671,6 +723,8 @@ def main() -> None:
                 arm_name="left",
                 ranked=left_orientation_ranked,
                 camera_info=camera_info,
+                object_world_positions=object_world_positions,
+                camera_pose_world_wxyz=camera_pose_world_wxyz,
                 top_k=int(args.top_k),
                 draw_grasp_boxes=bool(args.draw_grasp_boxes),
                 box_thickness=int(args.box_thickness),
@@ -685,6 +739,8 @@ def main() -> None:
                 arm_name="right",
                 ranked=right_orientation_ranked,
                 camera_info=camera_info,
+                object_world_positions=object_world_positions,
+                camera_pose_world_wxyz=camera_pose_world_wxyz,
                 top_k=int(args.top_k),
                 draw_grasp_boxes=bool(args.draw_grasp_boxes),
                 box_thickness=int(args.box_thickness),
@@ -705,6 +761,8 @@ def main() -> None:
                 arm_name="left",
                 ranked=left_fused_ranked,
                 camera_info=camera_info,
+                object_world_positions=object_world_positions,
+                camera_pose_world_wxyz=camera_pose_world_wxyz,
                 top_k=int(args.top_k),
                 draw_grasp_boxes=bool(args.draw_grasp_boxes),
                 box_thickness=int(args.box_thickness),
@@ -719,6 +777,8 @@ def main() -> None:
                 arm_name="right",
                 ranked=right_fused_ranked,
                 camera_info=camera_info,
+                object_world_positions=object_world_positions,
+                camera_pose_world_wxyz=camera_pose_world_wxyz,
                 top_k=int(args.top_k),
                 draw_grasp_boxes=bool(args.draw_grasp_boxes),
                 box_thickness=int(args.box_thickness),

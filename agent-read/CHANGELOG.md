@@ -167,6 +167,11 @@
 
 ## 2026-03-23
 
+- Updated `code_painting/render_anygrasp_ranked_preview.py` so staged previews now also overlay replay object center markers and object-name labels.
+- Validation:
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/render_anygrasp_ranked_preview.py`
+  - staged-mode synthetic fixture check under `/tmp/anygrasp_ranked_preview_fixture/out4`
+
 - Updated `code_painting/render_anygrasp_ranked_preview.py` once more:
   - `--replay_dir` is now optional
   - omitting `--replay_dir` falls back to the original raw-score combined preview path
