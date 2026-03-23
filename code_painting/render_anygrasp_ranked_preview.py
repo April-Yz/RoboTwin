@@ -47,7 +47,7 @@ class CandidateRecord:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Annotate AnyGrasp result images with planner-style staged filtering.")
     parser.add_argument("--anygrasp_dir", type=Path, required=True, help="Per-video AnyGrasp result dir.")
-    parser.add_argument("--replay_dir", type=Path, required=True, help="Per-video replay dir containing multi_object_world_poses.npz.")
+    parser.add_argument("--replay_dir", type=Path, default=None, help="Optional per-video replay dir containing multi_object_world_poses.npz.")
     parser.add_argument("--hand_npz", type=Path, required=True, help="hand_detections_<id>.npz used to distinguish left/right orientation similarity.")
     parser.add_argument("--output_dir", type=Path, required=True, help="Directory to save annotated preview images.")
     parser.add_argument("--frames", type=int, nargs="+", required=True, help="Source frame ids, e.g. 1 21.")
@@ -182,7 +182,7 @@ def load_replay_frame_data(
     replay_dir: Path,
     frame: int,
     fixed_camera_pose_world_wxyz: Optional[np.ndarray],
-) -> Tuple[Dict[str, np.ndarray], np.ndarray]:
+) -> Tuple[Dict[str, np.ndarray], np.ndarray, str]:
     pose_path = replay_dir / "multi_object_world_poses.npz"
     if not pose_path.is_file():
         raise FileNotFoundError(f"Missing multi_object_world_poses.npz: {pose_path}")
@@ -202,13 +202,15 @@ def load_replay_frame_data(
         object_world_positions[object_name] = np.asarray(pose_world_wxyz[:3], dtype=np.float64).reshape(3)
     if "head_camera_pose_world_wxyz" in data.files:
         camera_pose_world_wxyz = np.asarray(data["head_camera_pose_world_wxyz"], dtype=np.float64)[idx]
+        camera_pose_source = "replay_npz"
     else:
         if fixed_camera_pose_world_wxyz is None:
             raise RuntimeError(
                 "Replay export does not contain head_camera_pose_world_wxyz and no fixed fallback pose was provided."
             )
         camera_pose_world_wxyz = np.asarray(fixed_camera_pose_world_wxyz, dtype=np.float64).reshape(7)
-    return object_world_positions, np.asarray(camera_pose_world_wxyz, dtype=np.float64).reshape(7)
+        camera_pose_source = "fixed_fallback"
+    return object_world_positions, np.asarray(camera_pose_world_wxyz, dtype=np.float64).reshape(7), str(camera_pose_source)
 
 
 def nearest_valid_hand_frame(frame: int, hand_valid: np.ndarray) -> Optional[int]:
@@ -409,6 +411,44 @@ def build_candidates_for_arm(
     return all_candidates, filtered_candidates, int(ref_frame)
 
 
+def build_score_ranked_candidates_for_arm(
+    grasps: Sequence[Dict],
+    arm_name: str,
+    hand_data: Dict[str, np.ndarray],
+    frame: int,
+) -> Tuple[List[CandidateRecord], int]:
+    hand_valid = np.asarray(hand_data[f"{arm_name}_gripper_valid"], dtype=bool)
+    hand_rotations = np.asarray(hand_data[f"{arm_name}_gripper_rotation_matrix"], dtype=np.float64)
+    ref_frame = int(frame) if frame < hand_valid.shape[0] and bool(hand_valid[frame]) else nearest_valid_hand_frame(int(frame), hand_valid)
+    if ref_frame is None:
+        raise RuntimeError(f"No valid {arm_name} hand rotation exists for frame {frame}.")
+    ref_rot = np.asarray(hand_rotations[ref_frame], dtype=np.float64)
+    ranked: List[CandidateRecord] = []
+    for candidate_idx, grasp in enumerate(grasps):
+        translation = np.asarray(grasp["translation"], dtype=np.float64).reshape(3)
+        rotation_matrix = np.asarray(grasp["rotation_matrix"], dtype=np.float64).reshape(3, 3)
+        anygrasp_score = float(grasp["score"])
+        rotation_distance = rotation_distance_deg(ref_rot, rotation_matrix)
+        orientation_score = orientation_score_from_rotation_distance(rotation_distance)
+        ranked.append(
+            CandidateRecord(
+                candidate_idx=int(candidate_idx),
+                anygrasp_score=anygrasp_score,
+                orientation_score=orientation_score,
+                fused_score=anygrasp_score,
+                rotation_distance_deg=rotation_distance,
+                translation=translation,
+                rotation_matrix=rotation_matrix,
+                width=float(grasp.get("width", 0.0)),
+                depth=float(grasp.get("depth", 0.0)),
+                nearest_object="",
+                nearest_object_distance_m=float("nan"),
+            )
+        )
+    ranked.sort(key=lambda item: (-float(item.anygrasp_score), float(item.rotation_distance_deg)))
+    return ranked, int(ref_frame)
+
+
 def annotate_arm_preview(
     base_image: np.ndarray,
     arm_name: str,
@@ -478,6 +518,15 @@ def orientation_line(row_idx: int, item: CandidateRecord) -> str:
     )
 
 
+def score_line(row_idx: int, item: CandidateRecord) -> str:
+    return (
+        f"#{row_idx + 1:02d} "
+        f"idx={item.candidate_idx:02d} "
+        f"s={item.anygrasp_score:.3f} "
+        f"rot={item.rotation_distance_deg:.1f}"
+    )
+
+
 def make_fused_line_builder(anygrasp_weight: float, orientation_weight: float):
     def fused_line(row_idx: int, item: CandidateRecord) -> str:
         return (
@@ -494,7 +543,7 @@ def make_fused_line_builder(anygrasp_weight: float, orientation_weight: float):
 def main() -> None:
     args = parse_args()
     args.anygrasp_dir = args.anygrasp_dir.resolve()
-    args.replay_dir = args.replay_dir.resolve()
+    args.replay_dir = None if args.replay_dir is None else args.replay_dir.resolve()
     args.hand_npz = args.hand_npz.resolve()
     args.output_dir = args.output_dir.resolve()
     args.robot_config = args.robot_config.resolve()
@@ -516,13 +565,63 @@ def main() -> None:
             height=int(camera_info["height"]),
             image_mode=str(args.base_image_mode),
         )
+        if args.replay_dir is None:
+            left_score_ranked, left_ref_frame = build_score_ranked_candidates_for_arm(grasps, "left", hand_data, frame)
+            right_score_ranked, right_ref_frame = build_score_ranked_candidates_for_arm(grasps, "right", hand_data, frame)
+            score_image = build_combined_image(
+                annotate_arm_preview(
+                    base_image=base_image,
+                    arm_name="left",
+                    ranked=left_score_ranked,
+                    camera_info=camera_info,
+                    top_k=int(args.top_k),
+                    draw_grasp_boxes=bool(args.draw_grasp_boxes),
+                    box_thickness=int(args.box_thickness),
+                    font_scale=float(args.font_scale),
+                    panel_width=int(args.panel_width),
+                    line_height=int(args.line_height),
+                    stage_title="score rank",
+                    line_builder=score_line,
+                ),
+                annotate_arm_preview(
+                    base_image=base_image,
+                    arm_name="right",
+                    ranked=right_score_ranked,
+                    camera_info=camera_info,
+                    top_k=int(args.top_k),
+                    draw_grasp_boxes=bool(args.draw_grasp_boxes),
+                    box_thickness=int(args.box_thickness),
+                    font_scale=float(args.font_scale),
+                    panel_width=int(args.panel_width),
+                    line_height=int(args.line_height),
+                    stage_title="score rank",
+                    line_builder=score_line,
+                ),
+            )
+            score_path = args.output_dir / f"frame_{frame:06d}_left_right_score_rank.png"
+            if not cv2.imwrite(str(score_path), score_image):
+                raise RuntimeError(f"Failed to write {score_path}")
+            summary.append(
+                {
+                    "frame": int(frame),
+                    "mode": "score_only",
+                    "left_reference_hand_frame": int(left_ref_frame),
+                    "right_reference_hand_frame": int(right_ref_frame),
+                    "base_image_mode": str(args.base_image_mode),
+                    "base_image_dir": None if args.base_image_dir is None else str(args.base_image_dir),
+                    "draw_grasp_boxes": int(args.draw_grasp_boxes),
+                    "score_image": str(score_path),
+                    "top_k": int(args.top_k),
+                }
+            )
+            continue
         if fixed_camera_pose_world_wxyz is None:
             pose_path = args.replay_dir / "multi_object_world_poses.npz"
             if pose_path.is_file():
                 data = np.load(str(pose_path), allow_pickle=True)
                 if "head_camera_pose_world_wxyz" not in data.files:
                     fixed_camera_pose_world_wxyz = compute_fixed_head_camera_pose_world_wxyz(args)
-        object_world_positions, camera_pose_world_wxyz = load_replay_frame_data(
+        object_world_positions, camera_pose_world_wxyz, camera_pose_source = load_replay_frame_data(
             args.replay_dir,
             frame,
             fixed_camera_pose_world_wxyz,
@@ -646,6 +745,8 @@ def main() -> None:
                 "base_image_mode": str(args.base_image_mode),
                 "base_image_dir": None if args.base_image_dir is None else str(args.base_image_dir),
                 "draw_grasp_boxes": int(args.draw_grasp_boxes),
+                "camera_pose_world_wxyz": np.asarray(camera_pose_world_wxyz, dtype=np.float64).tolist(),
+                "camera_pose_source": str(camera_pose_source),
                 "object_filter_counts": {
                     "before_total": int(len(grasps)),
                     "left_after": int(len(left_object_filtered)),

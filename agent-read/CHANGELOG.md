@@ -167,6 +167,14 @@
 
 ## 2026-03-23
 
+- Updated `code_painting/render_anygrasp_ranked_preview.py` once more:
+  - `--replay_dir` is now optional
+  - omitting `--replay_dir` falls back to the original raw-score combined preview path
+  - staged mode now writes `camera_pose_world_wxyz` and `camera_pose_source` into `summary.json`
+- Validation:
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/render_anygrasp_ranked_preview.py`
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python /home/zaijia001/ssd/RoboTwin/code_painting/render_anygrasp_ranked_preview.py --anygrasp_dir /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_batch_results/d_pour_blue_1 --hand_npz /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis/hand_detections_1.npz --base_image_dir /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_d_pour_blue_norobot/d_pour_blue_1/head_anygrasp_frames --base_image_mode raw --output_dir /tmp/anygrasp_score_only_realcheck --frames 1 21 --top_k 5`
+
 - Updated `code_painting/render_anygrasp_ranked_preview.py` again so old replay exports without `head_camera_pose_world_wxyz` no longer hard-fail.
 - The script now falls back to a fixed head-camera world pose computed from:
   - `robot_config`
