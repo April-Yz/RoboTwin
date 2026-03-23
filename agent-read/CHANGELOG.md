@@ -301,3 +301,13 @@
 - Validation:
   - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/render_anygrasp_ranked_preview.py`
   - `bash /home/zaijia001/ssd/RoboTwin/code_painting/run_render_anygrasp_ranked_preview_batch.sh /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_batch_results /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_d_pour_blue_norobot /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis /tmp/anygrasp_hand_axis_fix_check --ids 1 --frames 1 --top_k 3 --left_target_object cup --right_target_object bottle --draw_grasp_boxes 1`
+
+- Updated staged orientation scoring to use the aligned hand-rotation convention instead of the raw detector-local rotation directly.
+- The preview now computes two orientation differences:
+  - `raw_rotation_distance_deg`: direct detector hand rotation vs AnyGrasp candidate
+  - `rotation_distance_deg`: aligned hand rotation vs AnyGrasp candidate
+- Ranking, orientation score, fused score, and `--max_rotation_distance_deg` filtering now all use the aligned rotation distance.
+- The right-side panel shows the aligned formula result and also prints `raw=...` per row for comparison.
+- Validation:
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/render_anygrasp_ranked_preview.py`
+  - `bash /home/zaijia001/ssd/RoboTwin/code_painting/run_render_anygrasp_ranked_preview_batch.sh /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_batch_results /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_d_pour_blue_norobot /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis /tmp/anygrasp_aligned_orientation_check --ids 1 --frames 1 --top_k 3 --left_target_object cup --right_target_object bottle --draw_grasp_boxes 1`

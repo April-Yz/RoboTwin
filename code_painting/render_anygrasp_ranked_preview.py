@@ -44,6 +44,7 @@ class CandidateRecord:
     orientation_score: float
     fused_score: float
     rotation_distance_deg: float
+    raw_rotation_distance_deg: float
     translation: np.ndarray
     rotation_matrix: np.ndarray
     width: float
@@ -73,6 +74,7 @@ class HandReference:
     ref_frame: int
     position: np.ndarray
     rotation_matrix: np.ndarray
+    aligned_rotation_matrix: np.ndarray
     finger_distance: float
 
 
@@ -495,20 +497,15 @@ def build_object_partitioned_candidates(
 
 def build_candidates_for_arm(
     shared_candidates: Sequence[SharedCandidateRecord],
-    arm_name: str,
-    hand_data: Dict[str, np.ndarray],
-    frame: int,
+    hand_reference: HandReference,
     target_object: str,
     anygrasp_score_weight: float,
     orientation_score_weight: float,
     max_rotation_distance_deg: float,
 ) -> Tuple[List[CandidateRecord], int, int]:
-    hand_valid = np.asarray(hand_data[f"{arm_name}_gripper_valid"], dtype=bool)
-    hand_rotations = np.asarray(hand_data[f"{arm_name}_gripper_rotation_matrix"], dtype=np.float64)
-    ref_frame = int(frame) if frame < hand_valid.shape[0] and bool(hand_valid[frame]) else nearest_valid_hand_frame(int(frame), hand_valid)
-    if ref_frame is None:
-        raise RuntimeError(f"No valid {arm_name} hand rotation exists for frame {frame}.")
-    ref_rot = np.asarray(hand_rotations[ref_frame], dtype=np.float64)
+    ref_frame = int(hand_reference.ref_frame)
+    ref_rot_raw = np.asarray(hand_reference.rotation_matrix, dtype=np.float64).reshape(3, 3)
+    ref_rot = np.asarray(hand_reference.aligned_rotation_matrix, dtype=np.float64).reshape(3, 3)
 
     filtered_candidates: List[CandidateRecord] = []
     target_object_candidates = 0
@@ -516,6 +513,7 @@ def build_candidates_for_arm(
         if str(candidate.nearest_object) != str(target_object):
             continue
         target_object_candidates += 1
+        raw_rotation_distance = rotation_distance_deg(ref_rot_raw, candidate.rotation_matrix)
         rotation_distance = rotation_distance_deg(ref_rot, candidate.rotation_matrix)
         if float(max_rotation_distance_deg) >= 0.0 and float(rotation_distance) > float(max_rotation_distance_deg):
             continue
@@ -528,6 +526,7 @@ def build_candidates_for_arm(
                 orientation_score=orientation_score,
                 fused_score=fused_score,
                 rotation_distance_deg=rotation_distance,
+                raw_rotation_distance_deg=raw_rotation_distance,
                 translation=np.asarray(candidate.translation, dtype=np.float64).reshape(3),
                 rotation_matrix=np.asarray(candidate.rotation_matrix, dtype=np.float64).reshape(3, 3),
                 width=float(candidate.width),
@@ -551,12 +550,14 @@ def build_score_ranked_candidates_for_arm(
     ref_frame = int(frame) if frame < hand_valid.shape[0] and bool(hand_valid[frame]) else nearest_valid_hand_frame(int(frame), hand_valid)
     if ref_frame is None:
         raise RuntimeError(f"No valid {arm_name} hand rotation exists for frame {frame}.")
-    ref_rot = np.asarray(hand_rotations[ref_frame], dtype=np.float64)
+    ref_rot_raw = np.asarray(hand_rotations[ref_frame], dtype=np.float64)
+    ref_rot = align_hand_rotation_to_candidate_convention(ref_rot_raw)
     ranked: List[CandidateRecord] = []
     for candidate_idx, grasp in enumerate(grasps):
         translation = np.asarray(grasp["translation"], dtype=np.float64).reshape(3)
         rotation_matrix = np.asarray(grasp["rotation_matrix"], dtype=np.float64).reshape(3, 3)
         anygrasp_score = float(grasp["score"])
+        raw_rotation_distance = rotation_distance_deg(ref_rot_raw, rotation_matrix)
         rotation_distance = rotation_distance_deg(ref_rot, rotation_matrix)
         orientation_score = orientation_score_from_rotation_distance(rotation_distance)
         ranked.append(
@@ -566,6 +567,7 @@ def build_score_ranked_candidates_for_arm(
                 orientation_score=orientation_score,
                 fused_score=anygrasp_score,
                 rotation_distance_deg=rotation_distance,
+                raw_rotation_distance_deg=raw_rotation_distance,
                 translation=translation,
                 rotation_matrix=rotation_matrix,
                 width=float(grasp.get("width", 0.0)),
@@ -577,6 +579,19 @@ def build_score_ranked_candidates_for_arm(
         )
     ranked.sort(key=lambda item: (-float(item.anygrasp_score), float(item.rotation_distance_deg)))
     return ranked, int(ref_frame)
+
+
+def align_hand_rotation_to_candidate_convention(rotation_matrix: np.ndarray) -> np.ndarray:
+    hand_rotation = np.asarray(rotation_matrix, dtype=np.float64).reshape(3, 3)
+    return orthonormalize_rotation(
+        np.column_stack(
+            [
+                hand_rotation[:, 2],
+                hand_rotation[:, 1],
+                -hand_rotation[:, 0],
+            ]
+        )
+    )
 
 
 def resolve_hand_reference(
@@ -596,6 +611,7 @@ def resolve_hand_reference(
         ref_frame=int(ref_frame),
         position=position,
         rotation_matrix=rotation_matrix,
+        aligned_rotation_matrix=align_hand_rotation_to_candidate_convention(rotation_matrix),
         finger_distance=finger_distance,
     )
 
@@ -606,23 +622,11 @@ def draw_hand_reference(
     hand_reference: HandReference,
     color: Tuple[int, int, int],
 ) -> None:
-    hand_rotation = np.asarray(hand_reference.rotation_matrix, dtype=np.float64).reshape(3, 3)
-    # detect_hands_realr1.py uses local +Z as the retreat/approach axis, while the
-    # AnyGrasp wireframe helper expects local +X as the forward finger direction.
-    # Remap only for visualization so the human reference is drawn in the same
-    # gripper-axis convention as the AnyGrasp candidates.
-    wireframe_rotation = np.column_stack(
-        [
-            hand_rotation[:, 2],
-            hand_rotation[:, 1],
-            -hand_rotation[:, 0],
-        ]
-    )
     draw_grasp_wireframe(
         image=image,
         camera_info=camera_info,
         translation=np.asarray(hand_reference.position, dtype=np.float64).reshape(3),
-        rotation_matrix=wireframe_rotation,
+        rotation_matrix=np.asarray(hand_reference.aligned_rotation_matrix, dtype=np.float64).reshape(3, 3),
         width_m=float(np.clip(hand_reference.finger_distance, 0.01, 0.12)),
         depth_m=0.035,
         color=color,
@@ -729,7 +733,8 @@ def orientation_line(row_idx: int, item: CandidateRecord) -> str:
         f"#{row_idx + 1:02d} "
         f"idx={item.candidate_idx:02d} "
         f"1-{item.rotation_distance_deg:.1f}/180="
-        f"{item.orientation_score:.3f}"
+        f"{item.orientation_score:.3f} "
+        f"raw={item.raw_rotation_distance_deg:.1f}"
     )
 
 
@@ -749,7 +754,8 @@ def make_fused_line_builder(anygrasp_weight: float, orientation_weight: float):
             f"idx={item.candidate_idx:02d} "
             f"{item.anygrasp_score:.3f}*{anygrasp_weight:.2f} + "
             f"{item.orientation_score:.3f}*{orientation_weight:.2f} = "
-            f"{item.fused_score:.3f}"
+            f"{item.fused_score:.3f} "
+            f"(raw={item.raw_rotation_distance_deg:.1f})"
         )
 
     return fused_line
@@ -757,7 +763,8 @@ def make_fused_line_builder(anygrasp_weight: float, orientation_weight: float):
 
 def orientation_formula_lines(max_rotation_distance_deg: float) -> List[str]:
     lines = [
-        "ori = max(0, 1 - rot/180)",
+        "ori = max(0, 1 - aligned_rot/180)",
+        "raw_rot shown per row",
     ]
     if float(max_rotation_distance_deg) >= 0.0:
         lines.append(f"keep if rot <= {float(max_rotation_distance_deg):.1f} deg")
@@ -767,7 +774,7 @@ def orientation_formula_lines(max_rotation_distance_deg: float) -> List[str]:
 def fused_formula_lines(anygrasp_weight: float, orientation_weight: float, max_rotation_distance_deg: float) -> List[str]:
     lines = [
         f"total = anygrasp*{float(anygrasp_weight):.2f} + ori*{float(orientation_weight):.2f}",
-        "ori = max(0, 1 - rot/180)",
+        "ori = max(0, 1 - aligned_rot/180)",
     ]
     if float(max_rotation_distance_deg) >= 0.0:
         lines.append(f"keep if rot <= {float(max_rotation_distance_deg):.1f} deg")
@@ -802,8 +809,10 @@ def main() -> None:
             height=int(camera_info["height"]),
             image_mode=str(args.base_image_mode),
         )
-        left_hand_reference = resolve_hand_reference(hand_data, "left", frame) if bool(args.draw_hand_reference) else None
-        right_hand_reference = resolve_hand_reference(hand_data, "right", frame) if bool(args.draw_hand_reference) else None
+        left_hand_reference = resolve_hand_reference(hand_data, "left", frame)
+        right_hand_reference = resolve_hand_reference(hand_data, "right", frame)
+        left_hand_reference_overlay = left_hand_reference if bool(args.draw_hand_reference) else None
+        right_hand_reference_overlay = right_hand_reference if bool(args.draw_hand_reference) else None
         if args.replay_dir is None:
             left_score_ranked, left_ref_frame = build_score_ranked_candidates_for_arm(grasps, "left", hand_data, frame)
             right_score_ranked, right_ref_frame = build_score_ranked_candidates_for_arm(grasps, "right", hand_data, frame)
@@ -812,7 +821,7 @@ def main() -> None:
                 base_image=base_image,
                 arm_name="left",
                 ranked=left_score_ranked,
-                    hand_reference=left_hand_reference,
+                    hand_reference=left_hand_reference_overlay,
                     camera_info=camera_info,
                     object_world_positions=None,
                     camera_pose_world_wxyz=None,
@@ -831,7 +840,7 @@ def main() -> None:
                 base_image=base_image,
                 arm_name="right",
                 ranked=right_score_ranked,
-                    hand_reference=right_hand_reference,
+                    hand_reference=right_hand_reference_overlay,
                     camera_info=camera_info,
                     object_world_positions=None,
                     camera_pose_world_wxyz=None,
@@ -888,9 +897,7 @@ def main() -> None:
         )
         left_object_filtered, left_ref_frame, left_target_count = build_candidates_for_arm(
             shared_candidates=shared_candidates,
-            arm_name="left",
-            hand_data=hand_data,
-            frame=frame,
+            hand_reference=left_hand_reference,
             target_object=str(args.left_target_object),
             anygrasp_score_weight=float(args.anygrasp_score_weight),
             orientation_score_weight=float(args.orientation_score_weight),
@@ -898,9 +905,7 @@ def main() -> None:
         )
         right_object_filtered, right_ref_frame, right_target_count = build_candidates_for_arm(
             shared_candidates=shared_candidates,
-            arm_name="right",
-            hand_data=hand_data,
-            frame=frame,
+            hand_reference=right_hand_reference,
             target_object=str(args.right_target_object),
             anygrasp_score_weight=float(args.anygrasp_score_weight),
             orientation_score_weight=float(args.orientation_score_weight),
@@ -1013,7 +1018,7 @@ def main() -> None:
                 base_image=base_image,
                 arm_name="left",
                 ranked=left_orientation_ranked,
-                hand_reference=left_hand_reference,
+                hand_reference=left_hand_reference_overlay,
                 camera_info=camera_info,
                 object_world_positions=object_world_positions if bool(args.draw_object_overlay) else None,
                 camera_pose_world_wxyz=camera_pose_world_wxyz if bool(args.draw_object_overlay) else None,
@@ -1032,7 +1037,7 @@ def main() -> None:
                 base_image=base_image,
                 arm_name="right",
                 ranked=right_orientation_ranked,
-                hand_reference=right_hand_reference,
+                hand_reference=right_hand_reference_overlay,
                 camera_info=camera_info,
                 object_world_positions=object_world_positions if bool(args.draw_object_overlay) else None,
                 camera_pose_world_wxyz=camera_pose_world_wxyz if bool(args.draw_object_overlay) else None,
@@ -1057,7 +1062,7 @@ def main() -> None:
                 base_image=base_image,
                 arm_name="left",
                 ranked=left_fused_ranked,
-                hand_reference=left_hand_reference,
+                hand_reference=left_hand_reference_overlay,
                 camera_info=camera_info,
                 object_world_positions=object_world_positions if bool(args.draw_object_overlay) else None,
                 camera_pose_world_wxyz=camera_pose_world_wxyz if bool(args.draw_object_overlay) else None,
@@ -1076,7 +1081,7 @@ def main() -> None:
                 base_image=base_image,
                 arm_name="right",
                 ranked=right_fused_ranked,
-                hand_reference=right_hand_reference,
+                hand_reference=right_hand_reference_overlay,
                 camera_info=camera_info,
                 object_world_positions=object_world_positions if bool(args.draw_object_overlay) else None,
                 camera_pose_world_wxyz=camera_pose_world_wxyz if bool(args.draw_object_overlay) else None,
