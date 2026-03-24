@@ -2242,6 +2242,48 @@ def plan_request_diagnostics(
     }
 
 
+def _ee_base_pose_to_world_wxyz(renderer: ReplayRenderer, ee_pos_base: np.ndarray, ee_quat_wxyz_base: np.ndarray) -> np.ndarray:
+    base_world = base.pose_to_matrix(renderer._base_pose)
+    ee_base = np.eye(4, dtype=np.float64)
+    ee_base[:3, :3] = base.orthonormalize_rotation(R.from_quat(base.quat_wxyz_to_xyzw(ee_quat_wxyz_base)).as_matrix())
+    ee_base[:3, 3] = np.asarray(ee_pos_base, dtype=np.float64).reshape(3)
+    ee_world = base_world @ ee_base
+    quat = base.quat_xyzw_to_wxyz(R.from_matrix(base.orthonormalize_rotation(ee_world[:3, :3])).as_quat())
+    return np.concatenate([ee_world[:3, 3], quat]).astype(np.float64)
+
+
+def planned_eval_pose_from_plan(
+    renderer: ReplayRenderer,
+    arm: str,
+    plan: Optional[Dict],
+    pose_source: str,
+) -> Optional[np.ndarray]:
+    if not isinstance(plan, dict):
+        return None
+    if str(plan.get("status", "")) != "Success":
+        return None
+    if "target_joints" not in plan:
+        return None
+    solver = getattr(renderer, f"{arm}_ik_solver", None)
+    if solver is None or not hasattr(solver, "forward_kinematics"):
+        return None
+
+    target_arm = np.asarray(plan["target_joints"], dtype=np.float64).reshape(6)
+    full_joints = np.concatenate([np.asarray(renderer.torso_qpos, dtype=np.float64).reshape(4), target_arm], dtype=np.float64)
+    ee_pos_base, ee_quat_wxyz_base, _ = solver.forward_kinematics(full_joints)
+    ee_world_wxyz = _ee_base_pose_to_world_wxyz(renderer, ee_pos_base, ee_quat_wxyz_base)
+    if pose_source == "ee":
+        return ee_world_wxyz
+    if pose_source == "tcp":
+        tcp_world = pose_wxyz_to_matrix(ee_world_wxyz)
+        # Current planner convention uses local +X as the forward axis and TCP reference point.
+        # Under the current R1 config the TCP is 0.12 m forward of the ee/endlink pose.
+        tcp_world[:3, 3] += tcp_world[:3, 0] * 0.12
+        quat = base.quat_xyzw_to_wxyz(R.from_matrix(base.orthonormalize_rotation(tcp_world[:3, :3])).as_quat())
+        return np.concatenate([tcp_world[:3, 3], quat]).astype(np.float64)
+    return None
+
+
 def tcp_pose_errors(target_pose_world_wxyz: np.ndarray, current_pose_world_wxyz: np.ndarray) -> Tuple[float, float]:
     target_pose_world_wxyz = np.asarray(target_pose_world_wxyz, dtype=np.float64).reshape(7)
     current_pose_world_wxyz = np.asarray(current_pose_world_wxyz, dtype=np.float64).reshape(7)
@@ -2452,6 +2494,20 @@ def execute_stage_until_reached(
             f"theory={str(pre_plan_diag['theoretical_forward_axis_motion'])}"
         )
         plan = renderer.plan_path(arm, target_pose_world_wxyz)
+        planned_eval_pose = planned_eval_pose_from_plan(renderer, arm, plan, args.reach_error_pose_source)
+        if planned_eval_pose is not None:
+            plan_vs_target = plan_request_diagnostics(planned_eval_pose, target_eval_pose)
+            plan_vs_current = plan_request_diagnostics(current_eval_pose_before_plan, planned_eval_pose)
+            print(
+                f"[plan-solution] stage={label} arm={arm} try={attempt} "
+                f"plan_vs_target_fwd_cm={float(plan_vs_target['error']['forward_axis_signed_err_cm']):+.2f} "
+                f"plan_vs_target_dist={float(plan_vs_target['error']['dist_m']):.4f} "
+                f"plan_vs_target_rot={float(plan_vs_target['error']['rot_err_deg']):.2f} "
+                f"plan_vs_current_fwd_cm={float(plan_vs_current['error']['forward_axis_signed_err_cm']):+.2f} "
+                f"plan_vs_current_dist={float(plan_vs_current['error']['dist_m']):.4f} "
+                f"plan_vs_current_rot={float(plan_vs_current['error']['rot_err_deg']):.2f} "
+                f"theory={str(plan_vs_current['theoretical_forward_axis_motion'])}"
+            )
         last_status = execute_single_arm_plan(
             renderer=renderer,
             arm=arm,
@@ -2698,6 +2754,39 @@ def execute_dual_stage_until_reached(
         plans_by_arm: Dict[str, Optional[Dict]] = {
             arm: renderer.plan_path(arm, target_pose_world_wxyz_by_arm[arm]) for arm in arms
         }
+        plan_solution_by_arm: Dict[str, Dict[str, object]] = {}
+        for arm in arms:
+            planned_eval_pose = planned_eval_pose_from_plan(renderer, arm, plans_by_arm.get(arm), args.reach_error_pose_source)
+            if planned_eval_pose is None:
+                continue
+            target_eval_pose = target_pose_for_error(renderer, arm, target_pose_world_wxyz_by_arm[arm], args.reach_error_pose_source)
+            current_eval_pose_before_plan = np.asarray(pre_plan_by_arm[arm]["current_pose_world_wxyz"], dtype=np.float64).reshape(7)
+            plan_vs_target = plan_request_diagnostics(planned_eval_pose, target_eval_pose)
+            plan_vs_current = plan_request_diagnostics(current_eval_pose_before_plan, planned_eval_pose)
+            plan_solution_by_arm[arm] = {
+                "planned_eval_pose_world_wxyz": planned_eval_pose.tolist(),
+                "plan_vs_target": plan_vs_target,
+                "plan_vs_current": plan_vs_current,
+            }
+        if plan_solution_by_arm:
+            print(
+                f"[plan-solution] stage={label} try={attempt} "
+                + " ".join(
+                    [
+                        (
+                            f"{arm}:plan_vs_target_fwd_cm={float(plan_solution_by_arm[arm]['plan_vs_target']['error']['forward_axis_signed_err_cm']):+.2f},"
+                            f"plan_vs_target_dist={float(plan_solution_by_arm[arm]['plan_vs_target']['error']['dist_m']):.4f},"
+                            f"plan_vs_target_rot={float(plan_solution_by_arm[arm]['plan_vs_target']['error']['rot_err_deg']):.2f},"
+                            f"plan_vs_current_fwd_cm={float(plan_solution_by_arm[arm]['plan_vs_current']['error']['forward_axis_signed_err_cm']):+.2f},"
+                            f"plan_vs_current_dist={float(plan_solution_by_arm[arm]['plan_vs_current']['error']['dist_m']):.4f},"
+                            f"plan_vs_current_rot={float(plan_solution_by_arm[arm]['plan_vs_current']['error']['rot_err_deg']):.2f},"
+                            f"theory={str(plan_solution_by_arm[arm]['plan_vs_current']['theoretical_forward_axis_motion'])}"
+                        )
+                        for arm in arms
+                        if arm in plan_solution_by_arm
+                    ]
+                )
+            )
         statuses = execute_dual_arm_plan(
             renderer=renderer,
             plans_by_arm=plans_by_arm,
@@ -2742,6 +2831,7 @@ def execute_dual_stage_until_reached(
             {
                 "attempt": attempt,
                 "pre_plan_by_arm": pre_plan_by_arm,
+                "plan_solution_by_arm": plan_solution_by_arm,
                 "arms": arm_metrics,
                 "reached": bool(stage_reached),
             }
