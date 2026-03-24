@@ -2,6 +2,16 @@
 
 ## 2026-03-24
 
+- Added a dedicated annotated-keyframe batch wrapper:
+  - `code_painting/run_render_anygrasp_ranked_preview_keyframes_batch.sh`
+- This wrapper is the batch entry for:
+  - `frame 0 + annotated keyframes from hand_keyframes_all.json`
+- It reuses the same per-video path convention as the generic preview batch script, but defaults to:
+  - `--frame_selection_mode hand_keyframes_json`
+  - `--hand_keyframes_json <hand_dir>/hand_keyframes_all.json`
+- Validation:
+  - `bash /home/zaijia001/ssd/RoboTwin/code_painting/run_render_anygrasp_ranked_preview_keyframes_batch.sh /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_batch_results /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_d_pour_blue_norobot /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis /tmp/anygrasp_keyframes_batch_check --ids 1 --top_k 1 --left_target_object cup --right_target_object bottle --draw_grasp_boxes 1`
+
 - Extended `code_painting/render_anygrasp_ranked_preview.py` with a second frame-selection path:
   - existing manual mode still supports `--frames 1 22 -10`
   - new `--frame_selection_mode hand_keyframes_json` reads `hand_keyframes_all.json`

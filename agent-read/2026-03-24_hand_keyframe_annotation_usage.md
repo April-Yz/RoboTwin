@@ -310,6 +310,37 @@ for video_name, video_info in videos.items():
 - 手动 `--frames`
 - 还是来自 `hand_keyframes_all.json`
 
+如果要批量按这个模式处理整个 `d_pour_blue_{id}` 数据集，可以直接用：
+
+- [run_render_anygrasp_ranked_preview_keyframes_batch.sh](/home/zaijia001/ssd/RoboTwin/code_painting/run_render_anygrasp_ranked_preview_keyframes_batch.sh)
+
+示例：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_render_anygrasp_ranked_preview_keyframes_batch.sh \
+  /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_batch_results \
+  /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_d_pour_blue_norobot \
+  /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis \
+  /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_direct_preview_keyframes_batch \
+  --ids 1 2 3 \
+  --top_k 1 \
+  --left_target_object cup \
+  --right_target_object bottle \
+  --draw_grasp_boxes 1
+```
+
+这个 batch 脚本会默认：
+
+- 自动启用 `--frame_selection_mode hand_keyframes_json`
+- 默认读取：
+  - `hand_dir/hand_keyframes_all.json`
+
+如果要换成其它关键帧 JSON，也可以额外传：
+
+```bash
+--hand_keyframes_json /abs/path/to/another_hand_keyframes_all.json
+```
+
 ## 验证
 
 本次只做了语法级验证：
