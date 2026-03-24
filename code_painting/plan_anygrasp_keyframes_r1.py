@@ -233,6 +233,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--save_debug_execution_preview", type=int, default=1)
     parser.add_argument("--debug_execution_fps", type=int, default=10)
     parser.add_argument("--save_pose_debug", type=int, default=0, help="If 1, dump per-frame planner camera/TCP/object poses to pose_debug.jsonl.")
+    parser.add_argument("--pure_scene_output", type=int, default=0, help="If 1, keep head/third output videos clean: no overlay text, no candidate grippers, and no target-axis visualization. Debug videos remain unchanged.")
     parser.add_argument("--save_rank_preview_images", type=int, default=1)
     parser.add_argument("--rank_preview_top_n", type=int, default=3, help="Save per-keyframe rank preview PNGs for left/right rank 1..N.")
     parser.add_argument("--debug_target_axis_length", type=float, default=0.08)
@@ -1609,6 +1610,26 @@ def set_dual_arm_target_visuals(
     renderer.update_target_axis_visuals(left_pose_world_wxyz, right_pose_world_wxyz)
 
 
+def apply_target_visuals_from_state(renderer: ReplayRenderer, debug_execution_state: Optional[DebugExecutionState]) -> None:
+    if debug_execution_state is None or not debug_execution_state.target_pose_by_arm:
+        renderer.update_target_axis_visuals(None, None)
+        return
+    left_pose = debug_execution_state.target_pose_by_arm.get("left")
+    right_pose = debug_execution_state.target_pose_by_arm.get("right")
+    renderer.update_target_axis_visuals(left_pose, right_pose)
+
+
+def make_skipped_stage_result(reason: str) -> Dict[str, object]:
+    return {
+        "status": f"skipped:{reason}",
+        "attempts": 0,
+        "reached": False,
+        "pos_err_m": float("inf"),
+        "rot_err_deg": float("inf"),
+        "attempt_history": [],
+    }
+
+
 def record_frame(
     renderer: ReplayRenderer,
     head_writer: cv2.VideoWriter,
@@ -1617,7 +1638,11 @@ def record_frame(
     use_overlay: bool,
     debug_visuals: Optional[DebugVisualBundle] = None,
     debug_execution_state: Optional[DebugExecutionState] = None,
+    pure_scene_main: bool = False,
+    use_overlay_debug: Optional[bool] = None,
 ) -> None:
+    if use_overlay_debug is None:
+        use_overlay_debug = bool(use_overlay)
     viewer_active = bool(getattr(renderer, "viewer", None) is not None and not renderer.viewer.closed)
     if debug_visuals is not None:
         for actor in debug_visuals.keyframe_axis_actors.values():
@@ -1633,7 +1658,7 @@ def record_frame(
             for actors in per_frame.values():
                 for actor in actors:
                     hide_actor(actor)
-        if debug_execution_state is not None:
+        if debug_execution_state is not None and not bool(pure_scene_main):
             for item in selected_keyframes_for_active_frame(
                 debug_execution_state.selected_keyframes,
                 debug_execution_state.active_frame,
@@ -1647,6 +1672,10 @@ def record_frame(
                 debug_execution_state.common_candidates_per_frame,
                 debug_execution_state.arm_display_candidates,
             )
+    if bool(pure_scene_main):
+        renderer.update_target_axis_visuals(None, None)
+    else:
+        apply_target_visuals_from_state(renderer, debug_execution_state)
     renderer.update_robot_link_cameras()
     renderer.scene.update_render()
     if viewer_active:
@@ -1662,6 +1691,7 @@ def record_frame(
     if debug_execution_state is not None:
         frame_metrics = build_execution_frame_metrics(renderer, debug_execution_state)
     if debug_execution_state is not None and debug_execution_state.writer is not None and debug_visuals is not None:
+        apply_target_visuals_from_state(renderer, debug_execution_state)
         renderer.update_robot_link_cameras()
         renderer.scene.update_render()
         debug_overlay = list(overlay_lines)
@@ -1678,7 +1708,7 @@ def record_frame(
             ]
         )
         debug_rgb, _ = renderer.capture_camera(renderer.zed_camera)
-        debug_bgr = base.overlay_text(debug_rgb, debug_overlay) if use_overlay else cv2.cvtColor(debug_rgb, cv2.COLOR_RGB2BGR)
+        debug_bgr = base.overlay_text(debug_rgb, debug_overlay) if use_overlay_debug else cv2.cvtColor(debug_rgb, cv2.COLOR_RGB2BGR)
         annotate_candidate_labels(
             debug_bgr,
             renderer.zed_camera,
@@ -2160,6 +2190,8 @@ def emit_init_prefix_frames(
     arm_label: str,
     debug_visuals: Optional[DebugVisualBundle] = None,
     debug_execution_state: Optional[DebugExecutionState] = None,
+    pure_scene_main: bool = False,
+    use_overlay_debug: Optional[bool] = None,
 ) -> int:
     total = max(int(fixed_frames), 0)
     if total <= 0:
@@ -2178,6 +2210,8 @@ def emit_init_prefix_frames(
             use_overlay,
             debug_visuals,
             debug_execution_state,
+            pure_scene_main=pure_scene_main,
+            use_overlay_debug=use_overlay_debug,
         )
     return total
 
@@ -2200,6 +2234,8 @@ def execute_single_arm_plan(
     debug_visuals: Optional[DebugVisualBundle] = None,
     debug_execution_state: Optional[DebugExecutionState] = None,
     object_replay: Optional[ExecutionObjectReplayConfig] = None,
+    pure_scene_main: bool = False,
+    use_overlay_debug: Optional[bool] = None,
 ) -> str:
     status = renderer._plan_status(plan)
     overlay_lines = [f"stage={label}", f"arm={arm}", f"status={status}"]
@@ -2207,7 +2243,7 @@ def execute_single_arm_plan(
         overlay_lines.append(f"goal={target_visual_label}")
     set_single_arm_target_visual(renderer, arm, target_visual_pose)
     if status != "Success":
-        record_frame(renderer, head_writer, third_writer, overlay_lines, use_overlay, debug_visuals, debug_execution_state)
+        record_frame(renderer, head_writer, third_writer, overlay_lines, use_overlay, debug_visuals, debug_execution_state, pure_scene_main=pure_scene_main, use_overlay_debug=use_overlay_debug)
         return status
 
     position = np.asarray(plan["position"], dtype=np.float64)
@@ -2231,11 +2267,13 @@ def execute_single_arm_plan(
             use_overlay,
             debug_visuals,
             debug_execution_state,
+            pure_scene_main=pure_scene_main,
+            use_overlay_debug=use_overlay_debug,
         )
     renderer.step_scene(steps=max(int(settle_steps), 0))
     if object_replay is not None:
         update_execution_object_replay(object_replay, 1.0)
-    record_frame(renderer, head_writer, third_writer, overlay_lines + ["plan_step=done"], use_overlay, debug_visuals, debug_execution_state)
+    record_frame(renderer, head_writer, third_writer, overlay_lines + ["plan_step=done"], use_overlay, debug_visuals, debug_execution_state, pure_scene_main=pure_scene_main, use_overlay_debug=use_overlay_debug)
     for hold_idx in range(max(int(hold_frames_after_stage), 0)):
         record_frame(
             renderer,
@@ -2245,6 +2283,8 @@ def execute_single_arm_plan(
             use_overlay,
             debug_visuals,
             debug_execution_state,
+            pure_scene_main=pure_scene_main,
+            use_overlay_debug=use_overlay_debug,
         )
     return status
 
@@ -2266,6 +2306,8 @@ def execute_stage_until_reached(
     debug_execution_state: Optional[DebugExecutionState] = None,
     supervision_targets: Optional[Dict[str, np.ndarray]] = None,
     object_replay: Optional[ExecutionObjectReplayConfig] = None,
+    pure_scene_main: bool = False,
+    use_overlay_debug: Optional[bool] = None,
 ) -> Dict[str, object]:
     last_status = "Missing"
     last_pos_err = float("inf")
@@ -2296,6 +2338,8 @@ def execute_stage_until_reached(
             debug_visuals=debug_visuals,
             debug_execution_state=debug_execution_state,
             object_replay=object_replay,
+            pure_scene_main=pure_scene_main,
+            use_overlay_debug=use_overlay_debug,
         )
         current_eval_pose = get_current_pose_for_error(renderer, arm, args.reach_error_pose_source)
         target_eval_pose = target_pose_for_error(renderer, arm, target_pose_world_wxyz, args.reach_error_pose_source)
@@ -2333,6 +2377,8 @@ def execute_stage_until_reached(
             use_overlay,
             debug_visuals,
             debug_execution_state,
+            pure_scene_main=pure_scene_main,
+            use_overlay_debug=use_overlay_debug,
         )
         if reached:
             return {
@@ -2369,6 +2415,8 @@ def execute_dual_arm_plan(
     attached_actor_by_arm: Optional[Dict[str, Optional[sapien.Entity]]] = None,
     tcp_to_object_by_arm: Optional[Dict[str, Optional[np.ndarray]]] = None,
     object_replay: Optional[ExecutionObjectReplayConfig] = None,
+    pure_scene_main: bool = False,
+    use_overlay_debug: Optional[bool] = None,
 ) -> Dict[str, str]:
     arms = [arm for arm in ("left", "right") if arm in plans_by_arm]
     statuses: Dict[str, str] = {arm: renderer._plan_status(plans_by_arm.get(arm)) for arm in arms}
@@ -2391,7 +2439,7 @@ def execute_dual_arm_plan(
         max_steps = max(max_steps, int(position.shape[0]))
 
     if max_steps <= 0:
-        record_frame(renderer, head_writer, third_writer, overlay_lines, use_overlay, debug_visuals, debug_execution_state)
+        record_frame(renderer, head_writer, third_writer, overlay_lines, use_overlay, debug_visuals, debug_execution_state, pure_scene_main=pure_scene_main, use_overlay_debug=use_overlay_debug)
         return statuses
 
     for step_idx in range(max_steps):
@@ -2422,12 +2470,14 @@ def execute_dual_arm_plan(
             use_overlay,
             debug_visuals,
             debug_execution_state,
+            pure_scene_main=pure_scene_main,
+            use_overlay_debug=use_overlay_debug,
         )
 
     renderer.step_scene(steps=max(int(settle_steps), 0))
     if object_replay is not None:
         update_execution_object_replay(object_replay, 1.0)
-    record_frame(renderer, head_writer, third_writer, overlay_lines + ["plan_step=done"], use_overlay, debug_visuals, debug_execution_state)
+    record_frame(renderer, head_writer, third_writer, overlay_lines + ["plan_step=done"], use_overlay, debug_visuals, debug_execution_state, pure_scene_main=pure_scene_main, use_overlay_debug=use_overlay_debug)
     for hold_idx in range(max(int(hold_frames_after_stage), 0)):
         record_frame(
             renderer,
@@ -2437,6 +2487,8 @@ def execute_dual_arm_plan(
             use_overlay,
             debug_visuals,
             debug_execution_state,
+            pure_scene_main=pure_scene_main,
+            use_overlay_debug=use_overlay_debug,
         )
     return statuses
 
@@ -2454,6 +2506,8 @@ def execute_dual_stage_until_reached(
     attached_actor_by_arm: Optional[Dict[str, Optional[sapien.Entity]]] = None,
     tcp_to_object_by_arm: Optional[Dict[str, Optional[np.ndarray]]] = None,
     object_replay: Optional[ExecutionObjectReplayConfig] = None,
+    pure_scene_main: bool = False,
+    use_overlay_debug: Optional[bool] = None,
 ) -> Dict[str, object]:
     arms = [arm for arm in ("left", "right") if arm in target_pose_world_wxyz_by_arm]
     max_attempts = max(int(args.max_stage_replans), 1)
@@ -2481,6 +2535,8 @@ def execute_dual_stage_until_reached(
             attached_actor_by_arm=attached_actor_by_arm,
             tcp_to_object_by_arm=tcp_to_object_by_arm,
             object_replay=object_replay,
+            pure_scene_main=pure_scene_main,
+            use_overlay_debug=use_overlay_debug,
         )
 
         arm_metrics: Dict[str, Dict[str, object]] = {}
@@ -2516,7 +2572,7 @@ def execute_dual_stage_until_reached(
             f"right_reached={int(arm_metrics.get('right', {}).get('reached', False))}",
             f"both_reached={int(stage_reached)}",
         ]
-        record_frame(renderer, head_writer, third_writer, overlay_lines, use_overlay, debug_visuals, debug_execution_state)
+        record_frame(renderer, head_writer, third_writer, overlay_lines, use_overlay, debug_visuals, debug_execution_state, pure_scene_main=pure_scene_main, use_overlay_debug=use_overlay_debug)
         last_arm_metrics = arm_metrics
         if stage_reached:
             return {
@@ -2544,6 +2600,8 @@ def pause_after_keyframe1(
     goal_frame: int,
     debug_visuals: Optional[DebugVisualBundle] = None,
     debug_execution_state: Optional[DebugExecutionState] = None,
+    pure_scene_main: bool = False,
+    use_overlay_debug: Optional[bool] = None,
 ) -> int:
     seconds = max(float(args.pause_after_keyframe1_seconds), 0.0)
     if seconds <= 0.0:
@@ -2568,6 +2626,8 @@ def pause_after_keyframe1(
             use_overlay,
             debug_visuals,
             debug_execution_state,
+            pure_scene_main=pure_scene_main,
+            use_overlay_debug=use_overlay_debug,
         )
         if viewer_sleep > 0.0:
             time.sleep(viewer_sleep)
@@ -3102,7 +3162,9 @@ def main() -> None:
         goal_label_by_arm={},
         reach_error_pose_source=str(args.reach_error_pose_source),
     )
-    use_overlay = bool(args.overlay_text)
+    use_overlay = bool(args.overlay_text) and not bool(args.pure_scene_output)
+    use_overlay_debug = bool(args.overlay_text)
+    pure_scene_main = bool(args.pure_scene_output)
     dual_sync_mode = bool(args.execute_both_arms) and args.arm == "auto" and len(execution_sequences) >= 2
     stages_by_executed_arm: Dict[str, Dict[str, object]] = {}
     supervision_targets_by_executed_arm: Dict[str, Dict[str, np.ndarray]] = {}
@@ -3143,6 +3205,8 @@ def main() -> None:
                 arm_label="both",
                 debug_visuals=debug_visuals,
                 debug_execution_state=debug_execution_state,
+                pure_scene_main=pure_scene_main,
+                use_overlay_debug=use_overlay_debug,
             )
             init_prefix_frames_written_by_executed_arm["left"] = int(init_prefix_written)
             init_prefix_frames_written_by_executed_arm["right"] = int(init_prefix_written)
@@ -3163,6 +3227,8 @@ def main() -> None:
                 use_overlay,
                 debug_visuals,
                 debug_execution_state,
+                pure_scene_main=pure_scene_main,
+                use_overlay_debug=use_overlay_debug,
             )
 
             pregrasp_targets = {
@@ -3202,6 +3268,8 @@ def main() -> None:
                 args=args,
                 debug_visuals=debug_visuals,
                 debug_execution_state=debug_execution_state,
+                pure_scene_main=pure_scene_main,
+                use_overlay_debug=use_overlay_debug,
             )
 
             debug_execution_state.active_frame = int(exec_selected_by_arm["left"][0].source_frame)
@@ -3225,6 +3293,8 @@ def main() -> None:
                 args=args,
                 debug_visuals=debug_visuals,
                 debug_execution_state=debug_execution_state,
+                pure_scene_main=pure_scene_main,
+                use_overlay_debug=use_overlay_debug,
             )
             print(
                 "[stage] keyframe_1 grasp finished "
@@ -3232,91 +3302,138 @@ def main() -> None:
                 f"right_reached={int(bool(grasp_dual['arms'].get('right', {}).get('reached', False)))}"
             )
 
-            renderer.set_grippers(args.close_gripper, args.close_gripper)
-            debug_execution_state.current_stage = "close_gripper"
-            record_frame(
-                renderer,
-                head_writer,
-                third_writer,
-                ["stage=close_gripper", "arm=both"],
-                use_overlay,
-                debug_visuals,
-                debug_execution_state,
-            )
-            pause_after_keyframe1(
-                renderer=renderer,
-                head_writer=head_writer,
-                third_writer=third_writer,
-                use_overlay=use_overlay,
-                args=args,
-                arm_label="both",
-                goal_frame=int(exec_selected_by_arm["left"][0].source_frame),
-                debug_visuals=debug_visuals,
-                debug_execution_state=debug_execution_state,
-            )
-
-            attached_actor_by_arm: Dict[str, Optional[sapien.Entity]] = {}
-            tcp_to_object_by_arm: Dict[str, Optional[np.ndarray]] = {}
-            if not bool(args.replay_objects_during_action):
+            if not bool(pregrasp_dual.get("reached", False)):
+                skip_result = make_skipped_stage_result("pregrasp_not_reached")
                 for arm_name in dual_arms:
-                    obj_name = selected_objects_by_executed_arm[arm_name]
-                    attached_actor_by_arm[arm_name] = object_states[obj_name].actor
-                    tcp_pose = renderer.get_current_tcp_pose(arm_name)
-                    tcp_to_object_by_arm[arm_name] = np.linalg.inv(pose_wxyz_to_matrix(tcp_pose)) @ object_states[obj_name].pose_world_matrix
+                    stages_by_executed_arm[arm_name] = {
+                        "pregrasp": {
+                            "status": str(pregrasp_dual["arms"][arm_name]["status"]),
+                            "attempts": int(pregrasp_dual["attempts"]),
+                            "reached": bool(pregrasp_dual["arms"][arm_name]["reached"]),
+                            "pos_err_m": float(pregrasp_dual["arms"][arm_name]["pos_err_m"]),
+                            "rot_err_deg": float(pregrasp_dual["arms"][arm_name]["rot_err_deg"]),
+                            "attempt_history": pregrasp_dual["attempt_history"],
+                        },
+                        "grasp": make_skipped_stage_result("blocked_by_pregrasp"),
+                        "action": make_skipped_stage_result("blocked_by_pregrasp"),
+                    }
+                print("[stage-abort] dual_sync pregrasp not reached; skipping grasp/close/action")
+            elif not bool(grasp_dual.get("reached", False)):
+                skip_result = make_skipped_stage_result("grasp_not_reached")
+                for arm_name in dual_arms:
+                    stages_by_executed_arm[arm_name] = {
+                        "pregrasp": {
+                            "status": str(pregrasp_dual["arms"][arm_name]["status"]),
+                            "attempts": int(pregrasp_dual["attempts"]),
+                            "reached": bool(pregrasp_dual["arms"][arm_name]["reached"]),
+                            "pos_err_m": float(pregrasp_dual["arms"][arm_name]["pos_err_m"]),
+                            "rot_err_deg": float(pregrasp_dual["arms"][arm_name]["rot_err_deg"]),
+                            "attempt_history": pregrasp_dual["attempt_history"],
+                        },
+                        "grasp": {
+                            "status": str(grasp_dual["arms"][arm_name]["status"]),
+                            "attempts": int(grasp_dual["attempts"]),
+                            "reached": bool(grasp_dual["arms"][arm_name]["reached"]),
+                            "pos_err_m": float(grasp_dual["arms"][arm_name]["pos_err_m"]),
+                            "rot_err_deg": float(grasp_dual["arms"][arm_name]["rot_err_deg"]),
+                            "attempt_history": grasp_dual["attempt_history"],
+                        },
+                        "action": make_skipped_stage_result("blocked_by_grasp"),
+                    }
+                print("[stage-abort] dual_sync grasp not reached; skipping close/action")
+            else:
 
-            debug_execution_state.active_frame = int(exec_selected_by_arm["left"][1].source_frame)
-            debug_execution_state.current_stage = "action"
-            debug_execution_state.target_pose_by_arm = {k: np.asarray(v, dtype=np.float64) for k, v in action_targets.items()}
-            debug_execution_state.goal_label_by_arm = {
-                arm_name: f"keyframe_{int(seq[1].source_frame)}_action" for arm_name, seq in exec_selected_by_arm.items()
-            }
-            set_dual_arm_target_visuals(
-                renderer,
-                action_targets.get("left"),
-                action_targets.get("right"),
-            )
-            action_dual = execute_dual_stage_until_reached(
-                renderer=renderer,
-                target_pose_world_wxyz_by_arm=action_targets,
-                label="action",
-                head_writer=head_writer,
-                third_writer=third_writer,
-                use_overlay=use_overlay,
-                args=args,
-                debug_visuals=debug_visuals,
-                debug_execution_state=debug_execution_state,
-                attached_actor_by_arm=attached_actor_by_arm,
-                tcp_to_object_by_arm=tcp_to_object_by_arm,
-                object_replay=action_object_replay,
-            )
+                renderer.set_grippers(args.close_gripper, args.close_gripper)
+                debug_execution_state.current_stage = "close_gripper"
+                record_frame(
+                    renderer,
+                    head_writer,
+                    third_writer,
+                    ["stage=close_gripper", "arm=both"],
+                    use_overlay,
+                    debug_visuals,
+                    debug_execution_state,
+                    pure_scene_main=pure_scene_main,
+                    use_overlay_debug=use_overlay_debug,
+                )
+                pause_after_keyframe1(
+                    renderer=renderer,
+                    head_writer=head_writer,
+                    third_writer=third_writer,
+                    use_overlay=use_overlay,
+                    args=args,
+                    arm_label="both",
+                    goal_frame=int(exec_selected_by_arm["left"][0].source_frame),
+                    debug_visuals=debug_visuals,
+                    debug_execution_state=debug_execution_state,
+                    pure_scene_main=pure_scene_main,
+                    use_overlay_debug=use_overlay_debug,
+                )
 
-            for arm_name in dual_arms:
-                stages_by_executed_arm[arm_name] = {
-                    "pregrasp": {
-                        "status": str(pregrasp_dual["arms"][arm_name]["status"]),
-                        "attempts": int(pregrasp_dual["attempts"]),
-                        "reached": bool(pregrasp_dual["arms"][arm_name]["reached"]),
-                        "pos_err_m": float(pregrasp_dual["arms"][arm_name]["pos_err_m"]),
-                        "rot_err_deg": float(pregrasp_dual["arms"][arm_name]["rot_err_deg"]),
-                        "attempt_history": pregrasp_dual["attempt_history"],
-                    },
-                    "grasp": {
-                        "status": str(grasp_dual["arms"][arm_name]["status"]),
-                        "attempts": int(grasp_dual["attempts"]),
-                        "reached": bool(grasp_dual["arms"][arm_name]["reached"]),
-                        "pos_err_m": float(grasp_dual["arms"][arm_name]["pos_err_m"]),
-                        "rot_err_deg": float(grasp_dual["arms"][arm_name]["rot_err_deg"]),
-                        "attempt_history": grasp_dual["attempt_history"],
-                    },
-                    "action": {
-                        "status": str(action_dual["arms"][arm_name]["status"]),
-                        "attempts": int(action_dual["attempts"]),
-                        "reached": bool(action_dual["arms"][arm_name]["reached"]),
-                        "pos_err_m": float(action_dual["arms"][arm_name]["pos_err_m"]),
-                        "rot_err_deg": float(action_dual["arms"][arm_name]["rot_err_deg"]),
-                        "attempt_history": action_dual["attempt_history"],
-                    },
+                attached_actor_by_arm: Dict[str, Optional[sapien.Entity]] = {}
+                tcp_to_object_by_arm: Dict[str, Optional[np.ndarray]] = {}
+                if not bool(args.replay_objects_during_action):
+                    for arm_name in dual_arms:
+                        obj_name = selected_objects_by_executed_arm[arm_name]
+                        attached_actor_by_arm[arm_name] = object_states[obj_name].actor
+                        tcp_pose = renderer.get_current_tcp_pose(arm_name)
+                        tcp_to_object_by_arm[arm_name] = np.linalg.inv(pose_wxyz_to_matrix(tcp_pose)) @ object_states[obj_name].pose_world_matrix
+
+                debug_execution_state.active_frame = int(exec_selected_by_arm["left"][1].source_frame)
+                debug_execution_state.current_stage = "action"
+                debug_execution_state.target_pose_by_arm = {k: np.asarray(v, dtype=np.float64) for k, v in action_targets.items()}
+                debug_execution_state.goal_label_by_arm = {
+                    arm_name: f"keyframe_{int(seq[1].source_frame)}_action" for arm_name, seq in exec_selected_by_arm.items()
                 }
+                set_dual_arm_target_visuals(
+                    renderer,
+                    action_targets.get("left"),
+                    action_targets.get("right"),
+                )
+                action_dual = execute_dual_stage_until_reached(
+                    renderer=renderer,
+                    target_pose_world_wxyz_by_arm=action_targets,
+                    label="action",
+                    head_writer=head_writer,
+                    third_writer=third_writer,
+                    use_overlay=use_overlay,
+                    args=args,
+                    debug_visuals=debug_visuals,
+                    debug_execution_state=debug_execution_state,
+                    attached_actor_by_arm=attached_actor_by_arm,
+                    tcp_to_object_by_arm=tcp_to_object_by_arm,
+                    object_replay=action_object_replay,
+                    pure_scene_main=pure_scene_main,
+                    use_overlay_debug=use_overlay_debug,
+                )
+
+                for arm_name in dual_arms:
+                    stages_by_executed_arm[arm_name] = {
+                        "pregrasp": {
+                            "status": str(pregrasp_dual["arms"][arm_name]["status"]),
+                            "attempts": int(pregrasp_dual["attempts"]),
+                            "reached": bool(pregrasp_dual["arms"][arm_name]["reached"]),
+                            "pos_err_m": float(pregrasp_dual["arms"][arm_name]["pos_err_m"]),
+                            "rot_err_deg": float(pregrasp_dual["arms"][arm_name]["rot_err_deg"]),
+                            "attempt_history": pregrasp_dual["attempt_history"],
+                        },
+                        "grasp": {
+                            "status": str(grasp_dual["arms"][arm_name]["status"]),
+                            "attempts": int(grasp_dual["attempts"]),
+                            "reached": bool(grasp_dual["arms"][arm_name]["reached"]),
+                            "pos_err_m": float(grasp_dual["arms"][arm_name]["pos_err_m"]),
+                            "rot_err_deg": float(grasp_dual["arms"][arm_name]["rot_err_deg"]),
+                            "attempt_history": grasp_dual["attempt_history"],
+                        },
+                        "action": {
+                            "status": str(action_dual["arms"][arm_name]["status"]),
+                            "attempts": int(action_dual["attempts"]),
+                            "reached": bool(action_dual["arms"][arm_name]["reached"]),
+                            "pos_err_m": float(action_dual["arms"][arm_name]["pos_err_m"]),
+                            "rot_err_deg": float(action_dual["arms"][arm_name]["rot_err_deg"]),
+                            "attempt_history": action_dual["attempt_history"],
+                        },
+                    }
         else:
             for exec_arm, exec_selected_keyframes in execution_sequences:
                 exec_object_name = exec_selected_keyframes[0].candidate.nearest_object
@@ -3337,6 +3454,8 @@ def main() -> None:
                         arm_label=exec_arm,
                         debug_visuals=debug_visuals,
                         debug_execution_state=debug_execution_state,
+                        pure_scene_main=pure_scene_main,
+                        use_overlay_debug=use_overlay_debug,
                     )
                 )
 
@@ -3386,6 +3505,8 @@ def main() -> None:
                     use_overlay,
                     debug_visuals,
                     debug_execution_state,
+                    pure_scene_main=pure_scene_main,
+                    use_overlay_debug=use_overlay_debug,
                 )
 
                 debug_execution_state.current_stage = "pregrasp"
@@ -3405,7 +3526,18 @@ def main() -> None:
                     debug_visuals=debug_visuals,
                     debug_execution_state=debug_execution_state,
                     supervision_targets=supervision_targets,
+                    pure_scene_main=pure_scene_main,
+                    use_overlay_debug=use_overlay_debug,
                 )
+
+                if not bool(pregrasp_result.get("reached", False)):
+                    print(f"[stage-abort] arm={exec_arm} pregrasp not reached; skipping grasp/close/action")
+                    stages_by_executed_arm[exec_arm] = {
+                        "pregrasp": pregrasp_result,
+                        "grasp": make_skipped_stage_result("blocked_by_pregrasp"),
+                        "action": make_skipped_stage_result("blocked_by_pregrasp"),
+                    }
+                    continue
 
                 debug_execution_state.current_stage = "grasp"
                 debug_execution_state.target_pose_by_arm = {exec_arm: np.asarray(grasp_pose, dtype=np.float64)}
@@ -3424,11 +3556,22 @@ def main() -> None:
                     debug_visuals=debug_visuals,
                     debug_execution_state=debug_execution_state,
                     supervision_targets=supervision_targets,
+                    pure_scene_main=pure_scene_main,
+                    use_overlay_debug=use_overlay_debug,
                 )
                 print(
                     "[stage] keyframe_1 grasp finished "
                     f"arm={exec_arm} reached={int(bool(grasp_result.get('reached', False)))}"
                 )
+
+                if not bool(grasp_result.get("reached", False)):
+                    print(f"[stage-abort] arm={exec_arm} grasp not reached; skipping close/action")
+                    stages_by_executed_arm[exec_arm] = {
+                        "pregrasp": pregrasp_result,
+                        "grasp": grasp_result,
+                        "action": make_skipped_stage_result("blocked_by_grasp"),
+                    }
+                    continue
 
                 set_single_arm_target_visual(renderer, exec_arm, grasp_pose)
                 renderer.set_grippers(args.close_gripper if exec_arm == "left" else None, args.close_gripper if exec_arm == "right" else None)
@@ -3441,6 +3584,8 @@ def main() -> None:
                     use_overlay,
                     debug_visuals,
                     debug_execution_state,
+                    pure_scene_main=pure_scene_main,
+                    use_overlay_debug=use_overlay_debug,
                 )
                 pause_after_keyframe1(
                     renderer=renderer,
@@ -3452,6 +3597,8 @@ def main() -> None:
                     goal_frame=int(exec_selected_keyframes[0].source_frame),
                     debug_visuals=debug_visuals,
                     debug_execution_state=debug_execution_state,
+                    pure_scene_main=pure_scene_main,
+                    use_overlay_debug=use_overlay_debug,
                 )
 
                 attached_actor = None
@@ -3481,6 +3628,8 @@ def main() -> None:
                     debug_visuals=debug_visuals,
                     debug_execution_state=debug_execution_state,
                     object_replay=action_object_replay,
+                    pure_scene_main=pure_scene_main,
+                    use_overlay_debug=use_overlay_debug,
                 )
                 stages_by_executed_arm[exec_arm] = {
                     "pregrasp": pregrasp_result,
@@ -3541,6 +3690,7 @@ def main() -> None:
         "candidate_keep_camera_up": int(args.candidate_keep_camera_up),
         "candidate_camera_top_axis": str(args.candidate_camera_top_axis),
         "candidate_target_local_x_offset_m": float(args.candidate_target_local_x_offset_m),
+        "pure_scene_output": int(args.pure_scene_output),
         "reach_error_pose_source": args.reach_error_pose_source,
         "init_prefix_frames": int(args.init_prefix_frames),
         "execute_both_arms": int(args.execute_both_arms),

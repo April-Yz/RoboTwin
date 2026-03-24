@@ -502,3 +502,29 @@
 - Validation:
   - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_anygrasp_keyframes_r1_batch.py`
   - `git -C /home/zaijia001/ssd/RoboTwin diff --check -- code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_anygrasp_keyframes_r1_batch.py agent-read/CHANGELOG.md agent-read/V1.14_preview_top1_execution_relation.md agent-read/V1.14_preview_top1_execution_relation_ZH.md agent-read/V1.8_command_log.md agent-read/V1.8_command_log_ZH.md code_painting/README_anygrasp_keyframe_planner.md`
+
+- Fixed a stage-transition bug in the AnyGrasp planner execution pipeline.
+- Previously, `execute_stage_until_reached()` could report `reached=False`, but the main flow still advanced into later stages.
+- This affected both legacy and annotated preview-summary modes, but the annotated-keyframe mode exposed it more often because its selected grasp poses are typically harder to realize exactly.
+- New behavior:
+  - if `pregrasp` is not reached, skip `grasp/close_gripper/action`
+  - if `grasp` is not reached, skip `close_gripper/action`
+  - the skipped stages are recorded explicitly in `plan_summary.json`
+- Added a new output switch:
+  - `--pure_scene_output 1`
+- In this mode:
+  - `head_cam_plan.mp4`
+  - `third_cam_plan.mp4`
+  are rendered without overlay text, candidate grippers, or target-axis visuals
+  while debug videos remain available for inspection.
+- Updated:
+  - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - `code_painting/plan_anygrasp_keyframes_r1_batch.py`
+  - `agent-read/V1.14_preview_top1_execution_relation.md`
+  - `agent-read/V1.14_preview_top1_execution_relation_ZH.md`
+  - `agent-read/V1.8_command_log.md`
+  - `agent-read/V1.8_command_log_ZH.md`
+  - `code_painting/README_anygrasp_keyframe_planner.md`
+- Validation:
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_anygrasp_keyframes_r1_batch.py`
+  - `git -C /home/zaijia001/ssd/RoboTwin diff --check -- code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_anygrasp_keyframes_r1_batch.py agent-read/CHANGELOG.md agent-read/V1.14_preview_top1_execution_relation.md agent-read/V1.14_preview_top1_execution_relation_ZH.md agent-read/V1.8_command_log.md agent-read/V1.8_command_log_ZH.md code_painting/README_anygrasp_keyframe_planner.md`

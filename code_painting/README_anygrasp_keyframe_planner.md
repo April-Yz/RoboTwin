@@ -167,6 +167,8 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_r1_b
   - `frame_selection.annotated_keyframes[1]` 作为 `action`
 - 路径保持不变：
   - `init -> pregrasp -> grasp -> close_gripper -> keyframe_2`
+- 如果你想让主输出视频只有真实场景，再加：
+  - `--pure_scene_output 1`
 
 ### 先跑 `id=1` demo
 
