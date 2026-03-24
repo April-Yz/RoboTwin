@@ -371,7 +371,21 @@ batch 根目录下会生成：
 - `--reach_rot_tol_deg`
   - 姿态到位阈值
 - `--max_stage_replans`
-  - 每个阶段最多重规划次数
+  - 旧模式下每个阶段最多重规划次数
+- `--replan_until_reached`
+  - 是否在 `reach=False` 时继续从当前位置重规划
+  - 当前默认 `1`
+- `--replan_until_reached_max_attempts`
+  - 继续重规划的最大次数
+  - 当前默认 `0`
+  - `0` 或负数表示不限次数，直到真正到位
+
+当前推荐行为：
+- 保持 `--replan_until_reached 1`
+- 若你希望同时保留纯净主视频和可视化 debug 视频，使用：
+  - `--pure_scene_output 1`
+  - `--save_debug_preview 1`
+  - `--save_debug_execution_preview 1`
 
 ### 渲染相关
 
