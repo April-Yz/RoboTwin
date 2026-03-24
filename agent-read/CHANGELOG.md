@@ -2,6 +2,22 @@
 
 ## 2026-03-24
 
+- Extended `code_painting/render_anygrasp_ranked_preview.py` with a second frame-selection path:
+  - existing manual mode still supports `--frames 1 22 -10`
+  - new `--frame_selection_mode hand_keyframes_json` reads `hand_keyframes_all.json`
+  - automatic selection now uses `frame 0 + annotated keyframes` for the current `hand_vis_<id>.mp4`
+- Added `--hand_keyframes_json` and frame-selection metadata export to:
+  - `summary.json`
+  - `warnings.json`
+- Updated docs so the downstream relation between:
+  - `annotate_hand_keyframes.py`
+  - `hand_keyframes_all.json`
+  - `render_anygrasp_ranked_preview.py`
+  is explicitly documented.
+- Validation:
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/render_anygrasp_ranked_preview.py`
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python /home/zaijia001/ssd/RoboTwin/code_painting/render_anygrasp_ranked_preview.py --anygrasp_dir /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_batch_results/d_pour_blue_1 --replay_dir /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_d_pour_blue_norobot/d_pour_blue_1 --hand_npz /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis/hand_detections_1.npz --base_image_dir /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_d_pour_blue_norobot/d_pour_blue_1/head_anygrasp_frames --base_image_mode raw --output_dir /tmp/anygrasp_keyframe_json_preview --frame_selection_mode hand_keyframes_json --hand_keyframes_json /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis/hand_keyframes_all.json --top_k 1 --left_target_object cup --right_target_object bottle --draw_grasp_boxes 1`
+
 - Added a headed hand-keyframe annotation utility at:
   - `/home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis/annotate_hand_keyframes.py`
 - Added usage documentation at:

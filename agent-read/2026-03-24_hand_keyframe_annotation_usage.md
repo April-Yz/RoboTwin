@@ -247,6 +247,69 @@ for video_name, video_info in videos.items():
 
 - 当前运行环境如果缺少 `cv2`，脚本会直接提示安装 `opencv-python`。
 
+## 下游集成
+
+这个总 JSON 现在还会被抓取候选预览脚本直接读取：
+
+- [render_anygrasp_ranked_preview.py](/home/zaijia001/ssd/RoboTwin/code_painting/render_anygrasp_ranked_preview.py)
+
+新增了一种自动取帧模式：
+
+- `--frame_selection_mode hand_keyframes_json`
+- `--hand_keyframes_json /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis/hand_keyframes_all.json`
+
+这个模式下，预览脚本会：
+
+1. 从 `anygrasp_dir` 或 `hand_npz` 推断当前视频 id
+2. 到 `hand_keyframes_all.json` 里查找：
+   - `videos["hand_vis_<id>.mp4"]["keyframes"]`
+3. 自动生成请求帧：
+   - 第 `0` 帧
+   - 加上该视频里保存的关键帧
+
+例如：
+
+- `hand_vis_1.mp4 -> keyframes=[15, 27]`
+
+则预览脚本会自动使用：
+
+- `0 15 27`
+
+这套模式和旧的手动模式并存：
+
+- 手动模式仍然支持：
+  - `--frames 1 22 -10`
+- 自动模式则适合“按标注关键帧直接生成三帧最佳候选图”
+
+示例命令：
+
+```bash
+/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python \
+  /home/zaijia001/ssd/RoboTwin/code_painting/render_anygrasp_ranked_preview.py \
+  --anygrasp_dir /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_batch_results/d_pour_blue_1 \
+  --replay_dir /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_d_pour_blue_norobot/d_pour_blue_1 \
+  --hand_npz /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis/hand_detections_1.npz \
+  --base_image_dir /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_d_pour_blue_norobot/d_pour_blue_1/head_anygrasp_frames \
+  --base_image_mode raw \
+  --output_dir /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_direct_preview/d_pour_blue_1_keyframes \
+  --frame_selection_mode hand_keyframes_json \
+  --hand_keyframes_json /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis/hand_keyframes_all.json \
+  --top_k 1 \
+  --left_target_object cup \
+  --right_target_object bottle \
+  --draw_grasp_boxes 1
+```
+
+输出里会额外记录：
+
+- `summary.json -> frame_selection`
+- `warnings.json -> frame_selection`
+
+这样后续批处理时可以追溯这一轮三帧到底是：
+
+- 手动 `--frames`
+- 还是来自 `hand_keyframes_all.json`
+
 ## 验证
 
 本次只做了语法级验证：

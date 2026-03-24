@@ -85,7 +85,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--replay_dir", type=Path, default=None, help="Optional per-video replay dir containing multi_object_world_poses.npz.")
     parser.add_argument("--hand_npz", type=Path, required=True, help="hand_detections_<id>.npz used to distinguish left/right orientation similarity.")
     parser.add_argument("--output_dir", type=Path, required=True, help="Directory to save annotated preview images.")
-    parser.add_argument("--frames", type=int, nargs="+", required=True, help="Source frame ids, e.g. 1 21.")
+    parser.add_argument("--frames", type=int, nargs="+", default=None, help="Manual source frame ids, e.g. 1 22 -10.")
+    parser.add_argument(
+        "--frame_selection_mode",
+        choices=["manual", "hand_keyframes_json"],
+        default="manual",
+        help="Manual frame list, or load frame 0 plus annotated keyframes from hand_keyframes_all.json.",
+    )
+    parser.add_argument(
+        "--hand_keyframes_json",
+        type=Path,
+        default=None,
+        help="Path to hand_keyframes_all.json. Used when --frame_selection_mode hand_keyframes_json.",
+    )
     parser.add_argument("--top_k", type=int, default=20, help="How many candidates to annotate for each arm in each stage.")
     parser.add_argument("--draw_grasp_boxes", type=int, default=1, help="If 1, draw a lightweight grasp wireframe for each displayed candidate.")
     parser.add_argument("--box_thickness", type=int, default=1)
@@ -125,6 +137,89 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--line_height", type=int, default=18)
     parser.add_argument("--panel_width", type=int, default=420)
     return parser.parse_args()
+
+
+def infer_video_id(anygrasp_dir: Path, hand_npz: Path) -> int:
+    patterns = [
+        re.compile(r"d_pour_blue_(\d+)$"),
+        re.compile(r"hand_detections_(\d+)\.npz$"),
+    ]
+    candidates = [str(anygrasp_dir.name), str(hand_npz.name)]
+    for candidate in candidates:
+        for pattern in patterns:
+            match = pattern.search(candidate)
+            if match is not None:
+                return int(match.group(1))
+    raise ValueError(
+        "Could not infer video id from anygrasp_dir or hand_npz. "
+        f"anygrasp_dir={anygrasp_dir} hand_npz={hand_npz}"
+    )
+
+
+def load_hand_keyframe_annotations(hand_keyframes_json: Path) -> Dict[str, object]:
+    with hand_keyframes_json.open("r", encoding="utf-8") as f:
+        data = json.load(f)
+    if isinstance(data, dict) and "videos" in data and isinstance(data["videos"], dict):
+        return data
+    if isinstance(data, dict):
+        # Backward-compatible flat layout documented in the annotation tool.
+        return {"_meta": {"schema_version": 1}, "videos": data}
+    raise ValueError(f"Unsupported hand keyframe annotation format in {hand_keyframes_json}")
+
+
+def deduplicate_int_list(values: Sequence[int]) -> List[int]:
+    seen = set()
+    result: List[int] = []
+    for value in values:
+        key = int(value)
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(key)
+    return result
+
+
+def resolve_requested_frames_from_args(args: argparse.Namespace) -> Tuple[List[int], Dict[str, object], List[Dict[str, object]]]:
+    warnings_log: List[Dict[str, object]] = []
+    if str(args.frame_selection_mode) == "manual":
+        if not args.frames:
+            raise ValueError("--frames is required when --frame_selection_mode manual")
+        requested_frames = [int(v) for v in args.frames]
+        metadata = {
+            "mode": "manual",
+            "requested_frames": [int(v) for v in requested_frames],
+        }
+        return requested_frames, metadata, warnings_log
+
+    if args.hand_keyframes_json is None:
+        raise ValueError("--hand_keyframes_json is required when --frame_selection_mode hand_keyframes_json")
+    hand_keyframes_json = args.hand_keyframes_json.resolve()
+    annotations = load_hand_keyframe_annotations(hand_keyframes_json)
+    video_id = infer_video_id(args.anygrasp_dir, args.hand_npz)
+    video_name = f"hand_vis_{int(video_id)}.mp4"
+    videos = annotations["videos"]
+    if video_name not in videos:
+        raise KeyError(f"{video_name} not found in {hand_keyframes_json}")
+    video_info = videos[video_name]
+    keyframes = [int(v) for v in video_info.get("keyframes", [])]
+    requested_frames = deduplicate_int_list([0] + keyframes)
+    if len(keyframes) == 0:
+        warnings_log.append(
+            {
+                "type": "hand_keyframe_selection_warning",
+                "video_name": str(video_name),
+                "message": f"{video_name} has no annotated keyframes; using only frame 0",
+            }
+        )
+    metadata = {
+        "mode": "hand_keyframes_json",
+        "hand_keyframes_json": str(hand_keyframes_json),
+        "video_id": int(video_id),
+        "video_name": str(video_name),
+        "annotated_keyframes": [int(v) for v in keyframes],
+        "requested_frames": [int(v) for v in requested_frames],
+    }
+    return requested_frames, metadata, warnings_log
 
 
 def load_hand_data(hand_npz: Path) -> Dict[str, np.ndarray]:
@@ -863,6 +958,7 @@ def main() -> None:
     args.anygrasp_dir = args.anygrasp_dir.resolve()
     args.replay_dir = None if args.replay_dir is None else args.replay_dir.resolve()
     args.hand_npz = args.hand_npz.resolve()
+    args.hand_keyframes_json = None if args.hand_keyframes_json is None else args.hand_keyframes_json.resolve()
     args.output_dir = args.output_dir.resolve()
     args.base_image_dir = None if args.base_image_dir is None else args.base_image_dir.resolve()
     args.output_dir.mkdir(parents=True, exist_ok=True)
@@ -873,10 +969,22 @@ def main() -> None:
 
     hand_data = load_hand_data(args.hand_npz)
     available_frames = list_available_grasp_frames(args.anygrasp_dir)
-    resolved_frame_pairs = resolve_requested_frames(args.frames, available_frames)
+    requested_frames, frame_selection_metadata, frame_selection_warnings = resolve_requested_frames_from_args(args)
+    warnings_log: List[Dict[str, object]] = list(frame_selection_warnings)
+    print(
+        "[frame-select] "
+        f"mode={frame_selection_metadata['mode']} "
+        f"requested={frame_selection_metadata['requested_frames']}"
+    )
+    if str(frame_selection_metadata["mode"]) == "hand_keyframes_json":
+        print(
+            "[frame-select] "
+            f"video={frame_selection_metadata['video_name']} "
+            f"annotated_keyframes={frame_selection_metadata['annotated_keyframes']}"
+        )
+    resolved_frame_pairs = resolve_requested_frames(requested_frames, available_frames)
     fixed_camera_pose_world_wxyz: Optional[np.ndarray] = None
     summary = []
-    warnings_log: List[Dict[str, object]] = []
     for requested_frame, frame in resolved_frame_pairs:
         if int(requested_frame) != int(frame):
             print(f"[frame-resolve] requested={int(requested_frame)} resolved={int(frame)}")
@@ -1281,7 +1389,8 @@ def main() -> None:
     with summary_path.open("w", encoding="utf-8") as f:
         json.dump(
             {
-                "requested_frames": [int(v) for v in args.frames],
+                "frame_selection": frame_selection_metadata,
+                "requested_frames": [int(v) for v in requested_frames],
                 "resolved_frames": [{"requested": int(req), "resolved": int(res)} for req, res in resolved_frame_pairs],
                 "frames": summary,
             },
@@ -1292,7 +1401,8 @@ def main() -> None:
     with warnings_path.open("w", encoding="utf-8") as f:
         json.dump(
             {
-                "requested_frames": [int(v) for v in args.frames],
+                "frame_selection": frame_selection_metadata,
+                "requested_frames": [int(v) for v in requested_frames],
                 "resolved_frames": [{"requested": int(req), "resolved": int(res)} for req, res in resolved_frame_pairs],
                 "warnings": warnings_log,
             },
