@@ -30,7 +30,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ids", type=str, nargs="*", default=None, help="Optional subset ids like 1 4 22.")
     parser.add_argument("--keyframes", type=int, nargs=2, default=[1, 22], metavar=("GRASP_FRAME", "ACTION_FRAME"))
     parser.add_argument("--arm", choices=["auto", "left", "right"], default="auto")
-    parser.add_argument("--execute_both_arms", type=int, default=0)
+    parser.add_argument("--execute_both_arms", type=int, default=1)
     parser.add_argument("--planner_backend", choices=["urdfik", "curobo"], default="urdfik")
     parser.add_argument("--urdfik_trajectory_mode", choices=["joint_interp", "cartesian_interp_ik"], default="joint_interp")
     parser.add_argument("--urdfik_cartesian_interp_steps", type=int, default=8)

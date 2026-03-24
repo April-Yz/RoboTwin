@@ -344,11 +344,15 @@ batch 根目录下会生成：
   - 当前推荐 `urdfik`
 - `--arm`
   - `auto` / `left` / `right`
-  - `auto` 会自动在左右手里选更接近人手朝向的一侧
+  - `auto` 默认配合双臂模式使用
 - `--left_target_object`
   - 左手允许抓取的物体名，默认 `cup`
 - `--right_target_object`
   - 右手允许抓取的物体名，默认 `bottle`
+- `--execute_both_arms`
+  - 当前默认 `1`
+  - 当 `--arm auto` 时，默认双臂同步执行
+  - 只有某一只手没有有效关键帧候选时，才自动回退到单臂
 - `--candidate_object_max_distance_m`
   - 候选抓取点到目标物体中心的最大允许距离
 - `--approach_offset_m`

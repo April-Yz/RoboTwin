@@ -162,7 +162,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--reuse_preview_top_rank", type=int, default=1, help="1-based rank to read from the preview summary candidate list when --reuse_preview_summary_json is set.")
     parser.add_argument("--keyframes", type=int, nargs=2, default=[1, 22], metavar=("GRASP_FRAME", "ACTION_FRAME"))
     parser.add_argument("--arm", choices=["auto", "left", "right"], default="auto")
-    parser.add_argument("--execute_both_arms", type=int, default=0, help="If 1 and --arm auto, execute synchronized dual-arm stages and advance only when both arms satisfy reach checks.")
+    parser.add_argument("--execute_both_arms", type=int, default=1, help="If 1 and --arm auto, execute synchronized dual-arm stages and advance only when both arms satisfy reach checks.")
     parser.add_argument("--planner_backend", choices=["urdfik", "curobo"], default="urdfik")
     parser.add_argument(
         "--candidate_selection_mode",
