@@ -2218,6 +2218,30 @@ def pose_error_breakdown(
     }
 
 
+def plan_direction_label(forward_axis_signed_err_m: float, eps_m: float = 1e-4) -> str:
+    signed_err_m = float(forward_axis_signed_err_m)
+    if signed_err_m > float(eps_m):
+        return "move_backward_along_target_forward"
+    if signed_err_m < -float(eps_m):
+        return "move_forward_along_target_forward"
+    return "already_aligned_on_forward_axis"
+
+
+def plan_request_diagnostics(
+    current_eval_pose: np.ndarray,
+    target_eval_pose: np.ndarray,
+) -> Dict[str, object]:
+    current_eval_pose = np.asarray(current_eval_pose, dtype=np.float64).reshape(7)
+    target_eval_pose = np.asarray(target_eval_pose, dtype=np.float64).reshape(7)
+    breakdown = pose_error_breakdown(target_eval_pose, current_eval_pose)
+    return {
+        "current_pose_world_wxyz": current_eval_pose.tolist(),
+        "target_pose_world_wxyz": target_eval_pose.tolist(),
+        "error": breakdown,
+        "theoretical_forward_axis_motion": plan_direction_label(breakdown["forward_axis_signed_err_m"]),
+    }
+
+
 def tcp_pose_errors(target_pose_world_wxyz: np.ndarray, current_pose_world_wxyz: np.ndarray) -> Tuple[float, float]:
     target_pose_world_wxyz = np.asarray(target_pose_world_wxyz, dtype=np.float64).reshape(7)
     current_pose_world_wxyz = np.asarray(current_pose_world_wxyz, dtype=np.float64).reshape(7)
@@ -2416,6 +2440,17 @@ def execute_stage_until_reached(
     while True:
         attempt += 1
         attempts = attempt
+        current_eval_pose_before_plan = get_current_pose_for_error(renderer, arm, args.reach_error_pose_source)
+        target_eval_pose = target_pose_for_error(renderer, arm, target_pose_world_wxyz, args.reach_error_pose_source)
+        pre_plan_diag = plan_request_diagnostics(current_eval_pose_before_plan, target_eval_pose)
+        print(
+            f"[plan-request] stage={label} arm={arm} try={attempt} "
+            f"dx={float(pre_plan_diag['error']['dx_m']):.4f} dy={float(pre_plan_diag['error']['dy_m']):.4f} dz={float(pre_plan_diag['error']['dz_m']):.4f} "
+            f"dist={float(pre_plan_diag['error']['dist_m']):.4f} rot={float(pre_plan_diag['error']['rot_err_deg']):.2f} "
+            f"fwd_rot={float(pre_plan_diag['error']['forward_axis_err_deg']):.2f} "
+            f"fwd_cm={float(pre_plan_diag['error']['forward_axis_signed_err_cm']):+.2f} "
+            f"theory={str(pre_plan_diag['theoretical_forward_axis_motion'])}"
+        )
         plan = renderer.plan_path(arm, target_pose_world_wxyz)
         last_status = execute_single_arm_plan(
             renderer=renderer,
@@ -2439,7 +2474,6 @@ def execute_stage_until_reached(
             use_overlay_debug=use_overlay_debug,
         )
         current_eval_pose = get_current_pose_for_error(renderer, arm, args.reach_error_pose_source)
-        target_eval_pose = target_pose_for_error(renderer, arm, target_pose_world_wxyz, args.reach_error_pose_source)
         stage_error = pose_error_breakdown(target_eval_pose, current_eval_pose)
         last_pos_err = float(stage_error["dist_m"])
         last_rot_err = float(stage_error["rot_err_deg"])
@@ -2452,6 +2486,7 @@ def execute_stage_until_reached(
         attempt_history.append(
             {
                 "attempt": attempt,
+                "pre_plan": pre_plan_diag,
                 "status": last_status,
                 "target_error": stage_error,
                 "pos_err_m": last_pos_err,
@@ -2636,6 +2671,30 @@ def execute_dual_stage_until_reached(
     attempt = 0
     while True:
         attempt += 1
+        pre_plan_by_arm: Dict[str, Dict[str, object]] = {}
+        for arm in arms:
+            current_eval_pose_before_plan = get_current_pose_for_error(renderer, arm, args.reach_error_pose_source)
+            target_eval_pose = target_pose_for_error(renderer, arm, target_pose_world_wxyz_by_arm[arm], args.reach_error_pose_source)
+            pre_plan_diag = plan_request_diagnostics(current_eval_pose_before_plan, target_eval_pose)
+            pre_plan_by_arm[arm] = pre_plan_diag
+        print(
+            f"[plan-request] stage={label} try={attempt} "
+            + " ".join(
+                [
+                    (
+                        f"{arm}:dx={float(pre_plan_by_arm[arm]['error']['dx_m']):.4f},"
+                        f"dy={float(pre_plan_by_arm[arm]['error']['dy_m']):.4f},"
+                        f"dz={float(pre_plan_by_arm[arm]['error']['dz_m']):.4f},"
+                        f"dist={float(pre_plan_by_arm[arm]['error']['dist_m']):.4f},"
+                        f"rot={float(pre_plan_by_arm[arm]['error']['rot_err_deg']):.2f},"
+                        f"fwd_rot={float(pre_plan_by_arm[arm]['error']['forward_axis_err_deg']):.2f},"
+                        f"fwd_cm={float(pre_plan_by_arm[arm]['error']['forward_axis_signed_err_cm']):+.2f},"
+                        f"theory={str(pre_plan_by_arm[arm]['theoretical_forward_axis_motion'])}"
+                    )
+                    for arm in arms
+                ]
+            )
+        )
         plans_by_arm: Dict[str, Optional[Dict]] = {
             arm: renderer.plan_path(arm, target_pose_world_wxyz_by_arm[arm]) for arm in arms
         }
@@ -2682,6 +2741,7 @@ def execute_dual_stage_until_reached(
         attempt_history.append(
             {
                 "attempt": attempt,
+                "pre_plan_by_arm": pre_plan_by_arm,
                 "arms": arm_metrics,
                 "reached": bool(stage_reached),
             }
