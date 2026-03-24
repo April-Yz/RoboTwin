@@ -35,11 +35,13 @@ class URDFInverseKinematics:
 
         self.tensor_args = TensorDeviceType()
         self.robot_cfg = RobotConfig.from_basic(self.urdf_file, self.base_link, self.ee_link, self.tensor_args)
+        self.default_rotation_threshold = 0.02
+        self.default_position_threshold = 0.001
         self.ik_config = IKSolverConfig.load_from_robot_config(
             self.robot_cfg,
             None,
-            rotation_threshold=0.05,
-            position_threshold=0.005,
+            rotation_threshold=self.default_rotation_threshold,
+            position_threshold=self.default_position_threshold,
             num_seeds=1,
             self_collision_check=False,
             self_collision_opt=False,
@@ -69,7 +71,6 @@ class URDFInverseKinematics:
         seed_tensor = None
         if current_joints is not None:
             seed_tensor = torch.tensor(current_joints, device=self.tensor_args.device, dtype=torch.float32).view(1, -1)
-
         if seed_tensor is not None:
             result = self.ik_solver.solve_batch(goal, seed_config=seed_tensor)
         else:
@@ -81,18 +82,28 @@ class URDFInverseKinematics:
         is_success = bool(result.success.cpu().numpy().all())
         original_pos_thresh = self.ik_solver.position_threshold
         original_rot_thresh = self.ik_solver.rotation_threshold
+        max_pos_thresh = max(float(original_pos_thresh) * 2.0, 0.002)
+        max_rot_thresh = max(float(original_rot_thresh) * 2.0, 0.04)
 
         while not is_success:
-            self.ik_solver.position_threshold *= 5
-            self.ik_solver.rotation_threshold *= 2
+            self.ik_solver.position_threshold = min(float(self.ik_solver.position_threshold) * 2.0, max_pos_thresh)
+            self.ik_solver.rotation_threshold = min(float(self.ik_solver.rotation_threshold) * 1.5, max_rot_thresh)
             if seed_tensor is not None:
                 result = self.ik_solver.solve_batch(goal, seed_config=seed_tensor)
             else:
                 result = self.ik_solver.solve_batch(goal)
             is_success = bool(result.success.cpu().numpy().all())
-            if self.ik_solver.position_threshold > 0.1:
+            if (
+                float(self.ik_solver.position_threshold) >= max_pos_thresh
+                and float(self.ik_solver.rotation_threshold) >= max_rot_thresh
+            ):
                 pos_err = float(result.position_error.cpu().numpy()[0, 0])
-                print(f"[IK] Failed to converge (ee_link={self.ee_link}, pos_err={pos_err:.4f}m)")
+                print(
+                    "[IK] Failed to converge "
+                    f"(ee_link={self.ee_link}, pos_err={pos_err:.4f}m, "
+                    f"pos_thresh={float(self.ik_solver.position_threshold):.4f}m, "
+                    f"rot_thresh={float(self.ik_solver.rotation_threshold):.4f}rad)"
+                )
                 break
 
         self.ik_solver.position_threshold = original_pos_thresh

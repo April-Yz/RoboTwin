@@ -69,7 +69,9 @@ class HandRetargetR1URDFIKRenderer(ReplayRenderer):
         print(
             "[ik-trajectory] "
             f"mode={self.urdfik_trajectory_mode} "
-            f"cartesian_interp_steps={self.urdfik_cartesian_interp_steps}"
+            f"cartesian_interp_steps={self.urdfik_cartesian_interp_steps} "
+            f"ik_pos_thresh={self.left_ik_solver.default_position_threshold:.4f}m "
+            f"ik_rot_thresh={self.left_ik_solver.default_rotation_threshold:.4f}rad"
         )
         print(
             "[ik-init] "
@@ -93,6 +95,34 @@ class HandRetargetR1URDFIKRenderer(ReplayRenderer):
         target_pose_base = self.world_pose_to_base_pose(target_pose_world)
         target_pose_ee = self.robot._trans_from_gripper_to_endlink(target_pose_base.tolist(), arm_tag=arm)
         return np.asarray(target_pose_ee.p, dtype=np.float64), np.asarray(target_pose_ee.q, dtype=np.float64)
+
+    @staticmethod
+    def _effective_cartesian_interp_steps(
+        start_pose_world: np.ndarray,
+        target_pose_world: np.ndarray,
+        requested_waypoints: int,
+        min_translation_step_m: float,
+        min_rotation_step_rad: float,
+    ) -> int:
+        start_pose_world = np.asarray(start_pose_world, dtype=np.float64).reshape(7)
+        target_pose_world = np.asarray(target_pose_world, dtype=np.float64).reshape(7)
+        requested_waypoints = max(int(requested_waypoints), 2)
+
+        translation_dist = float(np.linalg.norm(target_pose_world[:3] - start_pose_world[:3]))
+        start_rot = R.from_quat(base.quat_wxyz_to_xyzw(base.normalize_quat_wxyz(start_pose_world[3:])))
+        target_rot = R.from_quat(base.quat_wxyz_to_xyzw(base.normalize_quat_wxyz(target_pose_world[3:])))
+        rotation_dist = float((target_rot * start_rot.inv()).magnitude())
+
+        max_steps_from_translation = requested_waypoints
+        if min_translation_step_m > 1e-9 and translation_dist > 1e-9:
+            max_steps_from_translation = max(int(np.ceil(translation_dist / min_translation_step_m)) + 1, 2)
+
+        max_steps_from_rotation = requested_waypoints
+        if min_rotation_step_rad > 1e-9 and rotation_dist > 1e-9:
+            max_steps_from_rotation = max(int(np.ceil(rotation_dist / min_rotation_step_rad)) + 1, 2)
+
+        effective_waypoints = max(2, min(requested_waypoints, max_steps_from_translation, max_steps_from_rotation))
+        return effective_waypoints
 
     @staticmethod
     def _interpolate_tcp_pose_world_series(
@@ -150,15 +180,70 @@ class HandRetargetR1URDFIKRenderer(ReplayRenderer):
             payload["waypoint_count"] = int(waypoint_count)
         return payload
 
+    def _solution_error_to_ee_target(
+        self,
+        arm: str,
+        target_arm: np.ndarray,
+        ee_pos_base: np.ndarray,
+        ee_quat_base: np.ndarray,
+    ) -> Tuple[float, float]:
+        solver = self.left_ik_solver if arm == "left" else self.right_ik_solver
+        full_joints = np.concatenate([np.asarray(self.torso_qpos, dtype=np.float64).reshape(4), target_arm.reshape(6)], dtype=np.float64)
+        fk_pos_base, fk_quat_wxyz_base, _ = solver.forward_kinematics(full_joints)
+        pos_err = float(np.linalg.norm(np.asarray(fk_pos_base, dtype=np.float64).reshape(3) - np.asarray(ee_pos_base, dtype=np.float64).reshape(3)))
+        rot_err = float(base.quat_angle_deg_wxyz(np.asarray(fk_quat_wxyz_base, dtype=np.float64).reshape(4), np.asarray(ee_quat_base, dtype=np.float64).reshape(4)))
+        return pos_err, rot_err
+
+    def _solve_ik_best_candidate(
+        self,
+        arm: str,
+        ee_pos_base: np.ndarray,
+        ee_quat_base: np.ndarray,
+        current_seed: Optional[np.ndarray],
+    ):
+        solver = self.left_ik_solver if arm == "left" else self.right_ik_solver
+        candidates: List[Tuple[str, Optional[np.ndarray]]] = [("seeded", current_seed)]
+        if current_seed is not None:
+            candidates.append(("unseeded", None))
+
+        best_result = None
+        best_mode = None
+        best_score = None
+        for mode, seed in candidates:
+            result = solver.solve_ik(
+                target_position=ee_pos_base,
+                target_orientation_wxyz=ee_quat_base,
+                current_joints=seed,
+            )
+            if result is None:
+                continue
+            solution = result.solution.detach().cpu().numpy().reshape(-1)
+            if solution.shape[0] < 10:
+                continue
+            target_arm = solution[-6:].astype(np.float64)
+            pos_err, rot_err = self._solution_error_to_ee_target(arm, target_arm, ee_pos_base, ee_quat_base)
+            score = (pos_err, rot_err)
+            if best_score is None or score < best_score:
+                best_result = result
+                best_mode = mode
+                best_score = score
+        if best_result is not None and best_mode == "unseeded":
+            print(
+                "[ik-candidate] "
+                f"arm={arm} chosen=unseeded "
+                f"pos_err={best_score[0]:.4f}m rot_err={best_score[1]:.2f}deg"
+            )
+        return best_result
+
     def _plan_path_joint_interp(self, arm: str, target_pose_world: np.ndarray) -> Optional[Dict]:
         current_arm = self._current_arm_joints(arm)
         current_full = np.concatenate([self.torso_qpos, current_arm], dtype=np.float64)
         ee_pos_base, ee_quat_base = self._target_tcp_world_to_ee_base(arm, target_pose_world)
-        solver = self.left_ik_solver if arm == "left" else self.right_ik_solver
-        result = solver.solve_ik(
-            target_position=ee_pos_base,
-            target_orientation_wxyz=ee_quat_base,
-            current_joints=current_full,
+        result = self._solve_ik_best_candidate(
+            arm,
+            ee_pos_base=ee_pos_base,
+            ee_quat_base=ee_quat_base,
+            current_seed=current_full,
         )
         if result is None:
             return self._build_fail_plan(arm, current_arm, target_pose_world, ee_pos_base, ee_quat_base)
@@ -194,22 +279,35 @@ class HandRetargetR1URDFIKRenderer(ReplayRenderer):
         current_arm = self._current_arm_joints(arm)
         current_full = np.concatenate([self.torso_qpos, current_arm], dtype=np.float64)
         current_tcp_world = np.asarray(self.get_current_tcp_pose(arm), dtype=np.float64).reshape(7)
-        tcp_waypoints_world = self._interpolate_tcp_pose_world_series(
+        effective_waypoints = self._effective_cartesian_interp_steps(
             current_tcp_world,
             target_pose_world,
             self.urdfik_cartesian_interp_steps,
+            min_translation_step_m=self.left_ik_solver.default_position_threshold * 3.0,
+            min_rotation_step_rad=self.left_ik_solver.default_rotation_threshold * 1.5,
         )
-        solver = self.left_ik_solver if arm == "left" else self.right_ik_solver
+        if effective_waypoints != self.urdfik_cartesian_interp_steps:
+            print(
+                "[ik-waypoints] "
+                f"arm={arm} requested={self.urdfik_cartesian_interp_steps} "
+                f"effective={effective_waypoints}"
+            )
+        tcp_waypoints_world = self._interpolate_tcp_pose_world_series(
+            current_tcp_world,
+            target_pose_world,
+            effective_waypoints,
+        )
         joint_waypoints: List[np.ndarray] = [current_arm.copy()]
         ee_waypoints_base: List[np.ndarray] = []
         current_seed = current_full.copy()
         for waypoint_index, tcp_waypoint_world in enumerate(tcp_waypoints_world[1:], start=1):
             ee_pos_base, ee_quat_base = self._target_tcp_world_to_ee_base(arm, tcp_waypoint_world)
             ee_waypoints_base.append(np.concatenate([ee_pos_base, ee_quat_base]).astype(np.float64))
-            result = solver.solve_ik(
-                target_position=ee_pos_base,
-                target_orientation_wxyz=ee_quat_base,
-                current_joints=current_seed,
+            result = self._solve_ik_best_candidate(
+                arm,
+                ee_pos_base=ee_pos_base,
+                ee_quat_base=ee_quat_base,
+                current_seed=current_seed,
             )
             if result is None:
                 return self._build_fail_plan(

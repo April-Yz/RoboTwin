@@ -1,0 +1,54 @@
+# CHANGELOG.zh
+
+## 2026-03-25
+
+- 新增 AnyGrasp 执行层关节收敛调试与补偿参数：
+  - `--joint_command_scene_steps`
+  - `--joint_target_wait_steps`
+  - `--joint_target_wait_tol_rad`
+- 修改位置：
+  - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - `code_painting/plan_anygrasp_keyframes_r1_batch.py`
+- 改动目的：
+  - 解决 `plan-request` / `plan-solution` 已经显示规划终点开始回退，但 `attempt` 仍然长期停留在前方偏差的问题。
+  - 让执行阶段在每个 joint waypoint 后推进更多 physics scene step，并在整段轨迹结束后继续等待，直到实际关节更接近最终命令目标再测 reach error。
+- 当前分析结论：
+  - 先前对 `plan_vs_current_fwd_cm` 的语义有过误读。
+  - 正确解释是：在 `plan-solution` 中，`plan_vs_current_fwd_cm > 0` 表示“当前姿态在规划终点前方”，也就是规划终点其实在当前姿态后方。
+  - 因此在较后期的长 try 段里，IK 终点已经开始回退，但执行层没有充分收敛到该终点。
+- 额外文档：
+  - `agent-read/2026-03-25_ik_execution_regression/README.zh.md`
+  - `agent-read/2026-03-25_ik_execution_regression/README.en.md`
+
+- 增加“同目标时跳过 grasp 重执行”的逻辑：
+  - 当 `pregrasp` 和 `grasp` 目标 pose 实际相同（典型情形是 `--approach_offset_m 0.0`）
+  - 不再在到达 `pregrasp` 后，对同一个目标再做一次 `grasp` 重规划和执行
+  - 直接把 `grasp` 视为复用 `pregrasp` 结果，并写入 `grasp_skipped_same_target`
+- 这样做的原因：
+  - 在 `approach_offset_m=0.0` 时，日志显示 `pregrasp` 已可到位
+  - 但随后对同一目标再次进入 `grasp` 会把末端重新拉离正确位置
+- 另外记录：
+  - 本轮曾尝试在 `urdfik.py` 中加入 seeded/unseeded FK 后验评分
+  - 该尝试导致 `pregrasp` 第一轮就出现大幅错误姿态
+  - 已回退，不保留该修改
+
+- 新增对 `cartesian_interp_ik` 的第三轮修正：
+  - 把 `urdfik.py` 默认位置阈值从 `0.005m` 收紧到 `0.001m`
+  - 把默认旋转阈值从 `0.05rad` 收紧到 `0.02rad`
+  - 阈值放宽不再无上限扩大到 `0.1m`，而是限制在小范围内
+  - `render_hand_retarget_r1_npz_urdfik.py` 现在会根据 IK 阈值自动缩减过细的 cartesian waypoint 数
+- 直接原因：
+  - `action` 阶段日志显示目标总位移大约只有几厘米到 9 厘米，但 `--urdfik_cartesian_interp_steps 30` 会把单步平移切到约 `3mm`
+  - 旧的 IK 成功阈值是 `5mm`
+  - 这会让求解器在很多 waypoint 上“几乎不动也算成功”，最终整条路径理论终点仍然离目标很远
+- 结论更新：
+  - 对这个问题，“更多 try”不是主修复手段
+  - “继续加大插值步数”反而可能更差
+  - 需要先保证单个 waypoint 的目标分辨率高于 IK 成功阈值
+
+- 在此基础上又增加了 waypoint 级别的 `seeded/unseeded` 候选比较：
+  - 位置：`code_painting/render_hand_retarget_r1_npz_urdfik.py`
+  - 行为：对同一个 waypoint，同时尝试“使用当前 seed”与“无 seed”两种 IK 解
+  - 再用 FK 后验比较两者对该 waypoint 的 `ee` 目标误差，保留更接近的一支
+- 目的：
+  - 解决在 `action` 阶段中，插值分辨率修正后仍存在的“左手被当前 seed 锁在局部解里”的问题

@@ -66,6 +66,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--approach_offset_m", type=float, default=0.08, help="Pregrasp-only retreat distance. The final grasp target is unchanged; a separate pregrasp pose is generated behind it along the local forward axis.")
     parser.add_argument("--settle_steps", type=int, default=4)
     parser.add_argument("--execute_interp_steps", type=int, default=24)
+    parser.add_argument("--joint_command_scene_steps", type=int, default=2)
+    parser.add_argument("--joint_target_wait_steps", type=int, default=60)
+    parser.add_argument("--joint_target_wait_tol_rad", type=float, default=0.01)
     parser.add_argument("--reach_pos_tol_m", type=float, default=0.03)
     parser.add_argument("--reach_rot_tol_deg", type=float, default=20.0)
     parser.add_argument("--reach_error_pose_source", choices=["tcp", "ee"], default="tcp")
@@ -220,6 +223,12 @@ def build_single_command(args: argparse.Namespace, anygrasp_dir: Path, replay_di
         str(args.settle_steps),
         "--execute_interp_steps",
         str(args.execute_interp_steps),
+        "--joint_command_scene_steps",
+        str(args.joint_command_scene_steps),
+        "--joint_target_wait_steps",
+        str(args.joint_target_wait_steps),
+        "--joint_target_wait_tol_rad",
+        str(args.joint_target_wait_tol_rad),
         "--reach_pos_tol_m",
         str(args.reach_pos_tol_m),
         "--reach_rot_tol_deg",
