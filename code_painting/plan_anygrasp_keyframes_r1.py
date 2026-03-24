@@ -2179,6 +2179,9 @@ def compute_supervision_errors(
             "dz_m": float(breakdown["dz_m"]),
             "pos_err_m": float(breakdown["dist_m"]),
             "rot_err_deg": float(breakdown["rot_err_deg"]),
+            "forward_axis_err_deg": float(breakdown["forward_axis_err_deg"]),
+            "forward_axis_signed_err_m": float(breakdown["forward_axis_signed_err_m"]),
+            "forward_axis_signed_err_cm": float(breakdown["forward_axis_signed_err_cm"]),
         }
     return errors
 
@@ -2192,12 +2195,26 @@ def pose_error_breakdown(
     delta = target_pose_world_wxyz[:3] - current_pose_world_wxyz[:3]
     dist = float(np.linalg.norm(delta))
     rot_err = float(base.quat_angle_deg_wxyz(current_pose_world_wxyz[3:], target_pose_world_wxyz[3:]))
+    target_pose_world_matrix = pose_wxyz_to_matrix(target_pose_world_wxyz)
+    current_pose_world_matrix = pose_wxyz_to_matrix(current_pose_world_wxyz)
+    # The planner and candidate conventions use local +X as the gripper forward axis.
+    target_forward_world = base.orthonormalize_rotation(target_pose_world_matrix[:3, :3])[:, 0]
+    current_forward_world = base.orthonormalize_rotation(current_pose_world_matrix[:3, :3])[:, 0]
+    forward_axis_cos = float(np.clip(np.dot(target_forward_world, current_forward_world), -1.0, 1.0))
+    forward_axis_err_deg = float(np.rad2deg(np.arccos(forward_axis_cos)))
+    # Positive means the actual gripper is ahead of the target along the target forward axis.
+    # Negative means the actual gripper is behind the target along that same axis.
+    actual_minus_target = current_pose_world_wxyz[:3] - target_pose_world_wxyz[:3]
+    forward_axis_signed_err_m = float(np.dot(actual_minus_target, target_forward_world))
     return {
         "dx_m": float(delta[0]),
         "dy_m": float(delta[1]),
         "dz_m": float(delta[2]),
         "dist_m": dist,
         "rot_err_deg": rot_err,
+        "forward_axis_err_deg": forward_axis_err_deg,
+        "forward_axis_signed_err_m": forward_axis_signed_err_m,
+        "forward_axis_signed_err_cm": float(forward_axis_signed_err_m * 100.0),
     }
 
 
@@ -2446,14 +2463,19 @@ def execute_stage_until_reached(
         print(
             f"[attempt] stage={label} arm={arm} try={attempt} status={last_status} "
             f"dx={stage_error['dx_m']:.4f} dy={stage_error['dy_m']:.4f} dz={stage_error['dz_m']:.4f} "
-            f"dist={stage_error['dist_m']:.4f} rot={stage_error['rot_err_deg']:.2f} reached={int(reached)}"
+            f"dist={stage_error['dist_m']:.4f} rot={stage_error['rot_err_deg']:.2f} "
+            f"fwd_rot={stage_error['forward_axis_err_deg']:.2f} "
+            f"fwd_cm={stage_error['forward_axis_signed_err_cm']:+.2f} "
+            f"reached={int(reached)}"
         )
         for supervision_arm, supervision_error in supervision_errors.items():
             print(
                 f"[attempt-supervision] stage={label} exec_arm={arm} supervised_arm={supervision_arm} try={attempt} "
                 f"dx={float(supervision_error.get('dx_m', 0.0)):.4f} dy={float(supervision_error.get('dy_m', 0.0)):.4f} "
                 f"dz={float(supervision_error.get('dz_m', 0.0)):.4f} dist={float(supervision_error.get('pos_err_m', 0.0)):.4f} "
-                f"rot={float(supervision_error.get('rot_err_deg', 0.0)):.2f}"
+                f"rot={float(supervision_error.get('rot_err_deg', 0.0)):.2f} "
+                f"fwd_rot={float(supervision_error.get('forward_axis_err_deg', 0.0)):.2f} "
+                f"fwd_cm={float(supervision_error.get('forward_axis_signed_err_cm', 0.0)):+.2f}"
             )
         record_frame(
             renderer,
@@ -2674,6 +2696,8 @@ def execute_dual_stage_until_reached(
                         f"dz={float(arm_metrics[arm]['target_error']['dz_m']):.4f},"
                         f"dist={float(arm_metrics[arm]['target_error']['dist_m']):.4f},"
                         f"rot={float(arm_metrics[arm]['target_error']['rot_err_deg']):.2f},"
+                        f"fwd_rot={float(arm_metrics[arm]['target_error']['forward_axis_err_deg']):.2f},"
+                        f"fwd_cm={float(arm_metrics[arm]['target_error']['forward_axis_signed_err_cm']):+.2f},"
                         f"reached={int(bool(arm_metrics[arm]['reached']))}"
                     )
                     for arm in arms
