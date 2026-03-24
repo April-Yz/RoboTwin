@@ -116,6 +116,17 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_r1_b
   - `--planner_backend urdfik`
   - `--urdfik_trajectory_mode cartesian_interp_ik`
 
+如果要开有头界面，把下面三项加到命令末尾：
+
+```bash
+--enable_viewer 1 \
+--viewer_frame_delay 0.02 \
+--viewer_wait_at_end 1
+```
+
+关于 preview-top1 路径下的阶段顺序，以及“物体是否附着到夹爪”的关系，见：
+- [V1.14_preview_top1_execution_relation_ZH.md](/home/zaijia001/ssd/RoboTwin/agent-read/V1.14_preview_top1_execution_relation_ZH.md)
+
 ### 先跑 `id=1` demo
 
 ```bash

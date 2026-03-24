@@ -1,5 +1,30 @@
 # CHANGELOG
 
+## 2026-03-24
+
+- Added a headed hand-keyframe annotation utility at:
+  - `/home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis/annotate_hand_keyframes.py`
+- Added usage documentation at:
+  - `agent-read/2026-03-24_hand_keyframe_annotation_usage.md`
+- The annotation JSON is now maintained as a single incrementally updated file:
+  - `/home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis/hand_keyframes_all.json`
+- The JSON schema now uses:
+  - top-level `_meta`
+  - top-level `videos`
+  - per-video `status`
+- The script remains backward compatible with the original flat JSON layout and upgrades it on next save.
+- Key controls documented explicitly:
+  - `n` next video
+  - `p` previous video
+  - `r` replay current video
+  - `left/right` frame stepping
+  - `space` toggle keyframe
+- Updated the headed viewer layout so status text is rendered in a dedicated top banner instead of being drawn on top of the video frame.
+- Validation:
+  - `python3 -m py_compile /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis/annotate_hand_keyframes.py`
+- Runtime note:
+  - interactive viewer not executed in this round because system Python currently lacks `cv2`
+
 ## 2026-03-20
 
 - Added explicit Backend-A trajectory submodes to the AnyGrasp planner:
@@ -396,3 +421,17 @@
 - Validation:
   - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_anygrasp_keyframes_r1_batch.py`
   - `git -C /home/zaijia001/ssd/RoboTwin diff --check -- code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_anygrasp_keyframes_r1_batch.py agent-read/CHANGELOG.md agent-read/V1.8_command_log.md agent-read/V1.8_command_log_ZH.md code_painting/README_anygrasp_keyframe_planner.md`
+
+- Added a dedicated behavior note for the preview-top1 execution path:
+  - `agent-read/V1.14_preview_top1_execution_relation.md`
+  - `agent-read/V1.14_preview_top1_execution_relation_ZH.md`
+- Documented:
+  - headed viewer mode for the preview-summary reuse command
+  - stage order `pregrasp -> grasp -> close_gripper -> action`
+  - the meaning of `pregrasp = keyframe_1 offset by --approach_offset_m`, currently `0.08 m`
+  - object/TCP relation before close and after close, for both:
+    - `replay_objects_during_action 0`
+    - `replay_objects_during_action 1`
+- No execution logic change was needed here because the code path already implemented this behavior; this update records the behavior explicitly for takeover/debugging.
+- Validation:
+  - `git -C /home/zaijia001/ssd/RoboTwin diff --check -- agent-read/CHANGELOG.md agent-read/V1.8_command_log.md agent-read/V1.8_command_log_ZH.md agent-read/V1.14_preview_top1_execution_relation.md agent-read/V1.14_preview_top1_execution_relation_ZH.md code_painting/README_anygrasp_keyframe_planner.md`
