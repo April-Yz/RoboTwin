@@ -480,3 +480,25 @@
   - `code_painting/README_anygrasp_keyframe_planner.md`
 - Validation:
   - `git -C /home/zaijia001/ssd/RoboTwin diff --check -- agent-read/CHANGELOG.md agent-read/V1.14_preview_top1_execution_relation.md agent-read/V1.14_preview_top1_execution_relation_ZH.md code_painting/README_anygrasp_keyframe_planner.md`
+
+- Extended preview-summary reuse with a new execution frame mode:
+  - `--reuse_preview_frame_mode annotated_json_keyframes`
+- The old behavior is preserved as:
+  - `--reuse_preview_frame_mode legacy_1_max22rel`
+- In the new annotated mode:
+  - planner reads `frame_selection.annotated_keyframes` from preview `summary.json`
+  - frame `0` remains preview-only context
+  - execution keyframes become the first two annotated keyframes
+  - stage order stays unchanged:
+    - `init -> pregrasp -> grasp -> close_gripper -> action`
+- Updated:
+  - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - `code_painting/plan_anygrasp_keyframes_r1_batch.py`
+  - `agent-read/V1.14_preview_top1_execution_relation.md`
+  - `agent-read/V1.14_preview_top1_execution_relation_ZH.md`
+  - `agent-read/V1.8_command_log.md`
+  - `agent-read/V1.8_command_log_ZH.md`
+  - `code_painting/README_anygrasp_keyframe_planner.md`
+- Validation:
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_anygrasp_keyframes_r1_batch.py`
+  - `git -C /home/zaijia001/ssd/RoboTwin diff --check -- code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_anygrasp_keyframes_r1_batch.py agent-read/CHANGELOG.md agent-read/V1.14_preview_top1_execution_relation.md agent-read/V1.14_preview_top1_execution_relation_ZH.md agent-read/V1.8_command_log.md agent-read/V1.8_command_log_ZH.md code_painting/README_anygrasp_keyframe_planner.md`

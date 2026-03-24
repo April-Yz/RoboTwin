@@ -134,6 +134,40 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_r1_b
   - viewer 版命令
   - 候选来源、关键帧、平滑、执行模式、物体 replay 等参数说明
 
+### 直接使用 hand keyframes JSON 指定的两个关键帧
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_r1_batch.sh \
+  /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_batch_results \
+  /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_d_pour_blue_norobot \
+  /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis \
+  /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_from_annotated_keyframes \
+  --reuse_preview_summary_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_direct_preview_keyframes_batch \
+  --reuse_preview_frame_mode annotated_json_keyframes \
+  --reuse_preview_candidate_group orientation \
+  --reuse_preview_top_rank 1 \
+  --planner_backend urdfik \
+  --urdfik_trajectory_mode cartesian_interp_ik \
+  --urdfik_cartesian_interp_steps 30 \
+  --approach_offset_m 0.08 \
+  --left_target_object cup \
+  --right_target_object bottle
+```
+
+这条命令的含义：
+
+- preview 输出来自 `anygrasp_direct_preview_keyframes_batch`
+- 每个视频的 `summary.json` 里已经有三帧：
+  - `frame 0`
+  - 标注关键帧1
+  - 标注关键帧2
+- planner 会忽略 `frame 0` 的执行作用，只把它当 preview 上下文
+- 真正执行的两帧改为：
+  - `frame_selection.annotated_keyframes[0]` 作为 `grasp`
+  - `frame_selection.annotated_keyframes[1]` 作为 `action`
+- 路径保持不变：
+  - `init -> pregrasp -> grasp -> close_gripper -> keyframe_2`
+
 ### 先跑 `id=1` demo
 
 ```bash

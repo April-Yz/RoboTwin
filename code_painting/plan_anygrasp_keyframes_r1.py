@@ -157,6 +157,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output_dir", type=Path, required=True, help="Output dir for planned demo video and metadata.")
     parser.add_argument("--reuse_plan_summary_json", type=Path, default=None, help="Optional previous plan_summary.json. If set, skip AnyGrasp candidate recomputation and execute the already selected candidates from that JSON directly.")
     parser.add_argument("--reuse_preview_summary_json", type=Path, default=None, help="Optional previous preview summary.json from render_anygrasp_ranked_preview.py. If set, load top-ranked preview candidates directly instead of recomputing AnyGrasp selection.")
+    parser.add_argument("--reuse_preview_frame_mode", choices=["legacy_1_max22rel", "annotated_json_keyframes"], default="legacy_1_max22rel", help="How to choose execution keyframes when --reuse_preview_summary_json is set. 'legacy_1_max22rel' keeps the old frame-1 + max(frame-22, resolved-relative-frame) rule. 'annotated_json_keyframes' uses the first two annotated keyframes recorded in preview frame_selection metadata and treats frame 0 as preview-only context.")
     parser.add_argument("--reuse_preview_candidate_group", choices=["orientation", "fused"], default="orientation", help="Which preview ranking list to use when --reuse_preview_summary_json is set.")
     parser.add_argument("--reuse_preview_top_rank", type=int, default=1, help="1-based rank to read from the preview summary candidate list when --reuse_preview_summary_json is set.")
     parser.add_argument("--keyframes", type=int, nargs=2, default=[1, 22], metavar=("GRASP_FRAME", "ACTION_FRAME"))
@@ -395,15 +396,33 @@ def load_reused_plan_summary(
 
 def resolve_frames_from_preview_summary(
     preview_summary: Dict[str, object],
+    frame_mode: str,
     requested_keyframes: Sequence[int],
     requested_relative_frame: Optional[int],
-) -> Tuple[List[int], List[Tuple[int, int]], Optional[int]]:
+) -> Tuple[List[int], List[int], List[Tuple[int, int]], Optional[int]]:
     resolved_pairs_raw = preview_summary.get("resolved_frames", [])
     resolved_map: Dict[int, int] = {}
     for item in resolved_pairs_raw:
         if not isinstance(item, dict):
             continue
         resolved_map[int(item["requested"])] = int(item["resolved"])
+
+    if str(frame_mode) == "annotated_json_keyframes":
+        if requested_relative_frame is not None:
+            raise ValueError("--candidate_selection_relative_frame is not used with --reuse_preview_frame_mode annotated_json_keyframes")
+        frame_selection = preview_summary.get("frame_selection", {})
+        annotated_keyframes = [int(v) for v in frame_selection.get("annotated_keyframes", [])]
+        if len(annotated_keyframes) < 2:
+            raise ValueError(
+                "Preview summary does not contain at least two annotated keyframes in frame_selection.annotated_keyframes"
+            )
+        requested_from_preview = annotated_keyframes[:2]
+        resolved_keyframe_pairs = [
+            (int(requested), int(resolved_map.get(int(requested), int(requested))))
+            for requested in requested_from_preview
+        ]
+        keyframes = [int(resolved) for _, resolved in resolved_keyframe_pairs]
+        return requested_from_preview, keyframes, resolved_keyframe_pairs, None
 
     resolved_keyframe_pairs: List[Tuple[int, int]] = []
     for requested in [int(v) for v in requested_keyframes]:
@@ -418,7 +437,7 @@ def resolve_frames_from_preview_summary(
         if len(keyframes) >= 2:
             keyframes[1] = max(int(keyframes[1]), int(resolved_relative_frame))
             resolved_keyframe_pairs[1] = (int(requested_keyframes[1]), int(keyframes[1]))
-    return keyframes, resolved_keyframe_pairs, resolved_relative_frame
+    return [int(v) for v in requested_keyframes], keyframes, resolved_keyframe_pairs, resolved_relative_frame
 
 
 def load_reused_preview_summary(
@@ -429,12 +448,13 @@ def load_reused_preview_summary(
     requested_arm_mode: str,
     requested_keyframes: Sequence[int],
     requested_relative_frame: Optional[int],
-) -> Tuple[ArmSelectionResult, Dict[str, ArmDebugInfo], List[Tuple[str, List[SelectedKeyframe]]], Dict, List[int], List[Tuple[int, int]], Optional[int]]:
+) -> Tuple[ArmSelectionResult, Dict[str, ArmDebugInfo], List[Tuple[str, List[SelectedKeyframe]]], Dict, List[int], List[int], List[Tuple[int, int]], Optional[int]]:
     with path.open("r", encoding="utf-8") as f:
         summary = json.load(f)
 
-    keyframes, resolved_keyframe_pairs, resolved_relative_frame = resolve_frames_from_preview_summary(
+    requested_keyframes_used, keyframes, resolved_keyframe_pairs, resolved_relative_frame = resolve_frames_from_preview_summary(
         preview_summary=summary,
+        frame_mode=str(args.reuse_preview_frame_mode),
         requested_keyframes=requested_keyframes,
         requested_relative_frame=requested_relative_frame,
     )
@@ -545,7 +565,7 @@ def load_reused_preview_summary(
             f"Failed to reuse preview summary candidates from {path}. "
             f"group={args.reuse_preview_candidate_group} rank={args.reuse_preview_top_rank}"
         )
-    return best_selection, arm_debugs, execution_sequences, summary, keyframes, resolved_keyframe_pairs, resolved_relative_frame
+    return best_selection, arm_debugs, execution_sequences, summary, requested_keyframes_used, keyframes, resolved_keyframe_pairs, resolved_relative_frame
 
 
 def build_renderer(args: argparse.Namespace) -> ReplayRenderer:
@@ -2850,11 +2870,13 @@ def main() -> None:
     if args.reuse_preview_summary_json is not None:
         with args.reuse_preview_summary_json.open("r", encoding="utf-8") as f:
             preview_summary_for_resolution = json.load(f)
-        keyframes, resolved_keyframe_pairs, resolved_relative_frame = resolve_frames_from_preview_summary(
+        requested_keyframes_used, keyframes, resolved_keyframe_pairs, resolved_relative_frame = resolve_frames_from_preview_summary(
             preview_summary=preview_summary_for_resolution,
+            frame_mode=str(args.reuse_preview_frame_mode),
             requested_keyframes=requested_keyframes,
             requested_relative_frame=(None if args.candidate_selection_relative_frame is None else int(args.candidate_selection_relative_frame)),
         )
+        requested_keyframes = list(requested_keyframes_used)
         args.resolved_candidate_selection_relative_frame = resolved_relative_frame
     else:
         available_grasp_frames = list_available_grasp_frames(args.anygrasp_dir)
@@ -2893,7 +2915,7 @@ def main() -> None:
     reused_plan_summary: Optional[Dict] = None
     reused_preview_summary: Optional[Dict] = None
     if args.reuse_preview_summary_json is not None:
-        selection_result, arm_debugs, execution_sequences, reused_preview_summary, keyframes, resolved_keyframe_pairs, resolved_relative_frame = load_reused_preview_summary(
+        selection_result, arm_debugs, execution_sequences, reused_preview_summary, requested_keyframes_used, keyframes, resolved_keyframe_pairs, resolved_relative_frame = load_reused_preview_summary(
             renderer=renderer,
             args=args,
             hand_data=hand_data,
@@ -2905,6 +2927,7 @@ def main() -> None:
         if not (bool(args.execute_both_arms) and args.arm == "auto"):
             execution_sequences = [(selection_result.arm, selection_result.selected_keyframes)]
         selected_keyframes = selection_result.selected_keyframes
+        args.requested_keyframes = [int(v) for v in requested_keyframes_used]
         args.resolved_keyframes = list(keyframes)
         args.resolved_keyframe_pairs = [(int(req), int(res)) for req, res in resolved_keyframe_pairs]
         args.resolved_candidate_selection_relative_frame = None if resolved_relative_frame is None else int(resolved_relative_frame)
@@ -2914,6 +2937,7 @@ def main() -> None:
         print(
             "[reuse-preview-summary] "
             f"path={args.reuse_preview_summary_json} "
+            f"frame_mode={args.reuse_preview_frame_mode} "
             f"group={args.reuse_preview_candidate_group} "
             f"rank={int(args.reuse_preview_top_rank)} "
             f"executed_arms={[arm_name for arm_name, _ in execution_sequences]} "
@@ -3489,6 +3513,7 @@ def main() -> None:
         "hand_npz": str(args.hand_npz),
         "reuse_plan_summary_json": None if args.reuse_plan_summary_json is None else str(args.reuse_plan_summary_json),
         "reuse_preview_summary_json": None if args.reuse_preview_summary_json is None else str(args.reuse_preview_summary_json),
+        "reuse_preview_frame_mode": str(args.reuse_preview_frame_mode),
         "reuse_preview_candidate_group": str(args.reuse_preview_candidate_group),
         "reuse_preview_top_rank": int(args.reuse_preview_top_rank),
         "selection_source": (
@@ -3499,6 +3524,7 @@ def main() -> None:
         "requested_keyframes": [int(v) for v in args.requested_keyframes],
         "resolved_keyframes": [int(v) for v in args.resolved_keyframes],
         "resolved_keyframe_pairs": [{"requested": int(req), "resolved": int(res)} for req, res in args.resolved_keyframe_pairs],
+        "reuse_preview_frame_selection": None if reused_preview_summary is None else reused_preview_summary.get("frame_selection"),
         "keyframes": keyframes,
         "selected_arm": primary_exec_arm,
         "expected_object_for_selected_arm": selection_result.expected_object,

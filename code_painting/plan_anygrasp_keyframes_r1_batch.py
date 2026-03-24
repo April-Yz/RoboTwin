@@ -24,6 +24,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--hand_dir", type=Path, required=True, help="Directory containing hand_detections_<id>.npz files.")
     parser.add_argument("--output_root", type=Path, required=True, help="Root for per-video planned demo outputs.")
     parser.add_argument("--reuse_preview_summary_root", type=Path, default=None, help="Optional root containing per-video preview summary.json files, e.g. anygrasp_direct_preview/d_pour_blue_batch_fi60.")
+    parser.add_argument("--reuse_preview_frame_mode", choices=["legacy_1_max22rel", "annotated_json_keyframes"], default="legacy_1_max22rel")
     parser.add_argument("--reuse_preview_candidate_group", choices=["orientation", "fused"], default="orientation")
     parser.add_argument("--reuse_preview_top_rank", type=int, default=1)
     parser.add_argument("--ids", type=str, nargs="*", default=None, help="Optional subset ids like 1 4 22.")
@@ -145,6 +146,8 @@ def build_single_command(args: argparse.Namespace, anygrasp_dir: Path, replay_di
         "--output_dir",
         str(output_dir.resolve()),
         *(["--reuse_preview_summary_json", str((args.reuse_preview_summary_root / anygrasp_dir.name / "summary.json").resolve())] if args.reuse_preview_summary_root is not None else []),
+        "--reuse_preview_frame_mode",
+        str(args.reuse_preview_frame_mode),
         "--reuse_preview_candidate_group",
         str(args.reuse_preview_candidate_group),
         "--reuse_preview_top_rank",
@@ -370,6 +373,7 @@ def main() -> None:
         "hand_dir": str(args.hand_dir),
         "output_root": str(args.output_root),
         "reuse_preview_summary_root": None if args.reuse_preview_summary_root is None else str(args.reuse_preview_summary_root),
+        "reuse_preview_frame_mode": str(args.reuse_preview_frame_mode),
         "reuse_preview_candidate_group": str(args.reuse_preview_candidate_group),
         "reuse_preview_top_rank": int(args.reuse_preview_top_rank),
         "keyframes": [int(v) for v in args.keyframes],
