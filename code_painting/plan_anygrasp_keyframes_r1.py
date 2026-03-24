@@ -2119,13 +2119,34 @@ def compute_supervision_errors(
     for arm_name, target_pose in supervision_targets.items():
         current_pose = get_current_pose_for_error(renderer, arm_name, pose_source)
         target_eval_pose = target_pose_for_error(renderer, arm_name, target_pose, pose_source)
-        pos_err, rot_err = tcp_pose_errors(target_eval_pose, current_pose)
+        breakdown = pose_error_breakdown(target_eval_pose, current_pose)
         errors[arm_name] = {
             "pose_source": pose_source,
-            "pos_err_m": float(pos_err),
-            "rot_err_deg": float(rot_err),
+            "dx_m": float(breakdown["dx_m"]),
+            "dy_m": float(breakdown["dy_m"]),
+            "dz_m": float(breakdown["dz_m"]),
+            "pos_err_m": float(breakdown["dist_m"]),
+            "rot_err_deg": float(breakdown["rot_err_deg"]),
         }
     return errors
+
+
+def pose_error_breakdown(
+    target_pose_world_wxyz: np.ndarray,
+    current_pose_world_wxyz: np.ndarray,
+) -> Dict[str, float]:
+    target_pose_world_wxyz = np.asarray(target_pose_world_wxyz, dtype=np.float64).reshape(7)
+    current_pose_world_wxyz = np.asarray(current_pose_world_wxyz, dtype=np.float64).reshape(7)
+    delta = target_pose_world_wxyz[:3] - current_pose_world_wxyz[:3]
+    dist = float(np.linalg.norm(delta))
+    rot_err = float(base.quat_angle_deg_wxyz(current_pose_world_wxyz[3:], target_pose_world_wxyz[3:]))
+    return {
+        "dx_m": float(delta[0]),
+        "dy_m": float(delta[1]),
+        "dz_m": float(delta[2]),
+        "dist_m": dist,
+        "rot_err_deg": rot_err,
+    }
 
 
 def tcp_pose_errors(target_pose_world_wxyz: np.ndarray, current_pose_world_wxyz: np.ndarray) -> Tuple[float, float]:
@@ -2350,7 +2371,9 @@ def execute_stage_until_reached(
         )
         current_eval_pose = get_current_pose_for_error(renderer, arm, args.reach_error_pose_source)
         target_eval_pose = target_pose_for_error(renderer, arm, target_pose_world_wxyz, args.reach_error_pose_source)
-        last_pos_err, last_rot_err = tcp_pose_errors(target_eval_pose, current_eval_pose)
+        stage_error = pose_error_breakdown(target_eval_pose, current_eval_pose)
+        last_pos_err = float(stage_error["dist_m"])
+        last_rot_err = float(stage_error["rot_err_deg"])
         reached = (
             last_status == "Success"
             and last_pos_err <= float(args.reach_pos_tol_m)
@@ -2361,12 +2384,25 @@ def execute_stage_until_reached(
             {
                 "attempt": attempt,
                 "status": last_status,
+                "target_error": stage_error,
                 "pos_err_m": last_pos_err,
                 "rot_err_deg": last_rot_err,
                 "reached": bool(reached),
                 "supervision_errors": supervision_errors,
             }
         )
+        print(
+            f"[attempt] stage={label} arm={arm} try={attempt} status={last_status} "
+            f"dx={stage_error['dx_m']:.4f} dy={stage_error['dy_m']:.4f} dz={stage_error['dz_m']:.4f} "
+            f"dist={stage_error['dist_m']:.4f} rot={stage_error['rot_err_deg']:.2f} reached={int(reached)}"
+        )
+        for supervision_arm, supervision_error in supervision_errors.items():
+            print(
+                f"[attempt-supervision] stage={label} exec_arm={arm} supervised_arm={supervision_arm} try={attempt} "
+                f"dx={float(supervision_error.get('dx_m', 0.0)):.4f} dy={float(supervision_error.get('dy_m', 0.0)):.4f} "
+                f"dz={float(supervision_error.get('dz_m', 0.0)):.4f} dist={float(supervision_error.get('pos_err_m', 0.0)):.4f} "
+                f"rot={float(supervision_error.get('rot_err_deg', 0.0)):.2f}"
+            )
         record_frame(
             renderer,
             head_writer,
@@ -2552,7 +2588,9 @@ def execute_dual_stage_until_reached(
         for arm in arms:
             current_eval_pose = get_current_pose_for_error(renderer, arm, args.reach_error_pose_source)
             target_eval_pose = target_pose_for_error(renderer, arm, target_pose_world_wxyz_by_arm[arm], args.reach_error_pose_source)
-            pos_err, rot_err = tcp_pose_errors(target_eval_pose, current_eval_pose)
+            error_breakdown = pose_error_breakdown(target_eval_pose, current_eval_pose)
+            pos_err = float(error_breakdown["dist_m"])
+            rot_err = float(error_breakdown["rot_err_deg"])
             reached = (
                 statuses.get(arm, "Missing") == "Success"
                 and pos_err <= float(args.reach_pos_tol_m)
@@ -2560,6 +2598,7 @@ def execute_dual_stage_until_reached(
             )
             arm_metrics[arm] = {
                 "status": statuses.get(arm, "Missing"),
+                "target_error": error_breakdown,
                 "pos_err_m": float(pos_err),
                 "rot_err_deg": float(rot_err),
                 "reached": bool(reached),
@@ -2572,6 +2611,22 @@ def execute_dual_stage_until_reached(
                 "arms": arm_metrics,
                 "reached": bool(stage_reached),
             }
+        )
+        print(
+            f"[attempt] stage={label} try={attempt} "
+            + " ".join(
+                [
+                    (
+                        f"{arm}:dx={float(arm_metrics[arm]['target_error']['dx_m']):.4f},"
+                        f"dy={float(arm_metrics[arm]['target_error']['dy_m']):.4f},"
+                        f"dz={float(arm_metrics[arm]['target_error']['dz_m']):.4f},"
+                        f"dist={float(arm_metrics[arm]['target_error']['dist_m']):.4f},"
+                        f"rot={float(arm_metrics[arm]['target_error']['rot_err_deg']):.2f},"
+                        f"reached={int(bool(arm_metrics[arm]['reached']))}"
+                    )
+                    for arm in arms
+                ]
+            )
         )
 
         overlay_lines = [

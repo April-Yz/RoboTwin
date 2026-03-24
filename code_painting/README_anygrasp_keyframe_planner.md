@@ -372,8 +372,10 @@ batch 根目录下会生成：
   - 每段结束后额外停留几帧，方便看视频
 - `--reach_pos_tol_m`
   - 位置到位阈值
+  - 当前默认 `0.03` 米
 - `--reach_rot_tol_deg`
   - 姿态到位阈值
+  - 当前默认 `20` 度
 - `--max_stage_replans`
   - 旧模式下每个阶段最多重规划次数
 - `--replan_until_reached`
@@ -390,6 +392,14 @@ batch 根目录下会生成：
   - `--pure_scene_output 1`
   - `--save_debug_preview 1`
   - `--save_debug_execution_preview 1`
+
+新的终端日志：
+- 每次 `try` 结束后都会输出当前 target 误差
+- 单臂格式：
+  - `dx dy dz dist rot reached`
+- 双臂格式：
+  - 同一行分别打印 `left` 和 `right` 的 `dx dy dz dist rot reached`
+- 单臂模式下如果存在监督手，还会额外打印 `attempt-supervision`
 
 ### 渲染相关
 
