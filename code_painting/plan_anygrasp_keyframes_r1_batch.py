@@ -383,7 +383,7 @@ def main() -> None:
                         "summary_path": str(summary_path),
                     }
                 )
-                logging.error("Failed %s (execution_failed_in_summary)", video_name)
+                logging.warning("Completed %s with stage failures recorded in summary", video_name)
             else:
                 successes.append(video_name)
         except subprocess.CalledProcessError as exc:
@@ -440,9 +440,8 @@ def main() -> None:
         )
 
     if failures:
-        raise SystemExit(
-            f"Batch planning completed with failures. failed_ids={failed_ids} failed_json={failed_ids_path}"
-        )
+        logging.warning("Batch planning completed with failed_ids=%s failed_json=%s", failed_ids, failed_ids_path)
+        return
     logging.info("Batch planning completed successfully.")
 
 

@@ -1654,6 +1654,28 @@ def execution_failed(stages_by_executed_arm: Dict[str, Dict[str, object]]) -> bo
     return False
 
 
+def collect_failed_stage_records(stages_by_executed_arm: Dict[str, Dict[str, object]]) -> List[Dict[str, object]]:
+    failed_records: List[Dict[str, object]] = []
+    for arm_name, arm_stages in stages_by_executed_arm.items():
+        for stage_name in ("pregrasp", "grasp", "action"):
+            stage_result = arm_stages.get(stage_name)
+            if not isinstance(stage_result, dict):
+                continue
+            if stage_result_failed(stage_result):
+                failed_records.append(
+                    {
+                        "arm": str(arm_name),
+                        "stage": str(stage_name),
+                        "status": str(stage_result.get("status", "Missing")),
+                        "attempts": int(stage_result.get("attempts", 0)),
+                        "reached": bool(stage_result.get("reached", False)),
+                        "pos_err_m": float(stage_result.get("pos_err_m", float("inf"))),
+                        "rot_err_deg": float(stage_result.get("rot_err_deg", float("inf"))),
+                    }
+                )
+    return failed_records
+
+
 def record_frame(
     renderer: ReplayRenderer,
     head_writer: cv2.VideoWriter,
@@ -3892,12 +3914,13 @@ def main() -> None:
         "head_video": str(head_video_path),
         "third_video": str(third_video_path) if third_writer is not None else None,
     }
-    summary["execution_failed"] = bool(execution_failed(stages_by_executed_arm))
+    summary["failed_stage_records"] = collect_failed_stage_records(stages_by_executed_arm)
+    summary["execution_failed"] = bool(summary["failed_stage_records"])
     summary["execution_success"] = not bool(summary["execution_failed"])
     with (args.output_dir / "plan_summary.json").open("w", encoding="utf-8") as f:
         json.dump(summary, f, indent=2)
 
-    status_prefix = "[fail]" if bool(summary["execution_failed"]) else "[done]"
+    status_prefix = "[warn]" if bool(summary["execution_failed"]) else "[done]"
     print(
         f"{status_prefix} "
         f"executed_arms={summary['executed_arms']} primary_arm={primary_exec_arm} object={primary_object_name} "
@@ -3906,8 +3929,6 @@ def main() -> None:
         f"statuses_by_arm={summary['stages_by_executed_arm']} "
         f"head_video={head_video_path}"
     )
-    if bool(summary["execution_failed"]):
-        raise SystemExit(2)
     renderer.hold_viewer()
 
 

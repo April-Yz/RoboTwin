@@ -170,6 +170,7 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_r1_b
 - 如果你想让主输出视频只有真实场景，再加：
   - `--pure_scene_output 1`
 - 如果你想限制每个 stage 最多尝试 20 次，超过后把该视频记为失败，再加：
+- 如果你想限制每个 stage 最多尝试 20 次，超过后继续下一阶段，但把未达标 stage 和最终误差记进 JSON，再加：
   - `--replan_until_reached 1`
   - `--replan_until_reached_max_attempts 20`
   - batch 结束后会在输出根目录写：
@@ -212,7 +213,7 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_r1_b
   --planner_backend urdfik
 ```
 
-### batch 跑所有视频，并把超过 20 次仍未到位的视频记为失败
+### batch 跑所有视频，stage 超过 20 次仍未到位时继续执行并记录失败 id
 
 ```bash
 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_r1_batch.sh \
@@ -246,8 +247,12 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_r1_b
 行为说明：
 - 单个视频里，只要任一执行 arm 的 `pregrasp / grasp / action` 在 20 次内仍未 `reached`
 - 单视频脚本会写出 `plan_summary.json`
-- 并打印 `[fail] ...`
-- 然后以非零退出码返回给 batch
+- 并打印 `[warn] ...`
+- 但不会中断后续 stage，也不会因为这个原因中止单视频进程
+- `plan_summary.json` 会额外记录：
+  - `execution_failed`
+  - `execution_success`
+  - `failed_stage_records`
 - batch 会把失败视频汇总到：
   - `batch_plan_summary.json`
   - `batch_failed_ids.json`
