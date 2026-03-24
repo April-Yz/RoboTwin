@@ -331,7 +331,16 @@ class Robot:
             print("Update world pointcloud wrong!")
 
     def _trans_from_gripper_to_endlink(self, target_pose, arm_tag=None):
-        # Incoming pose is fingertip TCP; shift/orient to wrist endlink frame.
+        # Incoming pose uses the planner "TCP/gripper" convention, i.e. the same reference
+        # returned by get_left/right_tcp_pose() below.
+        #
+        # In the current R1 config gripper_bias == 0.12, so the translational term
+        # (0.12 - gripper_bias) becomes 0. That means the conversion mainly changes the
+        # orientation convention from planner TCP/gripper space to the wrist/endlink IK space.
+        #
+        # If a future robot config changes gripper_bias, this function will also introduce
+        # the corresponding local +X translation between the planner TCP reference point and
+        # the wrist/endlink frame.
         gripper_bias = (self.left_gripper_bias if arm_tag == "left" else self.right_gripper_bias)
         inv_delta_matrix = (self.left_inv_delta_matrix if arm_tag == "left" else self.right_inv_delta_matrix)
         target_pose_arr = np.array(target_pose)
@@ -564,7 +573,9 @@ class Robot:
     def get_right_ee_pose(self):
         return self._trans_endpose(arm_tag="right", is_endpose=False)
 
-    # get gripper centor pose
+    # Return the planner-side TCP/gripper reference point.
+    # This is computed from the wrist/endlink pose by moving along local +X by gripper_bias.
+    # For the current R1 config gripper_bias == 0.12.
     def get_left_tcp_pose(self):
         return self._trans_endpose(arm_tag="left", is_endpose=True)
 
@@ -601,6 +612,7 @@ class Robot:
         endpose_arr[:3, :3] = (t3d.quaternions.quat2mat(ee_pose.q) @ global_trans_matrix @ delta_matrix)
         dis = gripper_bias
         if is_endpose == False:
+            # Wrist/endlink convention used by IK / move_group.
             dis -= 0.12
         endpose_arr[:3, 3] = ee_pose.p + endpose_arr[:3, :3] @ np.array([dis, 0, 0]).T
         res = (endpose_arr[:3, 3].tolist() + t3d.quaternions.mat2quat(endpose_arr[:3, :3]).tolist())

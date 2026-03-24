@@ -2070,8 +2070,11 @@ def get_current_pose_for_error(renderer: ReplayRenderer, arm: str, pose_source: 
     if renderer.robot is None:
         raise RuntimeError("Robot is unavailable.")
     if pose_source == "tcp":
+        # This must match the same planner-side TCP/gripper convention used by
+        # target_pose_for_error(..., pose_source="tcp") and by renderer.plan_path(...).
         return renderer.get_current_tcp_pose(arm)
     if pose_source == "ee":
+        # EE here means the wrist/endlink convention returned by robot.get_*_ee_pose().
         pose = renderer.robot.get_left_ee_pose() if arm == "left" else renderer.robot.get_right_ee_pose()
         return np.asarray(pose, dtype=np.float64)
     raise ValueError(f"Unsupported pose_source: {pose_source}")
@@ -2082,8 +2085,13 @@ def target_pose_for_error(renderer: ReplayRenderer, arm: str, target_tcp_pose_wo
         raise RuntimeError("Robot is unavailable.")
     target_tcp_pose_world_wxyz = np.asarray(target_tcp_pose_world_wxyz, dtype=np.float64).reshape(7)
     if pose_source == "tcp":
+        # Direct comparison in planner TCP/gripper space.
         return target_tcp_pose_world_wxyz
     if pose_source == "ee":
+        # Convert the planner TCP/gripper target into the wrist/endlink convention before
+        # comparing against robot.get_*_ee_pose(). Under the current R1 config,
+        # gripper_bias == 0.12, so this conversion contributes no extra translation and
+        # mainly changes the orientation convention for IK/endlink space.
         target_pose_base = renderer.world_pose_to_base_pose(target_tcp_pose_world_wxyz)
         target_pose_ee_base = renderer.robot._trans_from_gripper_to_endlink(target_pose_base.tolist(), arm_tag=arm)
         base_world = base.pose_to_matrix(renderer._base_pose)
