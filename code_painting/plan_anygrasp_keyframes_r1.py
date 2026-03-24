@@ -1641,6 +1641,19 @@ def stage_attempt_budget(args: argparse.Namespace) -> Optional[int]:
     return max(int(args.max_stage_replans), 1)
 
 
+def stage_result_failed(stage_result: Dict[str, object]) -> bool:
+    return not bool(stage_result.get("reached", False))
+
+
+def execution_failed(stages_by_executed_arm: Dict[str, Dict[str, object]]) -> bool:
+    for arm_stages in stages_by_executed_arm.values():
+        for stage_name in ("pregrasp", "grasp", "action"):
+            stage_result = arm_stages.get(stage_name)
+            if isinstance(stage_result, dict) and stage_result_failed(stage_result):
+                return True
+    return False
+
+
 def record_frame(
     renderer: ReplayRenderer,
     head_writer: cv2.VideoWriter,
@@ -3879,17 +3892,22 @@ def main() -> None:
         "head_video": str(head_video_path),
         "third_video": str(third_video_path) if third_writer is not None else None,
     }
+    summary["execution_failed"] = bool(execution_failed(stages_by_executed_arm))
+    summary["execution_success"] = not bool(summary["execution_failed"])
     with (args.output_dir / "plan_summary.json").open("w", encoding="utf-8") as f:
         json.dump(summary, f, indent=2)
 
+    status_prefix = "[fail]" if bool(summary["execution_failed"]) else "[done]"
     print(
-        "[done] "
+        f"{status_prefix} "
         f"executed_arms={summary['executed_arms']} primary_arm={primary_exec_arm} object={primary_object_name} "
         f"selected_f{primary_exec_selected_keyframes[0].source_frame}=candidate_{primary_exec_selected_keyframes[0].candidate.candidate_idx} "
         f"selected_f{primary_exec_selected_keyframes[1].source_frame}=candidate_{primary_exec_selected_keyframes[1].candidate.candidate_idx} "
         f"statuses_by_arm={summary['stages_by_executed_arm']} "
         f"head_video={head_video_path}"
     )
+    if bool(summary["execution_failed"]):
+        raise SystemExit(2)
     renderer.hold_viewer()
 
 

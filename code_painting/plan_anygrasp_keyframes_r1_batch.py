@@ -292,6 +292,16 @@ def build_single_command(args: argparse.Namespace, anygrasp_dir: Path, replay_di
     return cmd
 
 
+def load_plan_summary(summary_path: Path) -> Optional[dict]:
+    if not summary_path.is_file():
+        return None
+    try:
+        with summary_path.open("r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
     args = parse_args()
@@ -322,7 +332,7 @@ def main() -> None:
         video_name = anygrasp_dir.name
         video_id = trailing_id(video_name)
         if video_id is None:
-            failures.append((video_name, "invalid_video_id"))
+            failures.append({"video_name": video_name, "video_id": None, "reason": "invalid_video_id"})
             logging.error("Skipping %s because trailing id is missing", video_name)
             if not bool(args.continue_on_error):
                 break
@@ -337,13 +347,13 @@ def main() -> None:
             continue
 
         if not replay_dir.is_dir():
-            failures.append((video_name, f"missing_replay_dir:{replay_dir}"))
+            failures.append({"video_name": video_name, "video_id": video_id, "reason": f"missing_replay_dir:{replay_dir}"})
             logging.error("Missing replay dir for %s: %s", video_name, replay_dir)
             if not bool(args.continue_on_error):
                 break
             continue
         if not hand_npz.is_file():
-            failures.append((video_name, f"missing_hand_npz:{hand_npz}"))
+            failures.append({"video_name": video_name, "video_id": video_id, "reason": f"missing_hand_npz:{hand_npz}"})
             logging.error("Missing hand npz for %s: %s", video_name, hand_npz)
             if not bool(args.continue_on_error):
                 break
@@ -351,7 +361,7 @@ def main() -> None:
         if args.reuse_preview_summary_root is not None:
             preview_summary_path = args.reuse_preview_summary_root / video_name / "summary.json"
             if not preview_summary_path.is_file():
-                failures.append((video_name, f"missing_preview_summary:{preview_summary_path}"))
+                failures.append({"video_name": video_name, "video_id": video_id, "reason": f"missing_preview_summary:{preview_summary_path}"})
                 logging.error("Missing preview summary for %s: %s", video_name, preview_summary_path)
                 if not bool(args.continue_on_error):
                     break
@@ -363,13 +373,38 @@ def main() -> None:
         logging.info("Command: %s", " ".join(cmd))
         try:
             subprocess.run(cmd, check=True)
-            successes.append(video_name)
+            plan_summary = load_plan_summary(summary_path)
+            if isinstance(plan_summary, dict) and bool(plan_summary.get("execution_failed", False)):
+                failures.append(
+                    {
+                        "video_name": video_name,
+                        "video_id": video_id,
+                        "reason": "execution_failed_in_summary",
+                        "summary_path": str(summary_path),
+                    }
+                )
+                logging.error("Failed %s (execution_failed_in_summary)", video_name)
+            else:
+                successes.append(video_name)
         except subprocess.CalledProcessError as exc:
-            failures.append((video_name, f"exit_code:{exc.returncode}"))
+            plan_summary = load_plan_summary(summary_path)
+            reason = f"exit_code:{exc.returncode}"
+            if isinstance(plan_summary, dict) and bool(plan_summary.get("execution_failed", False)):
+                reason = "execution_failed"
+            failures.append(
+                {
+                    "video_name": video_name,
+                    "video_id": video_id,
+                    "reason": reason,
+                    "exit_code": int(exc.returncode),
+                    "summary_path": str(summary_path) if summary_path.exists() else None,
+                }
+            )
             logging.error("Failed %s (exit_code=%s)", video_name, exc.returncode)
             if not bool(args.continue_on_error):
                 break
 
+    failed_ids = [item["video_id"] for item in failures if isinstance(item, dict) and item.get("video_id") is not None]
     batch_summary = {
         "anygrasp_root": str(args.anygrasp_root),
         "replay_root": str(args.replay_root),
@@ -387,13 +422,27 @@ def main() -> None:
         "selected_ids": list(args.ids) if args.ids else None,
         "successes": successes,
         "failures": failures,
+        "failed_ids": failed_ids,
     }
     summary_path = args.output_root / "batch_plan_summary.json"
     with summary_path.open("w", encoding="utf-8") as f:
         json.dump(batch_summary, f, indent=2)
+    failed_ids_path = args.output_root / "batch_failed_ids.json"
+    with failed_ids_path.open("w", encoding="utf-8") as f:
+        json.dump(
+            {
+                "output_root": str(args.output_root),
+                "failed_ids": failed_ids,
+                "failures": failures,
+            },
+            f,
+            indent=2,
+        )
 
     if failures:
-        raise SystemExit(f"Batch planning completed with failures: {failures}")
+        raise SystemExit(
+            f"Batch planning completed with failures. failed_ids={failed_ids} failed_json={failed_ids_path}"
+        )
     logging.info("Batch planning completed successfully.")
 
 

@@ -169,6 +169,12 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_r1_b
   - `init -> pregrasp -> grasp -> close_gripper -> keyframe_2`
 - 如果你想让主输出视频只有真实场景，再加：
   - `--pure_scene_output 1`
+- 如果你想限制每个 stage 最多尝试 20 次，超过后把该视频记为失败，再加：
+  - `--replan_until_reached 1`
+  - `--replan_until_reached_max_attempts 20`
+  - batch 结束后会在输出根目录写：
+    - `batch_plan_summary.json`
+    - `batch_failed_ids.json`
 
 ### 先跑 `id=1` demo
 
@@ -205,6 +211,46 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_r1_b
   --lighting_mode front_no_shadow \
   --planner_backend urdfik
 ```
+
+### batch 跑所有视频，并把超过 20 次仍未到位的视频记为失败
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_r1_batch.sh \
+  /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_batch_results \
+  /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_d_pour_blue_norobot \
+  /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis \
+  /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_from_annotated_keyframes \
+  --reuse_preview_summary_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_direct_preview_keyframes_batch \
+  --reuse_preview_frame_mode annotated_json_keyframes \
+  --reuse_preview_candidate_group orientation \
+  --reuse_preview_top_rank 1 \
+  --planner_backend urdfik \
+  --urdfik_trajectory_mode cartesian_interp_ik \
+  --urdfik_cartesian_interp_steps 30 \
+  --approach_offset_m 0.08 \
+  --candidate_target_local_x_offset_m 0.0 \
+  --left_target_object cup \
+  --right_target_object bottle \
+  --arm auto \
+  --execute_both_arms 1 \
+  --replay_objects_during_action 0 \
+  --save_debug_preview 1 \
+  --save_debug_execution_preview 1 \
+  --enable_viewer 1 \
+  --reach_pos_tol_m 0.2 \
+  --reach_rot_tol_deg 20 \
+  --replan_until_reached 1 \
+  --replan_until_reached_max_attempts 20
+```
+
+行为说明：
+- 单个视频里，只要任一执行 arm 的 `pregrasp / grasp / action` 在 20 次内仍未 `reached`
+- 单视频脚本会写出 `plan_summary.json`
+- 并打印 `[fail] ...`
+- 然后以非零退出码返回给 batch
+- batch 会把失败视频汇总到：
+  - `batch_plan_summary.json`
+  - `batch_failed_ids.json`
 
 ### 打开 viewer 调试
 
