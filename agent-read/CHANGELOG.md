@@ -435,3 +435,22 @@
 - No execution logic change was needed here because the code path already implemented this behavior; this update records the behavior explicitly for takeover/debugging.
 - Validation:
   - `git -C /home/zaijia001/ssd/RoboTwin diff --check -- agent-read/CHANGELOG.md agent-read/V1.8_command_log.md agent-read/V1.8_command_log_ZH.md agent-read/V1.14_preview_top1_execution_relation.md agent-read/V1.14_preview_top1_execution_relation_ZH.md code_painting/README_anygrasp_keyframe_planner.md`
+
+- Extended the preview-top1 behavior note with a practical command guide.
+- Added:
+  - a full batch command template
+  - a headed viewer variant
+  - grouped parameter explanations for:
+    - preview summary source
+    - keyframe / relative-frame controls
+    - EE/TCP smoothing
+    - pregrasp offset
+    - arm mode
+    - object replay mode
+    - debug and viewer controls
+- Updated:
+  - `agent-read/V1.14_preview_top1_execution_relation.md`
+  - `agent-read/V1.14_preview_top1_execution_relation_ZH.md`
+  - `code_painting/README_anygrasp_keyframe_planner.md`
+- Validation:
+  - `git -C /home/zaijia001/ssd/RoboTwin diff --check -- agent-read/CHANGELOG.md agent-read/V1.14_preview_top1_execution_relation.md agent-read/V1.14_preview_top1_execution_relation_ZH.md code_painting/README_anygrasp_keyframe_planner.md`

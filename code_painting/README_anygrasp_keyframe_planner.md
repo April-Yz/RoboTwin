@@ -127,6 +127,13 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_r1_b
 关于 preview-top1 路径下的阶段顺序，以及“物体是否附着到夹爪”的关系，见：
 - [V1.14_preview_top1_execution_relation_ZH.md](/home/zaijia001/ssd/RoboTwin/agent-read/V1.14_preview_top1_execution_relation_ZH.md)
 
+完整参数说明也整理在：
+- [V1.14_preview_top1_execution_relation_ZH.md](/home/zaijia001/ssd/RoboTwin/agent-read/V1.14_preview_top1_execution_relation_ZH.md)
+- 里面包含：
+  - 完整执行命令模板
+  - viewer 版命令
+  - 候选来源、关键帧、平滑、执行模式、物体 replay 等参数说明
+
 ### 先跑 `id=1` demo
 
 ```bash
