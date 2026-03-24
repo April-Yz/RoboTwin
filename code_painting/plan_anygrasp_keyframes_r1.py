@@ -201,7 +201,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--candidate_post_rot_xyz_deg", type=float, nargs=3, default=[0.0, 0.0, 0.0])
     parser.add_argument("--candidate_keep_camera_up", type=int, default=0, help="If 1, keep the gripper/camera top side facing upward overall while preserving the original grasp direction. The planner only resolves the redundant roll about the gripper forward axis.")
     parser.add_argument("--candidate_camera_top_axis", choices=["y", "z"], default="z", help="Which local gripper axis should be treated as the camera/top direction when --candidate_keep_camera_up=1.")
-    parser.add_argument("--candidate_target_local_x_offset_m", type=float, default=0.0, help="Additional translation applied to each AnyGrasp world target along the gripper local +X axis before planning/visualization. Use -0.12 if the raw candidate behaves like a wrist/endlink pose and you want a fingertip TCP target.")
+    parser.add_argument("--candidate_target_local_x_offset_m", type=float, default=0.0, help="Additional translation applied to each AnyGrasp world target along the gripper local +X axis before planning/visualization. This is the target-compensation knob for wrist/endlink vs fingertip-TCP mismatch: use a negative value such as -0.12 to move the planner target backward along local +X when the raw candidate behaves like a wrist/endlink pose but planning should use a fingertip TCP target.")
     parser.add_argument("--manual_candidate", type=str, nargs=3, action="append", default=[], metavar=("FRAME", "ARM", "CANDIDATE_IDX"), help="Optional manual candidate override, e.g. --manual_candidate 1 left 5. Partial overrides only reorder debug display; full two-frame overrides for one arm drive selection directly.")
     parser.add_argument("--object_mesh_override", action="append", default=[], help="Repeatable mesh override in the form NAME=/abs/path/to/mesh.obj, e.g. cup=/.../blue_cup.obj")
     parser.add_argument("--robot_config", type=Path, default=R1_CONFIG)
@@ -213,7 +213,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--robot_base_pose", type=float, nargs=7, default=None, metavar=("X", "Y", "Z", "QW", "QX", "QY", "QZ"))
     parser.add_argument("--open_gripper", type=float, default=1.0)
     parser.add_argument("--close_gripper", type=float, default=0.0)
-    parser.add_argument("--approach_offset_m", type=float, default=0.08)
+    parser.add_argument("--approach_offset_m", type=float, default=0.08, help="Pregrasp-only retreat distance. The grasp target itself is unchanged; instead the planner first creates a separate pregrasp pose by moving backward from the grasp pose along the gripper local +X axis (implemented as a retreat opposite to local +X in pose_with_offset_along_local_x).")
     parser.add_argument("--settle_steps", type=int, default=4)
     parser.add_argument("--execute_interp_steps", type=int, default=24)
     parser.add_argument("--reach_pos_tol_m", type=float, default=0.03)
@@ -802,6 +802,10 @@ def rotation_distance_deg(rot_a: np.ndarray, rot_b: np.ndarray) -> float:
 
 
 def shift_pose_along_local_x(pose_world_wxyz: np.ndarray, delta_m: float) -> np.ndarray:
+    # Candidate-target compensation before planning.
+    # This modifies the AnyGrasp target itself and is used to compensate for
+    # fingertip-TCP vs wrist/endlink convention mismatch. For example, a value
+    # of -0.12 moves the planner target backward along the gripper local +X axis.
     pose_world_wxyz = np.asarray(pose_world_wxyz, dtype=np.float64).reshape(7)
     pose_world_matrix = pose_wxyz_to_matrix(pose_world_wxyz)
     pose_world_matrix[:3, 3] += pose_world_matrix[:3, 0] * float(delta_m)
@@ -1790,6 +1794,11 @@ def record_frame(
 
 
 def pose_with_offset_along_local_x(pose_world_wxyz: np.ndarray, offset_m: float) -> np.ndarray:
+    # Pregrasp generation only.
+    # This does NOT change the actual grasp target. It creates a separate
+    # pregrasp pose by retreating backward from the grasp pose along the gripper
+    # local forward axis. In the current convention, retreat is implemented as
+    # subtracting local +X by `offset_m`.
     pose_world_wxyz = np.asarray(pose_world_wxyz, dtype=np.float64).reshape(7)
     pose_world_matrix = pose_wxyz_to_matrix(pose_world_wxyz)
     pose_world_matrix[:3, 3] -= pose_world_matrix[:3, 0] * float(offset_m)
