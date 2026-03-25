@@ -67,13 +67,28 @@ These two transforms solve different problems and must not be mixed together.
 
 ## Wrist Camera Definition
 
-In `RoboTwin2_repainting`, the wrist cameras are also mounted with a local rotation:
+For the current RoboTwin tree, R1 and R1 Pro do **not** share the same wrist local pose:
+
+- `galaxea_sim/robots/r1.py`
+  - extra RPY offset: `[-10 deg, 0, 0]`
+  - base local quaternion: `[0.5, 0.5, -0.5, 0.5]`
+- `galaxea_sim/robots/r1_pro.py`
+  - extra RPY offset: `[-10 deg, 0, -90 deg]`
+  - base local quaternion: `[0.5, 0.5, -0.5, 0.5]`
+
+So when debugging planner wrist videos for R1, the mounted pose should match the R1 definition rather than the R1 Pro definition.
+
+In older notes we treated them as effectively the same. That was sufficient for some viewer checks, but it is not correct for export orientation in the R1 planner path.
+
+## Historical Note
+
+In `RoboTwin2_repainting`, the wrist-camera debugging reference we previously checked was based on the R1 Pro path:
 
 - Source: [RoboTwin2_repainting/galaxea_sim/robots/r1_pro.py](/home/zaijia001/RoboTwin2_repainting/galaxea_sim/robots/r1_pro.py)
 - Base local quaternion: `[0.5, 0.5, -0.5, 0.5]` in `wxyz`
 - Extra RPY offset: `[-10 deg, 0, -90 deg]`
 
-So wrist camera debugging should start from this mounted pose, not from the raw `left_realsense_link` / `right_realsense_link` pose.
+That remains relevant for R1 Pro, but not as the default reference for the R1 planner exporter.
 
 ## Third View Note
 

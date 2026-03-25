@@ -2,6 +2,24 @@
 
 ## 2026-03-25
 
+- Corrected the R1 planner wrist-camera mount definition and removed post-export image rotation:
+  - Files:
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+    - `code_painting/CAMERA_DEBUG_NOTES_R1.md`
+  - Root cause:
+    - the R1 planner path had been using a wrist local pose closer to `galaxea_sim/robots/r1_pro.py`
+    - but `galaxea_sim/robots/r1.py` only includes `rx=-10°` and does not include the extra local `z=-90°`
+    - that is why wrist exports kept needing `90°/180°` image-plane patches and still looked geometrically unnatural
+  - Fix:
+    - override the wrist local quaternion specifically inside `plan_anygrasp_keyframes_r1.py` so the R1 planner matches `galaxea_sim/robots/r1.py`
+    - `rotate_wrist_rgb_for_export(...)` now becomes a pass-through; planner wrist exports no longer rotate the saved image afterward
+    - wrist-writer size returns to the original landscape `(image_width, image_height)`
+  - Impact:
+    - the wrist view now comes from the actual mounted camera pose rather than an export-time image-plane rotation
+    - no change to the global default in `render_hand_retarget_r1_npz.py`, so R1 Pro-related paths are not affected
+  - Validation:
+    - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py`
+
 - Corrected planner wrist-video export orientation again:
   - File:
     - `code_painting/plan_anygrasp_keyframes_r1.py`

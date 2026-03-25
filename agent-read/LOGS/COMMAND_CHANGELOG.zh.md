@@ -1,3 +1,18 @@
+## 2026-03-25 18:55:00 +08
+
+- R1 planner wrist 相机导出语义调整
+  - 行为：
+    - `left_wrist_cam_plan.mp4`
+    - `right_wrist_cam_plan.mp4`
+    - 不再依赖导出后图片旋转修正
+    - 改为在 `plan_anygrasp_keyframes_r1.py` 内使用与 `galaxea_sim/robots/r1.py` 一致的 wrist 本地姿态
+    - 输出尺寸恢复为原始横版 `image_width x image_height`
+  - 相关代码：
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - 说明：
+    - 这是只针对 R1 planner 链路的覆写，不改 `render_hand_retarget_r1_npz.py` 的全局默认值
+    - 目的是让 wrist 视频通过相机真实挂载姿态得到正确视角，而不是靠导出后旋转图片补丁
+
 ## 2026-03-25 18:35:00 +08
 
 - planner wrist 视频导出方向再次微调

@@ -1,3 +1,18 @@
+## 2026-03-25 18:55:00 +08
+
+- R1 planner wrist-camera export semantics updated
+  - Behavior:
+    - `left_wrist_cam_plan.mp4`
+    - `right_wrist_cam_plan.mp4`
+    - no longer depend on post-export image rotation
+    - instead use an R1-specific wrist local pose inside `plan_anygrasp_keyframes_r1.py` that matches `galaxea_sim/robots/r1.py`
+    - output size returns to the original landscape `image_width x image_height`
+  - Related code:
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - Notes:
+    - this override is specific to the R1 planner path and does not change the global default in `render_hand_retarget_r1_npz.py`
+    - the goal is to obtain the correct wrist view from the mounted camera pose itself rather than from an export-time image rotation patch
+
 ## 2026-03-25 18:35:00 +08
 
 - Planner wrist-video export fine-tuned again

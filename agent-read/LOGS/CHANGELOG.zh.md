@@ -2,6 +2,24 @@
 
 ## 2026-03-25
 
+- 修正 R1 planner 的 wrist 相机挂载定义，取消导出后图片旋转：
+  - 文件：
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+    - `code_painting/CAMERA_DEBUG_NOTES_R1.md`
+  - 根因：
+    - 当前 R1 planner 之前沿用了更接近 `galaxea_sim/robots/r1_pro.py` 的 wrist 本地姿态
+    - 但 `galaxea_sim/robots/r1.py` 的 wrist 相机只包含 `rx=-10°`，不包含额外 `z=-90°`
+    - 这就是为什么必须不断对导出图片做 `90°/180°` 补丁，且横宽比例总是不自然
+  - 修复：
+    - 在 `plan_anygrasp_keyframes_r1.py` 内为 R1 planner 单独覆写 wrist 本地四元数，使其与 `galaxea_sim/robots/r1.py` 一致
+    - `rotate_wrist_rgb_for_export(...)` 改为直通，不再对 wrist 图片做导出后旋转
+    - wrist writer 尺寸恢复为原始横版 `(image_width, image_height)`
+  - 影响：
+    - wrist 视角由相机真实挂载姿态决定，而不是导出阶段的图像平面旋转
+    - 不修改 `render_hand_retarget_r1_npz.py` 的全局默认值，避免影响 R1 Pro 相关链路
+  - 验证：
+    - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py`
+
 - 再次修正 planner wrist 视频导出方向：
   - 文件：
     - `code_painting/plan_anygrasp_keyframes_r1.py`
