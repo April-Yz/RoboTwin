@@ -2,6 +2,26 @@
 
 ## 2026-03-25
 
+- 修复 planner 导出的 wrist 视频朝向：
+  - 文件：
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - 问题：
+    - `left_wrist_cam_plan.mp4` / `right_wrist_cam_plan.mp4` 视觉上相当于期望视角逆时针转了 90 度
+  - 排查结论：
+    - 对比 `render_hand_retarget_r1_npz.py` 与 `galaxea_sim/robots/r1_pro.py` 后，R1 与 R1 Pro 的 wrist 相机挂载本地姿态本质一致：
+      - 基础四元数 `[0.5, 0.5, -0.5, 0.5]`
+      - 额外 RPY 偏移 `[-10deg, 0, -90deg]`
+    - 因此这次不改相机挂载定义，而是在 planner wrist 视频写出前做图像平面纠正
+  - 修复：
+    - 新增 `rotate_wrist_rgb_for_export(...)`
+    - 在 `record_frame(...)` 写出 left/right wrist 视频前统一做 `cv2.ROTATE_90_CLOCKWISE`
+    - 先旋转，再叠字/转 BGR，保证 debug 文本方向也正常
+  - 影响：
+    - 不改变相机世界位姿、planner target、候选坐标系转换或 head 视频
+    - 只修正 planner wrist 视频导出方向
+  - 验证：
+    - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py`
+
 - 调整 URDF IK waypoint 可视化，并补充对 stage 收敛参数的分析说明：
   - 文件：
     - `code_painting/plan_anygrasp_keyframes_r1.py`

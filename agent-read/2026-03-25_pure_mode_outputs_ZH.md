@@ -35,6 +35,7 @@
   - 左手 wrist camera 规划视频
 - `right_wrist_cam_plan.mp4`
   - 右手 wrist camera 规划视频
+  - planner 导出前会统一做顺时针 90 度图像旋转修正，以匹配预期观看方向
 - `pose_debug.jsonl`
   - 每帧一行 JSON 的时序状态记录，便于后处理和视频对齐
 - `plan_summary.json`

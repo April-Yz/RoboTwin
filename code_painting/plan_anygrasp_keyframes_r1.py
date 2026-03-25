@@ -2128,11 +2128,13 @@ def record_frame(
         third_writer.write(third_bgr)
     if debug_execution_state is not None and debug_execution_state.left_wrist_writer is not None and getattr(renderer, "_left_wrist_camera_link", None) is not None:
         left_wrist_rgb, _ = renderer.capture_camera(renderer.left_wrist_camera)
+        left_wrist_rgb = rotate_wrist_rgb_for_export(left_wrist_rgb)
         left_wrist_lines = list(overlay_lines) + ["left_wrist"]
         left_wrist_bgr = base.overlay_text(left_wrist_rgb, left_wrist_lines) if use_overlay else cv2.cvtColor(left_wrist_rgb, cv2.COLOR_RGB2BGR)
         debug_execution_state.left_wrist_writer.write(left_wrist_bgr)
     if debug_execution_state is not None and debug_execution_state.right_wrist_writer is not None and getattr(renderer, "_right_wrist_camera_link", None) is not None:
         right_wrist_rgb, _ = renderer.capture_camera(renderer.right_wrist_camera)
+        right_wrist_rgb = rotate_wrist_rgb_for_export(right_wrist_rgb)
         right_wrist_lines = list(overlay_lines) + ["right_wrist"]
         right_wrist_bgr = base.overlay_text(right_wrist_rgb, right_wrist_lines) if use_overlay else cv2.cvtColor(right_wrist_rgb, cv2.COLOR_RGB2BGR)
         debug_execution_state.right_wrist_writer.write(right_wrist_bgr)
@@ -2555,6 +2557,14 @@ def pose_like_to_world_wxyz(pose_like) -> np.ndarray:
     arr = np.asarray(pose_like, dtype=np.float64).reshape(7)
     arr[3:] = base.normalize_quat_wxyz(arr[3:])
     return arr
+
+
+def rotate_wrist_rgb_for_export(rgb: np.ndarray) -> np.ndarray:
+    rgb = np.asarray(rgb)
+    # The mounted wrist camera pose matches the R1 / R1 Pro simulator definition,
+    # but exported planner videos are perceived 90 deg CCW relative to the expected
+    # viewing orientation. Rotate the image plane back before overlay/write.
+    return cv2.rotate(rgb, cv2.ROTATE_90_CLOCKWISE)
 
 
 def get_current_pose_for_error(renderer: ReplayRenderer, arm: str, pose_source: str) -> np.ndarray:

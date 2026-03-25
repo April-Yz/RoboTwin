@@ -11,6 +11,20 @@
     - 参数形式不变，仍然只需追加 `--debug_visualize_ik_waypoints 1`
     - 该参数只影响 viewer/debug 可视化，不改变规划与执行逻辑
 
+## 2026-03-25 17:10:00 +08
+
+- planner wrist 视频导出方向修正
+  - 行为：
+    - `left_wrist_cam_plan.mp4`
+    - `right_wrist_cam_plan.mp4`
+    - 现在在写出前统一顺时针旋转 90 度
+  - 相关代码：
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - 说明：
+    - 该修正不新增命令行参数
+    - 只影响 planner wrist 视频文件的朝向
+    - 不改变相机世界位姿或 planner 坐标系定义
+
 ## 2026-03-25 12:08:00 +08
 
 - 新增参数：`--enable_grasp_action_object_collision 0|1`

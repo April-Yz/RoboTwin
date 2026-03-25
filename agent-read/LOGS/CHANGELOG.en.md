@@ -2,6 +2,26 @@
 
 ## 2026-03-25
 
+- Fixed the orientation of planner-exported wrist videos:
+  - File:
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - Problem:
+    - `left_wrist_cam_plan.mp4` / `right_wrist_cam_plan.mp4` appeared 90 degrees CCW relative to the expected viewing orientation
+  - Investigation result:
+    - after comparing `render_hand_retarget_r1_npz.py` and `galaxea_sim/robots/r1_pro.py`, the R1 and R1 Pro wrist-camera mount poses are effectively the same:
+      - base quaternion `[0.5, 0.5, -0.5, 0.5]`
+      - extra RPY offset `[-10deg, 0, -90deg]`
+    - so this round does not change the mounted camera definition; it corrects the exported image plane instead
+  - Fix:
+    - added `rotate_wrist_rgb_for_export(...)`
+    - apply `cv2.ROTATE_90_CLOCKWISE` before writing left/right wrist videos in `record_frame(...)`
+    - rotation now happens before overlay/BGR conversion so debug text stays upright as well
+  - Impact:
+    - no change to world camera pose, planner targets, candidate coordinate conversion, or head videos
+    - this only corrects planner wrist-video export orientation
+  - Validation:
+    - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py`
+
 - Adjusted URDF-IK waypoint visualization and documented the stage-settling parameters:
   - File:
     - `code_painting/plan_anygrasp_keyframes_r1.py`

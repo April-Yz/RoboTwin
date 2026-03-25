@@ -11,6 +11,20 @@
     - command syntax is unchanged; keep using `--debug_visualize_ik_waypoints 1`
     - this flag only affects viewer/debug visualization and does not change planning or execution logic
 
+## 2026-03-25 17:10:00 +08
+
+- Planner wrist-video orientation correction
+  - Behavior:
+    - `left_wrist_cam_plan.mp4`
+    - `right_wrist_cam_plan.mp4`
+    - are now rotated 90 degrees clockwise before being written
+  - Related code:
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - Notes:
+    - no new CLI parameter was added
+    - this only affects planner wrist-video orientation
+    - it does not change world camera pose or planner coordinate definitions
+
 ## 2026-03-25 12:08:00 +08
 
 - Added flag: `--enable_grasp_action_object_collision 0|1`
