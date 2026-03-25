@@ -435,6 +435,24 @@
 - Validation: `python -m py_compile` and `git diff --check` are run after this round.
 # 2026-03-25
 
+- Further refined the `base_occluder` height semantics:
+  - File:
+    - `code_painting/render_hand_retarget_r1_npz.py`
+  - Cause:
+    - the `base_link` plane position is closer to the visible chassis, but its `z` origin is not the user-intuitive "height above ground" reference
+    - using the full 3D `base_link` pose directly could place the occluder below the floor or at an obviously wrong height
+  - Change:
+    - the occluder now uses a mixed anchor:
+      - `x/y` still follow the `base_link` planar position
+      - `z` is interpreted relative to the renderer root/base world height
+      - orientation keeps only the base yaw instead of inheriting the full 3D link pose
+    - the debug log now also prints:
+      - `anchor_p=...`
+      - `root_z=...`
+    - this makes the `Z` value in `--base_occluder_local_pos X Y Z` behave like a height-above-ground control
+  - Validation:
+    - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/render_hand_retarget_r1_npz.py`
+
 - Fixed the `base_occluder` panel appearing far away from the robot base:
   - File:
     - `code_painting/render_hand_retarget_r1_npz.py`

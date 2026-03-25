@@ -815,14 +815,26 @@ class HandRetargetR1Renderer:
         anchor_pose = self._base_occluder_link.get_pose() if self._base_occluder_link is not None else self._base_pose
         if anchor_pose is None:
             return
-        anchor_rot = R.from_quat(quat_wxyz_to_xyzw(anchor_pose.q)).as_matrix()
-        world_pos = np.asarray(anchor_pose.p, dtype=np.float64) + (anchor_rot @ self.base_occluder_local_pos)
-        self._base_occluder.set_pose(sapien.Pose(world_pos, anchor_pose.q))
+        yaw_source = self._base_pose if self._base_pose is not None else anchor_pose
+        yaw_wxyz = np.asarray(yaw_source.q, dtype=np.float64).reshape(4)
+        yaw_deg = float(R.from_quat(quat_wxyz_to_xyzw(yaw_wxyz)).as_euler("xyz", degrees=True)[2])
+        yaw_only = R.from_euler("z", yaw_deg, degrees=True).as_matrix()
+        offset_xy = yaw_only @ np.array(
+            [float(self.base_occluder_local_pos[0]), float(self.base_occluder_local_pos[1]), 0.0],
+            dtype=np.float64,
+        )
+        world_pos = np.asarray(anchor_pose.p, dtype=np.float64).copy()
+        world_pos[:2] = world_pos[:2] + offset_xy[:2]
+        base_z = float(self._base_pose.p[2]) if self._base_pose is not None else 0.0
+        world_pos[2] = base_z + float(self.base_occluder_local_pos[2])
+        self._base_occluder.set_pose(sapien.Pose(world_pos, yaw_wxyz))
         if not self._base_occluder_summary_printed:
             self._base_occluder_summary_printed = True
             print(
                 "[base-occluder] "
                 f"anchor_link={self._base_occluder_link.get_name() if self._base_occluder_link is not None else 'root_pose'} "
+                f"anchor_p={np.round(np.asarray(anchor_pose.p, dtype=np.float64), 4).tolist()} "
+                f"root_z={base_z:.4f} "
                 f"world_p={np.round(world_pos, 4).tolist()} "
                 f"half_size={np.round(self.base_occluder_half_size, 4).tolist()} "
                 f"color={np.round(self.base_occluder_color, 4).tolist()}"

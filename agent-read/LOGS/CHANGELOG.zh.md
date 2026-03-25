@@ -436,6 +436,24 @@
 - 验证：本轮改动后运行 `python -m py_compile` 与 `git diff --check`。
 # 2026-03-25
 
+- 进一步修正 `base_occluder` 挡板的高度语义：
+  - 文件：
+    - `code_painting/render_hand_retarget_r1_npz.py`
+  - 原因：
+    - `base_link` 的平面位置更接近可见底盘，但其 `z` 原点并不等于用户直觉中的“离地高度参考”
+    - 直接使用 `base_link` 的完整 3D pose 会导致挡板落到地面以下或高度明显异常
+  - 改动：
+    - 挡板现在使用混合锚定：
+      - `x/y` 仍然跟随 `base_link` 的平面位置
+      - `z` 改为相对于 renderer root/base pose 的世界高度解释
+      - 朝向仅保留底座 yaw，不再继承可能干扰高度直觉的完整 3D link 姿态
+    - 调试日志新增：
+      - `anchor_p=...`
+      - `root_z=...`
+    - 这样 `--base_occluder_local_pos X Y Z` 中的 `Z` 可以按“离地高度”理解
+  - 验证：
+    - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/render_hand_retarget_r1_npz.py`
+
 - 修复 `base_occluder` 挡板位置偏离机器人底座的问题：
   - 文件：
     - `code_painting/render_hand_retarget_r1_npz.py`
