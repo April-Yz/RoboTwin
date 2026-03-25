@@ -1,3 +1,18 @@
+## 2026-03-25 18:20:00 +08
+
+- planner wrist 视频导出方向再次修正
+  - 行为：
+    - `left_wrist_cam_plan.mp4`
+    - `right_wrist_cam_plan.mp4`
+    - 不再做 `90°` 旋转，改为导出前统一做 `180°` 旋转
+    - 输出尺寸恢复为横版 `image_width x image_height`
+  - 相关代码：
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - 说明：
+    - 不新增命令行参数
+    - 这次修正基于用户实际导出结果：原方案会把 wrist 视频写成竖版且仍然上下颠倒
+    - 当前方案只修正图像平面方向，不修改相机挂载或规划坐标系
+
 ## 2026-03-25 16:45:00 +08
 
 - `--debug_visualize_ik_waypoints 1`

@@ -2,6 +2,21 @@
 
 ## 2026-03-25
 
+- Corrected planner wrist-video export orientation and frame size:
+  - File:
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - Problem:
+    - the previous round incorrectly treated the wrist videos as needing a `90°` rotation
+    - the exported files became portrait, and the user confirmed the image was still upside down
+  - Fix:
+    - changed `rotate_wrist_rgb_for_export(...)` from `cv2.ROTATE_90_CLOCKWISE` to `cv2.ROTATE_180`
+    - changed planner wrist-writer size back from portrait `(image_height, image_width)` to landscape `(image_width, image_height)`
+  - Current behavior:
+    - `left_wrist_cam_plan.mp4` / `right_wrist_cam_plan.mp4` stay in landscape format
+    - export now applies only an in-plane `180°` correction
+  - Validation:
+    - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py`
+
 - Fixed the orientation of planner-exported wrist videos:
   - File:
     - `code_painting/plan_anygrasp_keyframes_r1.py`

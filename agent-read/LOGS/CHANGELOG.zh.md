@@ -2,6 +2,21 @@
 
 ## 2026-03-25
 
+- 修正 planner wrist 视频导出方向与尺寸：
+  - 文件：
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - 问题：
+    - 上一轮将 wrist 视频误判为需要 `90°` 旋转
+    - 导出结果变成竖屏，并且用户确认画面仍然是上下颠倒
+  - 修复：
+    - `rotate_wrist_rgb_for_export(...)` 由 `cv2.ROTATE_90_CLOCKWISE` 改为 `cv2.ROTATE_180`
+    - planner wrist writer 尺寸由竖屏 `(image_height, image_width)` 改回横屏 `(image_width, image_height)`
+  - 当前行为：
+    - `left_wrist_cam_plan.mp4` / `right_wrist_cam_plan.mp4` 保持横版尺寸
+    - 导出前仅做 `180°` 图像平面旋转校正
+  - 验证：
+    - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py`
+
 - 修复 planner 导出的 wrist 视频朝向：
   - 文件：
     - `code_painting/plan_anygrasp_keyframes_r1.py`

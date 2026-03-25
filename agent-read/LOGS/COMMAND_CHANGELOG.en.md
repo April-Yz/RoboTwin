@@ -1,3 +1,18 @@
+## 2026-03-25 18:20:00 +08
+
+- Planner wrist-video export corrected again
+  - Behavior:
+    - `left_wrist_cam_plan.mp4`
+    - `right_wrist_cam_plan.mp4`
+    - no longer use a `90°` rotation; they now use a uniform `180°` in-plane rotation before export
+    - output size returns to landscape `image_width x image_height`
+  - Related code:
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - Notes:
+    - no new CLI parameter was added
+    - this correction is based on the user's actual exported result: the previous version produced portrait videos that were still upside down
+    - the new fix only changes image-plane export orientation, not the camera mount or planner coordinate conventions
+
 ## 2026-03-25 16:45:00 +08
 
 - `--debug_visualize_ik_waypoints 1`
