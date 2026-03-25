@@ -2240,15 +2240,15 @@ def short_direction_label(label: str) -> str:
     return str(label)
 
 
-    def colorize_forward_cm(value_cm: float) -> str:
-        text = f"{float(value_cm):+.2f}"
-        if not sys.stdout.isatty():
-            return text
+def colorize_forward_cm(value_cm: float) -> str:
+    text = f"{float(value_cm):+.2f}"
+    if not sys.stdout.isatty():
+        return text
     if value_cm > 1e-6:
         return f"\033[1;31m{text}\033[0m"
-        if value_cm < -1e-6:
-            return f"\033[1;36m{text}\033[0m"
-        return f"\033[1;33m{text}\033[0m"
+    if value_cm < -1e-6:
+        return f"\033[1;36m{text}\033[0m"
+    return f"\033[1;33m{text}\033[0m"
 
 
 def short_stage_status(stage_info: Optional[Dict[str, object]]) -> str:

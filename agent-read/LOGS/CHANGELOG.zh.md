@@ -74,3 +74,18 @@
     - `fXX=cYY`
     - `pre/gr/act`
     - `video`
+
+## 2026-03-25 11:51:21 +08
+
+- 修复日志格式化回归：
+  - 文件：
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - 问题：
+    - `colorize_forward_cm()` 在前一轮日志重构后被错误缩进到 `short_direction_label()` 作用域内
+    - 运行双臂 `plan-request` 时触发 `NameError: name 'colorize_forward_cm' is not defined`
+  - 修复：
+    - 将 `colorize_forward_cm()` 恢复为模块级函数
+    - 同时修正其内部 `if/elif` 缩进，保证正值/负值/近零颜色分支正常工作
+  - 验证：
+    - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py`
+    - `git -C /home/zaijia001/ssd/RoboTwin diff --check -- code_painting/plan_anygrasp_keyframes_r1.py`

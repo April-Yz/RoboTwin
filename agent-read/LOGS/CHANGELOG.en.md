@@ -74,3 +74,18 @@
     - `fXX=cYY`
     - `pre/gr/act`
     - `video`
+
+## 2026-03-25 11:51:21 +08
+
+- Fixed a logging-format regression:
+  - File:
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - Problem:
+    - `colorize_forward_cm()` was accidentally indented inside `short_direction_label()` during the previous log refactor
+    - dual-arm `plan-request` logging then crashed with `NameError: name 'colorize_forward_cm' is not defined`
+  - Fix:
+    - restored `colorize_forward_cm()` to module scope
+    - corrected its internal branch indentation so positive/negative/near-zero color cases work again
+  - Validation:
+    - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py`
+    - `git -C /home/zaijia001/ssd/RoboTwin diff --check -- code_painting/plan_anygrasp_keyframes_r1.py`
