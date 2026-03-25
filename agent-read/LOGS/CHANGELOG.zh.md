@@ -180,3 +180,12 @@
   - 验证：
     - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py`
     - `git -C /home/zaijia001/ssd/RoboTwin diff --check -- code_painting/plan_anygrasp_keyframes_r1.py`
+
+- 修复渐进闭合逻辑中的 SAPIEN API 兼容问题：
+  - 问题：
+    - `PhysxArticulationJoint` 在当前环境没有 `get_qpos()`，导致批处理在进入 `close_gripper` 时崩溃
+  - 修复：
+    - 改为从 articulation 的 `entity.get_qpos()` 读取整条 `qpos`
+    - 再按 `active_joints` 和 `joint.get_dof()` 累积偏移，提取夹爪 joint 对应的实际关节值
+  - 代码位置：
+    - `code_painting/plan_anygrasp_keyframes_r1.py:_get_gripper_joint_positions`

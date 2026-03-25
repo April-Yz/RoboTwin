@@ -179,3 +179,12 @@
   - Validation:
     - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py`
     - `git -C /home/zaijia001/ssd/RoboTwin diff --check -- code_painting/plan_anygrasp_keyframes_r1.py`
+
+- Fixed a SAPIEN API compatibility issue in the progressive-close path:
+  - Problem:
+    - `PhysxArticulationJoint` in the current environment does not provide `get_qpos()`, which caused a crash when entering `close_gripper`
+  - Fix:
+    - read the full articulation `qpos` from `entity.get_qpos()`
+    - then recover each gripper joint's actual position by accumulating offsets over `active_joints` with `joint.get_dof()`
+  - Code location:
+    - `code_painting/plan_anygrasp_keyframes_r1.py:_get_gripper_joint_positions`

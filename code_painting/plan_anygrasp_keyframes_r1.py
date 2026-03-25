@@ -1444,10 +1444,22 @@ def _get_gripper_joint_positions(renderer: ReplayRenderer, arm: str) -> np.ndarr
     if renderer.robot is None:
         return np.zeros(0, dtype=np.float64)
     joints = renderer.robot.left_gripper if arm == "left" else renderer.robot.right_gripper
+    entity = renderer.robot.left_entity if arm == "left" else renderer.robot.right_entity
+    active_joints = list(entity.get_active_joints()) if entity is not None else []
+    full_qpos = np.asarray(entity.get_qpos(), dtype=np.float64).reshape(-1) if entity is not None else np.zeros(0, dtype=np.float64)
     positions: List[float] = []
     for joint_info in joints:
-        qpos = np.asarray(joint_info[0].get_qpos(), dtype=np.float64).reshape(-1)
-        positions.append(float(qpos[0]) if qpos.size else 0.0)
+        joint = joint_info[0]
+        qpos_value = 0.0
+        cursor = 0
+        for active_joint in active_joints:
+            dof = int(active_joint.get_dof())
+            if active_joint is joint:
+                if dof > 0 and cursor + dof <= full_qpos.size:
+                    qpos_value = float(full_qpos[cursor])
+                break
+            cursor += max(dof, 0)
+        positions.append(qpos_value)
     return np.asarray(positions, dtype=np.float64)
 
 
