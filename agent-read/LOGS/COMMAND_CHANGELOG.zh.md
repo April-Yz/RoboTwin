@@ -1,3 +1,16 @@
+## 2026-03-25 16:45:00 +08
+
+- `--debug_visualize_ik_waypoints 1`
+  - 可视化增强：
+    - 现在除了中间 TCP waypoint 外，也显示起点和终点 marker
+    - 起点/终点统一使用红色 point+forward-axis marker
+    - 中间 waypoint marker 缩小，便于观察手、目标轴和路径关系
+  - 相关代码：
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - 使用说明：
+    - 参数形式不变，仍然只需追加 `--debug_visualize_ik_waypoints 1`
+    - 该参数只影响 viewer/debug 可视化，不改变规划与执行逻辑
+
 ## 2026-03-25 12:08:00 +08
 
 - 新增参数：`--enable_grasp_action_object_collision 0|1`

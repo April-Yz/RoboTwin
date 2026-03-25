@@ -1647,6 +1647,14 @@ def _get_ik_waypoint_marker_store(renderer: ReplayRenderer) -> Dict[str, List[sa
     return store
 
 
+def _get_ik_waypoint_endpoint_store(renderer: ReplayRenderer) -> Dict[str, List[sapien.Entity]]:
+    store = getattr(renderer, "_ik_waypoint_endpoint_actors", None)
+    if store is None:
+        store = {"left": [], "right": []}
+        setattr(renderer, "_ik_waypoint_endpoint_actors", store)
+    return store
+
+
 def _ensure_ik_waypoint_marker_actors(
     renderer: ReplayRenderer,
     args: argparse.Namespace,
@@ -1655,8 +1663,8 @@ def _ensure_ik_waypoint_marker_actors(
 ) -> List[sapien.Entity]:
     store = _get_ik_waypoint_marker_store(renderer)
     actors = store.setdefault(arm, [])
-    axis_length = max(float(args.debug_target_axis_length) * 0.42, 0.02)
-    thickness = max(float(args.debug_target_axis_thickness) * 0.72, 0.002)
+    axis_length = max(float(args.debug_target_axis_length) * 0.28, 0.015)
+    thickness = max(float(args.debug_target_axis_thickness) * 0.48, 0.0015)
     color = [0.15, 0.75, 1.0] if arm == "left" else [1.0, 0.65, 0.05]
     while len(actors) < count:
         idx = len(actors)
@@ -1672,13 +1680,39 @@ def _ensure_ik_waypoint_marker_actors(
     return actors
 
 
+def _ensure_ik_waypoint_endpoint_actors(
+    renderer: ReplayRenderer,
+    args: argparse.Namespace,
+    arm: str,
+    count: int,
+) -> List[sapien.Entity]:
+    store = _get_ik_waypoint_endpoint_store(renderer)
+    actors = store.setdefault(arm, [])
+    axis_length = max(float(args.debug_target_axis_length) * 0.34, 0.02)
+    thickness = max(float(args.debug_target_axis_thickness) * 0.56, 0.0018)
+    color = [1.0, 0.2, 0.2]
+    while len(actors) < count:
+        idx = len(actors)
+        actors.append(
+            create_forward_marker_actor(
+                renderer.scene,
+                f"debug_ik_waypoint_endpoint_{arm}_{idx}",
+                axis_length=axis_length,
+                thickness=thickness,
+                color=color,
+            )
+        )
+    return actors
+
+
 def clear_ik_waypoint_visuals(renderer: ReplayRenderer) -> None:
-    store = getattr(renderer, "_ik_waypoint_marker_actors", None)
-    if not store:
-        return
-    for actors in store.values():
-        for actor in actors:
-            hide_actor(actor)
+    for attr_name in ("_ik_waypoint_marker_actors", "_ik_waypoint_endpoint_actors"):
+        store = getattr(renderer, attr_name, None)
+        if not store:
+            continue
+        for actors in store.values():
+            for actor in actors:
+                hide_actor(actor)
 
 
 def update_ik_waypoint_visuals(
@@ -1694,11 +1728,14 @@ def update_ik_waypoint_visuals(
         return
 
     store = _get_ik_waypoint_marker_store(renderer)
+    endpoint_store = _get_ik_waypoint_endpoint_store(renderer)
     for arm in ("left", "right"):
         plan = plans_by_arm.get(arm) if arm in plans_by_arm else None
         tcp_waypoints = None if plan is None else plan.get("tcp_waypoints_world")
         if tcp_waypoints is None:
             for actor in store.get(arm, []):
+                hide_actor(actor)
+            for actor in endpoint_store.get(arm, []):
                 hide_actor(actor)
             continue
         waypoint_arr = np.asarray(tcp_waypoints, dtype=np.float64).reshape(-1, 7)
@@ -1707,6 +1744,12 @@ def update_ik_waypoint_visuals(
         for actor, pose_world_wxyz in zip(actors, intermediate):
             actor.set_pose(sapien.Pose(pose_world_wxyz[:3], base.normalize_quat_wxyz(pose_world_wxyz[3:])))
         for actor in actors[int(intermediate.shape[0]):]:
+            hide_actor(actor)
+        endpoint_poses = waypoint_arr[[0, -1]] if waypoint_arr.shape[0] >= 2 else waypoint_arr
+        endpoint_actors = _ensure_ik_waypoint_endpoint_actors(renderer, args, arm, int(endpoint_poses.shape[0]))
+        for actor, pose_world_wxyz in zip(endpoint_actors, endpoint_poses):
+            actor.set_pose(sapien.Pose(pose_world_wxyz[:3], base.normalize_quat_wxyz(pose_world_wxyz[3:])))
+        for actor in endpoint_actors[int(endpoint_poses.shape[0]):]:
             hide_actor(actor)
 
 

@@ -2,6 +2,35 @@
 
 ## 2026-03-25
 
+- 调整 URDF IK waypoint 可视化，并补充对 stage 收敛参数的分析说明：
+  - 文件：
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - 可视化改动：
+    - `--debug_visualize_ik_waypoints 1` 现在除中间 waypoint 外，也会显示起点和终点 marker
+    - 起点与终点统一使用红色 point+forward-axis marker
+    - 中间 waypoint marker 尺寸缩小，避免遮挡 viewer 中的手和目标
+  - 分析说明：
+    - 当前 `init` 仍只执行 `apply_robot_init_pose(...)` 的一次性 joint 命令后短暂 `step_scene(settle_steps)`，不会像 stage 末尾那样再调用 `settle_arms_to_targets(...)` 等待完全收敛
+    - `--settle_steps` 默认值为 `4`，其作用是：
+      - init 后推进少量物理步
+      - 每段 stage 主轨迹发完后，再额外推进若干 physics scene step
+    - `--joint_target_wait_steps` 默认值为 `60`，其作用是：
+      - 在 stage 轨迹结束后，继续逐步等待实际关节逼近最终 joint target
+  - 影响：
+    - 本轮不改变规划或执行逻辑，只改 viewer/debug 呈现
+  - 相关代码位置：
+    - waypoint marker 更新：
+      - `update_ik_waypoint_visuals(...)`
+      - `_ensure_ik_waypoint_marker_actors(...)`
+      - `_ensure_ik_waypoint_endpoint_actors(...)`
+    - init 与 stage 收敛：
+      - `apply_robot_init_pose(...)`
+      - `execute_single_arm_plan(...)`
+      - `execute_dual_arm_plan(...)`
+      - `settle_arms_to_targets(...)`
+  - 验证：
+    - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py`
+
 - 修复 pure 模式 `pose_debug.jsonl` 导出时的 EE pose 类型兼容问题：
   - 文件：
     - `code_painting/plan_anygrasp_keyframes_r1.py`

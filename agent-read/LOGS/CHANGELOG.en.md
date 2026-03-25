@@ -2,6 +2,35 @@
 
 ## 2026-03-25
 
+- Adjusted URDF-IK waypoint visualization and documented the stage-settling parameters:
+  - File:
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - Visualization changes:
+    - with `--debug_visualize_ik_waypoints 1`, the viewer now shows start and goal markers in addition to intermediate waypoints
+    - both start and goal use red point+forward-axis markers
+    - intermediate waypoint markers are now smaller to reduce clutter around the hands and targets
+  - Analysis notes:
+    - `init` still only applies `apply_robot_init_pose(...)` once and advances a short `step_scene(settle_steps)` window; unlike later stages, it does not call `settle_arms_to_targets(...)` to wait for full convergence
+    - `--settle_steps` defaults to `4` and is used to:
+      - advance a few physics steps after init
+      - add a short settle window after each stage trajectory is sent
+    - `--joint_target_wait_steps` defaults to `60` and is used to:
+      - keep stepping physics after the trajectory ends until the measured joints get closer to the final target
+  - Impact:
+    - no planning or execution logic changed in this round; this is a visualization-only update
+  - Relevant code:
+    - waypoint markers:
+      - `update_ik_waypoint_visuals(...)`
+      - `_ensure_ik_waypoint_marker_actors(...)`
+      - `_ensure_ik_waypoint_endpoint_actors(...)`
+    - init / stage settling:
+      - `apply_robot_init_pose(...)`
+      - `execute_single_arm_plan(...)`
+      - `execute_dual_arm_plan(...)`
+      - `settle_arms_to_targets(...)`
+  - Validation:
+    - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py`
+
 - Fixed pure-mode EE-pose serialization compatibility in `pose_debug.jsonl`:
   - File:
     - `code_painting/plan_anygrasp_keyframes_r1.py`

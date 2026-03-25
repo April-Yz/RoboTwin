@@ -1,3 +1,16 @@
+## 2026-03-25 16:45:00 +08
+
+- `--debug_visualize_ik_waypoints 1`
+  - Visualization enhancement:
+    - now shows start and goal markers in addition to intermediate TCP waypoints
+    - both start and goal use red point+forward-axis markers
+    - intermediate waypoint markers are smaller so the hands, target axes, and path are easier to inspect together
+  - Related code:
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - Usage:
+    - command syntax is unchanged; keep using `--debug_visualize_ik_waypoints 1`
+    - this flag only affects viewer/debug visualization and does not change planning or execution logic
+
 ## 2026-03-25 12:08:00 +08
 
 - Added flag: `--enable_grasp_action_object_collision 0|1`
