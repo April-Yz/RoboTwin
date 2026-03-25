@@ -2561,10 +2561,11 @@ def pose_like_to_world_wxyz(pose_like) -> np.ndarray:
 
 def rotate_wrist_rgb_for_export(rgb: np.ndarray) -> np.ndarray:
     rgb = np.asarray(rgb)
-    # The wrist-camera mount is correct, but planner-exported wrist videos appear
-    # upside down relative to the expected landscape view. Rotate in-plane by 180
-    # degrees and keep the original landscape frame size.
-    return cv2.rotate(rgb, cv2.ROTATE_180)
+    # The wrist-camera mount is correct, but planner-exported wrist videos are
+    # perceived as the correct view rotated 90 deg CCW. Rotate the image plane
+    # 90 deg CCW on export so the saved video matches the expected viewing
+    # direction.
+    return cv2.rotate(rgb, cv2.ROTATE_90_COUNTERCLOCKWISE)
 
 
 def get_current_pose_for_error(renderer: ReplayRenderer, arm: str, pose_source: str) -> np.ndarray:
@@ -4060,7 +4061,7 @@ def main() -> None:
     right_wrist_video_path = args.output_dir / "right_wrist_cam_plan.mp4"
     debug_execution_video_path = args.output_dir / "debug_execution_preview.mp4"
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    wrist_export_size = (int(args.image_width), int(args.image_height))
+    wrist_export_size = (int(args.image_height), int(args.image_width))
     head_writer = cv2.VideoWriter(str(head_video_path), fourcc, args.fps, (args.image_width, args.image_height))
     if not head_writer.isOpened():
         raise RuntimeError(f"Failed to open {head_video_path}")

@@ -1,3 +1,17 @@
+## 2026-03-25 18:35:00 +08
+
+- planner wrist 视频导出方向再次微调
+  - 行为：
+    - `left_wrist_cam_plan.mp4`
+    - `right_wrist_cam_plan.mp4`
+    - 改为导出前统一做 `90°` 逆时针旋转
+    - writer 尺寸与旋转后的帧保持一致
+  - 相关代码：
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - 说明：
+    - 该修正基于用户实际结果：上一轮 `180°` 仍然相当于正确视角逆时针转了 `90°`
+    - 不新增命令行参数
+
 ## 2026-03-25 18:20:00 +08
 
 - planner wrist 视频导出方向再次修正

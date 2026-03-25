@@ -2,6 +2,20 @@
 
 ## 2026-03-25
 
+- Corrected planner wrist-video export orientation again:
+  - File:
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - User feedback:
+    - after the previous `180°` correction, the exported result still looked like the correct view rotated 90 degrees CCW
+  - Fix:
+    - changed `rotate_wrist_rgb_for_export(...)` from `cv2.ROTATE_180` to `cv2.ROTATE_90_COUNTERCLOCKWISE`
+    - changed planner wrist-writer size back to the rotated-frame size `(image_height, image_width)`
+  - Current behavior:
+    - `left_wrist_cam_plan.mp4` / `right_wrist_cam_plan.mp4` are exported with a `90°` CCW image-plane rotation
+    - output dimensions match the rotated frames
+  - Validation:
+    - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py`
+
 - Corrected planner wrist-video export orientation and frame size:
   - File:
     - `code_painting/plan_anygrasp_keyframes_r1.py`

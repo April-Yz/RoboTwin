@@ -33,11 +33,11 @@
   - head camera 主规划视频
 - `left_wrist_cam_plan.mp4`
   - 左手 wrist camera 规划视频
-  - planner 导出前会统一做 180 度图像平面旋转修正，以匹配预期观看方向
+  - planner 导出前会统一做 90 度逆时针图像平面旋转修正，以匹配预期观看方向
 - `right_wrist_cam_plan.mp4`
   - 右手 wrist camera 规划视频
-  - planner 导出前会统一做 180 度图像平面旋转修正，以匹配预期观看方向
-  - 当前 wrist 视频保持与原始采集一致的横版尺寸 `640x360`
+  - planner 导出前会统一做 90 度逆时针图像平面旋转修正，以匹配预期观看方向
+  - 当前 wrist 视频尺寸与旋转后的帧保持一致
 - `pose_debug.jsonl`
   - 每帧一行 JSON 的时序状态记录，便于后处理和视频对齐
 - `plan_summary.json`

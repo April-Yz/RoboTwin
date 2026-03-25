@@ -1,3 +1,17 @@
+## 2026-03-25 18:35:00 +08
+
+- Planner wrist-video export fine-tuned again
+  - Behavior:
+    - `left_wrist_cam_plan.mp4`
+    - `right_wrist_cam_plan.mp4`
+    - now use a uniform `90°` CCW rotation before export
+    - writer dimensions match the rotated frames
+  - Related code:
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - Notes:
+    - this change is based on the user's actual result: the previous `180°` fix still looked like the correct view rotated `90°` CCW
+    - no new CLI parameter was added
+
 ## 2026-03-25 18:20:00 +08
 
 - Planner wrist-video export corrected again

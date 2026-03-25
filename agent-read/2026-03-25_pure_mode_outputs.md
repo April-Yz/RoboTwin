@@ -33,11 +33,11 @@ In a typical pure-mode output directory, the relevant files are:
   - head-camera planning video
 - `left_wrist_cam_plan.mp4`
   - left wrist-camera planning video
-  - planner export now applies a 180-degree in-plane correction so the saved wrist videos match the expected viewing orientation
+  - planner export now applies a 90-degree CCW in-plane correction so the saved wrist videos match the expected viewing orientation
 - `right_wrist_cam_plan.mp4`
   - right wrist-camera planning video
-  - planner export now applies a 180-degree in-plane correction so the saved wrist videos match the expected viewing orientation
-  - the wrist videos keep the original landscape size `640x360`
+  - planner export now applies a 90-degree CCW in-plane correction so the saved wrist videos match the expected viewing orientation
+  - wrist-video dimensions now follow the rotated frame size
 - `pose_debug.jsonl`
   - one JSON record per saved planning frame, meant for post-processing and video alignment
 - `plan_summary.json`
