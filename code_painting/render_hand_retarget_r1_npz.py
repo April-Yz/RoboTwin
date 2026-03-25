@@ -517,6 +517,10 @@ class HandRetargetR1Renderer:
         right_target_world_offset_xyz: Sequence[float],
         target_world_z_offset: float,
         disable_table: bool,
+        base_occluder_enable: bool,
+        base_occluder_local_pos: Sequence[float],
+        base_occluder_half_size: Sequence[float],
+        base_occluder_color: Sequence[float],
         camera_sweep_enable: bool,
         camera_sweep_steps_deg: Sequence[float],
         init_left_arm_joints: Optional[Sequence[float]],
@@ -561,6 +565,10 @@ class HandRetargetR1Renderer:
         self.right_target_world_offset_xyz = np.asarray(right_target_world_offset_xyz, dtype=np.float64).reshape(3)
         self.target_world_z_offset = float(target_world_z_offset)
         self.disable_table = bool(disable_table)
+        self.base_occluder_enable = bool(base_occluder_enable)
+        self.base_occluder_local_pos = np.asarray(base_occluder_local_pos, dtype=np.float64).reshape(3)
+        self.base_occluder_half_size = np.asarray(base_occluder_half_size, dtype=np.float64).reshape(3)
+        self.base_occluder_color = np.clip(np.asarray(base_occluder_color, dtype=np.float64).reshape(3), 0.0, 1.0)
         self.camera_sweep_enable = bool(camera_sweep_enable)
         self.camera_sweep_steps_deg = tuple(float(v) for v in camera_sweep_steps_deg)
         self.init_left_arm_joints = None if init_left_arm_joints is None else np.asarray(init_left_arm_joints, dtype=np.float64).reshape(6)
@@ -573,6 +581,7 @@ class HandRetargetR1Renderer:
         self._left_wrist_camera_link = None
         self._right_wrist_camera_link = None
         self._table = None
+        self._base_occluder = None
         self._base_pose = None
         self._left_target_axis_actor = None
         self._right_target_axis_actor = None
@@ -581,6 +590,8 @@ class HandRetargetR1Renderer:
         self._setup_cameras()
         if not self.disable_table:
             self._create_table()
+        if self.base_occluder_enable:
+            self._create_base_occluder()
         self._load_robot()
 
     def _setup_scene(self) -> None:
@@ -678,6 +689,16 @@ class HandRetargetR1Renderer:
         self._table = builder.build_kinematic(name="table")
         self._table.set_pose(sapien.Pose([0.0, 0.0, -0.025]))
 
+    def _create_base_occluder(self) -> None:
+        builder = self.scene.create_actor_builder()
+        # Visual-only occluder for hiding the base/chassis in camera views.
+        builder.add_box_visual(
+            half_size=self.base_occluder_half_size.tolist(),
+            material=self.base_occluder_color.tolist(),
+        )
+        self._base_occluder = builder.build_kinematic(name="base_occluder")
+        self._base_occluder.set_pose(HIDDEN_DEBUG_POSE)
+
     def _create_debug_axis_actor(self, name: str) -> sapien.Entity:
         builder = self.scene.create_actor_builder()
         axis_len = self.debug_target_axis_length
@@ -729,6 +750,7 @@ class HandRetargetR1Renderer:
             self._right_target_axis_actor = self._create_debug_axis_actor("right_target_axis")
 
         self._update_table_pose()
+        self._update_base_occluder_pose()
         self.update_robot_link_cameras()
         if self.debug_mode:
             self.print_head_camera_summary()
@@ -783,6 +805,14 @@ class HandRetargetR1Renderer:
         table_pos = np.asarray(self._base_pose.p, dtype=np.float64) + 0.65 * forward
         table_pos[2] = 0.0
         self._table.set_pose(sapien.Pose(table_pos, self._base_pose.q))
+
+    def _update_base_occluder_pose(self) -> None:
+        if self._base_occluder is None or self._base_pose is None:
+            return
+        world_pos = np.asarray(self._base_pose.p, dtype=np.float64) + (
+            R.from_quat(quat_wxyz_to_xyzw(self._base_pose.q)).as_matrix() @ self.base_occluder_local_pos
+        )
+        self._base_occluder.set_pose(sapien.Pose(world_pos, self._base_pose.q))
 
     def _camera_axis_mode_rotation(self) -> np.ndarray:
         presets = {
@@ -1730,6 +1760,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--right_target_world_offset_x_sweep_end", type=float, default=-0.3)
     parser.add_argument("--right_target_world_offset_x_sweep_step", type=float, default=0.05)
     parser.add_argument("--disable_table", type=int, default=1)
+    parser.add_argument("--base_occluder_enable", type=int, default=0, help="If 1, add a visual-only box attached above the robot base to hide the chassis in camera views. No collision is created.")
+    parser.add_argument("--base_occluder_local_pos", type=float, nargs=3, default=[0.0, 0.0, 0.4], metavar=("X", "Y", "Z"))
+    parser.add_argument("--base_occluder_half_size", type=float, nargs=3, default=[0.28, 0.32, 0.02], metavar=("HX", "HY", "HZ"))
+    parser.add_argument("--base_occluder_color", type=float, nargs=3, default=[1.0, 1.0, 1.0], metavar=("R", "G", "B"))
     parser.add_argument("--camera_sweep_enable", type=int, default=0)
     parser.add_argument("--camera_sweep_steps_deg", type=float, nargs="+", default=[-180.0, -90.0, 0.0, 90.0])
     parser.add_argument(
@@ -1879,6 +1913,10 @@ def main() -> None:
         right_target_world_offset_xyz=args.right_target_world_offset_xyz,
         target_world_z_offset=args.target_world_z_offset,
         disable_table=bool(args.disable_table),
+        base_occluder_enable=bool(args.base_occluder_enable),
+        base_occluder_local_pos=args.base_occluder_local_pos,
+        base_occluder_half_size=args.base_occluder_half_size,
+        base_occluder_color=args.base_occluder_color,
         camera_sweep_enable=bool(args.camera_sweep_enable),
         camera_sweep_steps_deg=args.camera_sweep_steps_deg,
         init_left_arm_joints=args.init_left_arm_joints,

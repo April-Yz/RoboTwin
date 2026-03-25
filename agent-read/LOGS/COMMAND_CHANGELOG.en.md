@@ -1,3 +1,23 @@
+## 2026-03-25 19:15:00 +08
+
+- Added visual-only base-occluder parameters
+  - Flags:
+    - `--base_occluder_enable 0|1`
+    - `--base_occluder_local_pos X Y Z`
+    - `--base_occluder_half_size HX HY HZ`
+    - `--base_occluder_color R G B`
+  - Entry points:
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+    - `code_painting/plan_anygrasp_keyframes_r1_batch.py`
+    - `code_painting/render_hand_retarget_r1_npz.py`
+  - Purpose:
+    - add a white occluder that follows the robot base and hides the chassis/base in videos
+    - the current implementation is visual-only and creates no collision
+  - Usage notes:
+    - useful for cleaning up pure/debug videos
+    - `local_pos` controls height and local offset
+    - `half_size` controls the occluder box dimensions
+
 ## 2026-03-25 18:55:00 +08
 
 - R1 planner wrist-camera export semantics updated

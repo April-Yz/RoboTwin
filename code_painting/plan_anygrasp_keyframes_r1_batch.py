@@ -103,6 +103,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--viewer_frame_delay", type=float, default=0.0)
     parser.add_argument("--viewer_wait_at_end", type=int, default=0)
     parser.add_argument("--disable_table", type=int, default=1)
+    parser.add_argument("--base_occluder_enable", type=int, default=0)
+    parser.add_argument("--base_occluder_local_pos", type=float, nargs=3, default=[0.0, 0.0, 0.4])
+    parser.add_argument("--base_occluder_half_size", type=float, nargs=3, default=[0.28, 0.32, 0.02])
+    parser.add_argument("--base_occluder_color", type=float, nargs=3, default=[1.0, 1.0, 1.0])
     parser.add_argument("--lighting_mode", choices=["default", "front", "front_no_shadow"], default="front_no_shadow")
     parser.add_argument("--camera_cv_axis_mode", type=str, default="legacy_r1")
     parser.add_argument("--head_camera_local_pos", type=float, nargs=3, default=[0.0, 0.0, 0.0])
@@ -302,6 +306,14 @@ def build_single_command(args: argparse.Namespace, anygrasp_dir: Path, replay_di
         str(args.viewer_wait_at_end),
         "--disable_table",
         str(args.disable_table),
+        "--base_occluder_enable",
+        str(args.base_occluder_enable),
+        "--base_occluder_local_pos",
+        *(str(v) for v in args.base_occluder_local_pos),
+        "--base_occluder_half_size",
+        *(str(v) for v in args.base_occluder_half_size),
+        "--base_occluder_color",
+        *(str(v) for v in args.base_occluder_color),
         "--lighting_mode",
         str(args.lighting_mode),
         "--camera_cv_axis_mode",

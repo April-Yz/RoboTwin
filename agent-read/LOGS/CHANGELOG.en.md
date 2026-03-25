@@ -2,6 +2,30 @@
 
 ## 2026-03-25
 
+- Added a visual-only base occluder to hide the chassis in rendered videos:
+  - Files:
+    - `code_painting/render_hand_retarget_r1_npz.py`
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+    - `code_painting/plan_anygrasp_keyframes_r1_batch.py`
+    - `code_painting/render_object_pose_r1_npz.py`
+  - Motivation:
+    - the robot chassis/base is often visible in head and wrist videos and hurts the composition
+    - the user wanted a configurable occluder with custom height/size that does not participate in collision
+  - Implementation:
+    - added a visual-only `base_occluder` actor with no collision shapes
+    - the occluder follows the robot base pose
+    - exposed CLI flags:
+      - `--base_occluder_enable`
+      - `--base_occluder_local_pos X Y Z`
+      - `--base_occluder_half_size HX HY HZ`
+      - `--base_occluder_color R G B`
+  - Semantics:
+    - `local_pos` is defined in the robot-base frame, so it rotates with the robot heading
+    - `half_size` uses the SAPIEN box half-size convention
+    - the occluder is visual-only and does not affect collision, IK obstacles, or grasp contact
+  - Validation:
+    - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/render_hand_retarget_r1_npz.py /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1_batch.py /home/zaijia001/ssd/RoboTwin/code_painting/render_object_pose_r1_npz.py`
+
 - Corrected the R1 planner wrist-camera mount definition and removed post-export image rotation:
   - Files:
     - `code_painting/plan_anygrasp_keyframes_r1.py`

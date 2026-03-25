@@ -1,3 +1,23 @@
+## 2026-03-25 19:15:00 +08
+
+- 新增底盘遮挡板参数（visual-only）
+  - 参数：
+    - `--base_occluder_enable 0|1`
+    - `--base_occluder_local_pos X Y Z`
+    - `--base_occluder_half_size HX HY HZ`
+    - `--base_occluder_color R G B`
+  - 入口：
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+    - `code_painting/plan_anygrasp_keyframes_r1_batch.py`
+    - `code_painting/render_hand_retarget_r1_npz.py`
+  - 用途：
+    - 在机器人 base 上方添加一个随 base pose 移动的白色挡板，遮住底盘/底座
+    - 当前只加 visual，不加 collision
+  - 使用说明：
+    - 适合 pure/debug 视频清理画面
+    - `local_pos` 用来控制高度和前后左右偏移
+    - `half_size` 用来控制挡板长宽厚
+
 ## 2026-03-25 18:55:00 +08
 
 - R1 planner wrist 相机导出语义调整

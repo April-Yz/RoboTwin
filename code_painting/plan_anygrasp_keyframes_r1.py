@@ -266,6 +266,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--viewer_frame_delay", type=float, default=0.0)
     parser.add_argument("--viewer_wait_at_end", type=int, default=0)
     parser.add_argument("--disable_table", type=int, default=1)
+    parser.add_argument("--base_occluder_enable", type=int, default=0, help="If 1, add a visual-only box attached above the robot base to occlude the chassis in camera views. No collision is created.")
+    parser.add_argument("--base_occluder_local_pos", type=float, nargs=3, default=[0.0, 0.0, 0.4], metavar=("X", "Y", "Z"))
+    parser.add_argument("--base_occluder_half_size", type=float, nargs=3, default=[0.28, 0.32, 0.02], metavar=("HX", "HY", "HZ"))
+    parser.add_argument("--base_occluder_color", type=float, nargs=3, default=[1.0, 1.0, 1.0], metavar=("R", "G", "B"))
     parser.add_argument("--lighting_mode", choices=["default", "front", "front_no_shadow"], default="front_no_shadow")
     parser.add_argument("--camera_cv_axis_mode", choices=sorted(base.CV_TO_WORLD_CAMERA_PRESETS.keys()), default="legacy_r1")
     parser.add_argument("--head_camera_local_pos", type=float, nargs=3, default=base.DEFAULT_HEAD_CAMERA_LOCAL_POS.tolist())
@@ -632,6 +636,10 @@ def build_renderer(args: argparse.Namespace) -> ReplayRenderer:
         right_target_world_offset_xyz=[0.0, 0.0, 0.0],
         target_world_z_offset=0.0,
         disable_table=bool(args.disable_table),
+        base_occluder_enable=bool(args.base_occluder_enable),
+        base_occluder_local_pos=args.base_occluder_local_pos,
+        base_occluder_half_size=args.base_occluder_half_size,
+        base_occluder_color=args.base_occluder_color,
         camera_sweep_enable=False,
         camera_sweep_steps_deg=[0.0],
         init_left_arm_joints=None,

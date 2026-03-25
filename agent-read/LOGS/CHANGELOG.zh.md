@@ -2,6 +2,30 @@
 
 ## 2026-03-25
 
+- 新增 base 遮挡板（visual-only）以挡住底盘：
+  - 文件：
+    - `code_painting/render_hand_retarget_r1_npz.py`
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+    - `code_painting/plan_anygrasp_keyframes_r1_batch.py`
+    - `code_painting/render_object_pose_r1_npz.py`
+  - 动机：
+    - head / wrist 视频里常能看到机器人底盘，影响画面
+    - 用户希望有一个可自定义高度和大小、且不参与碰撞的挡板
+  - 实现：
+    - 新增 visual-only `base_occluder` actor，不创建 collision
+    - 挡板跟随 robot base pose 更新
+    - 支持 CLI 参数：
+      - `--base_occluder_enable`
+      - `--base_occluder_local_pos X Y Z`
+      - `--base_occluder_half_size HX HY HZ`
+      - `--base_occluder_color R G B`
+  - 语义：
+    - `local_pos` 在机器人 base 坐标系下定义，因此随机器人朝向一起转
+    - `half_size` 为 SAPIEN box half-size
+    - 当前为 visual-only，不参与碰撞、IK 障碍或抓取碰撞
+  - 验证：
+    - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/render_hand_retarget_r1_npz.py /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1_batch.py /home/zaijia001/ssd/RoboTwin/code_painting/render_object_pose_r1_npz.py`
+
 - 修正 R1 planner 的 wrist 相机挂载定义，取消导出后图片旋转：
   - 文件：
     - `code_painting/plan_anygrasp_keyframes_r1.py`
