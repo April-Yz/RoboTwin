@@ -2,6 +2,9 @@
 
 ## 2026-03-25
 
+- 新增 CLI 参数 `--urdfik_cartesian_interp_auto_step_m`，用于控制 `--urdfik_cartesian_interp_steps=-1` 时自动 waypoint 模式的平移密度阈值。
+- 旧逻辑中 `0.05m` 为硬编码；现在变为参数，默认仍为 `0.05`，固定步数模式不受影响。
+- `render_hand_retarget_r1_npz_urdfik.py` 现在会在 `[ik-trajectory]` 与 `[ik-waypoints]` 日志中打印当前 `auto_step_m`。
 - 新增 AnyGrasp 执行层关节收敛调试与补偿参数：
   - `--joint_command_scene_steps`
   - `--joint_target_wait_steps`

@@ -2,6 +2,9 @@
 
 ## 2026-03-25
 
+- Added CLI parameter `--urdfik_cartesian_interp_auto_step_m` to control the translation-density threshold used by automatic waypoint mode when `--urdfik_cartesian_interp_steps=-1`.
+- The old `0.05m` threshold was hardcoded; it is now configurable with the same default `0.05`. Fixed waypoint mode is unchanged.
+- `render_hand_retarget_r1_npz_urdfik.py` now prints the active `auto_step_m` in `[ik-trajectory]` and `[ik-waypoints]` logs.
 - Added execution-side joint-convergence tuning parameters for the AnyGrasp planner:
   - `--joint_command_scene_steps`
   - `--joint_target_wait_steps`

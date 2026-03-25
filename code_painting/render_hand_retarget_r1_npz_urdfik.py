@@ -46,6 +46,7 @@ class HandRetargetR1URDFIKRenderer(ReplayRenderer):
     def __init__(self, *args, **kwargs) -> None:
         self.urdfik_trajectory_mode = str(kwargs.pop("urdfik_trajectory_mode", "joint_interp"))
         raw_cartesian_interp_steps = int(kwargs.pop("urdfik_cartesian_interp_steps", 8))
+        self.urdfik_cartesian_interp_auto_step_m = max(float(kwargs.pop("urdfik_cartesian_interp_auto_step_m", 0.05)), 1e-4)
         self.urdfik_cartesian_interp_steps = -1 if raw_cartesian_interp_steps == -1 else max(raw_cartesian_interp_steps, 2)
         kwargs["attach_planner"] = False
         if kwargs.get("init_left_arm_joints") is None:
@@ -71,6 +72,7 @@ class HandRetargetR1URDFIKRenderer(ReplayRenderer):
             "[ik-trajectory] "
             f"mode={self.urdfik_trajectory_mode} "
             f"cartesian_interp_steps={self.urdfik_cartesian_interp_steps} "
+            f"auto_step_m={self.urdfik_cartesian_interp_auto_step_m:.4f} "
             f"ik_pos_thresh={self.left_ik_solver.default_position_threshold:.4f}m "
             f"ik_rot_thresh={self.left_ik_solver.default_rotation_threshold:.4f}rad"
         )
@@ -129,7 +131,7 @@ class HandRetargetR1URDFIKRenderer(ReplayRenderer):
     def _auto_cartesian_interp_steps(
         start_pose_world: np.ndarray,
         target_pose_world: np.ndarray,
-        trigger_translation_m: float = 0.05,
+        trigger_translation_m: float,
     ) -> int:
         start_pose_world = np.asarray(start_pose_world, dtype=np.float64).reshape(7)
         target_pose_world = np.asarray(target_pose_world, dtype=np.float64).reshape(7)
@@ -295,12 +297,17 @@ class HandRetargetR1URDFIKRenderer(ReplayRenderer):
         current_full = np.concatenate([self.torso_qpos, current_arm], dtype=np.float64)
         current_tcp_world = np.asarray(self.get_current_tcp_pose(arm), dtype=np.float64).reshape(7)
         if self.urdfik_cartesian_interp_steps == -1:
-            requested_waypoints = self._auto_cartesian_interp_steps(current_tcp_world, target_pose_world)
+            requested_waypoints = self._auto_cartesian_interp_steps(
+                current_tcp_world,
+                target_pose_world,
+                trigger_translation_m=self.urdfik_cartesian_interp_auto_step_m,
+            )
             effective_waypoints = requested_waypoints
             if effective_waypoints != 2:
                 print(
                     "[ik-waypoints] "
                     f"arm={arm} requested=auto "
+                    f"step_m={self.urdfik_cartesian_interp_auto_step_m:.4f} "
                     f"effective={effective_waypoints}"
                 )
         else:

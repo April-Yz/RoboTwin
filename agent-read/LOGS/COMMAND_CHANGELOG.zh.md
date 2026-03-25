@@ -58,6 +58,19 @@
   - 相关代码：
     - `code_painting/render_hand_retarget_r1_npz_urdfik.py`
 
+- 新增参数：`--urdfik_cartesian_interp_auto_step_m`
+  - 入口：
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+    - `code_painting/plan_anygrasp_keyframes_r1_batch.py`
+  - 用途：
+    - 仅在 `--urdfik_cartesian_interp_steps=-1` 时生效，控制自动 waypoint 模式的平移阈值。
+  - 默认值：
+    - `0.05`
+  - 示例：
+    - `--urdfik_cartesian_interp_steps -1 --urdfik_cartesian_interp_auto_step_m 0.03`
+  - 说明：
+    - 值越小，中间 waypoint 越密。
+
 ## 2026-03-25 14:25:00 +08
 
 - `planner_backend=urdfik` + `urdfik_trajectory_mode=cartesian_interp_ik`

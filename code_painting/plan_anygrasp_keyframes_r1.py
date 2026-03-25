@@ -189,6 +189,12 @@ def parse_args() -> argparse.Namespace:
         default=8,
         help="Number of Cartesian TCP waypoints for urdfik_trajectory_mode=cartesian_interp_ik, including start and goal.",
     )
+    parser.add_argument(
+        "--urdfik_cartesian_interp_auto_step_m",
+        type=float,
+        default=0.05,
+        help="When --urdfik_cartesian_interp_steps=-1, translation threshold in meters used by auto waypoint mode. Smaller values create denser Cartesian interpolation.",
+    )
     parser.add_argument("--left_target_object", type=str, default="cup")
     parser.add_argument("--right_target_object", type=str, default="bottle")
     parser.add_argument("--candidate_max_rotation_distance_deg", type=float, default=-1.0, help="If >= 0, drop planner candidates whose hand-orientation rotation distance exceeds this threshold before selection.")
@@ -629,6 +635,7 @@ def build_renderer(args: argparse.Namespace) -> ReplayRenderer:
     if args.planner_backend == "urdfik":
         renderer_kwargs["urdfik_trajectory_mode"] = str(args.urdfik_trajectory_mode)
         renderer_kwargs["urdfik_cartesian_interp_steps"] = int(args.urdfik_cartesian_interp_steps)
+        renderer_kwargs["urdfik_cartesian_interp_auto_step_m"] = float(args.urdfik_cartesian_interp_auto_step_m)
     renderer = renderer_cls(**renderer_kwargs)
     # This planner script never captures wrist-camera RGB. Hide wrist cameras in the
     # scene so their frustums do not show up in saved videos / viewer output.

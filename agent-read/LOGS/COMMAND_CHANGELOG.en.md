@@ -41,6 +41,21 @@
     - It now closes progressively and stops early once contact with the selected object is present and gripper joint motion has stalled
   - Related code:
     - `code_painting/plan_anygrasp_keyframes_r1.py`
+
+## 2026-03-25 14:10:00 +08
+
+- Added parameter: `--urdfik_cartesian_interp_auto_step_m`
+  - Entry points:
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+    - `code_painting/plan_anygrasp_keyframes_r1_batch.py`
+  - Purpose:
+    - Only active when `--urdfik_cartesian_interp_steps=-1`, controlling the translation threshold of automatic waypoint mode.
+  - Default:
+    - `0.05`
+  - Example:
+    - `--urdfik_cartesian_interp_steps -1 --urdfik_cartesian_interp_auto_step_m 0.03`
+  - Note:
+    - Smaller values create denser intermediate waypoints.
   - Usage:
     - Command syntax is unchanged; keep using `--enable_grasp_action_object_collision 1`
     - With the default `0`, the original fast no-collision closing behavior is preserved
