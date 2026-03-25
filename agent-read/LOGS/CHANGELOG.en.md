@@ -22,6 +22,22 @@
   - Validation:
     - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py`
 
+- Fixed the post-rotation writer-size mismatch for wrist videos:
+  - File:
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - Problem:
+    - the previous round rotated planner wrist videos by `90° clockwise`
+    - but the `cv2.VideoWriter` instances were still opened with the original `(image_width, image_height)` = `640x360`
+    - the rotated frames are actually `360x640`
+    - as a result the writer created tiny placeholder mp4 files (around `258B`) without valid video frames
+  - Fix:
+    - planner wrist writers now use the rotated frame size `(image_height, image_width)`
+  - Impact:
+    - `head_cam_plan.mp4` keeps its original landscape size
+    - `left_wrist_cam_plan.mp4` / `right_wrist_cam_plan.mp4` now use portrait dimensions matching the rotated wrist frames
+  - Validation:
+    - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py`
+
 - Adjusted URDF-IK waypoint visualization and documented the stage-settling parameters:
   - File:
     - `code_painting/plan_anygrasp_keyframes_r1.py`

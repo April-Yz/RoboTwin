@@ -22,6 +22,22 @@
   - 验证：
     - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py`
 
+- 修复 wrist 视频旋转后的 writer 尺寸不匹配问题：
+  - 文件：
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - 问题：
+    - 上一轮对 planner wrist 视频做了 `90° 顺时针旋转`
+    - 但 `cv2.VideoWriter` 仍按原始 `(image_width, image_height)` = `640x360` 打开
+    - 旋转后的帧实际变成 `360x640`
+    - 结果是 writer 成功创建文件，但无法写入有效视频流，只留下约 `258B` 的空壳 mp4
+  - 修复：
+    - planner wrist writer 现在改为按旋转后尺寸 `(image_height, image_width)` 打开
+  - 影响：
+    - `head_cam_plan.mp4` 保持原尺寸不变
+    - `left_wrist_cam_plan.mp4` / `right_wrist_cam_plan.mp4` 现在会输出为竖屏尺寸，与旋转后的图像方向一致
+  - 验证：
+    - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py`
+
 - 调整 URDF IK waypoint 可视化，并补充对 stage 收敛参数的分析说明：
   - 文件：
     - `code_painting/plan_anygrasp_keyframes_r1.py`

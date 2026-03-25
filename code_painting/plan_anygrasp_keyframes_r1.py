@@ -4060,6 +4060,7 @@ def main() -> None:
     right_wrist_video_path = args.output_dir / "right_wrist_cam_plan.mp4"
     debug_execution_video_path = args.output_dir / "debug_execution_preview.mp4"
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    wrist_export_size = (int(args.image_height), int(args.image_width))
     head_writer = cv2.VideoWriter(str(head_video_path), fourcc, args.fps, (args.image_width, args.image_height))
     if not head_writer.isOpened():
         raise RuntimeError(f"Failed to open {head_video_path}")
@@ -4070,12 +4071,12 @@ def main() -> None:
             raise RuntimeError(f"Failed to open {third_video_path}")
     left_wrist_writer = None
     if getattr(renderer, "_left_wrist_camera_link", None) is not None:
-        left_wrist_writer = cv2.VideoWriter(str(left_wrist_video_path), fourcc, args.fps, (args.image_width, args.image_height))
+        left_wrist_writer = cv2.VideoWriter(str(left_wrist_video_path), fourcc, args.fps, wrist_export_size)
         if not left_wrist_writer.isOpened():
             raise RuntimeError(f"Failed to open {left_wrist_video_path}")
     right_wrist_writer = None
     if getattr(renderer, "_right_wrist_camera_link", None) is not None:
-        right_wrist_writer = cv2.VideoWriter(str(right_wrist_video_path), fourcc, args.fps, (args.image_width, args.image_height))
+        right_wrist_writer = cv2.VideoWriter(str(right_wrist_video_path), fourcc, args.fps, wrist_export_size)
         if not right_wrist_writer.isOpened():
             raise RuntimeError(f"Failed to open {right_wrist_video_path}")
     debug_execution_writer = None
