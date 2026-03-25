@@ -14,3 +14,14 @@
   - Notes:
     - this flag does not change target-pose construction for `pregrasp/grasp/action`
     - it also does not change the relative transform used when attaching the object to TCP
+## 2026-03-25 13:05:00 +08
+
+- Added visualization-mode flags to `plan_anygrasp_keyframes_r1.py`:
+  - New flags:
+    - `--debug_visualize_targets 0|1`
+    - `--viewer_show_camera_frustums 0|1`
+  - Usage:
+    - `debug_visualize_targets=0` disables target-axis actors globally
+    - `viewer_show_camera_frustums=0` disables SAPIEN camera frustum lines in the interactive viewer
+  - Related code:
+    - `code_painting/plan_anygrasp_keyframes_r1.py`

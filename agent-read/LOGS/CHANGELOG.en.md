@@ -125,3 +125,23 @@
     - it does not affect head-camera or third-person capture itself
   - Validation:
     - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py`
+
+## 2026-03-25 13:05:00 +08
+
+- Added pure/debug visualization controls to `plan_anygrasp_keyframes_r1.py`:
+  - File:
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - New flags:
+    - `--debug_visualize_targets 0|1`
+    - `--viewer_show_camera_frustums 0|1`
+  - Changes:
+    - restored target-axis rendering to an explicit flag instead of a hardcoded always-on path while keeping the default enabled
+    - disabled SAPIEN `ControlWindow.show_camera_linesets` by default in the viewer path
+    - after the wrist frustums are hidden, this also removes the remaining zed/third camera frustum lines by default
+  - Notes:
+    - `pure_scene_output` still controls clean main videos: no overlay text, no candidate grippers, no target axes
+    - `viewer_show_camera_frustums=0` now controls viewer camera-line visibility
+    - `debug_visualize_targets=1` keeps target axes available for debug runs
+  - Validation:
+    - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py`
+    - `git -C /home/zaijia001/ssd/RoboTwin diff --check -- code_painting/plan_anygrasp_keyframes_r1.py`

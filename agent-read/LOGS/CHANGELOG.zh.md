@@ -125,3 +125,23 @@
     - 不影响 head camera / third-person 输出本身
   - 验证：
     - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py`
+
+## 2026-03-25 13:05:00 +08
+
+- 为 `plan_anygrasp_keyframes_r1.py` 增加纯净/调试可视化控制：
+  - 文件：
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - 新参数：
+    - `--debug_visualize_targets 0|1`
+    - `--viewer_show_camera_frustums 0|1`
+  - 改动：
+    - 将之前硬编码常开的目标坐标轴恢复为显式参数，默认仍为开启
+    - 在 viewer 路径里默认关闭 SAPIEN `ControlWindow.show_camera_linesets`
+    - 这样 wrist frustum 隐藏后，剩余的 zed/third 相机视野线框也会一起默认关闭
+  - 说明：
+    - `pure_scene_output` 继续负责主视频去掉文字、候选 gripper、target axis
+    - `viewer_show_camera_frustums=0` 负责去掉 viewer 里的相机线框
+    - `debug_visualize_targets=1` 可保留 target axis 作为 debug 模式
+  - 验证：
+    - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py`
+    - `git -C /home/zaijia001/ssd/RoboTwin diff --check -- code_painting/plan_anygrasp_keyframes_r1.py`

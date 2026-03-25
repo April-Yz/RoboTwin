@@ -239,6 +239,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--debug_execution_fps", type=int, default=10)
     parser.add_argument("--save_pose_debug", type=int, default=0, help="If 1, dump per-frame planner camera/TCP/object poses to pose_debug.jsonl.")
     parser.add_argument("--pure_scene_output", type=int, default=0, help="If 1, keep head/third output videos clean: no overlay text, no candidate grippers, and no target-axis visualization. Debug videos remain unchanged.")
+    parser.add_argument("--debug_visualize_targets", type=int, default=1, help="If 1, show target axis actors. Original internal name: debug_visualize_targets.")
     parser.add_argument("--save_rank_preview_images", type=int, default=1)
     parser.add_argument("--rank_preview_top_n", type=int, default=3, help="Save per-keyframe rank preview PNGs for left/right rank 1..N.")
     parser.add_argument("--debug_target_axis_length", type=float, default=0.08)
@@ -247,6 +248,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--overlay_text", type=int, default=1)
     parser.add_argument("--third_person_view", type=int, default=0)
     parser.add_argument("--enable_viewer", type=int, default=0)
+    parser.add_argument("--viewer_show_camera_frustums", type=int, default=0, help="If 1, keep SAPIEN viewer camera frustum lines visible. Original viewer plugin field: show_camera_linesets.")
     parser.add_argument("--viewer_frame_delay", type=float, default=0.0)
     parser.add_argument("--viewer_wait_at_end", type=int, default=0)
     parser.add_argument("--disable_table", type=int, default=1)
@@ -601,9 +603,9 @@ def build_renderer(args: argparse.Namespace) -> ReplayRenderer:
         viewer_wait_at_end=bool(args.viewer_wait_at_end),
         debug_mode=False,
         debug_force_orientation="none",
-        # Keep target axes visible by default in the planner script so grasp/action
-        # targets remain inspectable in viewer/debug videos.
-        debug_visualize_targets=True,
+        # Expose target-axis rendering explicitly so pure/debug workflows can switch
+        # between clean and instrumented output without patching this script.
+        debug_visualize_targets=bool(args.debug_visualize_targets),
         debug_target_axis_length=args.debug_target_axis_length,
         debug_target_axis_thickness=args.debug_target_axis_thickness,
         orientation_remap_label="identity",
@@ -634,6 +636,13 @@ def build_renderer(args: argparse.Namespace) -> ReplayRenderer:
         renderer.right_wrist_camera.set_entity_pose(base.HIDDEN_DEBUG_POSE)
         renderer._left_wrist_camera_link = None
         renderer._right_wrist_camera_link = None
+    except Exception:
+        pass
+    # SAPIEN viewer draws camera frustum lines through ControlWindow.show_camera_linesets.
+    # Keep them off by default so viewer recordings match the intended clean video output.
+    try:
+        if getattr(renderer, "viewer", None) is not None:
+            renderer.viewer.control_window.show_camera_linesets = bool(args.viewer_show_camera_frustums)
     except Exception:
         pass
     return renderer

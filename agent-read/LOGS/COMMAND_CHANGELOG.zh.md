@@ -14,3 +14,14 @@
   - 说明：
     - 该参数不会改变 `pregrasp/grasp/action` 的目标位姿构造
     - 也不会改变物体附着到 TCP 的相对变换
+## 2026-03-25 13:05:00 +08
+
+- 为 `plan_anygrasp_keyframes_r1.py` 增加可视化模式相关参数：
+  - 新参数：
+    - `--debug_visualize_targets 0|1`
+    - `--viewer_show_camera_frustums 0|1`
+  - 用途：
+    - `debug_visualize_targets=0` 可全局关闭 target axis actor
+    - `viewer_show_camera_frustums=0` 可关闭 viewer 中 SAPIEN 相机线框
+  - 相关代码：
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
