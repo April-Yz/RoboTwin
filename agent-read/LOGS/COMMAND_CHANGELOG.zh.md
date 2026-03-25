@@ -66,3 +66,15 @@
     - 不再只执行 `current_joints -> target_joints` 的端点直线
   - 相关代码：
     - `code_painting/render_hand_retarget_r1_npz_urdfik.py`
+# 2026-03-25
+
+- 新增命令参数：`--debug_visualize_ik_waypoints`
+  - 入口：
+    - `/home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py`
+    - `/home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1_batch.py`
+  - 用途：
+    - 在 debug/viewer 中显示 `cartesian_interp_ik` 的中间 TCP/EE 平滑 waypoint，帮助判断是 waypoint 本身有问题，还是 IK/执行阶段出了问题。
+  - 显示内容：
+    - 中间 waypoint 的位置点和局部前进轴。
+  - 默认值：
+    - `0`

@@ -240,6 +240,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--save_pose_debug", type=int, default=0, help="If 1, dump per-frame planner camera/TCP/object poses to pose_debug.jsonl.")
     parser.add_argument("--pure_scene_output", type=int, default=0, help="If 1, keep head/third output videos clean: no overlay text, no candidate grippers, and no target-axis visualization. Debug videos remain unchanged.")
     parser.add_argument("--debug_visualize_targets", type=int, default=1, help="If 1, show target axis actors. Original internal name: debug_visualize_targets.")
+    parser.add_argument("--debug_visualize_ik_waypoints", type=int, default=0, help="If 1, visualize intermediate URDF IK Cartesian waypoints as point+forward-axis markers in viewer/debug output.")
     parser.add_argument("--save_rank_preview_images", type=int, default=1)
     parser.add_argument("--rank_preview_top_n", type=int, default=3, help="Save per-keyframe rank preview PNGs for left/right rank 1..N.")
     parser.add_argument("--debug_target_axis_length", type=float, default=0.08)
@@ -1617,6 +1618,97 @@ def create_colored_axis_actor(
     return actor
 
 
+def create_forward_marker_actor(
+    scene: sapien.Scene,
+    name: str,
+    axis_length: float,
+    thickness: float,
+    color: Sequence[float],
+) -> sapien.Entity:
+    builder = scene.create_actor_builder()
+    axis_half = axis_length * 0.5
+    builder.add_sphere_visual(radius=thickness * 2.0, material=list(color))
+    builder.add_box_visual(
+        pose=sapien.Pose([axis_half, 0.0, 0.0]),
+        half_size=[axis_half, thickness, thickness],
+        material=list(color),
+    )
+    actor = builder.build_kinematic(name=name)
+    hide_actor(actor)
+    return actor
+
+
+def _get_ik_waypoint_marker_store(renderer: ReplayRenderer) -> Dict[str, List[sapien.Entity]]:
+    store = getattr(renderer, "_ik_waypoint_marker_actors", None)
+    if store is None:
+        store = {"left": [], "right": []}
+        setattr(renderer, "_ik_waypoint_marker_actors", store)
+    return store
+
+
+def _ensure_ik_waypoint_marker_actors(
+    renderer: ReplayRenderer,
+    args: argparse.Namespace,
+    arm: str,
+    count: int,
+) -> List[sapien.Entity]:
+    store = _get_ik_waypoint_marker_store(renderer)
+    actors = store.setdefault(arm, [])
+    axis_length = max(float(args.debug_target_axis_length) * 0.42, 0.02)
+    thickness = max(float(args.debug_target_axis_thickness) * 0.72, 0.002)
+    color = [0.15, 0.75, 1.0] if arm == "left" else [1.0, 0.65, 0.05]
+    while len(actors) < count:
+        idx = len(actors)
+        actors.append(
+            create_forward_marker_actor(
+                renderer.scene,
+                f"debug_ik_waypoint_{arm}_{idx}",
+                axis_length=axis_length,
+                thickness=thickness,
+                color=color,
+            )
+        )
+    return actors
+
+
+def clear_ik_waypoint_visuals(renderer: ReplayRenderer) -> None:
+    store = getattr(renderer, "_ik_waypoint_marker_actors", None)
+    if not store:
+        return
+    for actors in store.values():
+        for actor in actors:
+            hide_actor(actor)
+
+
+def update_ik_waypoint_visuals(
+    renderer: ReplayRenderer,
+    args: argparse.Namespace,
+    plans_by_arm: Optional[Dict[str, Optional[Dict]]],
+) -> None:
+    if not bool(getattr(args, "debug_visualize_ik_waypoints", 0)):
+        clear_ik_waypoint_visuals(renderer)
+        return
+    if not plans_by_arm:
+        clear_ik_waypoint_visuals(renderer)
+        return
+
+    store = _get_ik_waypoint_marker_store(renderer)
+    for arm in ("left", "right"):
+        plan = plans_by_arm.get(arm) if arm in plans_by_arm else None
+        tcp_waypoints = None if plan is None else plan.get("tcp_waypoints_world")
+        if tcp_waypoints is None:
+            for actor in store.get(arm, []):
+                hide_actor(actor)
+            continue
+        waypoint_arr = np.asarray(tcp_waypoints, dtype=np.float64).reshape(-1, 7)
+        intermediate = waypoint_arr[1:-1]
+        actors = _ensure_ik_waypoint_marker_actors(renderer, args, arm, int(intermediate.shape[0]))
+        for actor, pose_world_wxyz in zip(actors, intermediate):
+            actor.set_pose(sapien.Pose(pose_world_wxyz[:3], base.normalize_quat_wxyz(pose_world_wxyz[3:])))
+        for actor in actors[int(intermediate.shape[0]):]:
+            hide_actor(actor)
+
+
 def create_gripper_candidate_actor(
     scene: sapien.Scene,
     name: str,
@@ -2891,6 +2983,7 @@ def execute_stage_until_reached(
             f"theory={short_direction_label(str(pre_plan_diag['theoretical_forward_axis_motion']))}"
         )
         plan = renderer.plan_path(arm, target_pose_world_wxyz)
+        update_ik_waypoint_visuals(renderer, args, {arm: plan})
         planned_eval_pose = planned_eval_pose_from_plan(renderer, arm, plan, args.reach_error_pose_source)
         if planned_eval_pose is not None:
             plan_vs_target = plan_request_diagnostics(planned_eval_pose, target_eval_pose)
@@ -2989,6 +3082,7 @@ def execute_stage_until_reached(
             use_overlay_debug=use_overlay_debug,
         )
         if reached:
+            clear_ik_waypoint_visuals(renderer)
             return {
                 "status": last_status,
                 "attempts": attempts,
@@ -3000,6 +3094,7 @@ def execute_stage_until_reached(
         if max_attempts is not None and attempt >= max_attempts:
             break
 
+    clear_ik_waypoint_visuals(renderer)
     return {
         "status": last_status,
         "attempts": attempts,
@@ -3183,6 +3278,7 @@ def execute_dual_stage_until_reached(
         plans_by_arm: Dict[str, Optional[Dict]] = {
             arm: renderer.plan_path(arm, target_pose_world_wxyz_by_arm[arm]) for arm in arms
         }
+        update_ik_waypoint_visuals(renderer, args, plans_by_arm)
         plan_solution_by_arm: Dict[str, Dict[str, object]] = {}
         for arm in arms:
             planned_eval_pose = planned_eval_pose_from_plan(renderer, arm, plans_by_arm.get(arm), args.reach_error_pose_source)
@@ -3288,6 +3384,7 @@ def execute_dual_stage_until_reached(
         record_frame(renderer, head_writer, third_writer, overlay_lines, use_overlay, debug_visuals, debug_execution_state, pure_scene_main=pure_scene_main, use_overlay_debug=use_overlay_debug)
         last_arm_metrics = arm_metrics
         if stage_reached:
+            clear_ik_waypoint_visuals(renderer)
             return {
                 "attempts": attempt,
                 "reached": True,
@@ -3297,6 +3394,7 @@ def execute_dual_stage_until_reached(
         if max_attempts is not None and attempt >= max_attempts:
             break
 
+    clear_ik_waypoint_visuals(renderer)
     return {
         "attempts": attempt,
         "reached": False,

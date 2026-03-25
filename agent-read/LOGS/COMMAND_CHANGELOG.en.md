@@ -66,3 +66,15 @@
     - it no longer executes only a straight endpoint interpolation from `current_joints` to `target_joints`
   - Related code:
     - `code_painting/render_hand_retarget_r1_npz_urdfik.py`
+# 2026-03-25
+
+- Added command parameter: `--debug_visualize_ik_waypoints`
+  - Entry points:
+    - `/home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py`
+    - `/home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1_batch.py`
+  - Purpose:
+    - Show the intermediate TCP/EE smoothing waypoints of `cartesian_interp_ik` in debug/viewer output, helping distinguish “bad waypoint generation” from “bad IK/execution follow-through”.
+  - Display:
+    - Position point plus local forward-axis marker for each intermediate waypoint.
+  - Default:
+    - `0`

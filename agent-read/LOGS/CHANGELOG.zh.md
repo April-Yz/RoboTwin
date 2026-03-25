@@ -235,3 +235,10 @@
     - `_execute_single_ik_plan(...)` 也优先执行完整 `plan["position"]` 轨迹
   - 影响：
     - `cartesian_interp_ik` 生成的 `joint_waypoints` 现在会成为真实执行轨迹的一部分
+# 2026-03-25
+
+- 新增 `--debug_visualize_ik_waypoints` 调试参数，用于在 `--planner_backend urdfik --urdfik_trajectory_mode cartesian_interp_ik` 下，把中间 `tcp_waypoints_world` 可视化到 viewer/debug 输出中。
+- 可视化形式为“小球 + 局部前进轴”，仅显示中间 waypoint，不显示起点和终点；终点继续使用原有 target axis。
+- 该改动只影响调试显示，不改变 waypoint 生成、IK 求解、轨迹执行或碰撞逻辑。
+- `plan_anygrasp_keyframes_r1_batch.py` 已同步透传该参数。
+- 验证：本轮改动后运行 `python -m py_compile` 与 `git diff --check`。
