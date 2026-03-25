@@ -2230,6 +2230,27 @@ def plan_direction_label(forward_axis_signed_err_m: float, eps_m: float = 1e-4) 
     return "already_aligned_on_forward_axis"
 
 
+def short_direction_label(label: str) -> str:
+    if label == "move_forward_along_target_forward":
+        return "forward"
+    if label == "move_backward_along_target_forward":
+        return "backward"
+    if label == "already_aligned_on_forward_axis":
+        return "aligned"
+    return str(label)
+
+
+def colorize_forward_cm(value_cm: float) -> str:
+    text = f"{float(value_cm):+.2f}"
+    if not sys.stdout.isatty():
+        return text
+    if value_cm > 1e-6:
+        return f"\033[1;31m{text}\033[0m"
+    if value_cm < -1e-6:
+        return f"\033[1;36m{text}\033[0m"
+    return f"\033[1;33m{text}\033[0m"
+
+
 def plan_request_diagnostics(
     current_eval_pose: np.ndarray,
     target_eval_pose: np.ndarray,
@@ -2598,8 +2619,8 @@ def execute_stage_until_reached(
             f"dx={float(pre_plan_diag['error']['dx_m']):.4f} dy={float(pre_plan_diag['error']['dy_m']):.4f} dz={float(pre_plan_diag['error']['dz_m']):.4f} "
             f"dist={float(pre_plan_diag['error']['dist_m']):.4f} rot={float(pre_plan_diag['error']['rot_err_deg']):.2f} "
             f"fwd_rot={float(pre_plan_diag['error']['forward_axis_err_deg']):.2f} "
-            f"fwd_cm={float(pre_plan_diag['error']['forward_axis_signed_err_cm']):+.2f} "
-            f"theory={str(pre_plan_diag['theoretical_forward_axis_motion'])}"
+            f"fwd_cm={colorize_forward_cm(float(pre_plan_diag['error']['forward_axis_signed_err_cm']))} "
+            f"theory={short_direction_label(str(pre_plan_diag['theoretical_forward_axis_motion']))}"
         )
         plan = renderer.plan_path(arm, target_pose_world_wxyz)
         planned_eval_pose = planned_eval_pose_from_plan(renderer, arm, plan, args.reach_error_pose_source)
@@ -2608,13 +2629,13 @@ def execute_stage_until_reached(
             plan_vs_current = plan_request_diagnostics(current_eval_pose_before_plan, planned_eval_pose)
             print(
                 f"[plan-solution] stage={label} arm={arm} try={attempt} "
-                f"plan_vs_target_fwd_cm={float(plan_vs_target['error']['forward_axis_signed_err_cm']):+.2f} "
+                f"plan_vs_target_fwd_cm={colorize_forward_cm(float(plan_vs_target['error']['forward_axis_signed_err_cm']))} "
                 f"plan_vs_target_dist={float(plan_vs_target['error']['dist_m']):.4f} "
                 f"plan_vs_target_rot={float(plan_vs_target['error']['rot_err_deg']):.2f} "
-                f"plan_vs_current_fwd_cm={float(plan_vs_current['error']['forward_axis_signed_err_cm']):+.2f} "
+                f"plan_vs_current_fwd_cm={colorize_forward_cm(float(plan_vs_current['error']['forward_axis_signed_err_cm']))} "
                 f"plan_vs_current_dist={float(plan_vs_current['error']['dist_m']):.4f} "
                 f"plan_vs_current_rot={float(plan_vs_current['error']['rot_err_deg']):.2f} "
-                f"theory={str(plan_vs_current['theoretical_forward_axis_motion'])}"
+                f"theory={short_direction_label(str(plan_vs_current['theoretical_forward_axis_motion']))}"
             )
         last_status = execute_single_arm_plan(
             renderer=renderer,
@@ -2667,7 +2688,7 @@ def execute_stage_until_reached(
             f"dx={stage_error['dx_m']:.4f} dy={stage_error['dy_m']:.4f} dz={stage_error['dz_m']:.4f} "
             f"dist={stage_error['dist_m']:.4f} rot={stage_error['rot_err_deg']:.2f} "
             f"fwd_rot={stage_error['forward_axis_err_deg']:.2f} "
-            f"fwd_cm={stage_error['forward_axis_signed_err_cm']:+.2f} "
+            f"fwd_cm={colorize_forward_cm(float(stage_error['forward_axis_signed_err_cm']))} "
             f"reached={int(reached)}"
         )
         for supervision_arm, supervision_error in supervision_errors.items():
@@ -2677,7 +2698,7 @@ def execute_stage_until_reached(
                 f"dz={float(supervision_error.get('dz_m', 0.0)):.4f} dist={float(supervision_error.get('pos_err_m', 0.0)):.4f} "
                 f"rot={float(supervision_error.get('rot_err_deg', 0.0)):.2f} "
                 f"fwd_rot={float(supervision_error.get('forward_axis_err_deg', 0.0)):.2f} "
-                f"fwd_cm={float(supervision_error.get('forward_axis_signed_err_cm', 0.0)):+.2f}"
+                f"fwd_cm={colorize_forward_cm(float(supervision_error.get('forward_axis_signed_err_cm', 0.0)))}"
             )
         record_frame(
             renderer,
@@ -2878,24 +2899,19 @@ def execute_dual_stage_until_reached(
             target_eval_pose = target_pose_for_error(renderer, arm, target_pose_world_wxyz_by_arm[arm], args.reach_error_pose_source)
             pre_plan_diag = plan_request_diagnostics(current_eval_pose_before_plan, target_eval_pose)
             pre_plan_by_arm[arm] = pre_plan_diag
-        print(
-            f"[plan-request] stage={label} try={attempt} "
-            + " ".join(
-                [
-                    (
-                        f"{arm}:dx={float(pre_plan_by_arm[arm]['error']['dx_m']):.4f},"
-                        f"dy={float(pre_plan_by_arm[arm]['error']['dy_m']):.4f},"
-                        f"dz={float(pre_plan_by_arm[arm]['error']['dz_m']):.4f},"
-                        f"dist={float(pre_plan_by_arm[arm]['error']['dist_m']):.4f},"
-                        f"rot={float(pre_plan_by_arm[arm]['error']['rot_err_deg']):.2f},"
-                        f"fwd_rot={float(pre_plan_by_arm[arm]['error']['forward_axis_err_deg']):.2f},"
-                        f"fwd_cm={float(pre_plan_by_arm[arm]['error']['forward_axis_signed_err_cm']):+.2f},"
-                        f"theory={str(pre_plan_by_arm[arm]['theoretical_forward_axis_motion'])}"
-                    )
-                    for arm in arms
-                ]
+        print(f"[plan-request] stage={label} try={attempt}")
+        for arm in arms:
+            print(
+                f"  {arm}: "
+                f"dx={float(pre_plan_by_arm[arm]['error']['dx_m']):.4f} "
+                f"dy={float(pre_plan_by_arm[arm]['error']['dy_m']):.4f} "
+                f"dz={float(pre_plan_by_arm[arm]['error']['dz_m']):.4f} "
+                f"dist={float(pre_plan_by_arm[arm]['error']['dist_m']):.4f} "
+                f"rot={float(pre_plan_by_arm[arm]['error']['rot_err_deg']):.2f} "
+                f"fwd_rot={float(pre_plan_by_arm[arm]['error']['forward_axis_err_deg']):.2f} "
+                f"fwd_cm={colorize_forward_cm(float(pre_plan_by_arm[arm]['error']['forward_axis_signed_err_cm']))} "
+                f"theory={short_direction_label(str(pre_plan_by_arm[arm]['theoretical_forward_axis_motion']))}"
             )
-        )
         plans_by_arm: Dict[str, Optional[Dict]] = {
             arm: renderer.plan_path(arm, target_pose_world_wxyz_by_arm[arm]) for arm in arms
         }
@@ -2914,24 +2930,20 @@ def execute_dual_stage_until_reached(
                 "plan_vs_current": plan_vs_current,
             }
         if plan_solution_by_arm:
-            print(
-                f"[plan-solution] stage={label} try={attempt} "
-                + " ".join(
-                    [
-                        (
-                            f"{arm}:plan_vs_target_fwd_cm={float(plan_solution_by_arm[arm]['plan_vs_target']['error']['forward_axis_signed_err_cm']):+.2f},"
-                            f"plan_vs_target_dist={float(plan_solution_by_arm[arm]['plan_vs_target']['error']['dist_m']):.4f},"
-                            f"plan_vs_target_rot={float(plan_solution_by_arm[arm]['plan_vs_target']['error']['rot_err_deg']):.2f},"
-                            f"plan_vs_current_fwd_cm={float(plan_solution_by_arm[arm]['plan_vs_current']['error']['forward_axis_signed_err_cm']):+.2f},"
-                            f"plan_vs_current_dist={float(plan_solution_by_arm[arm]['plan_vs_current']['error']['dist_m']):.4f},"
-                            f"plan_vs_current_rot={float(plan_solution_by_arm[arm]['plan_vs_current']['error']['rot_err_deg']):.2f},"
-                            f"theory={str(plan_solution_by_arm[arm]['plan_vs_current']['theoretical_forward_axis_motion'])}"
-                        )
-                        for arm in arms
-                        if arm in plan_solution_by_arm
-                    ]
+            print(f"[plan-solution] stage={label} try={attempt}")
+            for arm in arms:
+                if arm not in plan_solution_by_arm:
+                    continue
+                print(
+                    f"  {arm}: "
+                    f"plan_vs_target_fwd_cm={colorize_forward_cm(float(plan_solution_by_arm[arm]['plan_vs_target']['error']['forward_axis_signed_err_cm']))} "
+                    f"plan_vs_target_dist={float(plan_solution_by_arm[arm]['plan_vs_target']['error']['dist_m']):.4f} "
+                    f"plan_vs_target_rot={float(plan_solution_by_arm[arm]['plan_vs_target']['error']['rot_err_deg']):.2f} "
+                    f"plan_vs_current_fwd_cm={colorize_forward_cm(float(plan_solution_by_arm[arm]['plan_vs_current']['error']['forward_axis_signed_err_cm']))} "
+                    f"plan_vs_current_dist={float(plan_solution_by_arm[arm]['plan_vs_current']['error']['dist_m']):.4f} "
+                    f"plan_vs_current_rot={float(plan_solution_by_arm[arm]['plan_vs_current']['error']['rot_err_deg']):.2f} "
+                    f"theory={short_direction_label(str(plan_solution_by_arm[arm]['plan_vs_current']['theoretical_forward_axis_motion']))}"
                 )
-            )
         statuses = execute_dual_arm_plan(
             renderer=renderer,
             plans_by_arm=plans_by_arm,
@@ -2984,24 +2996,19 @@ def execute_dual_stage_until_reached(
                 "reached": bool(stage_reached),
             }
         )
-        print(
-            f"[attempt] stage={label} try={attempt} "
-            + " ".join(
-                [
-                    (
-                        f"{arm}:dx={float(arm_metrics[arm]['target_error']['dx_m']):.4f},"
-                        f"dy={float(arm_metrics[arm]['target_error']['dy_m']):.4f},"
-                        f"dz={float(arm_metrics[arm]['target_error']['dz_m']):.4f},"
-                        f"dist={float(arm_metrics[arm]['target_error']['dist_m']):.4f},"
-                        f"rot={float(arm_metrics[arm]['target_error']['rot_err_deg']):.2f},"
-                        f"fwd_rot={float(arm_metrics[arm]['target_error']['forward_axis_err_deg']):.2f},"
-                        f"fwd_cm={float(arm_metrics[arm]['target_error']['forward_axis_signed_err_cm']):+.2f},"
-                        f"reached={int(bool(arm_metrics[arm]['reached']))}"
-                    )
-                    for arm in arms
-                ]
+        print(f"[attempt] stage={label} try={attempt}")
+        for arm in arms:
+            print(
+                f"  {arm}: "
+                f"dx={float(arm_metrics[arm]['target_error']['dx_m']):.4f} "
+                f"dy={float(arm_metrics[arm]['target_error']['dy_m']):.4f} "
+                f"dz={float(arm_metrics[arm]['target_error']['dz_m']):.4f} "
+                f"dist={float(arm_metrics[arm]['target_error']['dist_m']):.4f} "
+                f"rot={float(arm_metrics[arm]['target_error']['rot_err_deg']):.2f} "
+                f"fwd_rot={float(arm_metrics[arm]['target_error']['forward_axis_err_deg']):.2f} "
+                f"fwd_cm={colorize_forward_cm(float(arm_metrics[arm]['target_error']['forward_axis_signed_err_cm']))} "
+                f"reached={int(bool(arm_metrics[arm]['reached']))}"
             )
-        )
 
         overlay_lines = [
             f"stage={label}",

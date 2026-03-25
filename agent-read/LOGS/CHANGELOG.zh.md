@@ -52,3 +52,15 @@
   - 再用 FK 后验比较两者对该 waypoint 的 `ee` 目标误差，保留更接近的一支
 - 目的：
   - 解决在 `action` 阶段中，插值分辨率修正后仍存在的“左手被当前 seed 锁在局部解里”的问题
+
+- 调整终端调试输出格式：
+  - `plan-request`
+  - `plan-solution`
+  - `attempt`
+- 改动内容：
+  - 双臂日志改为左右手分行打印
+  - `theory` 从长字符串改为：
+    - `forward`
+    - `backward`
+    - `aligned`
+  - `fwd_cm` 增加 ANSI 颜色高亮，正负更容易区分

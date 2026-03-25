@@ -52,3 +52,15 @@
   - then use FK-based post-checking against that waypoint's `ee` target and keep the closer candidate
 - Purpose:
   - address the remaining `action` failure mode where the interpolation-density fix helped, but the left arm was still being trapped in a local solution basin by the current seed
+
+- Adjusted terminal debug output formatting:
+  - `plan-request`
+  - `plan-solution`
+  - `attempt`
+- Changes:
+  - dual-arm logs are now printed as separate left/right lines
+  - `theory` is shortened to:
+    - `forward`
+    - `backward`
+    - `aligned`
+  - `fwd_cm` now uses ANSI color highlighting so sign changes are easier to spot
