@@ -436,6 +436,22 @@
 - 验证：本轮改动后运行 `python -m py_compile` 与 `git diff --check`。
 # 2026-03-25
 
+- 修复 `urdfik` / `ReplayRenderer` 路径下 `base_occluder` 未初始化更新的问题：
+  - 文件：
+    - `code_painting/replay_r1_h5.py`
+  - 原因：
+    - `ReplayRenderer._load_robot()` 重写了基类机器人加载流程，但没有同步接入后续新增的 `base_occluder` 逻辑
+    - 结果是在 `plan_anygrasp_keyframes_r1.py --planner_backend urdfik` 路径下：
+      - 不会打印 `[base-occluder] ...` 调试日志
+      - 挡板不会按修正后的锚点逻辑更新到目标位置
+  - 改动：
+    - 在 `ReplayRenderer._load_robot()` 中补上：
+      - `self._base_occluder_link = self._find_robot_link(["base_link"])`
+      - `self._update_base_occluder_pose()`
+    - 让 replay / urdfik 执行链与基类 renderer 的挡板行为保持一致
+  - 验证：
+    - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/replay_r1_h5.py code_painting/render_hand_retarget_r1_npz.py`
+
 - 进一步修正 `base_occluder` 挡板的高度语义：
   - 文件：
     - `code_painting/render_hand_retarget_r1_npz.py`

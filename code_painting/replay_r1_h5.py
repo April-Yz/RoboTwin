@@ -103,6 +103,7 @@ class ReplayRenderer(base.HandRetargetR1Renderer):
         self._head_camera_link = self._find_robot_link(["zed_link", "head_camera", "head", "camera_link"])
         if self._head_camera_link is None:
             raise RuntimeError("Could not find zed/head camera link on R1.")
+        self._base_occluder_link = self._find_robot_link(["base_link"])
         self._left_wrist_camera_link = self._find_robot_link(["left_realsense_link", "left_D405_link", "left_camera"])
         self._right_wrist_camera_link = self._find_robot_link(["right_realsense_link", "right_D405_link", "right_camera"])
 
@@ -111,6 +112,7 @@ class ReplayRenderer(base.HandRetargetR1Renderer):
             self._right_target_axis_actor = self._create_debug_axis_actor("right_target_axis")
 
         self._update_table_pose()
+        self._update_base_occluder_pose()
         self.update_robot_link_cameras()
         if self.hide_robot:
             self._freeze_head_camera_and_hide_robot()

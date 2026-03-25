@@ -435,6 +435,22 @@
 - Validation: `python -m py_compile` and `git diff --check` are run after this round.
 # 2026-03-25
 
+- Fixed `base_occluder` initialization/update missing on the `urdfik` / `ReplayRenderer` path:
+  - File:
+    - `code_painting/replay_r1_h5.py`
+  - Cause:
+    - `ReplayRenderer._load_robot()` overrides the base robot-loading flow but did not hook in the later-added `base_occluder` logic
+    - as a result, under `plan_anygrasp_keyframes_r1.py --planner_backend urdfik`:
+      - the `[base-occluder] ...` debug line was never printed
+      - the occluder was not updated using the corrected anchor semantics
+  - Change:
+    - added the missing calls inside `ReplayRenderer._load_robot()`:
+      - `self._base_occluder_link = self._find_robot_link(["base_link"])`
+      - `self._update_base_occluder_pose()`
+    - this keeps replay / urdfik execution consistent with the base renderer behavior
+  - Validation:
+    - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/replay_r1_h5.py code_painting/render_hand_retarget_r1_npz.py`
+
 - Further refined the `base_occluder` height semantics:
   - File:
     - `code_painting/render_hand_retarget_r1_npz.py`
