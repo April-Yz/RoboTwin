@@ -145,3 +145,16 @@
   - Validation:
     - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py`
     - `git -C /home/zaijia001/ssd/RoboTwin diff --check -- code_painting/plan_anygrasp_keyframes_r1.py`
+
+- Fixed the batch wrapper so the new pure/debug visualization flags are forwarded:
+  - File:
+    - `code_painting/plan_anygrasp_keyframes_r1_batch.py`
+  - Changes:
+    - added `--debug_visualize_targets` to the batch parser
+    - added `--viewer_show_camera_frustums` to the batch parser
+    - forwarded both flags in `build_single_command()`
+  - Reason:
+    - the pure-mode batch command was being rejected by batch-layer argparse before the single-run script could receive the flags
+  - Validation:
+    - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1_batch.py`
+    - `git -C /home/zaijia001/ssd/RoboTwin diff --check -- code_painting/plan_anygrasp_keyframes_r1_batch.py`

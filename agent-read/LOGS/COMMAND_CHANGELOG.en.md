@@ -25,3 +25,10 @@
     - `viewer_show_camera_frustums=0` disables SAPIEN camera frustum lines in the interactive viewer
   - Related code:
     - `code_painting/plan_anygrasp_keyframes_r1.py`
+
+- Synced the same visualization-mode flags through `plan_anygrasp_keyframes_r1_batch.py`:
+  - Forwarded flags:
+    - `--debug_visualize_targets`
+    - `--viewer_show_camera_frustums`
+  - Related code:
+    - `code_painting/plan_anygrasp_keyframes_r1_batch.py`

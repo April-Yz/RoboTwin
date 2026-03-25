@@ -145,3 +145,16 @@
   - 验证：
     - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py`
     - `git -C /home/zaijia001/ssd/RoboTwin diff --check -- code_painting/plan_anygrasp_keyframes_r1.py`
+
+- 修复 batch 包装层未透传纯净/调试可视化参数的问题：
+  - 文件：
+    - `code_painting/plan_anygrasp_keyframes_r1_batch.py`
+  - 改动：
+    - 为 batch 脚本补充 `--debug_visualize_targets`
+    - 为 batch 脚本补充 `--viewer_show_camera_frustums`
+    - 在 `build_single_command()` 中将这两个参数继续透传给 `plan_anygrasp_keyframes_r1.py`
+  - 原因：
+    - 之前纯净模式命令在 batch 层被 argparse 拒绝，主脚本参数无法到达
+  - 验证：
+    - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1_batch.py`
+    - `git -C /home/zaijia001/ssd/RoboTwin diff --check -- code_painting/plan_anygrasp_keyframes_r1_batch.py`

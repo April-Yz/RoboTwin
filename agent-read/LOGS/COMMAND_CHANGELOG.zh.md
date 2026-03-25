@@ -25,3 +25,10 @@
     - `viewer_show_camera_frustums=0` 可关闭 viewer 中 SAPIEN 相机线框
   - 相关代码：
     - `code_painting/plan_anygrasp_keyframes_r1.py`
+
+- 为 `plan_anygrasp_keyframes_r1_batch.py` 同步透传可视化模式参数：
+  - 新增透传：
+    - `--debug_visualize_targets`
+    - `--viewer_show_camera_frustums`
+  - 相关代码：
+    - `code_painting/plan_anygrasp_keyframes_r1_batch.py`

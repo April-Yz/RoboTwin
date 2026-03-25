@@ -88,6 +88,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--debug_execution_fps", type=int, default=10)
     parser.add_argument("--save_pose_debug", type=int, default=0)
     parser.add_argument("--pure_scene_output", type=int, default=0)
+    parser.add_argument("--debug_visualize_targets", type=int, default=1)
     parser.add_argument("--save_rank_preview_images", type=int, default=1)
     parser.add_argument("--rank_preview_top_n", type=int, default=3)
     parser.add_argument("--debug_target_axis_length", type=float, default=0.08)
@@ -96,6 +97,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--overlay_text", type=int, default=1)
     parser.add_argument("--third_person_view", type=int, default=0)
     parser.add_argument("--enable_viewer", type=int, default=0)
+    parser.add_argument("--viewer_show_camera_frustums", type=int, default=0)
     parser.add_argument("--viewer_frame_delay", type=float, default=0.0)
     parser.add_argument("--viewer_wait_at_end", type=int, default=0)
     parser.add_argument("--disable_table", type=int, default=1)
@@ -268,6 +270,8 @@ def build_single_command(args: argparse.Namespace, anygrasp_dir: Path, replay_di
         str(args.save_pose_debug),
         "--pure_scene_output",
         str(args.pure_scene_output),
+        "--debug_visualize_targets",
+        str(args.debug_visualize_targets),
         "--save_rank_preview_images",
         str(args.save_rank_preview_images),
         "--rank_preview_top_n",
@@ -284,6 +288,8 @@ def build_single_command(args: argparse.Namespace, anygrasp_dir: Path, replay_di
         str(args.third_person_view),
         "--enable_viewer",
         str(args.enable_viewer),
+        "--viewer_show_camera_frustums",
+        str(args.viewer_show_camera_frustums),
         "--viewer_frame_delay",
         str(args.viewer_frame_delay),
         "--viewer_wait_at_end",
