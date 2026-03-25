@@ -243,3 +243,20 @@
     - if `--replay_objects_ignore_collision 1` and the object is not enabled for grasp/action collision, collision is still omitted
   - Default:
     - `convex`
+
+- Added command parameter: `--gripper_contact_monitor_mode {fingers,fingers_and_base,all_robot_links}`
+  - Entry points:
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+    - `code_painting/plan_anygrasp_keyframes_r1_batch.py`
+  - Purpose:
+    - Control which robot links are allowed to trigger contact monitoring during `close_gripper`.
+  - Modes:
+    - `fingers`
+      - finger links only
+    - `fingers_and_base`
+      - finger links plus `left/right_gripper_link`
+    - `all_robot_links`
+      - all links of the articulation corresponding to the current arm
+  - Notes:
+    - this changes the monitoring set used by the early-stop logic, not just the printed debug output
+    - it is especially useful for debugging cases where finger/base links report `shapes=0` but other links may still carry collision

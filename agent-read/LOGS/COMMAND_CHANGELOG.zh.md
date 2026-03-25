@@ -241,3 +241,20 @@
     - 当 `--replay_objects_ignore_collision 1` 且对象未被纳入抓取/动作碰撞时，仍然不会创建 collision
   - 默认值：
     - `convex`
+
+- 新增命令参数：`--gripper_contact_monitor_mode {fingers,fingers_and_base,all_robot_links}`
+  - 入口：
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+    - `code_painting/plan_anygrasp_keyframes_r1_batch.py`
+  - 用途：
+    - 控制 `close_gripper` 阶段哪些 robot links 可以触发接触监控。
+  - 模式：
+    - `fingers`
+      - 仅 finger links
+    - `fingers_and_base`
+      - finger links + `left/right_gripper_link`
+    - `all_robot_links`
+      - 当前 arm 对应 articulation 的全部 links
+  - 说明：
+    - 这是停机判据使用的监控集合，不只是打印
+    - 当前非常适合用来排查“finger/base shapes=0，但其他 link 是否有 collision”这一类问题

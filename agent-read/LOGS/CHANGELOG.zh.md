@@ -522,3 +522,33 @@
   - 验证：
     - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_anygrasp_keyframes_r1_batch.py`
     - `git diff --check -- code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_anygrasp_keyframes_r1_batch.py`
+
+- 记录一次 `d_pour_blue_0` 的碰撞调试结论：
+  - 命令：
+    - 使用 `--execution_object_collision_mode solid_bbox --debug_collision_report 1`
+  - 关键输出：
+    - `planned_object_cup(shapes=1,types=PhysxCollisionShapeBox)`
+    - `planned_object_bottle(shapes=1,types=PhysxCollisionShapeBox)`
+    - `left_gripper_link(shapes=0)`
+    - `right_gripper_link(shapes=0)`
+    - `left_gripper_finger_link1/2(shapes=0)`
+    - `right_gripper_finger_link1/2(shapes=0)`
+    - 闭合全过程 `contact=0` 且 `base_contact=0`
+  - 结论：
+    - 物体侧 collision 已经成功生效
+    - 当前运行实例里，夹爪 base 和 finger links 在现有取 shape 路径下都显示 `shapes=0`
+    - 因此闭合阶段完全闭合到底，与“物体无碰撞”不同，更像是“夹爪侧当前没有可被检测到的 collision shape”
+
+- 新增夹爪接触监控范围参数：
+  - 文件：
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+    - `code_painting/plan_anygrasp_keyframes_r1_batch.py`
+  - 新增参数：
+    - `--gripper_contact_monitor_mode {fingers,fingers_and_base,all_robot_links}`
+  - 说明：
+    - `fingers`
+      - 保持原来的 finger-only 停机监控
+    - `fingers_and_base`
+      - 在 finger 基础上也监控 `left/right_gripper_link`
+    - `all_robot_links`
+      - 将整套 robot articulation links 都纳入闭合接触监控，主要用于 debug 当前夹爪 link collision 是否缺失

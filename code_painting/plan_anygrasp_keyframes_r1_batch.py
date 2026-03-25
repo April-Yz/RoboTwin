@@ -84,6 +84,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--enable_grasp_action_object_collision", type=int, default=0)
     parser.add_argument("--execution_object_collision_mode", choices=["convex", "solid_bbox"], default="convex")
     parser.add_argument("--debug_collision_report", type=int, default=0)
+    parser.add_argument("--gripper_contact_monitor_mode", choices=["fingers", "fingers_and_base", "all_robot_links"], default="fingers")
     parser.add_argument("--save_debug_preview", type=int, default=1)
     parser.add_argument("--debug_preview_fps", type=int, default=10)
     parser.add_argument("--debug_keyframe_hold_frames", type=int, default=12)
@@ -270,6 +271,8 @@ def build_single_command(args: argparse.Namespace, anygrasp_dir: Path, replay_di
         str(args.execution_object_collision_mode),
         "--debug_collision_report",
         str(args.debug_collision_report),
+        "--gripper_contact_monitor_mode",
+        str(args.gripper_contact_monitor_mode),
         "--save_debug_preview",
         str(args.save_debug_preview),
         "--debug_preview_fps",

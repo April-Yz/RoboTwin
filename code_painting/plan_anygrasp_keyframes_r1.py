@@ -248,6 +248,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--enable_grasp_action_object_collision", type=int, default=0, help="If 1, keep selected execution objects collision-capable but disable their collision before grasp. Collision is enabled only for the selected grasped objects during close_gripper/action, while the original no-collision mode remains available when this flag is 0.")
     parser.add_argument("--execution_object_collision_mode", choices=["convex", "solid_bbox"], default="convex", help="Collision shape used for execution objects when collision is enabled. 'convex' keeps the current convex mesh collision. 'solid_bbox' replaces collision with one solid axis-aligned box derived from the mesh bounds.")
     parser.add_argument("--debug_collision_report", type=int, default=0, help="If 1, print detailed collision/contact debug info during gripper close, including finger-only vs finger+gripper-base contacts and collision-shape summaries.")
+    parser.add_argument("--gripper_contact_monitor_mode", choices=["fingers", "fingers_and_base", "all_robot_links"], default="fingers", help="Which robot links are allowed to trigger contact during close_gripper collision monitoring. 'fingers' keeps the old behavior. 'fingers_and_base' also monitors left/right_gripper_link. 'all_robot_links' monitors the full articulation link set for debugging.")
     parser.add_argument("--save_debug_preview", type=int, default=1)
     parser.add_argument("--debug_preview_fps", type=int, default=10)
     parser.add_argument("--debug_keyframe_hold_frames", type=int, default=12)
@@ -1541,6 +1542,46 @@ def _get_gripper_base_entity(renderer: ReplayRenderer, arm: str) -> Optional[sap
     return getattr(ee_joint, "child_link", None)
 
 
+def _get_all_robot_link_entities(renderer: ReplayRenderer, arm: str) -> List[sapien.Entity]:
+    if renderer.robot is None:
+        return []
+    entity = renderer.robot.left_entity if arm == "left" else renderer.robot.right_entity
+    if entity is None:
+        return []
+    try:
+        return list(entity.get_links())
+    except Exception:
+        return []
+
+
+def _get_contact_monitor_entities(renderer: ReplayRenderer, arm: str, monitor_mode: str) -> List[sapien.Entity]:
+    finger_entities = list(_get_gripper_link_entities(renderer, arm))
+    if monitor_mode == "all_robot_links":
+        all_links = _get_all_robot_link_entities(renderer, arm)
+        unique_entities: List[sapien.Entity] = []
+        seen_ids = set()
+        for entity in all_links:
+            entity_id = id(entity)
+            if entity_id in seen_ids:
+                continue
+            seen_ids.add(entity_id)
+            unique_entities.append(entity)
+        return unique_entities
+    if monitor_mode == "fingers_and_base":
+        base_entity = _get_gripper_base_entity(renderer, arm)
+        if base_entity is not None:
+            finger_entities.append(base_entity)
+    unique_entities = []
+    seen_ids = set()
+    for entity in finger_entities:
+        entity_id = id(entity)
+        if entity_id in seen_ids:
+            continue
+        seen_ids.add(entity_id)
+        unique_entities.append(entity)
+    return unique_entities
+
+
 def _entity_name(entity: Optional[sapien.Entity]) -> str:
     if entity is None:
         return "none"
@@ -1622,6 +1663,7 @@ def close_grippers_progressively_with_collision_stop(
     stall_qpos_tol: float = 5e-5,
     contact_confirm_iters: int = 2,
     debug_collision_report: bool = False,
+    gripper_contact_monitor_mode: str = "fingers",
 ) -> Dict[str, Dict[str, object]]:
     if renderer.robot is None:
         return {}
@@ -1642,6 +1684,7 @@ def close_grippers_progressively_with_collision_stop(
             "reason": "target_reached",
             "gripper_entities": _get_gripper_link_entities(renderer, arm),
             "gripper_base_entity": _get_gripper_base_entity(renderer, arm),
+            "monitor_entities": _get_contact_monitor_entities(renderer, arm, str(gripper_contact_monitor_mode)),
             "object_actor": object_actor_by_arm.get(arm),
         }
 
@@ -1656,9 +1699,11 @@ def close_grippers_progressively_with_collision_stop(
             print(
                 "[collision-debug-init] "
                 f"arm={arm} "
+                f"monitor_mode={gripper_contact_monitor_mode} "
                 f"target={_summarize_entity_collision(target_entity)} "
                 f"gripper_base={_summarize_entity_collision(base_entity)} "
-                f"finger_links={_summarize_entities_collision(finger_entities)}"
+                f"finger_links={_summarize_entities_collision(finger_entities)} "
+                f"monitor_entities={_summarize_entities_collision(list(state['monitor_entities']))}"
             )
 
     for iter_idx in range(max_iters):
@@ -1699,9 +1744,10 @@ def close_grippers_progressively_with_collision_stop(
             finger_entities = list(state["gripper_entities"])  # type: ignore[arg-type]
             base_entity = state["gripper_base_entity"]  # type: ignore[assignment]
             monitored_with_base = finger_entities + ([base_entity] if base_entity is not None else [])
+            monitor_entities = list(state["monitor_entities"])  # type: ignore[arg-type]
             has_contact = _contact_involves_entities(
                 renderer,
-                finger_entities,
+                monitor_entities,
                 state["object_actor"],  # type: ignore[arg-type]
             )
             base_contact = _contact_involves_entities(
@@ -1715,7 +1761,7 @@ def close_grippers_progressively_with_collision_stop(
             if bool(debug_collision_report):
                 finger_pairs = _contact_pairs_involving_entities(
                     renderer,
-                    finger_entities,
+                    monitor_entities,
                     state["object_actor"],  # type: ignore[arg-type]
                 )
                 base_pairs = _contact_pairs_involving_entities(
@@ -1727,8 +1773,8 @@ def close_grippers_progressively_with_collision_stop(
                     "[collision-debug-step] "
                     f"arm={arm} iter={iter_idx + 1} cmd={float(state['current_cmd']):.3f} "
                     f"qpos_delta={qpos_delta:.6f} "
-                    f"finger_contact={int(has_contact)} base_contact={int(base_contact)} "
-                    f"finger_pairs={finger_pairs if finger_pairs else ['none']} "
+                    f"monitor_contact={int(has_contact)} base_contact={int(base_contact)} "
+                    f"monitor_pairs={finger_pairs if finger_pairs else ['none']} "
                     f"base_pairs={base_pairs if base_pairs else ['none']}"
                 )
 
@@ -1755,6 +1801,7 @@ def close_grippers_progressively_with_collision_stop(
             "had_contact": bool(int(state["contact_iters"]) > 0),
             "had_base_contact": bool(state["had_base_contact"]),
             "reason": str(state["reason"]),
+            "monitor_mode": str(gripper_contact_monitor_mode),
         }
     return result
 
@@ -4457,11 +4504,13 @@ def main() -> None:
                     args.close_gripper,
                     {arm_name: object_states[selected_objects_by_executed_arm[arm_name]].actor for arm_name in dual_arms},
                     debug_collision_report=bool(args.debug_collision_report),
+                    gripper_contact_monitor_mode=str(args.gripper_contact_monitor_mode),
                 )
                 print(
                     "[gripper-close] "
                     + " ".join(
-                        f"{arm_name}:reason={close_summary.get(arm_name, {}).get('reason', 'n/a')},"
+                        f"{arm_name}:monitor={close_summary.get(arm_name, {}).get('monitor_mode', 'n/a')},"
+                        f"reason={close_summary.get(arm_name, {}).get('reason', 'n/a')},"
                         f"cmd={float(close_summary.get(arm_name, {}).get('final_cmd', args.close_gripper)):.3f},"
                         f"contact={int(bool(close_summary.get(arm_name, {}).get('had_contact', False)))},"
                         f"base_contact={int(bool(close_summary.get(arm_name, {}).get('had_base_contact', False)))}"
@@ -4716,10 +4765,12 @@ def main() -> None:
                         args.close_gripper if exec_arm == "right" else None,
                         {exec_arm: object_states[exec_object_name].actor},
                         debug_collision_report=bool(args.debug_collision_report),
+                        gripper_contact_monitor_mode=str(args.gripper_contact_monitor_mode),
                     )
                     print(
                         "[gripper-close] "
-                        f"{exec_arm}:reason={close_summary.get(exec_arm, {}).get('reason', 'n/a')},"
+                        f"{exec_arm}:monitor={close_summary.get(exec_arm, {}).get('monitor_mode', 'n/a')},"
+                        f"reason={close_summary.get(exec_arm, {}).get('reason', 'n/a')},"
                         f"cmd={float(close_summary.get(exec_arm, {}).get('final_cmd', args.close_gripper)):.3f},"
                         f"contact={int(bool(close_summary.get(exec_arm, {}).get('had_contact', False)))},"
                         f"base_contact={int(bool(close_summary.get(exec_arm, {}).get('had_base_contact', False)))}"

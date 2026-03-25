@@ -521,3 +521,33 @@
   - Validation:
     - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_anygrasp_keyframes_r1_batch.py`
     - `git diff --check -- code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_anygrasp_keyframes_r1_batch.py`
+
+- Recorded one `d_pour_blue_0` collision-debug conclusion:
+  - Command:
+    - ran with `--execution_object_collision_mode solid_bbox --debug_collision_report 1`
+  - Key output:
+    - `planned_object_cup(shapes=1,types=PhysxCollisionShapeBox)`
+    - `planned_object_bottle(shapes=1,types=PhysxCollisionShapeBox)`
+    - `left_gripper_link(shapes=0)`
+    - `right_gripper_link(shapes=0)`
+    - `left_gripper_finger_link1/2(shapes=0)`
+    - `right_gripper_finger_link1/2(shapes=0)`
+    - the entire closing phase stayed at `contact=0` and `base_contact=0`
+  - Conclusion:
+    - object-side collision is active
+    - in the current runtime instance, the gripper base and finger links both show `shapes=0` through the current shape-inspection path
+    - therefore full closure is more consistent with “no detectable gripper-side collision shape” than with “objects have no collision”
+
+- Added gripper contact monitoring scope parameter:
+  - Files:
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+    - `code_painting/plan_anygrasp_keyframes_r1_batch.py`
+  - New parameter:
+    - `--gripper_contact_monitor_mode {fingers,fingers_and_base,all_robot_links}`
+  - Notes:
+    - `fingers`
+      - keeps the original finger-only stop monitoring
+    - `fingers_and_base`
+      - also monitors `left/right_gripper_link`
+    - `all_robot_links`
+      - monitors the full robot articulation link set during close-gripper contact checks; mainly intended to debug whether the gripper-link collisions are missing in the current runtime path
