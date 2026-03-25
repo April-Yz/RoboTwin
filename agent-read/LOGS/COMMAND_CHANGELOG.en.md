@@ -83,6 +83,30 @@
     - `code_painting/render_hand_retarget_r1_npz_urdfik.py`
 # 2026-03-25
 
+- `--pure_scene_output 1`
+  - Behavior update:
+    - no longer generates `debug_selection_preview.mp4`
+    - now keeps and writes:
+      - `head_cam_plan.mp4`
+      - `left_wrist_cam_plan.mp4`
+      - `right_wrist_cam_plan.mp4`
+    - auto-enables `pose_debug.jsonl`
+  - Main `pose_debug.jsonl` fields:
+    - `record_index`
+    - `stage`
+    - `active_frame`
+    - `current_*_camera_pose_world_wxyz`
+    - `current_*_tcp_pose_world_wxyz`
+    - `current_*_ee_pose_world_wxyz`
+    - `current_*_arm_qpos_rad`
+    - `current_*_gripper_joint_qpos_rad`
+    - `object_actor_poses`
+  - Related code:
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - Reference docs:
+    - `agent-read/2026-03-25_pure_mode_outputs_ZH.md`
+    - `agent-read/2026-03-25_pure_mode_outputs.md`
+
 - Added command parameter: `--debug_visualize_ik_waypoints`
   - Entry points:
     - `/home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py`

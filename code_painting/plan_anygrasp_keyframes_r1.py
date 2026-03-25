@@ -117,11 +117,14 @@ class DebugVisualBundle:
 @dataclass
 class DebugExecutionState:
     writer: Optional[cv2.VideoWriter]
+    left_wrist_writer: Optional[cv2.VideoWriter]
+    right_wrist_writer: Optional[cv2.VideoWriter]
     selected_keyframes: List[SelectedKeyframe]
     common_candidates_per_frame: Dict[int, List[CandidatePose]]
     arm_display_candidates: Dict[str, Dict[int, List[CandidatePose]]]
     head_intrinsic: np.ndarray
     active_frame: Optional[int] = None
+    record_index: int = 0
     pose_debug_path: Optional[Path] = None
     metrics_debug_path: Optional[Path] = None
     replay_head_camera_pose_by_frame: Optional[Dict[int, np.ndarray]] = None
@@ -243,8 +246,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--debug_keyframe_hold_frames", type=int, default=12)
     parser.add_argument("--save_debug_execution_preview", type=int, default=1)
     parser.add_argument("--debug_execution_fps", type=int, default=10)
-    parser.add_argument("--save_pose_debug", type=int, default=0, help="If 1, dump per-frame planner camera/TCP/object poses to pose_debug.jsonl.")
-    parser.add_argument("--pure_scene_output", type=int, default=0, help="If 1, keep head/third output videos clean: no overlay text, no candidate grippers, and no target-axis visualization. Debug videos remain unchanged.")
+    parser.add_argument("--save_pose_debug", type=int, default=0, help="If 1, dump per-frame planner camera/TCP/EE/qpos/object poses to pose_debug.jsonl. pure_scene_output also enables this file automatically.")
+    parser.add_argument("--pure_scene_output", type=int, default=0, help="If 1, keep head/third output videos clean: no overlay text, no candidate grippers, and no target-axis visualization. Also skip debug_selection_preview.mp4, keep head/left_wrist/right_wrist plan videos, and auto-save pose_debug.jsonl.")
     parser.add_argument("--debug_visualize_targets", type=int, default=1, help="If 1, show target axis actors. Original internal name: debug_visualize_targets.")
     parser.add_argument("--debug_visualize_ik_waypoints", type=int, default=0, help="If 1, visualize intermediate URDF IK Cartesian waypoints as point+forward-axis markers in viewer/debug output.")
     parser.add_argument("--save_rank_preview_images", type=int, default=1)
@@ -637,15 +640,6 @@ def build_renderer(args: argparse.Namespace) -> ReplayRenderer:
         renderer_kwargs["urdfik_cartesian_interp_steps"] = int(args.urdfik_cartesian_interp_steps)
         renderer_kwargs["urdfik_cartesian_interp_auto_step_m"] = float(args.urdfik_cartesian_interp_auto_step_m)
     renderer = renderer_cls(**renderer_kwargs)
-    # This planner script never captures wrist-camera RGB. Hide wrist cameras in the
-    # scene so their frustums do not show up in saved videos / viewer output.
-    try:
-        renderer.left_wrist_camera.set_entity_pose(base.HIDDEN_DEBUG_POSE)
-        renderer.right_wrist_camera.set_entity_pose(base.HIDDEN_DEBUG_POSE)
-        renderer._left_wrist_camera_link = None
-        renderer._right_wrist_camera_link = None
-    except Exception:
-        pass
     # SAPIEN viewer draws camera frustum lines through ControlWindow.show_camera_linesets.
     # Keep them off by default so viewer recordings match the intended clean video output.
     try:
@@ -2089,6 +2083,16 @@ def record_frame(
         third_rgb, _ = renderer.capture_camera(renderer.third_camera)
         third_bgr = base.overlay_text(third_rgb, overlay_lines) if use_overlay else cv2.cvtColor(third_rgb, cv2.COLOR_RGB2BGR)
         third_writer.write(third_bgr)
+    if debug_execution_state is not None and debug_execution_state.left_wrist_writer is not None and getattr(renderer, "_left_wrist_camera_link", None) is not None:
+        left_wrist_rgb, _ = renderer.capture_camera(renderer.left_wrist_camera)
+        left_wrist_lines = list(overlay_lines) + ["left_wrist"]
+        left_wrist_bgr = base.overlay_text(left_wrist_rgb, left_wrist_lines) if use_overlay else cv2.cvtColor(left_wrist_rgb, cv2.COLOR_RGB2BGR)
+        debug_execution_state.left_wrist_writer.write(left_wrist_bgr)
+    if debug_execution_state is not None and debug_execution_state.right_wrist_writer is not None and getattr(renderer, "_right_wrist_camera_link", None) is not None:
+        right_wrist_rgb, _ = renderer.capture_camera(renderer.right_wrist_camera)
+        right_wrist_lines = list(overlay_lines) + ["right_wrist"]
+        right_wrist_bgr = base.overlay_text(right_wrist_rgb, right_wrist_lines) if use_overlay else cv2.cvtColor(right_wrist_rgb, cv2.COLOR_RGB2BGR)
+        debug_execution_state.right_wrist_writer.write(right_wrist_bgr)
     frame_metrics = None
     if debug_execution_state is not None:
         frame_metrics = build_execution_frame_metrics(renderer, debug_execution_state)
@@ -2128,6 +2132,26 @@ def record_frame(
         debug_execution_state.writer.write(debug_bgr)
     if debug_execution_state is not None and debug_execution_state.pose_debug_path is not None:
         current_head_pose = renderer.get_head_camera_pose()
+        current_left_ee_pose = renderer.robot.get_left_ee_pose()
+        current_right_ee_pose = renderer.robot.get_right_ee_pose()
+        current_left_wrist_camera_pose = None
+        current_right_wrist_camera_pose = None
+        if getattr(renderer, "_left_wrist_camera_link", None) is not None:
+            left_wrist_pose = renderer.get_wrist_camera_pose("left")
+            current_left_wrist_camera_pose = (
+                np.asarray(left_wrist_pose.p, dtype=np.float64).reshape(3).tolist()
+                + base.normalize_quat_wxyz(np.asarray(left_wrist_pose.q, dtype=np.float64).reshape(4)).tolist()
+            )
+        if getattr(renderer, "_right_wrist_camera_link", None) is not None:
+            right_wrist_pose = renderer.get_wrist_camera_pose("right")
+            current_right_wrist_camera_pose = (
+                np.asarray(right_wrist_pose.p, dtype=np.float64).reshape(3).tolist()
+                + base.normalize_quat_wxyz(np.asarray(right_wrist_pose.q, dtype=np.float64).reshape(4)).tolist()
+            )
+        left_arm_qpos = np.asarray(renderer.robot.get_left_arm_real_jointState()[:6], dtype=np.float64).reshape(6)
+        right_arm_qpos = np.asarray(renderer.robot.get_right_arm_real_jointState()[:6], dtype=np.float64).reshape(6)
+        left_gripper_joint_qpos = _get_gripper_joint_positions(renderer, "left")
+        right_gripper_joint_qpos = _get_gripper_joint_positions(renderer, "right")
         object_actor_poses = {}
         if debug_execution_state.object_tracks is not None:
             for name, track in debug_execution_state.object_tracks.items():
@@ -2146,14 +2170,32 @@ def record_frame(
                     if idx is not None:
                         object_actor_poses[name]["replay_pose_world_wxyz"] = np.asarray(track.pose_world_wxyz[idx], dtype=np.float64).tolist()
         pose_debug = {
+            "record_index": int(debug_execution_state.record_index),
             "active_frame": None if debug_execution_state.active_frame is None else int(debug_execution_state.active_frame),
+            "stage": debug_execution_state.current_stage,
             "overlay_lines": list(overlay_lines),
             "current_head_camera_pose_world_wxyz": (
                 np.asarray(current_head_pose.p, dtype=np.float64).reshape(3).tolist()
                 + base.normalize_quat_wxyz(np.asarray(current_head_pose.q, dtype=np.float64).reshape(4)).tolist()
             ),
+            "current_left_wrist_camera_pose_world_wxyz": current_left_wrist_camera_pose,
+            "current_right_wrist_camera_pose_world_wxyz": current_right_wrist_camera_pose,
             "current_left_tcp_pose_world_wxyz": np.asarray(renderer.get_current_tcp_pose("left"), dtype=np.float64).tolist(),
             "current_right_tcp_pose_world_wxyz": np.asarray(renderer.get_current_tcp_pose("right"), dtype=np.float64).tolist(),
+            "current_left_ee_pose_world_wxyz": (
+                np.asarray(current_left_ee_pose.p, dtype=np.float64).reshape(3).tolist()
+                + base.normalize_quat_wxyz(np.asarray(current_left_ee_pose.q, dtype=np.float64).reshape(4)).tolist()
+            ),
+            "current_right_ee_pose_world_wxyz": (
+                np.asarray(current_right_ee_pose.p, dtype=np.float64).reshape(3).tolist()
+                + base.normalize_quat_wxyz(np.asarray(current_right_ee_pose.q, dtype=np.float64).reshape(4)).tolist()
+            ),
+            "current_left_arm_qpos_rad": left_arm_qpos.tolist(),
+            "current_right_arm_qpos_rad": right_arm_qpos.tolist(),
+            "current_left_gripper_joint_qpos_rad": left_gripper_joint_qpos.tolist(),
+            "current_right_gripper_joint_qpos_rad": right_gripper_joint_qpos.tolist(),
+            "current_left_gripper_command": float(renderer.robot.get_left_gripper_val()),
+            "current_right_gripper_command": float(renderer.robot.get_right_gripper_val()),
             "replay_head_camera_pose_world_wxyz": None
             if debug_execution_state.replay_head_camera_pose_by_frame is None or debug_execution_state.active_frame is None
             else np.asarray(
@@ -2168,6 +2210,8 @@ def record_frame(
     if debug_execution_state is not None and debug_execution_state.metrics_debug_path is not None and frame_metrics is not None:
         with debug_execution_state.metrics_debug_path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(frame_metrics, ensure_ascii=False) + "\n")
+    if debug_execution_state is not None:
+        debug_execution_state.record_index += 1
     if debug_visuals is not None and not viewer_active:
         for actors in debug_visuals.common_candidate_actors.values():
             for actor in actors:
@@ -3616,7 +3660,7 @@ def generate_debug_preview(
     head_intrinsic: np.ndarray,
     debug_visuals: DebugVisualBundle,
 ) -> Optional[Path]:
-    if not bool(args.save_debug_preview):
+    if not bool(args.save_debug_preview) or bool(args.pure_scene_output):
         renderer.update_target_axis_visuals(None, None)
         return None
 
@@ -3731,7 +3775,8 @@ def main() -> None:
         raise FileNotFoundError(f"reuse_preview_summary_json not found: {args.reuse_preview_summary_json}")
     if args.reuse_plan_summary_json is not None and args.reuse_preview_summary_json is not None:
         raise ValueError("Specify only one of --reuse_plan_summary_json or --reuse_preview_summary_json")
-    if bool(args.save_pose_debug):
+    save_pose_debug_effective = bool(args.save_pose_debug) or bool(args.pure_scene_output)
+    if save_pose_debug_effective:
         pose_debug_path = args.output_dir / "pose_debug.jsonl"
         if pose_debug_path.exists():
             pose_debug_path.unlink()
@@ -3954,6 +3999,8 @@ def main() -> None:
 
     head_video_path = args.output_dir / "head_cam_plan.mp4"
     third_video_path = args.output_dir / "third_cam_plan.mp4"
+    left_wrist_video_path = args.output_dir / "left_wrist_cam_plan.mp4"
+    right_wrist_video_path = args.output_dir / "right_wrist_cam_plan.mp4"
     debug_execution_video_path = args.output_dir / "debug_execution_preview.mp4"
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     head_writer = cv2.VideoWriter(str(head_video_path), fourcc, args.fps, (args.image_width, args.image_height))
@@ -3964,6 +4011,16 @@ def main() -> None:
         third_writer = cv2.VideoWriter(str(third_video_path), fourcc, args.fps, (args.image_width, args.image_height))
         if not third_writer.isOpened():
             raise RuntimeError(f"Failed to open {third_video_path}")
+    left_wrist_writer = None
+    if getattr(renderer, "_left_wrist_camera_link", None) is not None:
+        left_wrist_writer = cv2.VideoWriter(str(left_wrist_video_path), fourcc, args.fps, (args.image_width, args.image_height))
+        if not left_wrist_writer.isOpened():
+            raise RuntimeError(f"Failed to open {left_wrist_video_path}")
+    right_wrist_writer = None
+    if getattr(renderer, "_right_wrist_camera_link", None) is not None:
+        right_wrist_writer = cv2.VideoWriter(str(right_wrist_video_path), fourcc, args.fps, (args.image_width, args.image_height))
+        if not right_wrist_writer.isOpened():
+            raise RuntimeError(f"Failed to open {right_wrist_video_path}")
     debug_execution_writer = None
     if bool(args.save_debug_execution_preview):
         debug_execution_writer = cv2.VideoWriter(str(debug_execution_video_path), fourcc, int(args.debug_execution_fps), (args.image_width, args.image_height))
@@ -3971,12 +4028,14 @@ def main() -> None:
             raise RuntimeError(f"Failed to open {debug_execution_video_path}")
     debug_execution_state = DebugExecutionState(
         writer=debug_execution_writer,
+        left_wrist_writer=left_wrist_writer,
+        right_wrist_writer=right_wrist_writer,
         selected_keyframes=selected_keyframes,
         common_candidates_per_frame=common_candidates_per_frame,
         arm_display_candidates=arm_display_candidates,
         head_intrinsic=head_intrinsic,
         active_frame=None,
-        pose_debug_path=(args.output_dir / "pose_debug.jsonl") if bool(args.save_pose_debug) else None,
+        pose_debug_path=(args.output_dir / "pose_debug.jsonl") if save_pose_debug_effective else None,
         metrics_debug_path=metrics_debug_path,
         replay_head_camera_pose_by_frame=replay_head_camera_pose_by_frame,
         object_tracks=object_tracks,
@@ -4515,6 +4574,10 @@ def main() -> None:
         head_writer.release()
         if third_writer is not None:
             third_writer.release()
+        if left_wrist_writer is not None:
+            left_wrist_writer.release()
+        if right_wrist_writer is not None:
+            right_wrist_writer.release()
         if debug_execution_writer is not None:
             debug_execution_writer.release()
         renderer.update_target_axis_visuals(None, None)
@@ -4570,6 +4633,7 @@ def main() -> None:
         "candidate_target_local_x_offset_m": float(args.candidate_target_local_x_offset_m),
         "enable_grasp_action_object_collision": int(args.enable_grasp_action_object_collision),
         "pure_scene_output": int(args.pure_scene_output),
+        "save_pose_debug_effective": int(save_pose_debug_effective),
         "reach_error_pose_source": args.reach_error_pose_source,
         "init_prefix_frames": int(args.init_prefix_frames),
         "execute_both_arms": int(args.execute_both_arms),
@@ -4730,9 +4794,12 @@ def main() -> None:
         ],
         "debug_execution_video": str(debug_execution_video_path) if debug_execution_writer is not None else None,
         "debug_execution_metrics": str(metrics_debug_path),
+        "pose_debug": str(args.output_dir / "pose_debug.jsonl") if save_pose_debug_effective else None,
         "analysis_plots": analysis_plot_paths,
         "head_video": str(head_video_path),
         "third_video": str(third_video_path) if third_writer is not None else None,
+        "left_wrist_video": str(left_wrist_video_path) if left_wrist_writer is not None else None,
+        "right_wrist_video": str(right_wrist_video_path) if right_wrist_writer is not None else None,
     }
     summary["failed_stage_records"] = collect_failed_stage_records(stages_by_executed_arm)
     summary["execution_failed"] = bool(summary["failed_stage_records"])

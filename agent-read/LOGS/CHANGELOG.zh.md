@@ -240,6 +240,30 @@
     - `cartesian_interp_ik` 生成的 `joint_waypoints` 现在会成为真实执行轨迹的一部分
 # 2026-03-25
 
+- pure 模式输出增强：
+  - 文件：
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - 改动：
+    - `pure_scene_output=1` 时不再生成 `debug_selection_preview.mp4`
+    - 规划主流程现在会同时写出：
+      - `head_cam_plan.mp4`
+      - `left_wrist_cam_plan.mp4`
+      - `right_wrist_cam_plan.mp4`
+    - pure 模式会自动启用 `pose_debug.jsonl`，即使未显式传 `--save_pose_debug 1`
+    - `pose_debug.jsonl` 现在额外记录：
+      - 左右腕部相机 pose
+      - 左右 TCP / EE pose
+      - 左右臂 6 维 qpos
+      - 左右夹爪 finger-joint qpos
+      - 物体 actor pose / replay pose
+    - `plan_summary.json` 新增对应的视频和数据路径字段
+  - 文档：
+    - `agent-read/2026-03-25_pure_mode_outputs_ZH.md`
+    - `agent-read/2026-03-25_pure_mode_outputs.md`
+  - 验证：
+    - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_anygrasp_keyframes_r1_batch.py code_painting/render_hand_retarget_r1_npz_urdfik.py`
+    - `git diff --check -- code_painting/plan_anygrasp_keyframes_r1.py`
+
 - 新增 `--debug_visualize_ik_waypoints` 调试参数，用于在 `--planner_backend urdfik --urdfik_trajectory_mode cartesian_interp_ik` 下，把中间 `tcp_waypoints_world` 可视化到 viewer/debug 输出中。
 - 可视化形式为“小球 + 局部前进轴”，仅显示中间 waypoint，不显示起点和终点；终点继续使用原有 target axis。
 - 该改动只影响调试显示，不改变 waypoint 生成、IK 求解、轨迹执行或碰撞逻辑。
