@@ -188,3 +188,27 @@
     - then recover each gripper joint's actual position by accumulating offsets over `active_joints` with `joint.get_dof()`
   - Code location:
     - `code_painting/plan_anygrasp_keyframes_r1.py:_get_gripper_joint_positions`
+
+## 2026-03-25 14:05:00 +08
+
+- Added an explicit warning when `grasp` has not reached the target but execution still proceeds to `close_gripper`:
+  - File:
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - Behavior:
+    - before `close_gripper`, if the `grasp` stage reports `reached=False`, the script now prints `[warn] grasp_not_reached_before_close ...`
+    - this is logging only and does not change the execution logic
+
+- Added an automatic waypoint mode for URDF IK Cartesian interpolation:
+  - File:
+    - `code_painting/render_hand_retarget_r1_npz_urdfik.py`
+  - New behavior:
+    - when `--urdfik_cartesian_interp_steps > 1`, the original fixed-step mode is preserved
+    - when `--urdfik_cartesian_interp_steps -1`, an automatic mode is enabled
+  - Automatic mode rule:
+    - if absolute translation distance is `<= 5cm`, no intermediate TCP waypoint is added (start and goal only)
+    - once translation exceeds `5cm`, one additional intermediate waypoint is added per extra `5cm` bucket
+    - examples:
+      - `10cm` translation -> `1` intermediate waypoint
+      - `15cm` translation -> `2` intermediate waypoints
+  - Note:
+    - this automatic mode only adjusts waypoint count from TCP translation distance and does not change the IK target or execution semantics

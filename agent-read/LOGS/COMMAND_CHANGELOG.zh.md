@@ -44,3 +44,16 @@
   - 使用说明：
     - 参数形式不变，仍然只需追加 `--enable_grasp_action_object_collision 1`
     - 默认 `0` 时，仍保留原来的无碰撞快速闭合模式
+
+## 2026-03-25 14:05:00 +08
+
+- `--urdfik_cartesian_interp_steps`
+  - 新增约定：
+    - `-1` 表示自动 waypoint 模式
+  - 自动模式规则：
+    - 位移 `<= 0.05m` 时，不加中间 waypoint
+    - 位移每超过一个 `0.05m` 档位，增加一个中间 waypoint
+  - 示例：
+    - `--urdfik_cartesian_interp_steps -1`
+  - 相关代码：
+    - `code_painting/render_hand_retarget_r1_npz_urdfik.py`

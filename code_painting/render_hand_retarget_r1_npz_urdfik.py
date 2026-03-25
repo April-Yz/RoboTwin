@@ -45,7 +45,8 @@ DEFAULT_INIT_GRIPPER_OPEN = 1.0
 class HandRetargetR1URDFIKRenderer(ReplayRenderer):
     def __init__(self, *args, **kwargs) -> None:
         self.urdfik_trajectory_mode = str(kwargs.pop("urdfik_trajectory_mode", "joint_interp"))
-        self.urdfik_cartesian_interp_steps = max(int(kwargs.pop("urdfik_cartesian_interp_steps", 8)), 2)
+        raw_cartesian_interp_steps = int(kwargs.pop("urdfik_cartesian_interp_steps", 8))
+        self.urdfik_cartesian_interp_steps = -1 if raw_cartesian_interp_steps == -1 else max(raw_cartesian_interp_steps, 2)
         kwargs["attach_planner"] = False
         if kwargs.get("init_left_arm_joints") is None:
             kwargs["init_left_arm_joints"] = DEFAULT_INIT_LEFT_ARM_JOINTS.copy()
@@ -123,6 +124,20 @@ class HandRetargetR1URDFIKRenderer(ReplayRenderer):
 
         effective_waypoints = max(2, min(requested_waypoints, max_steps_from_translation, max_steps_from_rotation))
         return effective_waypoints
+
+    @staticmethod
+    def _auto_cartesian_interp_steps(
+        start_pose_world: np.ndarray,
+        target_pose_world: np.ndarray,
+        trigger_translation_m: float = 0.05,
+    ) -> int:
+        start_pose_world = np.asarray(start_pose_world, dtype=np.float64).reshape(7)
+        target_pose_world = np.asarray(target_pose_world, dtype=np.float64).reshape(7)
+        translation_dist = float(np.linalg.norm(target_pose_world[:3] - start_pose_world[:3]))
+        if translation_dist <= trigger_translation_m:
+            return 2
+        intermediate_waypoints = max(int(np.ceil(translation_dist / trigger_translation_m)) - 1, 1)
+        return intermediate_waypoints + 2
 
     @staticmethod
     def _interpolate_tcp_pose_world_series(
@@ -279,17 +294,28 @@ class HandRetargetR1URDFIKRenderer(ReplayRenderer):
         current_arm = self._current_arm_joints(arm)
         current_full = np.concatenate([self.torso_qpos, current_arm], dtype=np.float64)
         current_tcp_world = np.asarray(self.get_current_tcp_pose(arm), dtype=np.float64).reshape(7)
-        effective_waypoints = self._effective_cartesian_interp_steps(
-            current_tcp_world,
-            target_pose_world,
-            self.urdfik_cartesian_interp_steps,
-            min_translation_step_m=self.left_ik_solver.default_position_threshold * 3.0,
-            min_rotation_step_rad=self.left_ik_solver.default_rotation_threshold * 1.5,
-        )
-        if effective_waypoints != self.urdfik_cartesian_interp_steps:
+        if self.urdfik_cartesian_interp_steps == -1:
+            requested_waypoints = self._auto_cartesian_interp_steps(current_tcp_world, target_pose_world)
+            effective_waypoints = requested_waypoints
+            if effective_waypoints != 2:
+                print(
+                    "[ik-waypoints] "
+                    f"arm={arm} requested=auto "
+                    f"effective={effective_waypoints}"
+                )
+        else:
+            requested_waypoints = self.urdfik_cartesian_interp_steps
+            effective_waypoints = self._effective_cartesian_interp_steps(
+                current_tcp_world,
+                target_pose_world,
+                requested_waypoints,
+                min_translation_step_m=self.left_ik_solver.default_position_threshold * 3.0,
+                min_rotation_step_rad=self.left_ik_solver.default_rotation_threshold * 1.5,
+            )
+        if requested_waypoints != -1 and effective_waypoints != requested_waypoints:
             print(
                 "[ik-waypoints] "
-                f"arm={arm} requested={self.urdfik_cartesian_interp_steps} "
+                f"arm={arm} requested={requested_waypoints} "
                 f"effective={effective_waypoints}"
             )
         tcp_waypoints_world = self._interpolate_tcp_pose_world_series(

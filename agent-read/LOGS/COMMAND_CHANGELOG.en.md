@@ -44,3 +44,16 @@
   - Usage:
     - Command syntax is unchanged; keep using `--enable_grasp_action_object_collision 1`
     - With the default `0`, the original fast no-collision closing behavior is preserved
+
+## 2026-03-25 14:05:00 +08
+
+- `--urdfik_cartesian_interp_steps`
+  - New convention:
+    - `-1` enables automatic waypoint mode
+  - Automatic rule:
+    - no intermediate waypoint when translation is `<= 0.05m`
+    - add one intermediate waypoint for each additional `0.05m` bucket beyond that threshold
+  - Example:
+    - `--urdfik_cartesian_interp_steps -1`
+  - Related code:
+    - `code_painting/render_hand_retarget_r1_npz_urdfik.py`

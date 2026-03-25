@@ -189,3 +189,27 @@
     - 再按 `active_joints` 和 `joint.get_dof()` 累积偏移，提取夹爪 joint 对应的实际关节值
   - 代码位置：
     - `code_painting/plan_anygrasp_keyframes_r1.py:_get_gripper_joint_positions`
+
+## 2026-03-25 14:05:00 +08
+
+- 为 `grasp` 未到位但仍继续 `close_gripper` 的场景增加显式警告：
+  - 文件：
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - 行为：
+    - 在进入 `close_gripper` 前，如果 `grasp` 阶段 `reached=False`，打印 `[warn] grasp_not_reached_before_close ...`
+    - 仅增加日志，不改变原有执行逻辑
+
+- 为 URDF IK 的 Cartesian waypoint 模式增加自动步数模式：
+  - 文件：
+    - `code_painting/render_hand_retarget_r1_npz_urdfik.py`
+  - 新行为：
+    - `--urdfik_cartesian_interp_steps > 1` 时，继续保留原有固定步数模式
+    - `--urdfik_cartesian_interp_steps -1` 时启用自动模式
+  - 自动模式规则：
+    - 绝对平移距离 `<= 5cm` 时，不增加中间 TCP waypoint（等价于只保留起点和终点）
+    - 平移距离 `> 5cm` 后，每增加一个 `5cm` 档位增加一个中间 waypoint
+    - 示例：
+      - `10cm` 平移 -> `1` 个中间 waypoint
+      - `15cm` 平移 -> `2` 个中间 waypoint
+  - 说明：
+    - 该自动模式只根据 TCP 平移距离调节 waypoint 数，不改变现有 IK 目标或执行逻辑

@@ -4056,6 +4056,15 @@ def main() -> None:
                 f"left_reached={int(bool(grasp_dual['arms'].get('left', {}).get('reached', False)))} "
                 f"right_reached={int(bool(grasp_dual['arms'].get('right', {}).get('reached', False)))}"
             )
+            if not all(bool(grasp_dual["arms"].get(arm_name, {}).get("reached", False)) for arm_name in dual_arms):
+                print(
+                    "[warn] grasp_not_reached_before_close "
+                    + " ".join(
+                        f"{arm_name}:pos={float(grasp_dual['arms'][arm_name]['pos_err_m']):.4f},"
+                        f"rot={float(grasp_dual['arms'][arm_name]['rot_err_deg']):.2f}"
+                        for arm_name in dual_arms
+                    )
+                )
 
             if bool(args.enable_grasp_action_object_collision):
                 set_object_collision_for_names(
@@ -4310,6 +4319,12 @@ def main() -> None:
                     "[stage] keyframe_1 grasp finished "
                     f"arm={exec_arm} reached={int(bool(grasp_result.get('reached', False)))}"
                 )
+                if not bool(grasp_result.get("reached", False)):
+                    print(
+                        "[warn] grasp_not_reached_before_close "
+                        f"{exec_arm}:pos={float(grasp_result.get('pos_err_m', 0.0)):.4f},"
+                        f"rot={float(grasp_result.get('rot_err_deg', 0.0)):.2f}"
+                    )
 
                 set_single_arm_target_visual(renderer, exec_arm, grasp_pose)
                 if bool(args.enable_grasp_action_object_collision):
