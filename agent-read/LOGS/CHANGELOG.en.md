@@ -110,3 +110,18 @@
   - Validation:
     - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1_batch.py`
     - `git -C /home/zaijia001/ssd/RoboTwin diff --check -- code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_anygrasp_keyframes_r1_batch.py`
+
+## 2026-03-25 12:22:00 +08
+
+- Adjusted the default visualization behavior of `plan_anygrasp_keyframes_r1.py`:
+  - File:
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - Changes:
+    - restored target-pose axes to be visible by default
+    - hid the left/right wrist cameras by default in this planner script so wrist-camera frustums no longer appear in saved videos / viewer output
+  - Notes:
+    - this affects only the default behavior of `plan_anygrasp_keyframes_r1.py`
+    - it does not change the shared base renderer behavior for other scripts
+    - it does not affect head-camera or third-person capture itself
+  - Validation:
+    - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py`

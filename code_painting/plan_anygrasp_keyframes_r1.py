@@ -601,7 +601,9 @@ def build_renderer(args: argparse.Namespace) -> ReplayRenderer:
         viewer_wait_at_end=bool(args.viewer_wait_at_end),
         debug_mode=False,
         debug_force_orientation="none",
-        debug_visualize_targets=False,
+        # Keep target axes visible by default in the planner script so grasp/action
+        # targets remain inspectable in viewer/debug videos.
+        debug_visualize_targets=True,
         debug_target_axis_length=args.debug_target_axis_length,
         debug_target_axis_thickness=args.debug_target_axis_thickness,
         orientation_remap_label="identity",
@@ -624,7 +626,17 @@ def build_renderer(args: argparse.Namespace) -> ReplayRenderer:
     if args.planner_backend == "urdfik":
         renderer_kwargs["urdfik_trajectory_mode"] = str(args.urdfik_trajectory_mode)
         renderer_kwargs["urdfik_cartesian_interp_steps"] = int(args.urdfik_cartesian_interp_steps)
-    return renderer_cls(**renderer_kwargs)
+    renderer = renderer_cls(**renderer_kwargs)
+    # This planner script never captures wrist-camera RGB. Hide wrist cameras in the
+    # scene so their frustums do not show up in saved videos / viewer output.
+    try:
+        renderer.left_wrist_camera.set_entity_pose(base.HIDDEN_DEBUG_POSE)
+        renderer.right_wrist_camera.set_entity_pose(base.HIDDEN_DEBUG_POSE)
+        renderer._left_wrist_camera_link = None
+        renderer._right_wrist_camera_link = None
+    except Exception:
+        pass
+    return renderer
 
 
 def load_hand_data(hand_npz: Path) -> Dict[str, np.ndarray]:

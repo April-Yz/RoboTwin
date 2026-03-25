@@ -110,3 +110,18 @@
   - 验证：
     - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1_batch.py`
     - `git -C /home/zaijia001/ssd/RoboTwin diff --check -- code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_anygrasp_keyframes_r1_batch.py`
+
+## 2026-03-25 12:22:00 +08
+
+- 调整 `plan_anygrasp_keyframes_r1.py` 的默认可视化行为：
+  - 文件：
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - 改动：
+    - 将目标位姿坐标轴可视化恢复为默认开启
+    - 在这条规划脚本里默认隐藏 left/right wrist camera，使保存视频和 viewer 中不再出现 wrist 相机视野框
+  - 说明：
+    - 这只影响 `plan_anygrasp_keyframes_r1.py` 这条脚本的默认行为
+    - 不修改底层通用 renderer 的其它脚本用途
+    - 不影响 head camera / third-person 输出本身
+  - 验证：
+    - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py`
