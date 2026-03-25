@@ -2,6 +2,24 @@
 
 ## 2026-03-25
 
+- Fixed pure-mode EE-pose serialization compatibility in `pose_debug.jsonl`:
+  - File:
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - Problem:
+    - the newly added `current_left_ee_pose_world_wxyz` / `current_right_ee_pose_world_wxyz` export path in `record_frame(...)` incorrectly assumed that `robot.get_*_ee_pose()` returns a `sapien.Pose`
+    - in this robot implementation the API actually returns a 7D list `[x, y, z, qw, qx, qy, qz]`
+    - pure-mode batch runs therefore crashed on the first frame write with:
+      - `AttributeError: 'list' object has no attribute 'p'`
+  - Fix:
+    - added `pose_like_to_world_wxyz(...)`
+    - made the serializer accept both `sapien.Pose` objects and 7D pose lists
+    - switched the relevant head/ee pose exports in `record_frame(...)` to use the shared helper
+  - Impact:
+    - no change to planning or execution behavior
+    - this only fixes pure-mode `pose_debug.jsonl` serialization
+  - Validation:
+    - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py`
+
 - Added CLI parameter `--urdfik_cartesian_interp_auto_step_m` to control the translation-density threshold used by automatic waypoint mode when `--urdfik_cartesian_interp_steps=-1`.
 - The old `0.05m` threshold was hardcoded; it is now configurable with the same default `0.05`. Fixed waypoint mode is unchanged.
 - `render_hand_retarget_r1_npz_urdfik.py` now prints the active `auto_step_m` in `[ik-trajectory]` and `[ik-waypoints]` logs.

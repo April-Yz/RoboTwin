@@ -88,6 +88,10 @@
 
 - `tcp` 对应 planner / gripper 参考点语义
 - `ee` 对应 wrist/endlink 语义
+- 当前实现里：
+  - `current_*_tcp_pose_world_wxyz` 直接来自 planner 侧 7 维 pose
+  - `current_*_ee_pose_world_wxyz` 来自 `robot.get_*_ee_pose()` 返回的 7 维列表，而不是 `sapien.Pose`
+  - 导出层现已兼容这两种 pose 表示，后处理时都可统一按 `[x, y, z, qw, qx, qy, qz]` 读取
 
 ### 机器人关节状态
 

@@ -2,6 +2,24 @@
 
 ## 2026-03-25
 
+- 修复 pure 模式 `pose_debug.jsonl` 导出时的 EE pose 类型兼容问题：
+  - 文件：
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - 问题：
+    - `record_frame(...)` 新增的 `current_left_ee_pose_world_wxyz` / `current_right_ee_pose_world_wxyz` 导出逻辑，误把 `robot.get_*_ee_pose()` 当成 `sapien.Pose`
+    - 但该机器人接口实际返回的是 7 维列表 `[x, y, z, qw, qx, qy, qz]`
+    - 导致 pure 模式批处理在首帧落盘时触发：
+      - `AttributeError: 'list' object has no attribute 'p'`
+  - 修复：
+    - 新增 `pose_like_to_world_wxyz(...)`
+    - 统一兼容 `sapien.Pose` 与 7 维 pose 列表两种输入
+    - `record_frame(...)` 中的 head/ee pose 导出改为统一走该 helper
+  - 影响：
+    - 不改变主规划/执行逻辑
+    - 只修复 pure 模式下 `pose_debug.jsonl` 的数据序列化
+  - 验证：
+    - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py`
+
 - 新增 CLI 参数 `--urdfik_cartesian_interp_auto_step_m`，用于控制 `--urdfik_cartesian_interp_steps=-1` 时自动 waypoint 模式的平移密度阈值。
 - 旧逻辑中 `0.05m` 为硬编码；现在变为参数，默认仍为 `0.05`，固定步数模式不受影响。
 - `render_hand_retarget_r1_npz_urdfik.py` 现在会在 `[ik-trajectory]` 与 `[ik-waypoints]` 日志中打印当前 `auto_step_m`。

@@ -2174,22 +2174,13 @@ def record_frame(
             "active_frame": None if debug_execution_state.active_frame is None else int(debug_execution_state.active_frame),
             "stage": debug_execution_state.current_stage,
             "overlay_lines": list(overlay_lines),
-            "current_head_camera_pose_world_wxyz": (
-                np.asarray(current_head_pose.p, dtype=np.float64).reshape(3).tolist()
-                + base.normalize_quat_wxyz(np.asarray(current_head_pose.q, dtype=np.float64).reshape(4)).tolist()
-            ),
+            "current_head_camera_pose_world_wxyz": pose_like_to_world_wxyz(current_head_pose).tolist(),
             "current_left_wrist_camera_pose_world_wxyz": current_left_wrist_camera_pose,
             "current_right_wrist_camera_pose_world_wxyz": current_right_wrist_camera_pose,
             "current_left_tcp_pose_world_wxyz": np.asarray(renderer.get_current_tcp_pose("left"), dtype=np.float64).tolist(),
             "current_right_tcp_pose_world_wxyz": np.asarray(renderer.get_current_tcp_pose("right"), dtype=np.float64).tolist(),
-            "current_left_ee_pose_world_wxyz": (
-                np.asarray(current_left_ee_pose.p, dtype=np.float64).reshape(3).tolist()
-                + base.normalize_quat_wxyz(np.asarray(current_left_ee_pose.q, dtype=np.float64).reshape(4)).tolist()
-            ),
-            "current_right_ee_pose_world_wxyz": (
-                np.asarray(current_right_ee_pose.p, dtype=np.float64).reshape(3).tolist()
-                + base.normalize_quat_wxyz(np.asarray(current_right_ee_pose.q, dtype=np.float64).reshape(4)).tolist()
-            ),
+            "current_left_ee_pose_world_wxyz": pose_like_to_world_wxyz(current_left_ee_pose).tolist(),
+            "current_right_ee_pose_world_wxyz": pose_like_to_world_wxyz(current_right_ee_pose).tolist(),
             "current_left_arm_qpos_rad": left_arm_qpos.tolist(),
             "current_right_arm_qpos_rad": right_arm_qpos.tolist(),
             "current_left_gripper_joint_qpos_rad": left_gripper_joint_qpos.tolist(),
@@ -2508,6 +2499,19 @@ def generate_execution_analysis_plots(
 
 def sapien_pose_to_wxyz(pose: sapien.Pose) -> np.ndarray:
     return np.concatenate([np.asarray(pose.p, dtype=np.float64), np.asarray(pose.q, dtype=np.float64)]).astype(np.float64)
+
+
+def pose_like_to_world_wxyz(pose_like) -> np.ndarray:
+    if hasattr(pose_like, "p") and hasattr(pose_like, "q"):
+        return np.concatenate(
+            [
+                np.asarray(pose_like.p, dtype=np.float64).reshape(3),
+                base.normalize_quat_wxyz(np.asarray(pose_like.q, dtype=np.float64).reshape(4)),
+            ]
+        ).astype(np.float64)
+    arr = np.asarray(pose_like, dtype=np.float64).reshape(7)
+    arr[3:] = base.normalize_quat_wxyz(arr[3:])
+    return arr
 
 
 def get_current_pose_for_error(renderer: ReplayRenderer, arm: str, pose_source: str) -> np.ndarray:

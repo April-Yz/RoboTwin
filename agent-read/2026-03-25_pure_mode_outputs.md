@@ -88,6 +88,10 @@ Notes:
 
 - `tcp` follows the planner / gripper-reference convention
 - `ee` follows the wrist/endlink convention
+- In the current implementation:
+  - `current_*_tcp_pose_world_wxyz` already comes from planner-side 7D pose arrays
+  - `current_*_ee_pose_world_wxyz` comes from `robot.get_*_ee_pose()`, which returns a 7D list rather than a `sapien.Pose`
+  - the export layer now accepts both representations and writes them uniformly as `[x, y, z, qw, qx, qy, qz]`
 
 ### Robot joint states
 
