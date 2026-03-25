@@ -206,3 +206,38 @@
     - 中间 waypoint 的位置点和局部前进轴。
   - 默认值：
     - `0`
+
+- 新增命令参数：`--debug_collision_report`
+  - 入口：
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+    - `code_painting/plan_anygrasp_keyframes_r1_batch.py`
+  - 用途：
+    - 在 `close_gripper` 渐进闭合阶段打印更强的碰撞调试信息。
+  - 主要输出：
+    - `[collision-debug-init]`
+    - `[collision-debug-step]`
+    - 常规 `[gripper-close]` 新增 `base_contact=...`
+  - 调试重点：
+    - 区分 `finger_contact` 和 `base_contact`
+    - 打印 `finger_pairs` / `base_pairs`
+    - 查看目标物体、`left/right_gripper_link`、finger links 的 collision-shape 摘要
+  - 默认值：
+    - `0`
+
+- 新增命令参数：`--execution_object_collision_mode {convex,solid_bbox}`
+  - 入口：
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+    - `code_painting/plan_anygrasp_keyframes_r1_batch.py`
+  - 用途：
+    - 控制 execution object 在执行阶段使用的 collision 几何。
+  - 模式：
+    - `convex`
+      - 保持原来的 `add_convex_collision_from_file`
+    - `solid_bbox`
+      - 读取 mesh bounds
+      - 用单个 axis-aligned box 创建“实心” collision
+  - 说明：
+    - 只影响 execution collision，不改视觉 mesh
+    - 当 `--replay_objects_ignore_collision 1` 且对象未被纳入抓取/动作碰撞时，仍然不会创建 collision
+  - 默认值：
+    - `convex`

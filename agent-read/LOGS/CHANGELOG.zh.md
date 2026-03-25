@@ -491,3 +491,34 @@
   - `grasp` 未到位是 `close_gripper` 无接触的重要原因
   - 当前夹爪接触检测监控的是 finger joints 的 `child_link`，而不是 `left/right_gripper_link` 本体
 - 本轮未修改运行逻辑，仅补充分析记录。
+
+- 增强夹爪闭合阶段的碰撞调试输出，并新增“实心物体”测试模式：
+  - 文件：
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+    - `code_painting/plan_anygrasp_keyframes_r1_batch.py`
+  - 新增参数：
+    - `--debug_collision_report 1`
+    - `--execution_object_collision_mode solid_bbox`
+  - 改动：
+    - `close_grippers_progressively_with_collision_stop(...)` 现在可在 debug 模式下打印：
+      - 目标物体 collision shape 摘要
+      - `left/right_gripper_link` collision shape 摘要
+      - finger link collision shape 摘要
+      - 每次渐进闭合迭代中的：
+        - `finger_contact`
+        - `base_contact`
+        - `finger_pairs`
+        - `base_pairs`
+    - 常规 `[gripper-close]` 输出新增：
+      - `base_contact=...`
+    - 执行物体 collision 新增两种模式：
+      - `convex`：保持原来的 `add_convex_collision_from_file`
+      - `solid_bbox`：读取 mesh bounds，并用单个 axis-aligned box 作为实心碰撞体
+    - `solid_bbox` 只影响 execution object collision，不改视觉 mesh
+    - batch 脚本已支持转发这两个新参数
+  - 说明：
+    - 当前停机判据仍然只用 finger link 的接触，不改变原有行为
+    - `base_contact` 目前只作为 debug 额外输出，帮助判断是否是 gripper base 先碰到物体
+  - 验证：
+    - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_anygrasp_keyframes_r1_batch.py`
+    - `git diff --check -- code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_anygrasp_keyframes_r1_batch.py`

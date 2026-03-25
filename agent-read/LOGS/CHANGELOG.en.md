@@ -490,3 +490,34 @@
   - unreached `grasp` is a major reason why `close_gripper` sees no contact
   - current gripper contact detection monitors finger-joint `child_link`s rather than the `left/right_gripper_link` base links
 - No runtime logic was changed in this round; this was documentation-only analysis.
+
+- Added stronger gripper-close collision debug output and a "solid object" test mode:
+  - Files:
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+    - `code_painting/plan_anygrasp_keyframes_r1_batch.py`
+  - New parameters:
+    - `--debug_collision_report 1`
+    - `--execution_object_collision_mode solid_bbox`
+  - Changes:
+    - `close_grippers_progressively_with_collision_stop(...)` can now print, in debug mode:
+      - target-object collision-shape summary
+      - `left/right_gripper_link` collision-shape summary
+      - finger-link collision-shape summary
+      - per progressive-close iteration:
+        - `finger_contact`
+        - `base_contact`
+        - `finger_pairs`
+        - `base_pairs`
+    - Regular `[gripper-close]` output now also includes:
+      - `base_contact=...`
+    - Execution-object collision now supports two modes:
+      - `convex`: keep the existing `add_convex_collision_from_file`
+      - `solid_bbox`: derive mesh bounds and use one axis-aligned solid box as collision
+    - `solid_bbox` changes only execution collision, not the visual mesh
+    - the batch wrapper now forwards both new parameters
+  - Notes:
+    - the early-stop criterion still uses finger-link contact only, so behavior is unchanged by default
+    - `base_contact` is currently debug-only extra output to reveal whether the gripper base touched the object first
+  - Validation:
+    - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_anygrasp_keyframes_r1_batch.py`
+    - `git diff --check -- code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_anygrasp_keyframes_r1_batch.py`

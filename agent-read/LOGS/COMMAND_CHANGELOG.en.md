@@ -208,3 +208,38 @@
     - Position point plus local forward-axis marker for each intermediate waypoint.
   - Default:
     - `0`
+
+- Added command parameter: `--debug_collision_report`
+  - Entry points:
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+    - `code_painting/plan_anygrasp_keyframes_r1_batch.py`
+  - Purpose:
+    - Print stronger collision debug information during the progressive `close_gripper` stage.
+  - Main output:
+    - `[collision-debug-init]`
+    - `[collision-debug-step]`
+    - regular `[gripper-close]` now also includes `base_contact=...`
+  - Debug focus:
+    - distinguish `finger_contact` from `base_contact`
+    - inspect `finger_pairs` / `base_pairs`
+    - inspect collision-shape summaries of the target object, `left/right_gripper_link`, and finger links
+  - Default:
+    - `0`
+
+- Added command parameter: `--execution_object_collision_mode {convex,solid_bbox}`
+  - Entry points:
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+    - `code_painting/plan_anygrasp_keyframes_r1_batch.py`
+  - Purpose:
+    - Control which collision geometry execution objects use at runtime.
+  - Modes:
+    - `convex`
+      - keeps the current `add_convex_collision_from_file`
+    - `solid_bbox`
+      - reads mesh bounds
+      - creates one axis-aligned solid box collision
+  - Notes:
+    - affects execution collision only, not the visual mesh
+    - if `--replay_objects_ignore_collision 1` and the object is not enabled for grasp/action collision, collision is still omitted
+  - Default:
+    - `convex`

@@ -16,6 +16,7 @@ import cv2
 import numpy as np
 import sapien.core as sapien
 from scipy.spatial.transform import Rotation as R
+import trimesh
 
 THIS_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = THIS_DIR.parent
@@ -245,6 +246,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--replay_objects_during_action", type=int, default=0, help="If 1, replay object tracks from keyframe-1 to keyframe-2 during the action stage instead of attaching selected objects to the TCP.")
     parser.add_argument("--replay_objects_ignore_collision", type=int, default=1, help="If 1, replayed objects are created as visual-only kinematic actors without collision.")
     parser.add_argument("--enable_grasp_action_object_collision", type=int, default=0, help="If 1, keep selected execution objects collision-capable but disable their collision before grasp. Collision is enabled only for the selected grasped objects during close_gripper/action, while the original no-collision mode remains available when this flag is 0.")
+    parser.add_argument("--execution_object_collision_mode", choices=["convex", "solid_bbox"], default="convex", help="Collision shape used for execution objects when collision is enabled. 'convex' keeps the current convex mesh collision. 'solid_bbox' replaces collision with one solid axis-aligned box derived from the mesh bounds.")
+    parser.add_argument("--debug_collision_report", type=int, default=0, help="If 1, print detailed collision/contact debug info during gripper close, including finger-only vs finger+gripper-base contacts and collision-shape summaries.")
     parser.add_argument("--save_debug_preview", type=int, default=1)
     parser.add_argument("--debug_preview_fps", type=int, default=10)
     parser.add_argument("--debug_keyframe_hold_frames", type=int, default=12)
@@ -794,9 +797,54 @@ def load_replay_head_camera_poses(replay_dir: Path) -> Dict[int, np.ndarray]:
     return {int(frame): head_poses[idx] for idx, frame in enumerate(frame_indices.tolist())}
 
 
-def create_execution_object_actor(scene: sapien.Scene, mesh_file: Path, actor_name: str, ignore_collision: bool) -> sapien.Entity:
+def _add_execution_collision(
+    builder: sapien.ActorBuilder,
+    mesh_file: Path,
+    actor_name: str,
+    collision_mode: str,
+) -> None:
+    if collision_mode == "solid_bbox":
+        try:
+            mesh_scene = trimesh.load(str(mesh_file), force="scene", process=False)
+            bounds = np.asarray(mesh_scene.bounds, dtype=np.float64).reshape(2, 3)
+            center = bounds.mean(axis=0)
+            half_size = np.maximum((bounds[1] - bounds[0]) * 0.5, 1e-4)
+            builder.add_box_collision(
+                pose=sapien.Pose(center.tolist()),
+                half_size=half_size.tolist(),
+            )
+            print(
+                "[object-collision] "
+                f"actor={actor_name} mode=solid_bbox mesh={mesh_file} "
+                f"center={np.round(center, 4).tolist()} half_size={np.round(half_size, 4).tolist()}"
+            )
+            return
+        except Exception as exc:
+            print(
+                "[object-collision] "
+                f"actor={actor_name} requested=solid_bbox fallback=convex mesh={mesh_file} reason={exc}"
+            )
+    builder.add_convex_collision_from_file(str(mesh_file))
+
+
+def create_execution_object_actor(
+    scene: sapien.Scene,
+    mesh_file: Path,
+    actor_name: str,
+    ignore_collision: bool,
+    collision_mode: str = "convex",
+) -> sapien.Entity:
     if not bool(ignore_collision):
-        return create_object_actor(scene, mesh_file, actor_name)
+        builder = scene.create_actor_builder()
+        try:
+            builder.add_visual_from_file(str(mesh_file))
+        except Exception as exc:
+            raise RuntimeError(f"Failed to load mesh visual: {mesh_file}") from exc
+        try:
+            _add_execution_collision(builder, mesh_file, actor_name, str(collision_mode))
+        except Exception as exc:
+            raise RuntimeError(f"Failed to add execution collision for {mesh_file}") from exc
+        return builder.build_kinematic(name=actor_name)
     builder = scene.create_actor_builder()
     try:
         builder.add_visual_from_file(str(mesh_file))
@@ -1486,16 +1534,56 @@ def _get_gripper_link_entities(renderer: ReplayRenderer, arm: str) -> List[sapie
     return [joint_info[0].child_link for joint_info in joints if getattr(joint_info[0], "child_link", None) is not None]
 
 
-def _contact_involves_entities(
+def _get_gripper_base_entity(renderer: ReplayRenderer, arm: str) -> Optional[sapien.Entity]:
+    if renderer.robot is None:
+        return None
+    ee_joint = renderer.robot.left_ee if arm == "left" else renderer.robot.right_ee
+    return getattr(ee_joint, "child_link", None)
+
+
+def _entity_name(entity: Optional[sapien.Entity]) -> str:
+    if entity is None:
+        return "none"
+    getter = getattr(entity, "get_name", None)
+    if getter is None:
+        return type(entity).__name__
+    try:
+        return str(getter())
+    except Exception:
+        return type(entity).__name__
+
+
+def _collision_shape_type_name(shape: object) -> str:
+    return type(shape).__name__
+
+
+def _summarize_entity_collision(entity: Optional[sapien.Entity]) -> str:
+    if entity is None:
+        return "none"
+    shapes = _get_actor_collision_shapes(entity)
+    if not shapes:
+        return f"{_entity_name(entity)}(shapes=0)"
+    type_names = ",".join(sorted({_collision_shape_type_name(shape) for shape in shapes}))
+    return f"{_entity_name(entity)}(shapes={len(shapes)},types={type_names})"
+
+
+def _summarize_entities_collision(entities: Sequence[sapien.Entity]) -> str:
+    if not entities:
+        return "none"
+    return "|".join(_summarize_entity_collision(entity) for entity in entities)
+
+
+def _contact_pairs_involving_entities(
     renderer: ReplayRenderer,
-    gripper_entities: Sequence[sapien.Entity],
+    monitored_entities: Sequence[sapien.Entity],
     target_entity: Optional[sapien.Entity],
-) -> bool:
+) -> List[str]:
     if target_entity is None:
-        return False
-    gripper_set = set(gripper_entities)
-    if not gripper_set:
-        return False
+        return []
+    monitored_set = set(monitored_entities)
+    if not monitored_set:
+        return []
+    pairs: List[str] = []
     for contact in renderer.scene.get_contacts():
         entities: List[Optional[sapien.Entity]] = []
         if hasattr(contact, "bodies") and contact.bodies:
@@ -1507,9 +1595,19 @@ def _contact_involves_entities(
         if len(entities) != 2:
             continue
         e0, e1 = entities
-        if (e0 is target_entity and e1 in gripper_set) or (e1 is target_entity and e0 in gripper_set):
-            return True
-    return False
+        if e0 is target_entity and e1 in monitored_set:
+            pairs.append(f"{_entity_name(e1)}<->{_entity_name(e0)}")
+        elif e1 is target_entity and e0 in monitored_set:
+            pairs.append(f"{_entity_name(e0)}<->{_entity_name(e1)}")
+    return sorted(set(pairs))
+
+
+def _contact_involves_entities(
+    renderer: ReplayRenderer,
+    gripper_entities: Sequence[sapien.Entity],
+    target_entity: Optional[sapien.Entity],
+) -> bool:
+    return bool(_contact_pairs_involving_entities(renderer, gripper_entities, target_entity))
 
 
 def close_grippers_progressively_with_collision_stop(
@@ -1523,6 +1621,7 @@ def close_grippers_progressively_with_collision_stop(
     max_iters: int = 40,
     stall_qpos_tol: float = 5e-5,
     contact_confirm_iters: int = 2,
+    debug_collision_report: bool = False,
 ) -> Dict[str, Dict[str, object]]:
     if renderer.robot is None:
         return {}
@@ -1538,16 +1637,31 @@ def close_grippers_progressively_with_collision_stop(
             "current_cmd": current_cmd,
             "last_qpos": _get_gripper_joint_positions(renderer, arm),
             "contact_iters": 0,
+            "had_base_contact": False,
             "stopped": False,
             "reason": "target_reached",
             "gripper_entities": _get_gripper_link_entities(renderer, arm),
+            "gripper_base_entity": _get_gripper_base_entity(renderer, arm),
             "object_actor": object_actor_by_arm.get(arm),
         }
 
     if not state_by_arm:
         return {}
 
-    for _ in range(max_iters):
+    if bool(debug_collision_report):
+        for arm, state in state_by_arm.items():
+            finger_entities = list(state["gripper_entities"])  # type: ignore[arg-type]
+            base_entity = state["gripper_base_entity"]  # type: ignore[assignment]
+            target_entity = state["object_actor"]  # type: ignore[assignment]
+            print(
+                "[collision-debug-init] "
+                f"arm={arm} "
+                f"target={_summarize_entity_collision(target_entity)} "
+                f"gripper_base={_summarize_entity_collision(base_entity)} "
+                f"finger_links={_summarize_entities_collision(finger_entities)}"
+            )
+
+    for iter_idx in range(max_iters):
         left_cmd = None
         right_cmd = None
         pending = False
@@ -1582,12 +1696,41 @@ def close_grippers_progressively_with_collision_stop(
             prev_qpos = np.asarray(state["last_qpos"], dtype=np.float64)
             qpos_delta = float(np.max(np.abs(current_qpos - prev_qpos))) if current_qpos.size and prev_qpos.size else 0.0
             state["last_qpos"] = current_qpos
+            finger_entities = list(state["gripper_entities"])  # type: ignore[arg-type]
+            base_entity = state["gripper_base_entity"]  # type: ignore[assignment]
+            monitored_with_base = finger_entities + ([base_entity] if base_entity is not None else [])
             has_contact = _contact_involves_entities(
                 renderer,
-                state["gripper_entities"],  # type: ignore[arg-type]
+                finger_entities,
+                state["object_actor"],  # type: ignore[arg-type]
+            )
+            base_contact = _contact_involves_entities(
+                renderer,
+                monitored_with_base,
                 state["object_actor"],  # type: ignore[arg-type]
             )
             state["contact_iters"] = int(state["contact_iters"]) + 1 if has_contact else 0
+            state["had_base_contact"] = bool(state["had_base_contact"]) or bool(base_contact)
+
+            if bool(debug_collision_report):
+                finger_pairs = _contact_pairs_involving_entities(
+                    renderer,
+                    finger_entities,
+                    state["object_actor"],  # type: ignore[arg-type]
+                )
+                base_pairs = _contact_pairs_involving_entities(
+                    renderer,
+                    monitored_with_base,
+                    state["object_actor"],  # type: ignore[arg-type]
+                )
+                print(
+                    "[collision-debug-step] "
+                    f"arm={arm} iter={iter_idx + 1} cmd={float(state['current_cmd']):.3f} "
+                    f"qpos_delta={qpos_delta:.6f} "
+                    f"finger_contact={int(has_contact)} base_contact={int(base_contact)} "
+                    f"finger_pairs={finger_pairs if finger_pairs else ['none']} "
+                    f"base_pairs={base_pairs if base_pairs else ['none']}"
+                )
 
             target = float(state["target"])
             current_cmd = float(state["current_cmd"])
@@ -1610,6 +1753,7 @@ def close_grippers_progressively_with_collision_stop(
             "actual_qpos_max_abs": float(np.max(np.abs(qpos))) if qpos.size else 0.0,
             "contact_iters": int(state["contact_iters"]),
             "had_contact": bool(int(state["contact_iters"]) > 0),
+            "had_base_contact": bool(state["had_base_contact"]),
             "reason": str(state["reason"]),
         }
     return result
@@ -4018,6 +4162,7 @@ def main() -> None:
             state.mesh_file,
             f"planned_object_{state.name}",
             ignore_collision=(bool(args.replay_objects_ignore_collision) and not (use_grasp_action_object_collision and state.name in selected_object_names)),
+            collision_mode=str(args.execution_object_collision_mode),
         )
         if use_grasp_action_object_collision and state.name in selected_object_names:
             state.collision_groups_cache = set_actor_collision_enabled(state.actor, enabled=False, cached_groups=None)
@@ -4311,13 +4456,15 @@ def main() -> None:
                     args.close_gripper,
                     args.close_gripper,
                     {arm_name: object_states[selected_objects_by_executed_arm[arm_name]].actor for arm_name in dual_arms},
+                    debug_collision_report=bool(args.debug_collision_report),
                 )
                 print(
                     "[gripper-close] "
                     + " ".join(
                         f"{arm_name}:reason={close_summary.get(arm_name, {}).get('reason', 'n/a')},"
                         f"cmd={float(close_summary.get(arm_name, {}).get('final_cmd', args.close_gripper)):.3f},"
-                        f"contact={int(bool(close_summary.get(arm_name, {}).get('had_contact', False)))}"
+                        f"contact={int(bool(close_summary.get(arm_name, {}).get('had_contact', False)))},"
+                        f"base_contact={int(bool(close_summary.get(arm_name, {}).get('had_base_contact', False)))}"
                         for arm_name in dual_arms
                     )
                 )
@@ -4568,12 +4715,14 @@ def main() -> None:
                         args.close_gripper if exec_arm == "left" else None,
                         args.close_gripper if exec_arm == "right" else None,
                         {exec_arm: object_states[exec_object_name].actor},
+                        debug_collision_report=bool(args.debug_collision_report),
                     )
                     print(
                         "[gripper-close] "
                         f"{exec_arm}:reason={close_summary.get(exec_arm, {}).get('reason', 'n/a')},"
                         f"cmd={float(close_summary.get(exec_arm, {}).get('final_cmd', args.close_gripper)):.3f},"
-                        f"contact={int(bool(close_summary.get(exec_arm, {}).get('had_contact', False)))}"
+                        f"contact={int(bool(close_summary.get(exec_arm, {}).get('had_contact', False)))},"
+                        f"base_contact={int(bool(close_summary.get(exec_arm, {}).get('had_base_contact', False)))}"
                     )
                 else:
                     renderer.set_grippers(args.close_gripper if exec_arm == "left" else None, args.close_gripper if exec_arm == "right" else None)
