@@ -241,3 +241,13 @@
 - This change affects debug display only and does not change waypoint generation, IK solving, trajectory execution, or collision behavior.
 - `plan_anygrasp_keyframes_r1_batch.py` now forwards the parameter as well.
 - Validation: `python -m py_compile` and `git diff --check` are run after this round.
+# 2026-03-25
+
+- Added a stage-level run analysis document:
+  - `agent-read/2026-03-25_overall_run_analysis_ZH.md`
+  - `agent-read/2026-03-25_overall_run_analysis.md`
+- Recorded the current conclusions:
+  - trajectory shape has improved, but planner/IK endpoints are still frequently wrong
+  - unreached `grasp` is a major reason why `close_gripper` sees no contact
+  - current gripper contact detection monitors finger-joint `child_link`s rather than the `left/right_gripper_link` base links
+- No runtime logic was changed in this round; this was documentation-only analysis.

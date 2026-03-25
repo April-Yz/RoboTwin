@@ -242,3 +242,13 @@
 - 该改动只影响调试显示，不改变 waypoint 生成、IK 求解、轨迹执行或碰撞逻辑。
 - `plan_anygrasp_keyframes_r1_batch.py` 已同步透传该参数。
 - 验证：本轮改动后运行 `python -m py_compile` 与 `git diff --check`。
+# 2026-03-25
+
+- 新增阶段性运行分析文档：
+  - `agent-read/2026-03-25_overall_run_analysis_ZH.md`
+  - `agent-read/2026-03-25_overall_run_analysis.md`
+- 记录了当前版本的主要结论：
+  - 轨迹形状已有改善，但 planner/IK 终点仍经常错误
+  - `grasp` 未到位是 `close_gripper` 无接触的重要原因
+  - 当前夹爪接触检测监控的是 finger joints 的 `child_link`，而不是 `left/right_gripper_link` 本体
+- 本轮未修改运行逻辑，仅补充分析记录。
