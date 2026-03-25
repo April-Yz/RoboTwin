@@ -436,6 +436,19 @@
 - 验证：本轮改动后运行 `python -m py_compile` 与 `git diff --check`。
 # 2026-03-25
 
+- 修复 `base_occluder` 挡板位置偏离机器人底座的问题：
+  - 文件：
+    - `code_painting/render_hand_retarget_r1_npz.py`
+  - 原因：
+    - 挡板此前跟随 renderer 内部的 root/base pose，而不是机器人可见底盘对应的 `base_link`
+    - 在当前 R1 配置下，这两者存在偏移，导致 viewer 中挡板看起来离机器人很远
+  - 改动：
+    - `base_occluder` 现在优先锚定到 `base_link`
+    - 若未找到 `base_link`，再回退到原来的 root/base pose
+    - 调试日志新增 `anchor_link=...`，便于确认当前实际使用的锚点
+  - 验证：
+    - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/render_hand_retarget_r1_npz.py`
+
 - 新增阶段性运行分析文档：
   - `agent-read/2026-03-25_overall_run_analysis_ZH.md`
   - `agent-read/2026-03-25_overall_run_analysis.md`

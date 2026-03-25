@@ -435,6 +435,19 @@
 - Validation: `python -m py_compile` and `git diff --check` are run after this round.
 # 2026-03-25
 
+- Fixed the `base_occluder` panel appearing far away from the robot base:
+  - File:
+    - `code_painting/render_hand_retarget_r1_npz.py`
+  - Cause:
+    - the occluder previously followed the renderer's internal root/base pose rather than the visible chassis-aligned `base_link`
+    - under the current R1 setup those frames are offset, so the occluder could appear far from the robot in the viewer
+  - Change:
+    - the `base_occluder` now anchors to `base_link` when available
+    - it falls back to the previous root/base pose only if `base_link` cannot be found
+    - the debug log now prints `anchor_link=...` so the active anchor can be verified directly
+  - Validation:
+    - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/render_hand_retarget_r1_npz.py`
+
 - Added a stage-level run analysis document:
   - `agent-read/2026-03-25_overall_run_analysis_ZH.md`
   - `agent-read/2026-03-25_overall_run_analysis.md`

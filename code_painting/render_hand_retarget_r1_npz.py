@@ -580,6 +580,7 @@ class HandRetargetR1Renderer:
         self._head_camera_link = None
         self._left_wrist_camera_link = None
         self._right_wrist_camera_link = None
+        self._base_occluder_link = None
         self._table = None
         self._base_occluder = None
         self._base_occluder_summary_printed = False
@@ -743,6 +744,7 @@ class HandRetargetR1Renderer:
         self._head_camera_link = self._find_robot_link(["zed_link", "head_camera", "head", "camera_link"])
         if self._head_camera_link is None:
             raise RuntimeError("Could not find zed/head camera link on R1.")
+        self._base_occluder_link = self._find_robot_link(["base_link"])
         self._left_wrist_camera_link = self._find_robot_link(["left_realsense_link", "left_D405_link", "left_camera"])
         self._right_wrist_camera_link = self._find_robot_link(["right_realsense_link", "right_D405_link", "right_camera"])
 
@@ -808,16 +810,19 @@ class HandRetargetR1Renderer:
         self._table.set_pose(sapien.Pose(table_pos, self._base_pose.q))
 
     def _update_base_occluder_pose(self) -> None:
-        if self._base_occluder is None or self._base_pose is None:
+        if self._base_occluder is None:
             return
-        world_pos = np.asarray(self._base_pose.p, dtype=np.float64) + (
-            R.from_quat(quat_wxyz_to_xyzw(self._base_pose.q)).as_matrix() @ self.base_occluder_local_pos
-        )
-        self._base_occluder.set_pose(sapien.Pose(world_pos, self._base_pose.q))
+        anchor_pose = self._base_occluder_link.get_pose() if self._base_occluder_link is not None else self._base_pose
+        if anchor_pose is None:
+            return
+        anchor_rot = R.from_quat(quat_wxyz_to_xyzw(anchor_pose.q)).as_matrix()
+        world_pos = np.asarray(anchor_pose.p, dtype=np.float64) + (anchor_rot @ self.base_occluder_local_pos)
+        self._base_occluder.set_pose(sapien.Pose(world_pos, anchor_pose.q))
         if not self._base_occluder_summary_printed:
             self._base_occluder_summary_printed = True
             print(
                 "[base-occluder] "
+                f"anchor_link={self._base_occluder_link.get_name() if self._base_occluder_link is not None else 'root_pose'} "
                 f"world_p={np.round(world_pos, 4).tolist()} "
                 f"half_size={np.round(self.base_occluder_half_size, 4).tolist()} "
                 f"color={np.round(self.base_occluder_color, 4).tolist()}"
