@@ -89,3 +89,24 @@
   - 验证：
     - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py`
     - `git -C /home/zaijia001/ssd/RoboTwin diff --check -- code_painting/plan_anygrasp_keyframes_r1.py`
+
+## 2026-03-25 12:08:00 +08
+
+- 新增 grasp/action 期物体碰撞开关：
+  - 文件：
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+    - `code_painting/plan_anygrasp_keyframes_r1_batch.py`
+  - 新参数：
+    - `--enable_grasp_action_object_collision 0|1`
+  - 行为：
+    - 默认 `0`，保持原来的无碰撞模式不变
+    - 设为 `1` 时，为被执行臂选中的执行物体保留 collision geometry
+    - 在 `pregrasp` 阶段仍关闭这些物体的碰撞
+    - 在 `close_gripper` 前开启所选物体碰撞，并保持到 `action` 阶段结束
+    - 不修改对象附着逻辑、TCP 相对位姿、目标位姿生成或其它相对变换
+  - 实现说明：
+    - 通过缓存并恢复 SAPIEN collision groups 做阶段性启停
+    - 未被选中的其它物体仍保持原有行为
+  - 验证：
+    - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1_batch.py`
+    - `git -C /home/zaijia001/ssd/RoboTwin diff --check -- code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_anygrasp_keyframes_r1_batch.py`

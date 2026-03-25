@@ -42,6 +42,7 @@ class ObjectState:
     pose_world_matrix: np.ndarray
     visible: bool
     actor: Optional[sapien.Entity] = None
+    collision_groups_cache: Optional[List[List[int]]] = None
 
 
 @dataclass
@@ -230,6 +231,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--pause_after_keyframe1_seconds", type=float, default=0.0, help="After reaching keyframe-1 and closing the gripper, hold the robot at that pose for N seconds before planning/executing the next target.")
     parser.add_argument("--replay_objects_during_action", type=int, default=0, help="If 1, replay object tracks from keyframe-1 to keyframe-2 during the action stage instead of attaching selected objects to the TCP.")
     parser.add_argument("--replay_objects_ignore_collision", type=int, default=1, help="If 1, replayed objects are created as visual-only kinematic actors without collision.")
+    parser.add_argument("--enable_grasp_action_object_collision", type=int, default=0, help="If 1, keep selected execution objects collision-capable but disable their collision before grasp. Collision is enabled only for the selected grasped objects during close_gripper/action, while the original no-collision mode remains available when this flag is 0.")
     parser.add_argument("--save_debug_preview", type=int, default=1)
     parser.add_argument("--debug_preview_fps", type=int, default=10)
     parser.add_argument("--debug_keyframe_hold_frames", type=int, default=12)
@@ -764,6 +766,66 @@ def create_execution_object_actor(scene: sapien.Scene, mesh_file: Path, actor_na
     except Exception as exc:
         raise RuntimeError(f"Failed to load mesh visual: {mesh_file}") from exc
     return builder.build_kinematic(name=actor_name)
+
+
+def _get_actor_collision_shapes(actor: Optional[sapien.Entity]) -> List[object]:
+    if actor is None:
+        return []
+    try:
+        components = list(actor.get_components())
+    except Exception:
+        return []
+    for component in components:
+        getter = getattr(component, "get_collision_shapes", None)
+        if getter is None:
+            continue
+        try:
+            shapes = list(getter())
+        except Exception:
+            continue
+        if shapes:
+            return shapes
+    return []
+
+
+def snapshot_actor_collision_groups(actor: Optional[sapien.Entity]) -> Optional[List[List[int]]]:
+    shapes = _get_actor_collision_shapes(actor)
+    if not shapes:
+        return None
+    groups: List[List[int]] = []
+    for shape in shapes:
+        try:
+            groups.append(list(shape.get_collision_groups()))
+        except Exception:
+            return None
+    return groups
+
+
+def set_actor_collision_groups(actor: Optional[sapien.Entity], groups_per_shape: Sequence[Sequence[int]]) -> bool:
+    shapes = _get_actor_collision_shapes(actor)
+    if not shapes or len(shapes) != len(groups_per_shape):
+        return False
+    try:
+        for shape, groups in zip(shapes, groups_per_shape):
+            shape.set_collision_groups([int(v) for v in groups])
+    except Exception:
+        return False
+    return True
+
+
+def set_actor_collision_enabled(actor: Optional[sapien.Entity], enabled: bool, cached_groups: Optional[List[List[int]]]) -> Optional[List[List[int]]]:
+    shapes = _get_actor_collision_shapes(actor)
+    if not shapes:
+        return cached_groups
+    if enabled:
+        if cached_groups is not None:
+            set_actor_collision_groups(actor, cached_groups)
+        return cached_groups
+    if cached_groups is None:
+        cached_groups = snapshot_actor_collision_groups(actor)
+    disabled_groups = [[0, 0, 0, 0] for _ in shapes]
+    set_actor_collision_groups(actor, disabled_groups)
+    return cached_groups
 
 
 def nearest_track_index(replay_frame_indices: np.ndarray, source_frame: int) -> int:
@@ -1343,6 +1405,18 @@ def set_actor_pose(actor: sapien.Entity, pose_world_wxyz: np.ndarray) -> None:
 
 def hide_actor(actor: sapien.Entity) -> None:
     actor.set_pose(base.HIDDEN_DEBUG_POSE)
+
+
+def set_object_collision_for_names(object_states: Dict[str, ObjectState], object_names: Sequence[str], enabled: bool) -> None:
+    for object_name in object_names:
+        state = object_states.get(str(object_name))
+        if state is None or state.actor is None:
+            continue
+        state.collision_groups_cache = set_actor_collision_enabled(
+            state.actor,
+            enabled=bool(enabled),
+            cached_groups=state.collision_groups_cache,
+        )
 
 
 def create_colored_axis_actor(
@@ -3537,13 +3611,17 @@ def main() -> None:
     )
 
     object_states = object_states_per_frame[keyframes[0]]
+    selected_object_names = {seq[0].candidate.nearest_object for _, seq in execution_sequences if seq}
+    use_grasp_action_object_collision = bool(args.enable_grasp_action_object_collision)
     for state in object_states.values():
         state.actor = create_execution_object_actor(
             renderer.scene,
             state.mesh_file,
             f"planned_object_{state.name}",
-            ignore_collision=bool(args.replay_objects_ignore_collision),
+            ignore_collision=(bool(args.replay_objects_ignore_collision) and not (use_grasp_action_object_collision and state.name in selected_object_names)),
         )
+        if use_grasp_action_object_collision and state.name in selected_object_names:
+            state.collision_groups_cache = set_actor_collision_enabled(state.actor, enabled=False, cached_groups=None)
         set_actor_pose(state.actor, state.pose_world_wxyz)
         if state.name in object_tracks:
             object_tracks[state.name].actor = state.actor
@@ -3799,6 +3877,12 @@ def main() -> None:
                 f"right_reached={int(bool(grasp_dual['arms'].get('right', {}).get('reached', False)))}"
             )
 
+            if bool(args.enable_grasp_action_object_collision):
+                set_object_collision_for_names(
+                    object_states,
+                    [selected_objects_by_executed_arm[arm_name] for arm_name in dual_arms],
+                    enabled=True,
+                )
             renderer.set_grippers(args.close_gripper, args.close_gripper)
             debug_execution_state.current_stage = "close_gripper"
             record_frame(
@@ -4032,6 +4116,8 @@ def main() -> None:
                 )
 
                 set_single_arm_target_visual(renderer, exec_arm, grasp_pose)
+                if bool(args.enable_grasp_action_object_collision):
+                    set_object_collision_for_names(object_states, [exec_object_name], enabled=True)
                 renderer.set_grippers(args.close_gripper if exec_arm == "left" else None, args.close_gripper if exec_arm == "right" else None)
                 debug_execution_state.current_stage = "close_gripper"
                 record_frame(
@@ -4095,6 +4181,8 @@ def main() -> None:
                     "action": action_result,
                 }
     finally:
+        if bool(args.enable_grasp_action_object_collision):
+            set_object_collision_for_names(object_states, selected_objects_by_executed_arm.values(), enabled=False)
         head_writer.release()
         if third_writer is not None:
             third_writer.release()
@@ -4151,6 +4239,7 @@ def main() -> None:
         "candidate_keep_camera_up": int(args.candidate_keep_camera_up),
         "candidate_camera_top_axis": str(args.candidate_camera_top_axis),
         "candidate_target_local_x_offset_m": float(args.candidate_target_local_x_offset_m),
+        "enable_grasp_action_object_collision": int(args.enable_grasp_action_object_collision),
         "pure_scene_output": int(args.pure_scene_output),
         "reach_error_pose_source": args.reach_error_pose_source,
         "init_prefix_frames": int(args.init_prefix_frames),

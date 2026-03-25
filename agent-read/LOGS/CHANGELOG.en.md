@@ -89,3 +89,24 @@
   - Validation:
     - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py`
     - `git -C /home/zaijia001/ssd/RoboTwin diff --check -- code_painting/plan_anygrasp_keyframes_r1.py`
+
+## 2026-03-25 12:08:00 +08
+
+- Added a grasp/action object-collision toggle:
+  - Files:
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+    - `code_painting/plan_anygrasp_keyframes_r1_batch.py`
+  - New flag:
+    - `--enable_grasp_action_object_collision 0|1`
+  - Behavior:
+    - default `0` preserves the original no-collision execution mode
+    - when set to `1`, execution objects selected by the executed arm keep collision geometry
+    - collision stays disabled during `pregrasp`
+    - collision is enabled right before `close_gripper` and remains enabled through `action`
+    - object attachment logic, TCP-relative transforms, target generation, and other pose transforms are unchanged
+  - Implementation note:
+    - stage-local collision enable/disable is implemented by caching and restoring SAPIEN collision groups
+    - non-selected objects keep their original behavior
+  - Validation:
+    - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1_batch.py`
+    - `git -C /home/zaijia001/ssd/RoboTwin diff --check -- code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_anygrasp_keyframes_r1_batch.py`

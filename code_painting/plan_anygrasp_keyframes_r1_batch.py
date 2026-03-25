@@ -80,6 +80,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--pause_after_keyframe1_seconds", type=float, default=0.0)
     parser.add_argument("--replay_objects_during_action", type=int, default=0)
     parser.add_argument("--replay_objects_ignore_collision", type=int, default=1)
+    parser.add_argument("--enable_grasp_action_object_collision", type=int, default=0)
     parser.add_argument("--save_debug_preview", type=int, default=1)
     parser.add_argument("--debug_preview_fps", type=int, default=10)
     parser.add_argument("--debug_keyframe_hold_frames", type=int, default=12)
@@ -251,6 +252,8 @@ def build_single_command(args: argparse.Namespace, anygrasp_dir: Path, replay_di
         str(args.replay_objects_during_action),
         "--replay_objects_ignore_collision",
         str(args.replay_objects_ignore_collision),
+        "--enable_grasp_action_object_collision",
+        str(args.enable_grasp_action_object_collision),
         "--save_debug_preview",
         str(args.save_debug_preview),
         "--debug_preview_fps",
