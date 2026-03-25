@@ -582,6 +582,7 @@ class HandRetargetR1Renderer:
         self._right_wrist_camera_link = None
         self._table = None
         self._base_occluder = None
+        self._base_occluder_summary_printed = False
         self._base_pose = None
         self._left_target_axis_actor = None
         self._right_target_axis_actor = None
@@ -813,6 +814,14 @@ class HandRetargetR1Renderer:
             R.from_quat(quat_wxyz_to_xyzw(self._base_pose.q)).as_matrix() @ self.base_occluder_local_pos
         )
         self._base_occluder.set_pose(sapien.Pose(world_pos, self._base_pose.q))
+        if not self._base_occluder_summary_printed:
+            self._base_occluder_summary_printed = True
+            print(
+                "[base-occluder] "
+                f"world_p={np.round(world_pos, 4).tolist()} "
+                f"half_size={np.round(self.base_occluder_half_size, 4).tolist()} "
+                f"color={np.round(self.base_occluder_color, 4).tolist()}"
+            )
 
     def _camera_axis_mode_rotation(self) -> np.ndarray:
         presets = {

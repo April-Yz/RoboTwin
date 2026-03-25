@@ -26,6 +26,17 @@
   - 验证：
     - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/render_hand_retarget_r1_npz.py /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1_batch.py /home/zaijia001/ssd/RoboTwin/code_painting/render_object_pose_r1_npz.py`
 
+- 为 base 遮挡板补充首次位姿日志：
+  - 文件：
+    - `code_painting/render_hand_retarget_r1_npz.py`
+  - 变更：
+    - 遮挡板首次更新位姿时打印
+      - `world_p`
+      - `half_size`
+      - `color`
+  - 目的：
+    - 便于确认挡板是否创建成功，以及它是否落在预期位置/尺寸
+
 - 修正 R1 planner 的 wrist 相机挂载定义，取消导出后图片旋转：
   - 文件：
     - `code_painting/plan_anygrasp_keyframes_r1.py`

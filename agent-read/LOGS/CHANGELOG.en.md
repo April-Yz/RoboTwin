@@ -26,6 +26,17 @@
   - Validation:
     - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/render_hand_retarget_r1_npz.py /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1_batch.py /home/zaijia001/ssd/RoboTwin/code_painting/render_object_pose_r1_npz.py`
 
+- Added a first-pose debug log for the base occluder:
+  - File:
+    - `code_painting/render_hand_retarget_r1_npz.py`
+  - Change:
+    - when the occluder pose is updated for the first time, print
+      - `world_p`
+      - `half_size`
+      - `color`
+  - Purpose:
+    - helps confirm that the occluder is really created and whether it lands at the intended position and size
+
 - Corrected the R1 planner wrist-camera mount definition and removed post-export image rotation:
   - Files:
     - `code_painting/plan_anygrasp_keyframes_r1.py`
