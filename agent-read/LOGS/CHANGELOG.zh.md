@@ -220,5 +220,18 @@
     - `agent-read/V1.15_urdfik_cartesian_interp_execution_semantics.md`
   - 结论：
     - 当前中间 `ee/tcp` waypoint 确实用于逐点 IK 求解
-    - 但执行阶段并没有逐段消费这些 waypoint
-    - 实际执行仍主要是从 `current_joints` 到最终 `target_joints` 的 joint-space 线性插值
+    - 最新修复后，执行阶段也会逐段消费这些 waypoint 对应的 `joint_waypoints`
+    - `cartesian_interp_ik` 现在既影响 IK 解，也更直接影响最终执行轨迹
+
+## 2026-03-25 14:25:00 +08
+
+- 修复 `urdfik` 执行层未真正消费 `joint_waypoints` 的问题：
+  - 文件：
+    - `code_painting/render_hand_retarget_r1_npz_urdfik.py`
+  - 改动：
+    - `execute_plans(...)` 不再只从 `current_joints` 到 `target_joints` 做一次端点插值
+    - 现在直接消费 `plan["position"]` / `plan["velocity"]`
+    - 双臂执行时按左右臂相对轨迹进度交错推进，和基础 renderer 的轨迹执行语义保持一致
+    - `_execute_single_ik_plan(...)` 也优先执行完整 `plan["position"]` 轨迹
+  - 影响：
+    - `cartesian_interp_ik` 生成的 `joint_waypoints` 现在会成为真实执行轨迹的一部分

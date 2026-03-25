@@ -395,12 +395,16 @@ class HandRetargetR1URDFIKRenderer(ReplayRenderer):
             return status
         if self.robot is None:
             return "Missing"
-        current = np.asarray(plan["current_joints"], dtype=np.float64).reshape(6)
-        target = np.asarray(plan["target_joints"], dtype=np.float64).reshape(6)
-        traj = np.linspace(current, target, num=max(int(num_steps), 2), endpoint=True)
-        vel = np.zeros(6, dtype=np.float64)
-        for q in traj:
-            self.robot.set_arm_joints(q, vel, arm)
+        traj = np.asarray(plan.get("position"), dtype=np.float64).reshape(-1, 6)
+        if traj.shape[0] == 0:
+            current = np.asarray(plan["current_joints"], dtype=np.float64).reshape(6)
+            target = np.asarray(plan["target_joints"], dtype=np.float64).reshape(6)
+            traj = np.linspace(current, target, num=max(int(num_steps), 2), endpoint=True)
+        vel_traj = np.asarray(plan.get("velocity"), dtype=np.float64).reshape(-1, 6) if "velocity" in plan else np.zeros_like(traj, dtype=np.float64)
+        if vel_traj.shape[0] != traj.shape[0]:
+            vel_traj = np.zeros_like(traj, dtype=np.float64)
+        for q, v in zip(traj, vel_traj):
+            self.robot.set_arm_joints(q, v, arm)
             self.step_scene(steps=1)
         self.step_scene(steps=4)
         return "Success"
@@ -411,20 +415,23 @@ class HandRetargetR1URDFIKRenderer(ReplayRenderer):
 
         left_ok = left_status == "Success"
         right_ok = right_status == "Success"
-        left_curr = np.asarray(left_plan["current_joints"], dtype=np.float64).reshape(6) if left_ok else None
-        right_curr = np.asarray(right_plan["current_joints"], dtype=np.float64).reshape(6) if right_ok else None
-        left_tgt = np.asarray(left_plan["target_joints"], dtype=np.float64).reshape(6) if left_ok else None
-        right_tgt = np.asarray(right_plan["target_joints"], dtype=np.float64).reshape(6) if right_ok else None
-        num_steps = 20
+        left_pos = np.asarray(left_plan["position"], dtype=np.float64).reshape(-1, 6) if left_ok else None
+        left_vel = np.asarray(left_plan["velocity"], dtype=np.float64).reshape(-1, 6) if left_ok else None
+        right_pos = np.asarray(right_plan["position"], dtype=np.float64).reshape(-1, 6) if right_ok else None
+        right_vel = np.asarray(right_plan["velocity"], dtype=np.float64).reshape(-1, 6) if right_ok else None
 
-        for step in range(num_steps):
-            alpha = float(step + 1) / float(num_steps)
-            if left_ok:
-                q_left = left_curr * (1.0 - alpha) + left_tgt * alpha
-                self.robot.set_arm_joints(q_left, np.zeros(6, dtype=np.float64), "left")
-            if right_ok:
-                q_right = right_curr * (1.0 - alpha) + right_tgt * alpha
-                self.robot.set_arm_joints(q_right, np.zeros(6, dtype=np.float64), "right")
+        left_idx = 0
+        right_idx = 0
+        left_n = int(left_pos.shape[0]) if left_ok else 0
+        right_n = int(right_pos.shape[0]) if right_ok else 0
+
+        while left_idx < left_n or right_idx < right_n:
+            if left_ok and left_idx < left_n and (not right_ok or left_idx / max(left_n, 1) <= right_idx / max(right_n, 1)):
+                self.robot.set_arm_joints(left_pos[left_idx], left_vel[left_idx], "left")
+                left_idx += 1
+            if right_ok and right_idx < right_n and (not left_ok or right_idx / max(right_n, 1) <= left_idx / max(left_n, 1)):
+                self.robot.set_arm_joints(right_pos[right_idx], right_vel[right_idx], "right")
+                right_idx += 1
             self.step_scene(steps=1)
 
         self.step_scene(steps=4)

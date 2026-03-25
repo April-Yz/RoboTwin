@@ -57,3 +57,12 @@
     - `--urdfik_cartesian_interp_steps -1`
   - 相关代码：
     - `code_painting/render_hand_retarget_r1_npz_urdfik.py`
+
+## 2026-03-25 14:25:00 +08
+
+- `planner_backend=urdfik` + `urdfik_trajectory_mode=cartesian_interp_ik`
+  - 行为修正：
+    - 现在执行层会真正消费 `plan["position"]` 中的整条 `joint_waypoints`
+    - 不再只执行 `current_joints -> target_joints` 的端点直线
+  - 相关代码：
+    - `code_painting/render_hand_retarget_r1_npz_urdfik.py`

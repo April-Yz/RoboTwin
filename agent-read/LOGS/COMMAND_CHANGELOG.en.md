@@ -57,3 +57,12 @@
     - `--urdfik_cartesian_interp_steps -1`
   - Related code:
     - `code_painting/render_hand_retarget_r1_npz_urdfik.py`
+
+## 2026-03-25 14:25:00 +08
+
+- `planner_backend=urdfik` + `urdfik_trajectory_mode=cartesian_interp_ik`
+  - Behavior fix:
+    - the execution layer now truly consumes the full `joint_waypoints` stored in `plan["position"]`
+    - it no longer executes only a straight endpoint interpolation from `current_joints` to `target_joints`
+  - Related code:
+    - `code_painting/render_hand_retarget_r1_npz_urdfik.py`
