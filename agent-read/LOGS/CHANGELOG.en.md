@@ -212,3 +212,12 @@
       - `15cm` translation -> `2` intermediate waypoints
   - Note:
     - this automatic mode only adjusts waypoint count from TCP translation distance and does not change the IK target or execution semantics
+
+- Recorded the actual execution semantics of `cartesian_interp_ik`:
+  - New documents:
+    - `agent-read/V1.15_urdfik_cartesian_interp_execution_semantics_ZH.md`
+    - `agent-read/V1.15_urdfik_cartesian_interp_execution_semantics.md`
+  - Conclusion:
+    - intermediate `ee/tcp` waypoints are indeed used for per-waypoint IK solving
+    - but the execution stage does not replay those waypoints segment by segment
+    - the final motion is still mainly a joint-space linear interpolation from `current_joints` to the final `target_joints`

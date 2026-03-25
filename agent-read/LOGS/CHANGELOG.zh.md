@@ -213,3 +213,12 @@
       - `15cm` 平移 -> `2` 个中间 waypoint
   - 说明：
     - 该自动模式只根据 TCP 平移距离调节 waypoint 数，不改变现有 IK 目标或执行逻辑
+
+- 记录 `cartesian_interp_ik` 的实际执行语义说明：
+  - 新文档：
+    - `agent-read/V1.15_urdfik_cartesian_interp_execution_semantics_ZH.md`
+    - `agent-read/V1.15_urdfik_cartesian_interp_execution_semantics.md`
+  - 结论：
+    - 当前中间 `ee/tcp` waypoint 确实用于逐点 IK 求解
+    - 但执行阶段并没有逐段消费这些 waypoint
+    - 实际执行仍主要是从 `current_joints` 到最终 `target_joints` 的 joint-space 线性插值
