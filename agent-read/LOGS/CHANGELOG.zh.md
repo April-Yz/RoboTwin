@@ -64,3 +64,13 @@
     - `backward`
     - `aligned`
   - `fwd_cm` 增加 ANSI 颜色高亮，正负更容易区分
+
+- 进一步压缩单样本结束时的终端总结：
+  - 不再打印完整的 `statuses_by_arm={...}` 大字典
+  - 改为短格式：
+    - `arms`
+    - `arm`
+    - `obj`
+    - `fXX=cYY`
+    - `pre/gr/act`
+    - `video`

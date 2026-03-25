@@ -64,3 +64,13 @@
     - `backward`
     - `aligned`
   - `fwd_cm` now uses ANSI color highlighting so sign changes are easier to spot
+
+- Further compressed the end-of-sample terminal summary:
+  - it no longer prints the full `statuses_by_arm={...}` dictionary
+  - it now uses a short format with:
+    - `arms`
+    - `arm`
+    - `obj`
+    - `fXX=cYY`
+    - `pre/gr/act`
+    - `video`

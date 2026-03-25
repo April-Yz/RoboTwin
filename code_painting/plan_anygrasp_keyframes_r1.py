@@ -2240,15 +2240,29 @@ def short_direction_label(label: str) -> str:
     return str(label)
 
 
-def colorize_forward_cm(value_cm: float) -> str:
-    text = f"{float(value_cm):+.2f}"
-    if not sys.stdout.isatty():
-        return text
+    def colorize_forward_cm(value_cm: float) -> str:
+        text = f"{float(value_cm):+.2f}"
+        if not sys.stdout.isatty():
+            return text
     if value_cm > 1e-6:
         return f"\033[1;31m{text}\033[0m"
-    if value_cm < -1e-6:
-        return f"\033[1;36m{text}\033[0m"
-    return f"\033[1;33m{text}\033[0m"
+        if value_cm < -1e-6:
+            return f"\033[1;36m{text}\033[0m"
+        return f"\033[1;33m{text}\033[0m"
+
+
+def short_stage_status(stage_info: Optional[Dict[str, object]]) -> str:
+    # Original fields are:
+    # - reached: whether the stage satisfied the configured reach thresholds
+    # - pos_err_m / rot_err_deg: final pose error after execution
+    if not isinstance(stage_info, dict):
+        return "na"
+    reached = bool(stage_info.get("reached", False))
+    pos_err = stage_info.get("pos_err_m", None)
+    rot_err = stage_info.get("rot_err_deg", None)
+    if pos_err is None or rot_err is None:
+        return "ok" if reached else "miss"
+    return f"{'ok' if reached else 'miss'}(p={float(pos_err):.3f},r={float(rot_err):.1f})"
 
 
 def plan_request_diagnostics(
@@ -4309,13 +4323,17 @@ def main() -> None:
         json.dump(summary, f, indent=2)
 
     status_prefix = "[warn]" if bool(summary["execution_failed"]) else "[done]"
+    sel0 = primary_exec_selected_keyframes[0]
+    sel1 = primary_exec_selected_keyframes[1]
     print(
         f"{status_prefix} "
-        f"executed_arms={summary['executed_arms']} primary_arm={primary_exec_arm} object={primary_object_name} "
-        f"selected_f{primary_exec_selected_keyframes[0].source_frame}=candidate_{primary_exec_selected_keyframes[0].candidate.candidate_idx} "
-        f"selected_f{primary_exec_selected_keyframes[1].source_frame}=candidate_{primary_exec_selected_keyframes[1].candidate.candidate_idx} "
-        f"statuses_by_arm={summary['stages_by_executed_arm']} "
-        f"head_video={head_video_path}"
+        f"arms={','.join(summary['executed_arms'])} arm={primary_exec_arm} obj={primary_object_name} "
+        f"f{sel0.source_frame}=c{sel0.candidate.candidate_idx} "
+        f"f{sel1.source_frame}=c{sel1.candidate.candidate_idx} "
+        f"pre={short_stage_status(primary_stages.get('pregrasp'))} "
+        f"gr={short_stage_status(primary_stages.get('grasp'))} "
+        f"act={short_stage_status(primary_stages.get('action'))} "
+        f"video={head_video_path}"
     )
     renderer.hold_viewer()
 
