@@ -1440,6 +1440,153 @@ def set_object_collision_for_names(object_states: Dict[str, ObjectState], object
         )
 
 
+def _get_gripper_joint_positions(renderer: ReplayRenderer, arm: str) -> np.ndarray:
+    if renderer.robot is None:
+        return np.zeros(0, dtype=np.float64)
+    joints = renderer.robot.left_gripper if arm == "left" else renderer.robot.right_gripper
+    positions: List[float] = []
+    for joint_info in joints:
+        qpos = np.asarray(joint_info[0].get_qpos(), dtype=np.float64).reshape(-1)
+        positions.append(float(qpos[0]) if qpos.size else 0.0)
+    return np.asarray(positions, dtype=np.float64)
+
+
+def _get_gripper_link_entities(renderer: ReplayRenderer, arm: str) -> List[sapien.Entity]:
+    if renderer.robot is None:
+        return []
+    joints = renderer.robot.left_gripper if arm == "left" else renderer.robot.right_gripper
+    return [joint_info[0].child_link for joint_info in joints if getattr(joint_info[0], "child_link", None) is not None]
+
+
+def _contact_involves_entities(
+    renderer: ReplayRenderer,
+    gripper_entities: Sequence[sapien.Entity],
+    target_entity: Optional[sapien.Entity],
+) -> bool:
+    if target_entity is None:
+        return False
+    gripper_set = set(gripper_entities)
+    if not gripper_set:
+        return False
+    for contact in renderer.scene.get_contacts():
+        entities: List[Optional[sapien.Entity]] = []
+        if hasattr(contact, "bodies") and contact.bodies:
+            for body in contact.bodies:
+                entities.append(getattr(body, "entity", None))
+        else:
+            entities.append(getattr(contact, "actor0", None))
+            entities.append(getattr(contact, "actor1", None))
+        if len(entities) != 2:
+            continue
+        e0, e1 = entities
+        if (e0 is target_entity and e1 in gripper_set) or (e1 is target_entity and e0 in gripper_set):
+            return True
+    return False
+
+
+def close_grippers_progressively_with_collision_stop(
+    renderer: ReplayRenderer,
+    left_target: Optional[float],
+    right_target: Optional[float],
+    object_actor_by_arm: Dict[str, Optional[sapien.Entity]],
+    *,
+    command_step: float = 0.05,
+    settle_steps_per_iter: int = 6,
+    max_iters: int = 40,
+    stall_qpos_tol: float = 5e-5,
+    contact_confirm_iters: int = 2,
+) -> Dict[str, Dict[str, object]]:
+    if renderer.robot is None:
+        return {}
+
+    state_by_arm: Dict[str, Dict[str, object]] = {}
+    for arm, target in (("left", left_target), ("right", right_target)):
+        if target is None:
+            continue
+        target = float(np.clip(target, 0.0, 1.0))
+        current_cmd = float(renderer.robot.get_left_gripper_val() if arm == "left" else renderer.robot.get_right_gripper_val())
+        state_by_arm[arm] = {
+            "target": target,
+            "current_cmd": current_cmd,
+            "last_qpos": _get_gripper_joint_positions(renderer, arm),
+            "contact_iters": 0,
+            "stopped": False,
+            "reason": "target_reached",
+            "gripper_entities": _get_gripper_link_entities(renderer, arm),
+            "object_actor": object_actor_by_arm.get(arm),
+        }
+
+    if not state_by_arm:
+        return {}
+
+    for _ in range(max_iters):
+        left_cmd = None
+        right_cmd = None
+        pending = False
+        for arm, state in state_by_arm.items():
+            if bool(state["stopped"]):
+                continue
+            pending = True
+            current_cmd = float(state["current_cmd"])
+            target = float(state["target"])
+            delta = target - current_cmd
+            if abs(delta) <= 1e-6:
+                state["stopped"] = True
+                state["reason"] = "target_reached"
+                continue
+            next_cmd = current_cmd + float(np.sign(delta)) * min(abs(delta), command_step)
+            state["current_cmd"] = float(next_cmd)
+            if arm == "left":
+                left_cmd = float(next_cmd)
+            else:
+                right_cmd = float(next_cmd)
+        if not pending:
+            break
+
+        renderer.set_grippers(left_cmd, right_cmd)
+        if settle_steps_per_iter > 0:
+            renderer.step_scene(steps=int(settle_steps_per_iter))
+
+        for arm, state in state_by_arm.items():
+            if bool(state["stopped"]):
+                continue
+            current_qpos = _get_gripper_joint_positions(renderer, arm)
+            prev_qpos = np.asarray(state["last_qpos"], dtype=np.float64)
+            qpos_delta = float(np.max(np.abs(current_qpos - prev_qpos))) if current_qpos.size and prev_qpos.size else 0.0
+            state["last_qpos"] = current_qpos
+            has_contact = _contact_involves_entities(
+                renderer,
+                state["gripper_entities"],  # type: ignore[arg-type]
+                state["object_actor"],  # type: ignore[arg-type]
+            )
+            state["contact_iters"] = int(state["contact_iters"]) + 1 if has_contact else 0
+
+            target = float(state["target"])
+            current_cmd = float(state["current_cmd"])
+            if abs(target - current_cmd) <= 1e-6:
+                state["stopped"] = True
+                state["reason"] = "target_reached"
+            elif has_contact and qpos_delta <= stall_qpos_tol and int(state["contact_iters"]) >= contact_confirm_iters:
+                state["stopped"] = True
+                state["reason"] = "contact_stall"
+
+        if all(bool(state["stopped"]) for state in state_by_arm.values()):
+            break
+
+    result: Dict[str, Dict[str, object]] = {}
+    for arm, state in state_by_arm.items():
+        qpos = np.asarray(state["last_qpos"], dtype=np.float64)
+        result[arm] = {
+            "final_cmd": float(state["current_cmd"]),
+            "target": float(state["target"]),
+            "actual_qpos_max_abs": float(np.max(np.abs(qpos))) if qpos.size else 0.0,
+            "contact_iters": int(state["contact_iters"]),
+            "had_contact": bool(int(state["contact_iters"]) > 0),
+            "reason": str(state["reason"]),
+        }
+    return result
+
+
 def create_colored_axis_actor(
     scene: sapien.Scene,
     name: str,
@@ -3904,7 +4051,23 @@ def main() -> None:
                     [selected_objects_by_executed_arm[arm_name] for arm_name in dual_arms],
                     enabled=True,
                 )
-            renderer.set_grippers(args.close_gripper, args.close_gripper)
+                close_summary = close_grippers_progressively_with_collision_stop(
+                    renderer,
+                    args.close_gripper,
+                    args.close_gripper,
+                    {arm_name: object_states[selected_objects_by_executed_arm[arm_name]].actor for arm_name in dual_arms},
+                )
+                print(
+                    "[gripper-close] "
+                    + " ".join(
+                        f"{arm_name}:reason={close_summary.get(arm_name, {}).get('reason', 'n/a')},"
+                        f"cmd={float(close_summary.get(arm_name, {}).get('final_cmd', args.close_gripper)):.3f},"
+                        f"contact={int(bool(close_summary.get(arm_name, {}).get('had_contact', False)))}"
+                        for arm_name in dual_arms
+                    )
+                )
+            else:
+                renderer.set_grippers(args.close_gripper, args.close_gripper)
             debug_execution_state.current_stage = "close_gripper"
             record_frame(
                 renderer,
@@ -4139,7 +4302,20 @@ def main() -> None:
                 set_single_arm_target_visual(renderer, exec_arm, grasp_pose)
                 if bool(args.enable_grasp_action_object_collision):
                     set_object_collision_for_names(object_states, [exec_object_name], enabled=True)
-                renderer.set_grippers(args.close_gripper if exec_arm == "left" else None, args.close_gripper if exec_arm == "right" else None)
+                    close_summary = close_grippers_progressively_with_collision_stop(
+                        renderer,
+                        args.close_gripper if exec_arm == "left" else None,
+                        args.close_gripper if exec_arm == "right" else None,
+                        {exec_arm: object_states[exec_object_name].actor},
+                    )
+                    print(
+                        "[gripper-close] "
+                        f"{exec_arm}:reason={close_summary.get(exec_arm, {}).get('reason', 'n/a')},"
+                        f"cmd={float(close_summary.get(exec_arm, {}).get('final_cmd', args.close_gripper)):.3f},"
+                        f"contact={int(bool(close_summary.get(exec_arm, {}).get('had_contact', False)))}"
+                    )
+                else:
+                    renderer.set_grippers(args.close_gripper if exec_arm == "left" else None, args.close_gripper if exec_arm == "right" else None)
                 debug_execution_state.current_stage = "close_gripper"
                 record_frame(
                     renderer,

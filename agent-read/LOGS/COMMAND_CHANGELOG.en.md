@@ -32,3 +32,15 @@
     - `--viewer_show_camera_frustums`
   - Related code:
     - `code_painting/plan_anygrasp_keyframes_r1_batch.py`
+
+## 2026-03-25 13:35:00 +08
+
+- `--enable_grasp_action_object_collision 1`
+  - Behavior enhancement:
+    - The `close_gripper` stage no longer always closes fully in one shot
+    - It now closes progressively and stops early once contact with the selected object is present and gripper joint motion has stalled
+  - Related code:
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - Usage:
+    - Command syntax is unchanged; keep using `--enable_grasp_action_object_collision 1`
+    - With the default `0`, the original fast no-collision closing behavior is preserved

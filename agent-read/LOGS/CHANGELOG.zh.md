@@ -158,3 +158,25 @@
   - 验证：
     - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1_batch.py`
     - `git -C /home/zaijia001/ssd/RoboTwin diff --check -- code_painting/plan_anygrasp_keyframes_r1_batch.py`
+
+## 2026-03-25 13:35:00 +08
+
+- 为 `--enable_grasp_action_object_collision=1` 增加最小版“渐进闭合直到接触/停滞”逻辑：
+  - 文件：
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - 问题分析：
+    - 之前该开关只是在 `grasp/action` 阶段重新启用所选物体碰撞
+    - 夹爪仍然使用一次性 `set_grippers(close)`，且仅推进极少量物理步
+    - 因此即使物体存在 collision shape，手指仍可能视觉上完全闭合并穿过物体
+  - 改动：
+    - 新增 `close_grippers_progressively_with_collision_stop()`
+    - 在 `close_gripper` 阶段按小步命令闭合夹爪
+    - 每步推进物理，并读取夹爪关节 `qpos`
+    - 同时检查所选物体与当前执行臂夹爪 links 的接触
+    - 当“已接触且夹爪关节位移停滞”时提前停止闭合
+    - 默认无碰撞模式保持原来的 `renderer.set_grippers(...)` 行为不变
+  - 备注：
+    - 这是最小修复，不改变 `pregrasp/grasp/action` 目标构造，也不改变物体附着到 TCP 的相对位姿
+  - 验证：
+    - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py`
+    - `git -C /home/zaijia001/ssd/RoboTwin diff --check -- code_painting/plan_anygrasp_keyframes_r1.py`

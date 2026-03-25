@@ -32,3 +32,15 @@
     - `--viewer_show_camera_frustums`
   - 相关代码：
     - `code_painting/plan_anygrasp_keyframes_r1_batch.py`
+
+## 2026-03-25 13:35:00 +08
+
+- `--enable_grasp_action_object_collision 1`
+  - 行为增强：
+    - `close_gripper` 阶段不再总是一次性闭合到底
+    - 现在会渐进闭合，并在检测到所选物体接触且夹爪关节运动停滞时提前停止
+  - 相关代码：
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - 使用说明：
+    - 参数形式不变，仍然只需追加 `--enable_grasp_action_object_collision 1`
+    - 默认 `0` 时，仍保留原来的无碰撞快速闭合模式

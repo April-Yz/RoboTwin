@@ -158,3 +158,24 @@
   - Validation:
     - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1_batch.py`
     - `git -C /home/zaijia001/ssd/RoboTwin diff --check -- code_painting/plan_anygrasp_keyframes_r1_batch.py`
+
+## 2026-03-25 13:35:00 +08
+
+- Added a minimal "progressive close until contact/stall" path for `--enable_grasp_action_object_collision=1`:
+  - File:
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - Analysis:
+    - Previously the flag only re-enabled collision for the selected object during `grasp/action`
+    - The gripper still used a one-shot `set_grippers(close)` update and only advanced a very small number of physics steps
+    - As a result, the fingers could still visually close through the object even when collision shapes were present
+  - Change:
+    - Added `close_grippers_progressively_with_collision_stop()`
+    - The `close_gripper` stage now closes in small command increments
+    - Each increment advances physics, reads gripper joint `qpos`, and checks contacts between the selected object and the executing gripper links
+    - Closure stops early once contact is present and gripper joint motion has stalled
+    - The original one-shot `renderer.set_grippers(...)` path remains unchanged when the collision flag is disabled
+  - Note:
+    - This is a minimal fix; it does not change `pregrasp/grasp/action` target construction or the TCP-to-object attachment transform
+  - Validation:
+    - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py`
+    - `git -C /home/zaijia001/ssd/RoboTwin diff --check -- code_painting/plan_anygrasp_keyframes_r1.py`
