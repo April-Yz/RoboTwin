@@ -258,3 +258,76 @@
   - 说明：
     - 这是停机判据使用的监控集合，不只是打印
     - 当前非常适合用来排查“finger/base shapes=0，但其他 link 是否有 collision”这一类问题
+
+## 2026-03-25 23:10:00 +08
+
+- 新增最小碰撞探针命令：
+  - 入口脚本：
+    - `code_painting/minimal_gripper_collision_probe.py`
+  - 用途：
+    - 不经过 AnyGrasp/IK/stage 主流程，直接验证 R1 gripper 与简单 box 或 mesh(solid_bbox/convex) 物体之间的 raw scene contact
+  - 代表命令：
+    - box：
+      - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python code_painting/minimal_gripper_collision_probe.py --arm left --object_kind box --probe_local_offset 0.04 0.0 0.0 --max_iters 20 --settle_steps_per_iter 8`
+    - mesh：
+      - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python code_painting/minimal_gripper_collision_probe.py --arm left --object_kind mesh --mesh_path /home/zaijia001/ssd/data/R1/hand/obj_mesh/blue_cup/blue_cup.obj --mesh_collision_mode solid_bbox --probe_local_offset 0.04 0.0 0.0 --max_iters 20 --settle_steps_per_iter 8`
+  - 关键输出：
+    - 终端逐步打印：
+      - `qpos`
+      - `raw_contact_total`
+      - `target_contact_total`
+      - `target_contacts`
+    - JSON：
+      - `code_painting/minimal_gripper_collision_probe/probe_left_box.json`
+      - `code_painting/minimal_gripper_collision_probe/probe_left_mesh.json`
+
+- `--debug_collision_report 1` 调试输出增强：
+  - 新增 close 阶段 raw target contact 打印：
+    - `raw_target_contacts`
+    - `raw_target_contact_total`
+    - `[gripper-close] ... raw_target_contact=0|1`
+  - 相关代码：
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - 用途：
+    - 区分“monitor/helper 没匹配到接触”和“raw physics contact 本身就不存在”
+
+- `--debug_collision_report 1` 输出继续增强：
+  - 新增：
+    - `target_pose=...`
+    - `target_collision_debug=...`
+  - 用途：
+    - 直接查看 close 阶段目标物体 actor pose 是否稳定
+    - 直接查看 `solid_bbox` 的 `center/half_size`
+
+- 新增参数：`--debug_visualize_object_collision_bbox 0|1`
+  - 入口：
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+    - `code_painting/plan_anygrasp_keyframes_r1_batch.py`
+  - 用途：
+    - 在 `execution_object_collision_mode=solid_bbox` 下，额外显示物体 collision bbox
+  - 典型用法：
+    - 在原命令末尾追加：
+      - `--debug_visualize_object_collision_bbox 1`
+
+- 新增参数：`--grasp_action_object_collision_start_stage {close_gripper,grasp,pregrasp}`
+  - 用途：
+    - 控制 selected execution objects 从哪个 stage 开始参与碰撞
+  - 典型实验：
+    - `--enable_grasp_action_object_collision 1 --grasp_action_object_collision_start_stage pregrasp --execution_object_collision_mode convex`
+
+- 新增 close 前 pose 导出：
+  - 输出文件：
+    - `close_stage_snapshot_dual_before_close.json`
+    - `close_stage_snapshot_<arm>_before_close.json`
+
+- 新增参数：`--execution_object_scale_override NAME=S|SX,SY,SZ`
+  - 用途：
+    - 单独缩放 execution object 的 visual mesh 与 collision geometry
+  - 典型示例：
+    - `--execution_object_scale_override cup=0.9`
+    - `--execution_object_scale_override bottle=0.9`
+
+- 新增参数：
+  - `--execution_object_visual_scale_override NAME=S|SX,SY,SZ`
+  - `--execution_object_collision_scale_override NAME=S|SX,SY,SZ`
+  - 用途：分别控制 execution object 的 visual mesh 与 collision shape 缩放

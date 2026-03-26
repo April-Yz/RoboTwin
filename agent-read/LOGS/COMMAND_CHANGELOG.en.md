@@ -260,3 +260,76 @@
   - Notes:
     - this changes the monitoring set used by the early-stop logic, not just the printed debug output
     - it is especially useful for debugging cases where finger/base links report `shapes=0` but other links may still carry collision
+
+## 2026-03-25 23:10:00 +08
+
+- Added a minimal collision-probe command:
+  - Entry script:
+    - `code_painting/minimal_gripper_collision_probe.py`
+  - Purpose:
+    - verify raw scene contacts between the R1 gripper and either a simple box or a mesh (`solid_bbox` / `convex`) object without going through the AnyGrasp/IK/stage main pipeline
+  - Representative commands:
+    - box:
+      - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python code_painting/minimal_gripper_collision_probe.py --arm left --object_kind box --probe_local_offset 0.04 0.0 0.0 --max_iters 20 --settle_steps_per_iter 8`
+    - mesh:
+      - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python code_painting/minimal_gripper_collision_probe.py --arm left --object_kind mesh --mesh_path /home/zaijia001/ssd/data/R1/hand/obj_mesh/blue_cup/blue_cup.obj --mesh_collision_mode solid_bbox --probe_local_offset 0.04 0.0 0.0 --max_iters 20 --settle_steps_per_iter 8`
+  - Key outputs:
+    - step-by-step terminal logs of:
+      - `qpos`
+      - `raw_contact_total`
+      - `target_contact_total`
+      - `target_contacts`
+    - JSON outputs:
+      - `code_painting/minimal_gripper_collision_probe/probe_left_box.json`
+      - `code_painting/minimal_gripper_collision_probe/probe_left_mesh.json`
+
+- Enhanced `--debug_collision_report 1` output:
+  - added raw target-contact reporting during the close stage:
+    - `raw_target_contacts`
+    - `raw_target_contact_total`
+    - `[gripper-close] ... raw_target_contact=0|1`
+  - Related code:
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - Purpose:
+    - distinguish “the monitor/helper failed to match a contact” from “raw physics contact does not exist at all”
+
+- Further enhanced `--debug_collision_report 1` output:
+  - Added:
+    - `target_pose=...`
+    - `target_collision_debug=...`
+  - Purpose:
+    - directly inspect whether the target-object actor pose stays stable during close
+    - directly inspect the `solid_bbox` `center/half_size`
+
+- Added flag: `--debug_visualize_object_collision_bbox 0|1`
+  - Entry points:
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+    - `code_painting/plan_anygrasp_keyframes_r1_batch.py`
+  - Purpose:
+    - when `execution_object_collision_mode=solid_bbox`, additionally display the object's collision bbox
+  - Typical usage:
+    - append to the existing command:
+      - `--debug_visualize_object_collision_bbox 1`
+
+- Added flag: `--grasp_action_object_collision_start_stage {close_gripper,grasp,pregrasp}`
+  - Purpose:
+    - control from which stage selected execution objects start participating in collision
+  - Typical experiment:
+    - `--enable_grasp_action_object_collision 1 --grasp_action_object_collision_start_stage pregrasp --execution_object_collision_mode convex`
+
+- Added pre-close pose export:
+  - Output files:
+    - `close_stage_snapshot_dual_before_close.json`
+    - `close_stage_snapshot_<arm>_before_close.json`
+
+- Added flag: `--execution_object_scale_override NAME=S|SX,SY,SZ`
+  - Purpose:
+    - independently scale an execution object's visual mesh and collision geometry together
+  - Typical examples:
+    - `--execution_object_scale_override cup=0.9`
+    - `--execution_object_scale_override bottle=0.9`
+
+- Added flags:
+  - `--execution_object_visual_scale_override NAME=S|SX,SY,SZ`
+  - `--execution_object_collision_scale_override NAME=S|SX,SY,SZ`
+  - Purpose: independently control execution-object visual-mesh scale and collision-shape scale

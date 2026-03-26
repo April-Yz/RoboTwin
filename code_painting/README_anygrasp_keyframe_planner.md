@@ -124,6 +124,35 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_r1_b
 --viewer_wait_at_end 1
 ```
 
+如果你想把执行用的目标物体碰撞/视觉模型一起缩小，可以额外加：
+
+```bash
+--execution_object_scale_override cup=0.9 \
+--execution_object_scale_override bottle=0.9
+```
+
+如果你想分别控制 visual 和 collision 的缩放比例，可以改用：
+
+```bash
+--execution_object_visual_scale_override cup=0.7 \
+--execution_object_collision_scale_override cup=0.5 \
+--execution_object_visual_scale_override bottle=0.7 \
+--execution_object_collision_scale_override bottle=0.5
+```
+
+其中：
+
+- `--execution_object_scale_override` 是旧的统一缩放参数
+- `--execution_object_visual_scale_override` 只改 visual mesh
+- `--execution_object_collision_scale_override` 只改 collision shape
+- 如果同一物体同时给了统一缩放和专用缩放，则专用缩放优先
+
+如果你要保留原来的“只在 `close_gripper` 阶段才让目标物体开始参与碰撞”的逻辑，再显式加：
+
+```bash
+--grasp_action_object_collision_start_stage close_gripper
+```
+
 关于 preview-top1 路径下的阶段顺序，以及“物体是否附着到夹爪”的关系，见：
 - [V1.14_preview_top1_execution_relation_ZH.md](/home/zaijia001/ssd/RoboTwin/agent-read/V1.14_preview_top1_execution_relation_ZH.md)
 

@@ -552,3 +552,176 @@
       - 在 finger 基础上也监控 `left/right_gripper_link`
     - `all_robot_links`
       - 将整套 robot articulation links 都纳入闭合接触监控，主要用于 debug 当前夹爪 link collision 是否缺失
+
+## 2026-03-25 23:10:00 +08
+
+- 新增最小 gripper/object 碰撞探针脚本并完成首轮验证：
+  - 文件：
+    - `code_painting/minimal_gripper_collision_probe.py`
+    - `agent-read/2026-03-25_minimal_gripper_collision_probe_ZH.md`
+    - `agent-read/2026-03-25_minimal_gripper_collision_probe.md`
+  - 目的：
+    - 在不经过 AnyGrasp/IK/stage 流程的前提下，单独验证 R1 gripper 与测试物体在 `close_gripper` 时是否真的产生 raw physics contact
+    - 区分“主流程 contact debug helper 失明”和“物理引擎里根本没有 robot-object 碰撞”
+  - 最小实验：
+    - box probe：
+      - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python code_painting/minimal_gripper_collision_probe.py --arm left --object_kind box --probe_local_offset 0.04 0.0 0.0 --max_iters 20 --settle_steps_per_iter 8`
+    - mesh + solid_bbox probe：
+      - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python code_painting/minimal_gripper_collision_probe.py --arm left --object_kind mesh --mesh_path /home/zaijia001/ssd/data/R1/hand/obj_mesh/blue_cup/blue_cup.obj --mesh_collision_mode solid_bbox --probe_local_offset 0.04 0.0 0.0 --max_iters 20 --settle_steps_per_iter 8`
+  - 新结论：
+    - 当前 helper/component 摘要仍会打印 robot links `shapes=0`
+    - 但最小隔离实验里，`scene.get_contacts()` 已经能稳定观测到：
+      - `left_gripper_finger_link1<->probe_box`
+      - `left_gripper_finger_link2<->probe_box`
+      - `left_gripper_finger_link1<->probe_mesh`
+      - `left_gripper_finger_link2<->probe_mesh`
+      - 以及更大 mesh 情况下的 `left_gripper_link<->probe_mesh`
+    - 因此 `shapes=0` 不能再直接解释为“机器人没有碰撞体”或“物理中没有接触”
+    - 当前主流程里 `contact=0` 更像是监控/匹配/时序问题，或 close 阶段物体真实位姿与视频观感不一致
+  - 验证：
+    - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/minimal_gripper_collision_probe.py`
+    - `git diff --check -- code_painting/minimal_gripper_collision_probe.py`
+
+- 为主流程 `close_gripper` 调试增加 raw target contact 输出并完成回灌验证：
+  - 文件：
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+    - `agent-read/2026-03-25_minimal_gripper_collision_probe_ZH.md`
+    - `agent-read/2026-03-25_minimal_gripper_collision_probe.md`
+  - 改动：
+    - `debug_collision_report=1` 时，`close_grippers_progressively_with_collision_stop(...)` 现在额外打印：
+      - `raw_target_contacts`
+      - `raw_target_contact_total`
+    - `[gripper-close]` 汇总新增：
+      - `raw_target_contact=0|1`
+  - 回灌验证命令：
+    - `bash code_painting/run_plan_anygrasp_keyframes_r1_batch.sh ... --debug_collision_report 1 --gripper_contact_monitor_mode all_robot_links --enable_viewer 0`
+  - 新结论：
+    - 在当前 `d_pour_blue_0` case 里，主流程 close 阶段不仅 monitor/helper 为 0，连 raw target contacts 也持续为 0
+    - 因此当前问题不能只解释为“monitor 漏报”，而更像是主流程 close 阶段根本没有与目标物体发生 raw physics contact
+
+- 为主流程 close 阶段增加目标物体 pose / collision debug 输出：
+  - 文件：
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - 改动：
+    - `debug_collision_report=1` 时，`[collision-debug-init]` 现在额外打印：
+      - `target_pose=...`
+      - `target_collision_debug=...`
+    - `[collision-debug-step]` 现在额外打印每次 close 迭代中的：
+      - `target_pose=...`
+  - 本轮回灌结论：
+    - 当前 `d_pour_blue_0` close 阶段里，target pose 基本稳定不变，且 raw target contact 始终为 0
+    - 因此问题更像是 visual mesh 与 `solid_bbox` collision primitive 存在显著几何偏差，而不是 close 阶段 object pose 被不断重设
+
+- 新增 execution object collision bbox 可视化：
+  - 文件：
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+    - `code_painting/plan_anygrasp_keyframes_r1_batch.py`
+  - 新参数：
+    - `--debug_visualize_object_collision_bbox 0|1`
+  - 行为：
+    - 当 execution object 使用 `solid_bbox` collision 时，为其额外创建一个 visual-only bbox actor
+    - bbox actor 采用与 collision 相同的局部 `center/half_size`
+    - 并跟随 object actor 的 pose 更新
+  - 目的：
+    - 在 viewer/视频里直接比较 visual mesh 与 collision bbox
+    - 判断当前“穿模”是否只是 visual mesh 现象
+  - 验证：
+    - `python -m py_compile code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_anygrasp_keyframes_r1_batch.py`
+    - 主流程回灌：`... --debug_visualize_object_collision_bbox 1 ...`
+
+- 增加 `convex` 对照实验并更新判断：
+  - 验证命令：
+    - `... --execution_object_collision_mode convex --debug_collision_report 1 --gripper_contact_monitor_mode all_robot_links --enable_viewer 0`
+  - 结果：
+    - 当前 `d_pour_blue_0` case 在 `convex` 模式下，close 阶段 raw target contacts 仍持续为 0
+  - 结论：
+    - 问题不只与 `solid_bbox` 盒子近似有关
+    - 即便改用 `convex` mesh collision，主流程 close 阶段仍没有 raw physics contact
+
+- 新增 close 起始姿态导出与“从 pregrasp 就开启物体碰撞”实验：
+  - 文件：
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+    - `code_painting/plan_anygrasp_keyframes_r1_batch.py`
+  - 新参数：
+    - `--grasp_action_object_collision_start_stage {close_gripper,grasp,pregrasp}`
+  - 新行为：
+    - close 前写出 `close_stage_snapshot_*.json`
+    - 可将 selected execution objects 的碰撞启用时机前移到 `grasp` 或 `pregrasp`
+  - 关键实验结果：
+    - 在 `pregrasp + convex` 实验中，主流程首次稳定出现 raw target contacts
+    - 但 monitor/helper 仍然输出 `monitor_contact=0`
+  - 结论更新：
+    - 旧默认 `close_gripper` 才启用物体碰撞，确实太晚
+    - 同时当前 monitor/contact 匹配逻辑仍存在漏报问题
+
+- 新增 execution object 缩放覆盖参数，用于单独缩小 `cup` / `bottle` 的执行视觉与碰撞模型：
+  - 文件：
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+    - `code_painting/plan_anygrasp_keyframes_r1_batch.py`
+    - `code_painting/README_anygrasp_keyframe_planner.md`
+  - 新参数：
+    - `--execution_object_scale_override NAME=S`
+    - `--execution_object_scale_override NAME=SX,SY,SZ`
+  - 行为：
+    - 同时缩放 execution object 的 visual mesh 与 collision shape
+    - `solid_bbox` 模式下同步缩放 bbox center / half_size
+  - 典型用法：
+    - `--execution_object_scale_override cup=0.9 --execution_object_scale_override bottle=0.9`
+  - 备注：
+    - 若要保留原来的“仅在 close_gripper 前启用物体碰撞”逻辑，继续使用：
+      - `--grasp_action_object_collision_start_stage close_gripper`
+
+- 运行“缩小物体 + 保留 close_gripper 才启用碰撞”的对照实验：
+  - 输出目录：
+    - `code_painting/anygrasp_single_scaled_close_only_probe/d_pour_blue_0`
+  - 参数：
+    - `--grasp_action_object_collision_start_stage close_gripper`
+    - `--execution_object_scale_override cup=0.9`
+    - `--execution_object_scale_override bottle=0.9`
+  - 结果：
+    - close init 到 iter 20 始终 `raw_target_contact_total=0`
+    - 最终 `raw_target_contact=0`
+  - 结论：
+    - 仅把执行物体缩小到 0.9，不足以让旧的 `close_gripper`-only 碰撞启用逻辑检测到接触
+
+- 运行“全程碰撞 + 缩放 0.8 / 0.5”实验：
+  - 输出目录：
+    - `code_painting/anygrasp_single_all_collision_scale08/d_pour_blue_0`
+    - `code_painting/anygrasp_single_all_collision_scale05/d_pour_blue_0`
+  - 公共参数：
+    - `--grasp_action_object_collision_start_stage pregrasp`
+    - `--execution_object_collision_mode convex`
+  - 结果：
+    - `0.8`：left/right 在 close 阶段都能稳定检测到 raw target contact
+    - `0.5`：right 从 close init 就有 raw contact，left 在 close 中后段开始出现，最终 left/right 都是 `raw_target_contact=1`
+  - 结论：
+    - 全程碰撞输出本身是正常且可信的；真正异常的是 monitor/contact 统计链仍漏报
+    - 在启碰撞时机足够早的前提下，缩小到 `0.8` / `0.5` 仍不会让 raw contact 消失
+
+- 分析 `0.5 + pregrasp` 的全程碰撞结果，并新增 `0.5 + close_gripper + fingers` 对照实验：
+  - 新输出目录：
+    - `code_painting/anygrasp_single_scale05_close_only_fingers/d_pour_blue_0`
+  - 结果分析：
+    - `0.5 + pregrasp` 更接近“夹爪闭合到物体后被挡住、视觉上不完全闭合”的效果
+    - 但当前 close 停止逻辑仍依赖 monitor_contact，因此 reason 仍可能显示 `target_reached`
+  - 新对照实验结果：
+    - `close_gripper + fingers + scale=0.5` 下，left 仍 `raw_target_contact=0`，right 为 `raw_target_contact=1`
+  - 结论：
+    - 缩小到 `0.5` 后，若仍只在 close 才启用碰撞，则问题没有完全消失；更可靠的方案仍是从 `pregrasp` 开始启用碰撞
+
+- 新增 execution object visual/collision 分离缩放参数：
+  - 新参数：
+    - `--execution_object_visual_scale_override`
+    - `--execution_object_collision_scale_override`
+  - 兼容保留：
+    - `--execution_object_scale_override`
+  - 语义：
+    - 可分别控制 visual mesh 与 collision shape 的缩放比例
+    - 若同一物体同时给了统一缩放和专用缩放，则专用缩放优先
+
+- 新增对“已经进入碰撞体内部后才开启碰撞，为何不会立刻卡住”的机制分析：
+  - 结论要点：
+    - 晚启碰撞不会回退到首次接触边界
+    - close 停止逻辑依赖 monitor_contact + stall，而不是 raw contact 直接判停
+    - gripper 控制是 arm 级耦合，不是单指独立控制
+    - 执行对象是 kinematic actor，不会像动态物体那样被自然挤开形成干净接触边界

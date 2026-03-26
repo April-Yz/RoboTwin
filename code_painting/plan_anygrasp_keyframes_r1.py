@@ -8,7 +8,7 @@ import json
 import os
 import sys
 import time
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
@@ -46,8 +46,13 @@ class ObjectState:
     pose_world_wxyz: np.ndarray
     pose_world_matrix: np.ndarray
     visible: bool
+    visual_scale: np.ndarray = field(default_factory=lambda: np.ones(3, dtype=np.float64))
+    collision_scale: np.ndarray = field(default_factory=lambda: np.ones(3, dtype=np.float64))
     actor: Optional[sapien.Entity] = None
+    collision_bbox_actor: Optional[sapien.Entity] = None
     collision_groups_cache: Optional[List[List[int]]] = None
+    collision_mode: str = "convex"
+    collision_debug_info: Optional[Dict[str, object]] = None
 
 
 @dataclass
@@ -246,8 +251,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--replay_objects_during_action", type=int, default=0, help="If 1, replay object tracks from keyframe-1 to keyframe-2 during the action stage instead of attaching selected objects to the TCP.")
     parser.add_argument("--replay_objects_ignore_collision", type=int, default=1, help="If 1, replayed objects are created as visual-only kinematic actors without collision.")
     parser.add_argument("--enable_grasp_action_object_collision", type=int, default=0, help="If 1, keep selected execution objects collision-capable but disable their collision before grasp. Collision is enabled only for the selected grasped objects during close_gripper/action, while the original no-collision mode remains available when this flag is 0.")
+    parser.add_argument("--grasp_action_object_collision_start_stage", choices=["close_gripper", "grasp", "pregrasp"], default="close_gripper", help="When enable_grasp_action_object_collision=1, decide from which stage the selected execution objects should participate in collision. 'close_gripper' keeps the old behavior. 'grasp' enables collision before the grasp stage. 'pregrasp' keeps collision enabled from the beginning of execution.")
     parser.add_argument("--execution_object_collision_mode", choices=["convex", "solid_bbox"], default="convex", help="Collision shape used for execution objects when collision is enabled. 'convex' keeps the current convex mesh collision. 'solid_bbox' replaces collision with one solid axis-aligned box derived from the mesh bounds.")
+    parser.add_argument("--execution_object_scale_override", action="append", default=[], help="Repeatable legacy execution-object scale override in the form NAME=S or NAME=SX,SY,SZ. When provided, the same scale is applied to both visual mesh and collision shape unless a more specific visual/collision override is also given.")
+    parser.add_argument("--execution_object_visual_scale_override", action="append", default=[], help="Repeatable execution-object visual scale override in the form NAME=S or NAME=SX,SY,SZ.")
+    parser.add_argument("--execution_object_collision_scale_override", action="append", default=[], help="Repeatable execution-object collision scale override in the form NAME=S or NAME=SX,SY,SZ.")
     parser.add_argument("--debug_collision_report", type=int, default=0, help="If 1, print detailed collision/contact debug info during gripper close, including finger-only vs finger+gripper-base contacts and collision-shape summaries.")
+    parser.add_argument("--debug_visualize_object_collision_bbox", type=int, default=0, help="If 1, create a visual-only box actor for each execution object using its collision bbox (currently available for solid_bbox mode) so the collision primitive can be compared directly against the rendered mesh.")
     parser.add_argument("--gripper_contact_monitor_mode", choices=["fingers", "fingers_and_base", "all_robot_links"], default="fingers", help="Which robot links are allowed to trigger contact during close_gripper collision monitoring. 'fingers' keeps the old behavior. 'fingers_and_base' also monitors left/right_gripper_link. 'all_robot_links' monitors the full articulation link set for debugging.")
     parser.add_argument("--save_debug_preview", type=int, default=1)
     parser.add_argument("--debug_preview_fps", type=int, default=10)
@@ -731,7 +741,35 @@ def parse_object_mesh_overrides(specs: Sequence[str]) -> Dict[str, Path]:
     return overrides
 
 
-def load_object_states(replay_dir: Path, source_frame: int, mesh_overrides: Optional[Dict[str, Path]] = None) -> Dict[str, ObjectState]:
+def parse_named_scale_overrides(specs: Sequence[str], flag_name: str) -> Dict[str, np.ndarray]:
+    overrides: Dict[str, np.ndarray] = {}
+    for spec in specs:
+        if "=" not in str(spec):
+            raise ValueError(f"Invalid {flag_name} value '{spec}'. Expected NAME=S or NAME=SX,SY,SZ")
+        name, raw_scale = str(spec).split("=", 1)
+        obj_name = name.strip()
+        if not obj_name:
+            raise ValueError(f"Invalid {flag_name} value '{spec}'. Empty object name.")
+        values = [float(v.strip()) for v in raw_scale.split(",") if v.strip()]
+        if len(values) == 1:
+            scale = np.asarray([values[0], values[0], values[0]], dtype=np.float64)
+        elif len(values) == 3:
+            scale = np.asarray(values, dtype=np.float64)
+        else:
+            raise ValueError(f"Invalid {flag_name} value '{spec}'. Expected 1 or 3 numeric scale values.")
+        if np.any(scale <= 0.0):
+            raise ValueError(f"Invalid {flag_name} value '{spec}'. Scale values must be > 0.")
+        overrides[obj_name] = scale
+    return overrides
+
+
+def load_object_states(
+    replay_dir: Path,
+    source_frame: int,
+    mesh_overrides: Optional[Dict[str, Path]] = None,
+    visual_scale_overrides: Optional[Dict[str, np.ndarray]] = None,
+    collision_scale_overrides: Optional[Dict[str, np.ndarray]] = None,
+) -> Dict[str, ObjectState]:
     pose_path = replay_dir / "multi_object_world_poses.npz"
     if not pose_path.is_file():
         raise FileNotFoundError(f"Missing multi_object_world_poses.npz: {pose_path}")
@@ -758,6 +796,16 @@ def load_object_states(replay_dir: Path, source_frame: int, mesh_overrides: Opti
             pose_world_wxyz=pose_world_wxyz,
             pose_world_matrix=pose_world_matrix,
             visible=visible,
+            visual_scale=(
+                np.asarray(visual_scale_overrides[object_name], dtype=np.float64).reshape(3)
+                if visual_scale_overrides and object_name in visual_scale_overrides
+                else np.ones(3, dtype=np.float64)
+            ),
+            collision_scale=(
+                np.asarray(collision_scale_overrides[object_name], dtype=np.float64).reshape(3)
+                if collision_scale_overrides and object_name in collision_scale_overrides
+                else np.ones(3, dtype=np.float64)
+            ),
         )
     return states
 
@@ -798,34 +846,70 @@ def load_replay_head_camera_poses(replay_dir: Path) -> Dict[int, np.ndarray]:
     return {int(frame): head_poses[idx] for idx, frame in enumerate(frame_indices.tolist())}
 
 
+def _build_execution_collision_debug_info(
+    mesh_file: Path,
+    collision_mode: str,
+    mesh_scale: Sequence[float],
+) -> Dict[str, object]:
+    scale = np.asarray(mesh_scale, dtype=np.float64).reshape(3)
+    info: Dict[str, object] = {
+        "requested_mode": str(collision_mode),
+        "effective_mode": str(collision_mode),
+        "mesh_file": str(mesh_file),
+        "mesh_scale": np.round(scale, 6).tolist(),
+    }
+    if collision_mode == "solid_bbox":
+        mesh_scene = trimesh.load(str(mesh_file), force="scene", process=False)
+        bounds = np.asarray(mesh_scene.bounds, dtype=np.float64).reshape(2, 3)
+        center = bounds.mean(axis=0) * scale
+        half_size = np.maximum((bounds[1] - bounds[0]) * 0.5 * scale, 1e-4)
+        info["center"] = np.round(center, 6).tolist()
+        info["half_size"] = np.round(half_size, 6).tolist()
+    return info
+
+
 def _add_execution_collision(
     builder: sapien.ActorBuilder,
     mesh_file: Path,
     actor_name: str,
     collision_mode: str,
-) -> None:
+    mesh_scale: Sequence[float],
+) -> Dict[str, object]:
+    scale = np.asarray(mesh_scale, dtype=np.float64).reshape(3)
     if collision_mode == "solid_bbox":
         try:
-            mesh_scene = trimesh.load(str(mesh_file), force="scene", process=False)
-            bounds = np.asarray(mesh_scene.bounds, dtype=np.float64).reshape(2, 3)
-            center = bounds.mean(axis=0)
-            half_size = np.maximum((bounds[1] - bounds[0]) * 0.5, 1e-4)
+            debug_info = _build_execution_collision_debug_info(mesh_file, collision_mode, scale)
+            center = np.asarray(debug_info["center"], dtype=np.float64)
+            half_size = np.asarray(debug_info["half_size"], dtype=np.float64)
             builder.add_box_collision(
                 pose=sapien.Pose(center.tolist()),
                 half_size=half_size.tolist(),
             )
             print(
                 "[object-collision] "
-                f"actor={actor_name} mode=solid_bbox mesh={mesh_file} "
+                f"actor={actor_name} mode=solid_bbox mesh={mesh_file} scale={np.round(scale, 4).tolist()} "
                 f"center={np.round(center, 4).tolist()} half_size={np.round(half_size, 4).tolist()}"
             )
-            return
+            return debug_info
         except Exception as exc:
             print(
                 "[object-collision] "
-                f"actor={actor_name} requested=solid_bbox fallback=convex mesh={mesh_file} reason={exc}"
+                f"actor={actor_name} requested=solid_bbox fallback=convex mesh={mesh_file} scale={np.round(scale, 4).tolist()} reason={exc}"
             )
-    builder.add_convex_collision_from_file(str(mesh_file))
+            return {
+                "requested_mode": str(collision_mode),
+                "effective_mode": "convex",
+                "mesh_file": str(mesh_file),
+                "mesh_scale": np.round(scale, 6).tolist(),
+                "fallback_reason": repr(exc),
+            }
+    builder.add_convex_collision_from_file(str(mesh_file), scale=scale.tolist())
+    return {
+        "requested_mode": str(collision_mode),
+        "effective_mode": "convex",
+        "mesh_file": str(mesh_file),
+        "mesh_scale": np.round(scale, 6).tolist(),
+    }
 
 
 def create_execution_object_actor(
@@ -834,24 +918,35 @@ def create_execution_object_actor(
     actor_name: str,
     ignore_collision: bool,
     collision_mode: str = "convex",
-) -> sapien.Entity:
+    visual_scale: Optional[Sequence[float]] = None,
+    collision_scale: Optional[Sequence[float]] = None,
+) -> Tuple[sapien.Entity, Optional[Dict[str, object]]]:
+    visual_scale_arr = np.asarray(visual_scale if visual_scale is not None else [1.0, 1.0, 1.0], dtype=np.float64).reshape(3)
+    collision_scale_arr = np.asarray(collision_scale if collision_scale is not None else [1.0, 1.0, 1.0], dtype=np.float64).reshape(3)
     if not bool(ignore_collision):
         builder = scene.create_actor_builder()
         try:
-            builder.add_visual_from_file(str(mesh_file))
+            builder.add_visual_from_file(str(mesh_file), scale=visual_scale_arr.tolist())
         except Exception as exc:
             raise RuntimeError(f"Failed to load mesh visual: {mesh_file}") from exc
         try:
-            _add_execution_collision(builder, mesh_file, actor_name, str(collision_mode))
+            debug_info = _add_execution_collision(builder, mesh_file, actor_name, str(collision_mode), collision_scale_arr)
+            debug_info["visual_scale"] = np.round(visual_scale_arr, 6).tolist()
         except Exception as exc:
             raise RuntimeError(f"Failed to add execution collision for {mesh_file}") from exc
-        return builder.build_kinematic(name=actor_name)
+        return builder.build_kinematic(name=actor_name), debug_info
     builder = scene.create_actor_builder()
     try:
-        builder.add_visual_from_file(str(mesh_file))
+        builder.add_visual_from_file(str(mesh_file), scale=visual_scale_arr.tolist())
     except Exception as exc:
         raise RuntimeError(f"Failed to load mesh visual: {mesh_file}") from exc
-    return builder.build_kinematic(name=actor_name)
+    return builder.build_kinematic(name=actor_name), {
+        "requested_mode": "none",
+        "effective_mode": "none",
+        "mesh_file": str(mesh_file),
+        "visual_scale": np.round(visual_scale_arr, 6).tolist(),
+        "mesh_scale": np.round(collision_scale_arr, 6).tolist(),
+    }
 
 
 def _get_actor_collision_shapes(actor: Optional[sapien.Entity]) -> List[object]:
@@ -1493,6 +1588,38 @@ def hide_actor(actor: sapien.Entity) -> None:
     actor.set_pose(base.HIDDEN_DEBUG_POSE)
 
 
+def create_debug_collision_bbox_actor(
+    scene: sapien.Scene,
+    name: str,
+    center: Sequence[float],
+    half_size: Sequence[float],
+    color: Sequence[float] = (0.2, 1.0, 0.2),
+) -> sapien.Entity:
+    builder = scene.create_actor_builder()
+    builder.add_box_visual(
+        pose=sapien.Pose(np.asarray(center, dtype=np.float64).reshape(3).tolist()),
+        half_size=np.asarray(half_size, dtype=np.float64).reshape(3).tolist(),
+        material=list(color),
+    )
+    actor = builder.build_kinematic(name=name)
+    hide_actor(actor)
+    return actor
+
+
+def set_object_state_pose(state: ObjectState, pose_world_wxyz: np.ndarray) -> None:
+    if state.actor is not None:
+        set_actor_pose(state.actor, pose_world_wxyz)
+    if state.collision_bbox_actor is not None:
+        set_actor_pose(state.collision_bbox_actor, pose_world_wxyz)
+
+
+def hide_object_state(state: ObjectState) -> None:
+    if state.actor is not None:
+        hide_actor(state.actor)
+    if state.collision_bbox_actor is not None:
+        hide_actor(state.collision_bbox_actor)
+
+
 def set_object_collision_for_names(object_states: Dict[str, ObjectState], object_names: Sequence[str], enabled: bool) -> None:
     for object_name in object_names:
         state = object_states.get(str(object_name))
@@ -1651,12 +1778,117 @@ def _contact_involves_entities(
     return bool(_contact_pairs_involving_entities(renderer, gripper_entities, target_entity))
 
 
+def _raw_contact_records_for_target(
+    renderer: ReplayRenderer,
+    target_entity: Optional[sapien.Entity],
+) -> List[Dict[str, object]]:
+    if target_entity is None:
+        return []
+    records: List[Dict[str, object]] = []
+    for contact in renderer.scene.get_contacts():
+        entities: List[Optional[sapien.Entity]] = []
+        if hasattr(contact, "bodies") and contact.bodies:
+            for body in contact.bodies:
+                entities.append(getattr(body, "entity", None))
+        else:
+            entities.append(getattr(contact, "actor0", None))
+            entities.append(getattr(contact, "actor1", None))
+        if len(entities) != 2:
+            continue
+        e0, e1 = entities
+        if e0 is not target_entity and e1 is not target_entity:
+            continue
+        records.append(
+            {
+                "pair": f"{_entity_name(e0)}<->{_entity_name(e1)}",
+                "entity0": _entity_name(e0),
+                "entity1": _entity_name(e1),
+                "n_points": int(len(getattr(contact, "points", []) or [])),
+            }
+        )
+    unique_records: List[Dict[str, object]] = []
+    seen = set()
+    for item in records:
+        key = (str(item["pair"]), int(item["n_points"]))
+        if key in seen:
+            continue
+        seen.add(key)
+        unique_records.append(item)
+    return unique_records
+
+
+def _entity_pose_summary(entity: Optional[sapien.Entity]) -> str:
+    if entity is None:
+        return "none"
+    try:
+        pose = entity.get_pose()
+    except Exception as exc:
+        return f"{_entity_name(entity)}(pose_error={exc})"
+    p = np.round(np.asarray(pose.p, dtype=np.float64), 4).tolist()
+    q = np.round(base.normalize_quat_wxyz(np.asarray(pose.q, dtype=np.float64)), 4).tolist()
+    return f"{_entity_name(entity)}(p={p},q={q})"
+
+
+def _entity_pose_record(entity: Optional[sapien.Entity]) -> Optional[Dict[str, object]]:
+    if entity is None:
+        return None
+    try:
+        pose = entity.get_pose()
+    except Exception as exc:
+        return {"name": _entity_name(entity), "pose_error": repr(exc)}
+    return {
+        "name": _entity_name(entity),
+        "position": np.round(np.asarray(pose.p, dtype=np.float64), 6).tolist(),
+        "quat_wxyz": np.round(base.normalize_quat_wxyz(np.asarray(pose.q, dtype=np.float64)), 6).tolist(),
+    }
+
+
+def export_close_stage_snapshot(
+    output_dir: Path,
+    tag: str,
+    renderer: ReplayRenderer,
+    object_states: Dict[str, ObjectState],
+    selected_objects_by_arm: Dict[str, str],
+    arms: Sequence[str],
+) -> Path:
+    payload: Dict[str, object] = {
+        "tag": str(tag),
+        "arms": list(arms),
+        "objects_by_arm": dict(selected_objects_by_arm),
+        "arm_records": {},
+    }
+    for arm in arms:
+        obj_name = selected_objects_by_arm.get(arm)
+        state = object_states.get(str(obj_name)) if obj_name is not None else None
+        finger_entities = _get_gripper_link_entities(renderer, arm)
+        base_entity = _get_gripper_base_entity(renderer, arm)
+        arm_record: Dict[str, object] = {
+            "tcp_pose_world": np.round(renderer.get_current_tcp_pose(arm), 6).tolist(),
+            "gripper_joint_qpos": np.round(_get_gripper_joint_positions(renderer, arm), 6).tolist(),
+            "gripper_base": _entity_pose_record(base_entity),
+            "finger_links": [_entity_pose_record(entity) for entity in finger_entities],
+        }
+        if state is not None:
+            arm_record["object_actor_pose"] = _entity_pose_record(state.actor)
+            arm_record["object_visual_pose_world"] = np.round(np.asarray(state.pose_world_wxyz, dtype=np.float64), 6).tolist()
+            arm_record["object_collision_mode"] = str(state.collision_mode)
+            arm_record["object_visual_scale"] = np.round(np.asarray(state.visual_scale, dtype=np.float64), 6).tolist()
+            arm_record["object_collision_scale"] = np.round(np.asarray(state.collision_scale, dtype=np.float64), 6).tolist()
+            arm_record["object_collision_debug_info"] = state.collision_debug_info
+        payload["arm_records"][arm] = arm_record
+    path = output_dir / f"close_stage_snapshot_{tag}.json"
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"[close-stage-snapshot] wrote {path}")
+    return path
+
+
 def close_grippers_progressively_with_collision_stop(
     renderer: ReplayRenderer,
     left_target: Optional[float],
     right_target: Optional[float],
     object_actor_by_arm: Dict[str, Optional[sapien.Entity]],
     *,
+    object_debug_by_arm: Optional[Dict[str, Dict[str, object]]] = None,
     command_step: float = 0.05,
     settle_steps_per_iter: int = 6,
     max_iters: int = 40,
@@ -1680,6 +1912,7 @@ def close_grippers_progressively_with_collision_stop(
             "last_qpos": _get_gripper_joint_positions(renderer, arm),
             "contact_iters": 0,
             "had_base_contact": False,
+            "had_raw_target_contact": False,
             "stopped": False,
             "reason": "target_reached",
             "gripper_entities": _get_gripper_link_entities(renderer, arm),
@@ -1696,14 +1929,20 @@ def close_grippers_progressively_with_collision_stop(
             finger_entities = list(state["gripper_entities"])  # type: ignore[arg-type]
             base_entity = state["gripper_base_entity"]  # type: ignore[assignment]
             target_entity = state["object_actor"]  # type: ignore[assignment]
+            raw_target_contacts = _raw_contact_records_for_target(renderer, target_entity)
+            object_debug = (object_debug_by_arm or {}).get(arm, {})
             print(
                 "[collision-debug-init] "
                 f"arm={arm} "
                 f"monitor_mode={gripper_contact_monitor_mode} "
                 f"target={_summarize_entity_collision(target_entity)} "
+                f"target_pose={_entity_pose_summary(target_entity)} "
+                f"target_collision_debug={object_debug if object_debug else {'none': True}} "
                 f"gripper_base={_summarize_entity_collision(base_entity)} "
+                f"gripper_base_pose={_entity_pose_summary(base_entity)} "
                 f"finger_links={_summarize_entities_collision(finger_entities)} "
-                f"monitor_entities={_summarize_entities_collision(list(state['monitor_entities']))}"
+                f"monitor_entities={_summarize_entities_collision(list(state['monitor_entities']))} "
+                f"raw_target_contacts={raw_target_contacts if raw_target_contacts else ['none']}"
             )
 
     for iter_idx in range(max_iters):
@@ -1757,6 +1996,11 @@ def close_grippers_progressively_with_collision_stop(
             )
             state["contact_iters"] = int(state["contact_iters"]) + 1 if has_contact else 0
             state["had_base_contact"] = bool(state["had_base_contact"]) or bool(base_contact)
+            raw_target_contacts = _raw_contact_records_for_target(
+                renderer,
+                state["object_actor"],  # type: ignore[arg-type]
+            )
+            state["had_raw_target_contact"] = bool(state["had_raw_target_contact"]) or bool(raw_target_contacts)
 
             if bool(debug_collision_report):
                 finger_pairs = _contact_pairs_involving_entities(
@@ -1769,13 +2013,16 @@ def close_grippers_progressively_with_collision_stop(
                     monitored_with_base,
                     state["object_actor"],  # type: ignore[arg-type]
                 )
+                target_pose_summary = _entity_pose_summary(state["object_actor"])  # type: ignore[arg-type]
                 print(
                     "[collision-debug-step] "
                     f"arm={arm} iter={iter_idx + 1} cmd={float(state['current_cmd']):.3f} "
                     f"qpos_delta={qpos_delta:.6f} "
-                    f"monitor_contact={int(has_contact)} base_contact={int(base_contact)} "
+                    f"target_pose={target_pose_summary} "
+                    f"monitor_contact={int(has_contact)} base_contact={int(base_contact)} raw_target_contact_total={len(raw_target_contacts)} "
                     f"monitor_pairs={finger_pairs if finger_pairs else ['none']} "
-                    f"base_pairs={base_pairs if base_pairs else ['none']}"
+                    f"base_pairs={base_pairs if base_pairs else ['none']} "
+                    f"raw_target_contacts={raw_target_contacts if raw_target_contacts else ['none']}"
                 )
 
             target = float(state["target"])
@@ -1800,6 +2047,7 @@ def close_grippers_progressively_with_collision_stop(
             "contact_iters": int(state["contact_iters"]),
             "had_contact": bool(int(state["contact_iters"]) > 0),
             "had_base_contact": bool(state["had_base_contact"]),
+            "had_raw_target_contact": bool(state["had_raw_target_contact"]),
             "reason": str(state["reason"]),
             "monitor_mode": str(gripper_contact_monitor_mode),
         }
@@ -3835,9 +4083,9 @@ def export_rank_preview_images(
                 if state.actor is None:
                     continue
                 if state.visible:
-                    set_actor_pose(state.actor, state.pose_world_wxyz)
+                    set_object_state_pose(state, state.pose_world_wxyz)
                 else:
-                    hide_actor(state.actor)
+                    hide_object_state(state)
 
             left_ranked = arm_debugs.get("left", ArmDebugInfo("left", None, {}, {}, {})).ranked_candidates_per_frame.get(frame, [])
             right_ranked = arm_debugs.get("right", ArmDebugInfo("right", None, {}, {}, {})).ranked_candidates_per_frame.get(frame, [])
@@ -4046,6 +4294,24 @@ def main() -> None:
 
     args.manual_candidate_overrides = parse_manual_candidate_overrides(args.manual_candidate)
     args.object_mesh_overrides = parse_object_mesh_overrides(args.object_mesh_override)
+    args.execution_object_scale_overrides = parse_named_scale_overrides(
+        args.execution_object_scale_override,
+        "--execution_object_scale_override",
+    )
+    args.execution_object_visual_scale_overrides = parse_named_scale_overrides(
+        args.execution_object_visual_scale_override,
+        "--execution_object_visual_scale_override",
+    )
+    args.execution_object_collision_scale_overrides = parse_named_scale_overrides(
+        args.execution_object_collision_scale_override,
+        "--execution_object_collision_scale_override",
+    )
+    merged_visual_scale_overrides = dict(args.execution_object_scale_overrides)
+    merged_visual_scale_overrides.update(args.execution_object_visual_scale_overrides)
+    merged_collision_scale_overrides = dict(args.execution_object_scale_overrides)
+    merged_collision_scale_overrides.update(args.execution_object_collision_scale_overrides)
+    args.execution_object_visual_scale_overrides = merged_visual_scale_overrides
+    args.execution_object_collision_scale_overrides = merged_collision_scale_overrides
     args.candidate_orientation_remap_label, args.candidate_orientation_remap_matrix = base.resolve_orientation_remap(args.candidate_orientation_remap_label)
     args.candidate_post_rot_xyz_deg = np.asarray(args.candidate_post_rot_xyz_deg, dtype=np.float64)
     args.candidate_post_rot_matrix = base.orthonormalize_rotation(
@@ -4096,7 +4362,16 @@ def main() -> None:
     hand_data = load_hand_data(args.hand_npz)
     replay_frame_indices, object_tracks = load_object_tracks(args.replay_dir, args.object_mesh_overrides)
     replay_head_camera_pose_by_frame = load_replay_head_camera_poses(args.replay_dir)
-    object_states_per_frame = {frame: load_object_states(args.replay_dir, frame, args.object_mesh_overrides) for frame in keyframes}
+    object_states_per_frame = {
+        frame: load_object_states(
+            args.replay_dir,
+            frame,
+            args.object_mesh_overrides,
+            args.execution_object_visual_scale_overrides,
+            args.execution_object_collision_scale_overrides,
+        )
+        for frame in keyframes
+    }
     reused_plan_summary: Optional[Dict] = None
     reused_preview_summary: Optional[Dict] = None
     if args.reuse_preview_summary_json is not None:
@@ -4116,7 +4391,16 @@ def main() -> None:
         args.resolved_keyframes = list(keyframes)
         args.resolved_keyframe_pairs = [(int(req), int(res)) for req, res in resolved_keyframe_pairs]
         args.resolved_candidate_selection_relative_frame = None if resolved_relative_frame is None else int(resolved_relative_frame)
-        object_states_per_frame = {frame: load_object_states(args.replay_dir, frame, args.object_mesh_overrides) for frame in keyframes}
+        object_states_per_frame = {
+            frame: load_object_states(
+                args.replay_dir,
+                frame,
+                args.object_mesh_overrides,
+                args.execution_object_visual_scale_overrides,
+                args.execution_object_collision_scale_overrides,
+            )
+            for frame in keyframes
+        }
         ranked_candidates_per_frame = selection_result.ranked_candidates_per_frame
         all_candidates_per_frame = selection_result.all_candidates_per_frame
         print(
@@ -4140,7 +4424,16 @@ def main() -> None:
         args.requested_keyframes = list(keyframes)
         args.resolved_keyframes = list(keyframes)
         args.resolved_keyframe_pairs = [(int(frame), int(frame)) for frame in keyframes]
-        object_states_per_frame = {frame: load_object_states(args.replay_dir, frame, args.object_mesh_overrides) for frame in keyframes}
+        object_states_per_frame = {
+            frame: load_object_states(
+                args.replay_dir,
+                frame,
+                args.object_mesh_overrides,
+                args.execution_object_visual_scale_overrides,
+                args.execution_object_collision_scale_overrides,
+            )
+            for frame in keyframes
+        }
         ranked_candidates_per_frame = selection_result.ranked_candidates_per_frame
         all_candidates_per_frame = selection_result.all_candidates_per_frame
         print(
@@ -4203,17 +4496,30 @@ def main() -> None:
     object_states = object_states_per_frame[keyframes[0]]
     selected_object_names = {seq[0].candidate.nearest_object for _, seq in execution_sequences if seq}
     use_grasp_action_object_collision = bool(args.enable_grasp_action_object_collision)
+    collision_start_stage = str(args.grasp_action_object_collision_start_stage)
     for state in object_states.values():
-        state.actor = create_execution_object_actor(
+        state.actor, state.collision_debug_info = create_execution_object_actor(
             renderer.scene,
             state.mesh_file,
             f"planned_object_{state.name}",
             ignore_collision=(bool(args.replay_objects_ignore_collision) and not (use_grasp_action_object_collision and state.name in selected_object_names)),
             collision_mode=str(args.execution_object_collision_mode),
+            visual_scale=state.visual_scale,
+            collision_scale=state.collision_scale,
         )
-        if use_grasp_action_object_collision and state.name in selected_object_names:
+        state.collision_mode = str(args.execution_object_collision_mode)
+        if bool(args.debug_visualize_object_collision_bbox):
+            info = state.collision_debug_info or {}
+            if info.get("effective_mode") == "solid_bbox" and "center" in info and "half_size" in info:
+                state.collision_bbox_actor = create_debug_collision_bbox_actor(
+                    renderer.scene,
+                    f"planned_object_{state.name}_collision_bbox",
+                    center=info["center"],
+                    half_size=info["half_size"],
+                )
+        if use_grasp_action_object_collision and state.name in selected_object_names and collision_start_stage != "pregrasp":
             state.collision_groups_cache = set_actor_collision_enabled(state.actor, enabled=False, cached_groups=None)
-        set_actor_pose(state.actor, state.pose_world_wxyz)
+        set_object_state_pose(state, state.pose_world_wxyz)
         if state.name in object_tracks:
             object_tracks[state.name].actor = state.actor
 
@@ -4254,7 +4560,7 @@ def main() -> None:
     )
     for state in object_states.values():
         if state.actor is not None:
-            set_actor_pose(state.actor, state.pose_world_wxyz)
+            set_object_state_pose(state, state.pose_world_wxyz)
     update_candidate_debug_visuals(debug_visuals, None, common_candidates_per_frame, arm_display_candidates)
     renderer.step_scene(steps=1)
 
@@ -4421,6 +4727,13 @@ def main() -> None:
                 use_overlay_debug=use_overlay_debug,
             )
 
+            if use_grasp_action_object_collision and collision_start_stage == "grasp":
+                set_object_collision_for_names(
+                    object_states,
+                    [selected_objects_by_executed_arm[arm_name] for arm_name in dual_arms],
+                    enabled=True,
+                )
+
             if skip_grasp_dual:
                 debug_execution_state.active_frame = int(exec_selected_by_arm["left"][0].source_frame)
                 debug_execution_state.current_stage = "grasp_skipped_same_target"
@@ -4493,6 +4806,14 @@ def main() -> None:
                 )
 
             if bool(args.enable_grasp_action_object_collision):
+                export_close_stage_snapshot(
+                    args.output_dir,
+                    tag="dual_before_close",
+                    renderer=renderer,
+                    object_states=object_states,
+                    selected_objects_by_arm=selected_objects_by_executed_arm,
+                    arms=dual_arms,
+                )
                 set_object_collision_for_names(
                     object_states,
                     [selected_objects_by_executed_arm[arm_name] for arm_name in dual_arms],
@@ -4503,6 +4824,14 @@ def main() -> None:
                     args.close_gripper,
                     args.close_gripper,
                     {arm_name: object_states[selected_objects_by_executed_arm[arm_name]].actor for arm_name in dual_arms},
+                    object_debug_by_arm={
+                        arm_name: {
+                            "object_name": selected_objects_by_executed_arm[arm_name],
+                            "collision_mode": object_states[selected_objects_by_executed_arm[arm_name]].collision_mode,
+                            "collision_debug_info": object_states[selected_objects_by_executed_arm[arm_name]].collision_debug_info,
+                        }
+                        for arm_name in dual_arms
+                    },
                     debug_collision_report=bool(args.debug_collision_report),
                     gripper_contact_monitor_mode=str(args.gripper_contact_monitor_mode),
                 )
@@ -4513,7 +4842,8 @@ def main() -> None:
                         f"reason={close_summary.get(arm_name, {}).get('reason', 'n/a')},"
                         f"cmd={float(close_summary.get(arm_name, {}).get('final_cmd', args.close_gripper)):.3f},"
                         f"contact={int(bool(close_summary.get(arm_name, {}).get('had_contact', False)))},"
-                        f"base_contact={int(bool(close_summary.get(arm_name, {}).get('had_base_contact', False)))}"
+                        f"base_contact={int(bool(close_summary.get(arm_name, {}).get('had_base_contact', False)))},"
+                        f"raw_target_contact={int(bool(close_summary.get(arm_name, {}).get('had_raw_target_contact', False)))}"
                         for arm_name in dual_arms
                     )
                 )
@@ -4705,6 +5035,9 @@ def main() -> None:
                     use_overlay_debug=use_overlay_debug,
                 )
 
+                if use_grasp_action_object_collision and collision_start_stage == "grasp":
+                    set_object_collision_for_names(object_states, [exec_object_name], enabled=True)
+
                 if poses_are_effectively_same(pregrasp_pose, grasp_pose):
                     debug_execution_state.current_stage = "grasp_skipped_same_target"
                     debug_execution_state.target_pose_by_arm = {exec_arm: np.asarray(grasp_pose, dtype=np.float64)}
@@ -4758,12 +5091,27 @@ def main() -> None:
 
                 set_single_arm_target_visual(renderer, exec_arm, grasp_pose)
                 if bool(args.enable_grasp_action_object_collision):
+                    export_close_stage_snapshot(
+                        args.output_dir,
+                        tag=f"{exec_arm}_before_close",
+                        renderer=renderer,
+                        object_states=object_states,
+                        selected_objects_by_arm={exec_arm: exec_object_name},
+                        arms=[exec_arm],
+                    )
                     set_object_collision_for_names(object_states, [exec_object_name], enabled=True)
                     close_summary = close_grippers_progressively_with_collision_stop(
                         renderer,
                         args.close_gripper if exec_arm == "left" else None,
                         args.close_gripper if exec_arm == "right" else None,
                         {exec_arm: object_states[exec_object_name].actor},
+                        object_debug_by_arm={
+                            exec_arm: {
+                                "object_name": exec_object_name,
+                                "collision_mode": object_states[exec_object_name].collision_mode,
+                                "collision_debug_info": object_states[exec_object_name].collision_debug_info,
+                            }
+                        },
                         debug_collision_report=bool(args.debug_collision_report),
                         gripper_contact_monitor_mode=str(args.gripper_contact_monitor_mode),
                     )
@@ -4773,7 +5121,8 @@ def main() -> None:
                         f"reason={close_summary.get(exec_arm, {}).get('reason', 'n/a')},"
                         f"cmd={float(close_summary.get(exec_arm, {}).get('final_cmd', args.close_gripper)):.3f},"
                         f"contact={int(bool(close_summary.get(exec_arm, {}).get('had_contact', False)))},"
-                        f"base_contact={int(bool(close_summary.get(exec_arm, {}).get('had_base_contact', False)))}"
+                        f"base_contact={int(bool(close_summary.get(exec_arm, {}).get('had_base_contact', False)))},"
+                        f"raw_target_contact={int(bool(close_summary.get(exec_arm, {}).get('had_raw_target_contact', False)))}"
                     )
                 else:
                     renderer.set_grippers(args.close_gripper if exec_arm == "left" else None, args.close_gripper if exec_arm == "right" else None)

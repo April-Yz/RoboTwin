@@ -551,3 +551,176 @@
       - also monitors `left/right_gripper_link`
     - `all_robot_links`
       - monitors the full robot articulation link set during close-gripper contact checks; mainly intended to debug whether the gripper-link collisions are missing in the current runtime path
+
+## 2026-03-25 23:10:00 +08
+
+- Added a minimal gripper/object collision probe and ran the first validation round:
+  - Files:
+    - `code_painting/minimal_gripper_collision_probe.py`
+    - `agent-read/2026-03-25_minimal_gripper_collision_probe_ZH.md`
+    - `agent-read/2026-03-25_minimal_gripper_collision_probe.md`
+  - Goal:
+    - verify, without AnyGrasp/IK/stage logic, whether the R1 gripper actually generates raw physics contacts with a probe object during `close_gripper`
+    - separate “the main-pipeline contact debug helper is blind” from “the physics engine has no robot-object collision at all”
+  - Minimal experiments:
+    - box probe:
+      - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python code_painting/minimal_gripper_collision_probe.py --arm left --object_kind box --probe_local_offset 0.04 0.0 0.0 --max_iters 20 --settle_steps_per_iter 8`
+    - mesh + solid_bbox probe:
+      - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python code_painting/minimal_gripper_collision_probe.py --arm left --object_kind mesh --mesh_path /home/zaijia001/ssd/data/R1/hand/obj_mesh/blue_cup/blue_cup.obj --mesh_collision_mode solid_bbox --probe_local_offset 0.04 0.0 0.0 --max_iters 20 --settle_steps_per_iter 8`
+  - New conclusion:
+    - the helper/component summary still reports robot links as `shapes=0`
+    - however, in the minimal isolation experiment, `scene.get_contacts()` can already stably observe:
+      - `left_gripper_finger_link1<->probe_box`
+      - `left_gripper_finger_link2<->probe_box`
+      - `left_gripper_finger_link1<->probe_mesh`
+      - `left_gripper_finger_link2<->probe_mesh`
+      - and for the larger mesh case, `left_gripper_link<->probe_mesh`
+    - therefore `shapes=0` can no longer be treated as proof that the robot has no collision geometry or that no physics contact exists
+    - the full-pipeline `contact=0` symptom now looks more like a monitoring/matching/timing issue, or a mismatch between the object's real close-stage pose and the visual impression from the video
+  - Validation:
+    - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/minimal_gripper_collision_probe.py`
+    - `git diff --check -- code_painting/minimal_gripper_collision_probe.py`
+
+- Added raw target-contact reporting to the main `close_gripper` debug path and completed a reinjection check:
+  - Files:
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+    - `agent-read/2026-03-25_minimal_gripper_collision_probe_ZH.md`
+    - `agent-read/2026-03-25_minimal_gripper_collision_probe.md`
+  - Change:
+    - when `debug_collision_report=1`, `close_grippers_progressively_with_collision_stop(...)` now additionally prints:
+      - `raw_target_contacts`
+      - `raw_target_contact_total`
+    - the `[gripper-close]` summary now also includes:
+      - `raw_target_contact=0|1`
+  - Reinjection validation command:
+    - `bash code_painting/run_plan_anygrasp_keyframes_r1_batch.sh ... --debug_collision_report 1 --gripper_contact_monitor_mode all_robot_links --enable_viewer 0`
+  - New conclusion:
+    - in the current `d_pour_blue_0` case, the full close stage reports not only monitor/helper contact as zero, but also raw target contacts as zero throughout
+    - therefore the current issue can no longer be explained only as “the monitor under-reports”; it now looks more like the full close stage never generates raw physics contact with the target object at all
+
+- Added target-object pose / collision debug output to the main close stage:
+  - File:
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - Change:
+    - when `debug_collision_report=1`, `[collision-debug-init]` now additionally prints:
+      - `target_pose=...`
+      - `target_collision_debug=...`
+    - `[collision-debug-step]` now also prints, for each close iteration:
+      - `target_pose=...`
+  - Reinjection conclusion in this round:
+    - in the current `d_pour_blue_0` close stage, the target pose remains essentially stable while raw target contact stays zero throughout
+    - therefore the issue now looks more like a substantial geometric mismatch between the visual mesh and the `solid_bbox` collision primitive, rather than the object pose being repeatedly reset during close
+
+- Added execution-object collision-bbox visualization:
+  - Files:
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+    - `code_painting/plan_anygrasp_keyframes_r1_batch.py`
+  - New flag:
+    - `--debug_visualize_object_collision_bbox 0|1`
+  - Behavior:
+    - when an execution object uses `solid_bbox` collision, create an additional visual-only bbox actor for it
+    - the bbox actor uses the same local `center/half_size` as the collision primitive
+    - and follows the object actor pose
+  - Purpose:
+    - compare the visual mesh and the collision bbox directly in the viewer/videos
+    - determine whether the current "interpenetration" is only a visual-mesh effect
+  - Validation:
+    - `python -m py_compile code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_anygrasp_keyframes_r1_batch.py`
+    - main-pipeline reinjection with `... --debug_visualize_object_collision_bbox 1 ...`
+
+- Added a `convex` comparison experiment and updated the interpretation:
+  - Validation command:
+    - `... --execution_object_collision_mode convex --debug_collision_report 1 --gripper_contact_monitor_mode all_robot_links --enable_viewer 0`
+  - Result:
+    - for the current `d_pour_blue_0` case, the close stage still reports zero raw target contacts under `convex`
+  - Conclusion:
+    - the issue is not only about the `solid_bbox` box approximation
+    - even after switching to `convex` mesh collision, the full close stage still produces no raw physics contact
+
+- Added close-stage pose export and an experiment that enables object collision from `pregrasp`:
+  - Files:
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+    - `code_painting/plan_anygrasp_keyframes_r1_batch.py`
+  - New flag:
+    - `--grasp_action_object_collision_start_stage {close_gripper,grasp,pregrasp}`
+  - New behavior:
+    - write `close_stage_snapshot_*.json` before close
+    - allow selected execution objects to start participating in collision as early as `grasp` or `pregrasp`
+  - Key experiment result:
+    - in the `pregrasp + convex` experiment, raw target contacts appear stably in the full pipeline for the first time
+    - but the monitor/helper still reports `monitor_contact=0`
+  - Updated conclusion:
+    - the old default of enabling object collision only at `close_gripper` is indeed too late
+    - at the same time, the current monitor/contact matching logic still under-reports existing contacts
+
+- Added execution-object scale overrides so `cup` / `bottle` can be shrunk independently for execution visual and collision geometry:
+  - Files:
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+    - `code_painting/plan_anygrasp_keyframes_r1_batch.py`
+    - `code_painting/README_anygrasp_keyframe_planner.md`
+  - New flags:
+    - `--execution_object_scale_override NAME=S`
+    - `--execution_object_scale_override NAME=SX,SY,SZ`
+  - Behavior:
+    - scale both the execution visual mesh and collision shape together
+    - under `solid_bbox`, scale bbox center / half_size consistently as well
+  - Typical usage:
+    - `--execution_object_scale_override cup=0.9 --execution_object_scale_override bottle=0.9`
+  - Note:
+    - to keep the original logic where object collision starts only before `close_gripper`, continue using:
+      - `--grasp_action_object_collision_start_stage close_gripper`
+
+- Ran a control experiment with smaller objects while preserving the old `close_gripper`-only collision timing:
+  - Output dir:
+    - `code_painting/anygrasp_single_scaled_close_only_probe/d_pour_blue_0`
+  - Parameters:
+    - `--grasp_action_object_collision_start_stage close_gripper`
+    - `--execution_object_scale_override cup=0.9`
+    - `--execution_object_scale_override bottle=0.9`
+  - Result:
+    - from close init through iter 20, `raw_target_contact_total=0`
+    - final `raw_target_contact=0`
+  - Conclusion:
+    - shrinking the execution objects to 0.9 alone is not enough to make the old `close_gripper`-only collision-enable logic detect contact
+
+- Ran full-collision experiments with scales 0.8 / 0.5:
+  - Output dirs:
+    - `code_painting/anygrasp_single_all_collision_scale08/d_pour_blue_0`
+    - `code_painting/anygrasp_single_all_collision_scale05/d_pour_blue_0`
+  - Common parameters:
+    - `--grasp_action_object_collision_start_stage pregrasp`
+    - `--execution_object_collision_mode convex`
+  - Result:
+    - `0.8`: both left/right detect raw target contact stably during close
+    - `0.5`: right has raw contact from close init, left starts showing raw contact later in close, and both finish with `raw_target_contact=1`
+  - Conclusion:
+    - the full-collision output itself looks normal and trustworthy; the real abnormal part is still the under-reporting monitor/contact chain
+    - once collision is enabled early enough, shrinking to `0.8` / `0.5` still does not eliminate raw contact
+
+- Analyzed the `0.5 + pregrasp` full-collision result and added a `0.5 + close_gripper + fingers` control experiment:
+  - New output dir:
+    - `code_painting/anygrasp_single_scale05_close_only_fingers/d_pour_blue_0`
+  - Result analysis:
+    - `0.5 + pregrasp` looks closer to the desired effect where the gripper closes onto the object and is visually blocked before appearing fully closed
+    - but the current close-stop logic still depends on `monitor_contact`, so the final reason may still show `target_reached`
+  - New control result:
+    - under `close_gripper + fingers + scale=0.5`, left is still `raw_target_contact=0` while right is `raw_target_contact=1`
+  - Conclusion:
+    - after shrinking to `0.5`, if collision is still enabled only at close, the problem is not fully gone; the more reliable setup still starts collision from `pregrasp`
+
+- Added separate visual/collision scale overrides for execution objects:
+  - New flags:
+    - `--execution_object_visual_scale_override`
+    - `--execution_object_collision_scale_override`
+  - Kept for compatibility:
+    - `--execution_object_scale_override`
+  - Semantics:
+    - visual mesh and collision shape can now be scaled independently
+    - if both unified and dedicated overrides are provided for the same object, the dedicated override takes priority
+
+- Added a mechanism-level analysis of why enabling collision only after the gripper is already inside the collision volume does not immediately block at that pose:
+  - Key points:
+    - late-enabled collision does not roll the system back to the first-touch boundary
+    - close stopping depends on monitor_contact + stall, not raw contact directly
+    - gripper control is coupled at arm level, not independent per finger
+    - execution objects are kinematic actors, so they do not get naturally pushed into a clean separating contact state like dynamic bodies would
