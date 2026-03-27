@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## 2026-03-27
+
+- Documented the current `urdfik` execution timing semantics more explicitly in:
+  - `agent-read/V1.15_urdfik_cartesian_interp_execution_semantics.md`
+  - `agent-read/V1.15_urdfik_cartesian_interp_execution_semantics_ZH.md`
+  - `code_painting/README_anygrasp_keyframe_planner.md`
+- Added a dedicated explanation for why `viewer` can show smooth motion while `head_cam_plan.mp4` looks like a jump:
+  - `urdfik_cartesian_interp_steps` controls Cartesian waypoint density during planning
+  - `execute_interp_steps` can densify the joint command sequence again before replay
+  - `joint_command_scene_steps` controls physics steps per commanded waypoint
+  - `joint_target_wait_steps` is a post-trajectory convergence wait that is visible in the interactive viewer but not frame-by-frame serialized into the main head-camera export
+- No code-path change was needed in this round; this was a documentation/inspection update based on the current implementation in:
+  - `code_painting/render_hand_retarget_r1_npz_urdfik.py`
+  - `code_painting/plan_anygrasp_keyframes_r1.py`
+
 ## 2026-03-24
 
 - Added a dedicated annotated-keyframe batch wrapper:

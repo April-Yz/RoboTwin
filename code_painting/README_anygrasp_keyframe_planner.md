@@ -445,9 +445,20 @@ batch 根目录下会生成：
 ### 到位控制
 
 - `--execute_interp_steps`
-  - 执行时的轨迹插值步数，越大动作越慢
+  - 执行前对 `plan["position"]` 再做一次 joint 轨迹插值
+  - 如果 planner 产出的点数本来就少，它会明显增加中间 command waypoint 数
+  - 如果 planner 已经有很多点，它只会轻度加密
+- `--joint_command_scene_steps`
+  - 每下发一个 joint waypoint 后，实际推进多少个 physics step
+  - `head_cam_plan.mp4` 的主执行段通常是“每个 command waypoint 录 1 帧”，不是“每个 physics step 录 1 帧”
 - `--settle_steps`
-  - 每段动作执行后额外稳定的仿真步数
+  - command 轨迹全部下发后，先额外推进的粗粒度稳定步数
+- `--joint_target_wait_steps`
+  - command 轨迹结束后，最多再给多少个 physics step，让机械臂继续收敛到最终 joint target
+  - 这一步在 viewer 中仍然可见，但主视频不会把每一个 wait step 都逐帧录下来，只会在结束后再录 `plan_step=done`
+  - 所以如果主要运动发生在这里，viewer 看起来会连续，`head_cam_plan.mp4` 可能看起来像突然跳到终点
+- `--joint_target_wait_tol_rad`
+  - 最终 joint 收敛等待的每关节误差阈值
 - `--hold_frames_after_stage`
   - 每段结束后额外停留几帧，方便看视频
 - `--reach_pos_tol_m`
