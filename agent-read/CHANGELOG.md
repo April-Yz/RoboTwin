@@ -2,6 +2,21 @@
 
 ## 2026-03-27
 
+- Added a post-hoc smooth replay tool for AnyGrasp planner outputs based on `pose_debug.jsonl`:
+  - `code_painting/replay_pose_debug_smooth.py`
+  - `code_painting/run_replay_pose_debug_smooth.sh`
+- This new path is intended for presentation smoothing after a run has already finished:
+  - it reads recorded `pose_debug.jsonl`
+  - interpolates arm joint qpos, gripper state, and object actor poses
+  - re-renders a smoother replay video without changing the original plan result
+- Added paired docs:
+  - `agent-read/V1.16_pose_debug_smooth_replay.md`
+  - `agent-read/V1.16_pose_debug_smooth_replay_ZH.md`
+- Updated `code_painting/README_anygrasp_keyframe_planner.md` so `pose_debug.jsonl` and the smooth replay workflow are now documented in the main planner README.
+- Validation:
+  - `python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/replay_pose_debug_smooth.py`
+  - `bash /home/zaijia001/ssd/RoboTwin/code_painting/run_replay_pose_debug_smooth.sh --plan_summary_json /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_realoffset_batch_pure-v3-base/d_pour_blue_35/plan_summary.json --output_path /tmp/smooth_replay_test.mp4 --interp_factor 2 --max_input_records 5 --overlay_text 0 --base_occluder_enable 1 --base_occluder_local_pos 0 0 0.4 --base_occluder_half_size 0.45 0.45 0.02 --base_occluder_color 1 1 1`
+
 - Documented the current `urdfik` execution timing semantics more explicitly in:
   - `agent-read/V1.15_urdfik_cartesian_interp_execution_semantics.md`
   - `agent-read/V1.15_urdfik_cartesian_interp_execution_semantics_ZH.md`

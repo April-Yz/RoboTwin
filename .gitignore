@@ -14,7 +14,10 @@ viewer_show.*
 eval_video/
 task_config/
 **/.DS_Store
-
+code_painting/anygrasp*
+code_painting/replay*
+!code_painting/replay_pose_debug_smooth.py
+code_painting/no-use*
 # eval result
 eval_result/
 

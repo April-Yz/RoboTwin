@@ -322,6 +322,27 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_r1_b
 - `head_cam_plan.mp4`
 - `plan_summary.json`
 
+如果开启了：
+
+- `--save_pose_debug 1`
+- 或 `--pure_scene_output 1`
+
+还会额外生成：
+
+- `pose_debug.jsonl`
+
+它记录每一帧的：
+
+- 左右臂 joint qpos
+- gripper command / gripper joint qpos
+- 头相机 / TCP / EE pose
+- 当前执行物体 actor pose
+
+这个文件可以被新的后处理平滑重放脚本直接复用：
+
+- `code_painting/replay_pose_debug_smooth.py`
+- `code_painting/run_replay_pose_debug_smooth.sh`
+
 batch 根目录下会生成：
 
 - `batch_plan_summary.json`
@@ -537,6 +558,53 @@ batch 根目录下会生成：
 - `pos_err_m`
 - `rot_err_deg`
 
+
+## 基于 `pose_debug.jsonl` 的平滑重放
+
+如果你已经先跑完了一次 pure 模式或开启了 `--save_pose_debug 1`，可以再做一遍**后处理平滑重放**，把原来记录下来的离散执行帧补插值后重新导出更平滑的视频。
+
+最常用命令：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_replay_pose_debug_smooth.sh \
+  --plan_summary_json /path/to/d_pour_blue_35/plan_summary.json \
+  --output_path /path/to/d_pour_blue_35/head_cam_plan_smooth.mp4 \
+  --interp_factor 4 \
+  --fps 20 \
+  --overlay_text 0 \
+  --base_occluder_enable 1 \
+  --base_occluder_local_pos 0.0 0.0 0.4 \
+  --base_occluder_half_size 0.45 0.45 0.02 \
+  --base_occluder_color 1.0 1.0 1.0
+```
+
+说明：
+
+- 它会自动从 `plan_summary.json` 找到：
+  - `pose_debug.jsonl`
+  - `replay_dir`
+- 在相邻记录帧之间按 `--interp_factor` 做更密的插值
+- 然后重新渲染为一个更平滑的 replay 视频
+
+建议起步参数：
+
+- `--interp_factor 4`
+- `--fps 20`
+
+重要限制：
+
+- 这个脚本只改善**回放视频观感**
+- 不会改变原始 run 的 `reached / pos_err / rot_err`
+- 不会让那次真实执行本身变得更准确
+
+也就是说：
+
+- 真实执行质量，仍然要优先通过：
+  - `joint_command_scene_steps`
+  - `settle_steps`
+  - `joint_target_wait_steps`
+  去调
+- `replay_pose_debug_smooth.py` 更适合做“跑完后导出更平滑展示视频”
 
 ## 当前实现边界
 
