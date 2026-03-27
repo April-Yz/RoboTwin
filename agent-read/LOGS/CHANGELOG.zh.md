@@ -1,5 +1,24 @@
 # CHANGELOG.zh
 
+## 2026-03-27
+
+- 新增 `policy/pi0/scripts/process_repainted_headcam_with_wrist.py`
+  - 目的：
+    - 把“新的 SAM/repaint 后 head cam 视频 + 左右 wrist replay + world_targets_and_status.npz”统一转成 pi0 的 `processed_data` HDF5 中间格式
+  - 主要能力：
+    - 支持独立指定 `--head-root` 和 `--retarget-root`
+    - 支持模板化目录名：
+      - `--head-dir-template`
+      - `--retarget-dir-template`
+    - 支持新的 head 视频文件名：
+      - `target_with_original_head_cam_plan.mp4`
+    - 输出仍与现有 pi0 `processed_data/<task>-<num>/episode_x/*.hdf5` 兼容
+  - 相关文档：
+    - `agent-read/2026-03-27_pi0_repaint_wrist_to_hdf5_ZH.md`
+    - `agent-read/2026-03-27_pi0_repaint_wrist_to_hdf5.md`
+  - 验证：
+    - `cd /home/zaijia001/ssd/RoboTwin/policy/pi0 && source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && python -m py_compile scripts/process_repainted_headcam_with_wrist.py scripts/process_data_retageted_human.py scripts/process_data_R1.py`
+
 ## 2026-03-25
 
 - 新增 base 遮挡板（visual-only）以挡住底盘：

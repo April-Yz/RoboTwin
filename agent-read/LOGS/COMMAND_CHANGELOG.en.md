@@ -1,3 +1,21 @@
+## 2026-03-27 00:00:00 +08
+
+- Added a new pi0 data-conversion command: `process_repainted_headcam_with_wrist.py`
+  - Entry point:
+    - `policy/pi0/scripts/process_repainted_headcam_with_wrist.py`
+  - Purpose:
+    - convert the newer head-cam repaint outputs plus retarget wrist replays into `processed_data` HDF5 episodes
+  - Key arguments:
+    - `--head-root`
+    - `--head-dir-template`
+    - `--head-video-name`
+    - `--retarget-root`
+    - `--retarget-dir-template`
+    - `--ids`
+    - `--ignore-ids`
+  - Typical command:
+    - `python scripts/process_repainted_headcam_with_wrist.py d_pour_blue "pour water" 48 --head-root /home/zaijia001/ssd/inpainting_sam2_robot/results_repaint/d_pour_blue --head-dir-template 'id_{id}_head_cam_arm_gripper_cup_bottle_pad_target' --head-video-name target_with_original_head_cam_plan.mp4 --retarget-root /home/zaijia001/ssd/RoboTwin/code_painting/output_hand_retarget_swap_red_blue_keep_green_no_offset_pool_clean/d_pour_blue --retarget-dir-template 'hand_detections_{id}' --ignore-ids`
+
 ## 2026-03-25 19:15:00 +08
 
 - Added visual-only base-occluder parameters

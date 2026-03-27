@@ -1,5 +1,24 @@
 # CHANGELOG.en
 
+## 2026-03-27
+
+- Added `policy/pi0/scripts/process_repainted_headcam_with_wrist.py`
+  - Purpose:
+    - convert the newer “SAM/repainted head-cam video + left/right wrist replays + world_targets_and_status.npz” into the pi0 `processed_data` HDF5 intermediate format
+  - Main capabilities:
+    - separate `--head-root` and `--retarget-root`
+    - templated episode directory names via:
+      - `--head-dir-template`
+      - `--retarget-dir-template`
+    - support the new head-video filename:
+      - `target_with_original_head_cam_plan.mp4`
+    - keep output compatible with the existing pi0 `processed_data/<task>-<num>/episode_x/*.hdf5` layout
+  - Related docs:
+    - `agent-read/2026-03-27_pi0_repaint_wrist_to_hdf5_ZH.md`
+    - `agent-read/2026-03-27_pi0_repaint_wrist_to_hdf5.md`
+  - Validation:
+    - `cd /home/zaijia001/ssd/RoboTwin/policy/pi0 && source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && python -m py_compile scripts/process_repainted_headcam_with_wrist.py scripts/process_data_retageted_human.py scripts/process_data_R1.py`
+
 ## 2026-03-25
 
 - Added a visual-only base occluder to hide the chassis in rendered videos:

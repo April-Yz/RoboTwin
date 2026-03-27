@@ -1,3 +1,21 @@
+## 2026-03-27 00:00:00 +08
+
+- 新增 pi0 数据转换命令：`process_repainted_headcam_with_wrist.py`
+  - 入口：
+    - `policy/pi0/scripts/process_repainted_headcam_with_wrist.py`
+  - 用途：
+    - 把新的 head-cam repaint 结果与 retarget wrist 回放统一转成 `processed_data` HDF5
+  - 关键参数：
+    - `--head-root`
+    - `--head-dir-template`
+    - `--head-video-name`
+    - `--retarget-root`
+    - `--retarget-dir-template`
+    - `--ids`
+    - `--ignore-ids`
+  - 典型命令：
+    - `python scripts/process_repainted_headcam_with_wrist.py d_pour_blue "pour water" 48 --head-root /home/zaijia001/ssd/inpainting_sam2_robot/results_repaint/d_pour_blue --head-dir-template 'id_{id}_head_cam_arm_gripper_cup_bottle_pad_target' --head-video-name target_with_original_head_cam_plan.mp4 --retarget-root /home/zaijia001/ssd/RoboTwin/code_painting/output_hand_retarget_swap_red_blue_keep_green_no_offset_pool_clean/d_pour_blue --retarget-dir-template 'hand_detections_{id}' --ignore-ids`
+
 ## 2026-03-25 19:15:00 +08
 
 - 新增底盘遮挡板参数（visual-only）
