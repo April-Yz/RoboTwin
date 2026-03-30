@@ -2,6 +2,20 @@
 
 ## 2026-03-27
 
+- Added smooth-bundle scripts:
+  - `code_painting/smooth_planner_outputs_from_pose_debug.py`
+  - `code_painting/batch_smooth_planner_outputs.sh`
+  - Purpose:
+    - remove lingering / near-duplicate frames from the Step-1 planner outputs
+    - interpolate key states to smooth jumps
+    - re-export source-consistent head / left wrist / right wrist / pose_debug outputs
+  - Key output root:
+    - `code_painting/anygrasp_plan_keyframes_realoffset_batch_pure-v3_smooth`
+  - Validation:
+    - `python -m py_compile code_painting/smooth_planner_outputs_from_pose_debug.py`
+    - `bash -n code_painting/batch_smooth_planner_outputs.sh`
+    - one-sample output: `/tmp/d_pour_blue_0_smooth_bundle`
+
 - Added script:
   - `policy/pi0/scripts/process_repainted_planner_outputs.py`
   - Purpose: process pi0 data using source-consistent planner outputs:

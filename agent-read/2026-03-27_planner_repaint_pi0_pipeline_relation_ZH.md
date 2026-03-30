@@ -2,9 +2,9 @@
 
 ## 1. 这条链路现在推荐怎么理解
 
-当前更推荐把这条链路理解成连续三步：
+保留原来“planner -> repaint -> pi0”的主干结构，但在 Step1 和 Step2 之间插入一个 **smooth 中间步骤**。因此当前更推荐按连续四步理解：
 
-### 第一步：planner / AnyGrasp 生成执行视频与状态
+### Step 1：planner / AnyGrasp 生成原始执行视频与状态
 入口命令：
 - `code_painting/run_plan_anygrasp_keyframes_r1_batch.sh`
 
@@ -21,33 +21,68 @@
 /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_realoffset_batch_pure-v3/d_pour_blue_<id>/
 ```
 
-### 第二步：SAM / repaint 把 planner head 合成到背景上
-入口命令：
-- `inpainting_sam2_robot/script/batch_head_cam_repaint_with_auto_pad.sh`
+### Step 2：对 Step1 的 planner 结果做 smooth
+新的推荐入口：
+- `code_painting/batch_smooth_planner_outputs.sh`
+- 核心脚本：
+  - `code_painting/smooth_planner_outputs_from_pose_debug.py`
 
-它读取第一步的：
+它读取 Step1 的：
+- `head_cam_plan.mp4`
+- `left_wrist_cam_plan.mp4`
+- `right_wrist_cam_plan.mp4`
+- `pose_debug.jsonl`
+- `plan_summary.json`
+
+但真正驱动 smooth 的主状态来源是：
+- `pose_debug.jsonl`
+
+它会做两类处理：
+- **去掉徘徊/近重复帧**
+- **对保留下来的关键状态做插值平滑**
+
+然后输出新的 smooth bundle：
+- `head_cam_plan.mp4`
+- `left_wrist_cam_plan.mp4`
+- `right_wrist_cam_plan.mp4`
+- `pose_debug.jsonl`
+- `smooth_summary.json`
+
+输出目录：
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_realoffset_batch_pure-v3_smooth/d_pour_blue_<id>/
+```
+
+### Step 3：SAM / repaint 把 smooth 后的 planner head 合成到背景上
+新的推荐入口：
+- `inpainting_sam2_robot/script/batch_head_cam_repaint_with_auto_pad_from_smooth.sh`
+
+它读取 Step2 的：
 - `head_cam_plan.mp4`
 
-然后输出：
+然后根据 smooth 后 head 的 fps / duration 对原来的人手背景视频重新补长，再输出：
 - `target_with_original_head_cam_plan.mp4`
 
 输出目录：
 
 ```text
-/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint/d_pour_blue/id_<id>_head_cam_arm_gripper_cup_bottle_pad_target/
+/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint/d_pour_blue_smooth/id_<id>_head_cam_arm_gripper_cup_bottle_pad_target/
 ```
 
-### 第三步：pi0 数据处理
+### Step 4：pi0 数据处理
 新的推荐入口：
 - `policy/pi0/scripts/process_repainted_planner_outputs.py`
+- 包装脚本：
+  - `policy/pi0/run_process_repainted_smoothed_planner_outputs.sh`
 
 它读取：
-- 第二步的 repaint head：
+- Step3 的 repaint head：
   - `target_with_original_head_cam_plan.mp4`
-- 第一步 planner 目录里的 wrist：
+- Step2 smooth planner 目录里的 wrist：
   - `left_wrist_cam_plan.mp4`
   - `right_wrist_cam_plan.mp4`
-- 第一步 planner 目录里的状态：
+- Step2 smooth planner 目录里的状态：
   - `pose_debug.jsonl`
 
 然后转成：
@@ -58,20 +93,24 @@ processed_data/<task>-<num>/episode_x/
   episode_x.hdf5
 ```
 
-所以这三个阶段的前后关系是：
+所以这四个阶段的前后关系是：
 
 ```text
 run_plan_anygrasp_keyframes_r1_batch.sh
     ↓
-  生成 planner 的 head / wrist / pose_debug
+  生成原始 planner 的 head / wrist / pose_debug
     ↓
-batch_head_cam_repaint_with_auto_pad.sh
+batch_smooth_planner_outputs.sh
     ↓
-  把 planner 的 head 做 SAM/repaint，生成 target_with_original_head_cam_plan.mp4
+  去徘徊帧 + 插值平滑，生成 smooth planner bundle
+    ↓
+batch_head_cam_repaint_with_auto_pad_from_smooth.sh
+    ↓
+  对 smooth 后的 planner head 做 SAM/repaint，并按 smooth 后时长补齐背景
     ↓
 process_repainted_planner_outputs.py
     ↓
-  用 repaint 后的 head + planner wrist + planner pose_debug 生成 pi0 HDF5
+  用 smooth repaint head + smooth planner wrist + smooth planner pose_debug 生成 pi0 HDF5
 ```
 
 ---
@@ -100,7 +139,7 @@ process_repainted_planner_outputs.py
 
 ---
 
-## 3. 第一步命令：planner / AnyGrasp 批处理
+## 3. Step 1 命令：planner / AnyGrasp 批处理
 
 下面是一个完整示例，等价于你当前常用链路中的 planner 阶段。
 
@@ -193,7 +232,77 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_r1_b
 
 ---
 
-## 4. 第二步命令：SAM / repaint planner head
+## 4. Step 2 命令：对 Step1 的 planner 结果做 smooth
+
+完整示例：
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
+conda activate RoboTwin_bw
+
+bash /home/zaijia001/ssd/RoboTwin/code_painting/batch_smooth_planner_outputs.sh 0
+```
+
+如果你要显式写全所有关键参数，可以这样：
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
+conda activate RoboTwin_bw
+
+TASK_NAME=d_pour_blue \
+INPUT_ROOT=/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_realoffset_batch_pure-v3 \
+OUTPUT_ROOT=/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_realoffset_batch_pure-v3_smooth \
+INTERP_FACTOR=2 \
+FPS=10 \
+KEEP_HOVER_FRAMES_EVERY=3 \
+DEDUP_POS_THRESH_M=0.002 \
+DEDUP_ROT_THRESH_DEG=1.5 \
+DEDUP_JOINT_THRESH_RAD=0.01 \
+DEDUP_GRIPPER_THRESH=0.01 \
+OVERLAY_TEXT=0 \
+DISABLE_TABLE=1 \
+BASE_OCCLUDER_ENABLE=0 \
+LIGHTING_MODE=front_no_shadow \
+bash /home/zaijia001/ssd/RoboTwin/code_painting/batch_smooth_planner_outputs.sh 0
+```
+
+### Step 2 的关键输入
+
+以 `id=0` 为例：
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_realoffset_batch_pure-v3/d_pour_blue_0/
+  head_cam_plan.mp4
+  left_wrist_cam_plan.mp4
+  right_wrist_cam_plan.mp4
+  pose_debug.jsonl
+  plan_summary.json
+```
+
+### Step 2 的关键输出
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_realoffset_batch_pure-v3_smooth/d_pour_blue_0/
+  head_cam_plan.mp4
+  left_wrist_cam_plan.mp4
+  right_wrist_cam_plan.mp4
+  pose_debug.jsonl
+  smooth_summary.json
+```
+
+### Step 2 的关键语义
+
+- `KEEP_HOVER_FRAMES_EVERY`
+  - 用于去掉徘徊/近重复帧
+- `INTERP_FACTOR`
+  - 在保留关键帧之间插值，平滑跳变
+- `pose_debug.jsonl`
+  - 是 smooth 之后的状态来源
+- 输出目录里的 head / wrist / pose_debug 长度保持一致
+
+## 5. Step 3 命令：SAM / repaint smooth 后的 planner head
 
 ```bash
 cd /home/zaijia001/ssd/inpainting_sam2_robot
@@ -232,7 +341,82 @@ bash /home/zaijia001/ssd/inpainting_sam2_robot/script/batch_head_cam_repaint_wit
 
 ---
 
-## 5. 第三步命令：pi0 处理，全部改用 planner 同源数据
+完整示例：
+
+```bash
+cd /home/zaijia001/ssd/inpainting_sam2_robot
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
+conda activate inpainting-sam2-r1
+
+bash /home/zaijia001/ssd/inpainting_sam2_robot/script/batch_head_cam_repaint_with_auto_pad_from_smooth.sh 0
+```
+
+如果你要显式写全所有关键参数，可以这样：
+
+```bash
+cd /home/zaijia001/ssd/inpainting_sam2_robot
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
+conda activate inpainting-sam2-r1
+
+GPU=0 \
+DEVICE=cuda \
+TASK_NAME=d_pour_blue \
+ROBOT_ROOT=/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_realoffset_batch_pure-v3_smooth \
+STAGE1_ROOT=/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint \
+OUTPUT_ROOT=/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint/d_pour_blue_smooth \
+FORCE_REPAD=0 \
+ROBOT_VIDEO_NAME=head_cam_plan.mp4 \
+DILATE_KERNEL_SIZE=8 \
+ERODE_KERNEL_SIZE=14 \
+TEXT_PROMPT='robotic manipulator arm, forearm, wrist, gripper, end effector, cup, bottle.' \
+BOX_THRESHOLD=0.25 \
+TEXT_THRESHOLD=0.22 \
+MAX_MASK_AREA_RATIO=0.60 \
+MAX_SELECTED_BOXES=0 \
+ARM_SPLIT_RATIO=0.5 \
+EXCLUDE_BOTTOM_RATIO=0.10 \
+COMPOSITE_ERODE_KERNEL_SIZE=2 \
+BLEND_ALPHA_SIGMA=1.8 \
+SAM_MODEL_TYPE=vit_h \
+SAM_CKPT=./pretrained_models/sam_vit_h_4b8939.pth \
+LAMA_CONFIG=./lama/configs/prediction/default.yaml \
+LAMA_CKPT=./pretrained_models/big-lama \
+TRACKER_CKPT=vitb_384_mae_ce_32x4_ep300 \
+VI_CKPT=./pretrained_models/sttn.pth \
+MASK_IDX=2 \
+bash /home/zaijia001/ssd/inpainting_sam2_robot/script/batch_head_cam_repaint_with_auto_pad_from_smooth.sh 0
+```
+
+### Step 3 的关键输入
+
+- smooth planner head：
+  ```text
+  /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_realoffset_batch_pure-v3_smooth/d_pour_blue_0/head_cam_plan.mp4
+  ```
+- 原始 stage1 背景：
+  ```text
+  /home/zaijia001/ssd/inpainting_sam2_robot/results_repaint/stage1_no-human-obj_d_pour_blue_0/removed_w_mask_rgb_0.mp4
+  ```
+
+### Step 3 的对齐方式
+
+这一步与旧的 step2 不同，必须按 **smooth 后的 head** 的 fps 和 duration 对背景重新补长：
+
+- 不再沿用原 planner head 的时长
+- 也不沿用 hand-retarget 的时长
+- 而是使用：
+  - `ROBOT_ROOT/.../head_cam_plan.mp4`（smooth 之后）
+
+这样 Step 3 输出的 repaint head，才会与 Step 2 smooth bundle 的 wrist / pose_debug 对齐。
+
+### Step 3 的关键输出
+
+```text
+/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint/d_pour_blue_smooth/id_0_head_cam_arm_gripper_cup_bottle_pad_target/
+  target_with_original_head_cam_plan.mp4
+```
+
+## 6. Step 4 命令：pi0 处理，全部改用 smooth planner 同源数据
 
 新的推荐命令：
 
@@ -245,10 +429,10 @@ python scripts/process_repainted_planner_outputs.py \
   d_pour_blue \
   "pour water" \
   27 \
-  --head-root /home/zaijia001/ssd/inpainting_sam2_robot/results_repaint/d_pour_blue \
+  --head-root /home/zaijia001/ssd/inpainting_sam2_robot/results_repaint/d_pour_blue_smooth \
   --head-dir-template 'id_{id}_head_cam_arm_gripper_cup_bottle_pad_target' \
   --head-video-name target_with_original_head_cam_plan.mp4 \
-  --planner-root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_realoffset_batch_pure-v3 \
+  --planner-root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_realoffset_batch_pure-v3_smooth \
   --planner-dir-template 'd_pour_blue_{id}' \
   --left-wrist-video-name left_wrist_cam_plan.mp4 \
   --right-wrist-video-name right_wrist_cam_plan.mp4 \
@@ -256,19 +440,43 @@ python scripts/process_repainted_planner_outputs.py \
   --review-json /home/zaijia001/ssd/inpainting_sam2_robot/results_repaint/d_pour_blue/video_review.json \
   --review-mode strict \
   --ignore-ids \
-  --output-dir /home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/d_pour_blue-27-planner
+  --output-dir /home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/d_pour_blue-27-planner-smooth
+```
+
+如果你想用包装脚本，也可以：
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin/policy/pi0
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
+conda activate RoboTwin_bw
+
+TASK_NAME=d_pour_blue \
+INSTRUCTION='pour water' \
+EXPERT_DATA_NUM=27 \
+HEAD_ROOT=/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint/d_pour_blue_smooth \
+HEAD_DIR_TEMPLATE='id_{id}_head_cam_arm_gripper_cup_bottle_pad_target' \
+HEAD_VIDEO_NAME=target_with_original_head_cam_plan.mp4 \
+PLANNER_ROOT=/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_realoffset_batch_pure-v3_smooth \
+PLANNER_DIR_TEMPLATE='d_pour_blue_{id}' \
+LEFT_WRIST_VIDEO_NAME=left_wrist_cam_plan.mp4 \
+RIGHT_WRIST_VIDEO_NAME=right_wrist_cam_plan.mp4 \
+POSE_DEBUG_NAME=pose_debug.jsonl \
+REVIEW_JSON=/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint/d_pour_blue/video_review.json \
+REVIEW_MODE=strict \
+OUTPUT_DIR=/home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/d_pour_blue-27-planner-smooth \
+bash /home/zaijia001/ssd/RoboTwin/policy/pi0/run_process_repainted_smoothed_planner_outputs.sh
 ```
 
 ### 这一步各参数对应什么数据
 
 - `--head-root`
-  - repaint 结果根目录
+  - Step 3 smooth repaint 结果根目录
 - `--head-dir-template`
   - repaint episode 目录模板
 - `--head-video-name`
   - repaint 后的 head 视频文件名
 - `--planner-root`
-  - 第一步 planner 输出根目录
+  - Step 2 smooth planner bundle 根目录
 - `--planner-dir-template`
   - planner episode 目录模板
 - `--left-wrist-video-name`
@@ -288,23 +496,23 @@ python scripts/process_repainted_planner_outputs.py \
 
 以 `id=0` 为例：
 
-#### head（repaint 后）
+#### head（smooth repaint 后）
 
 ```text
-/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint/d_pour_blue/id_0_head_cam_arm_gripper_cup_bottle_pad_target/target_with_original_head_cam_plan.mp4
+/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint/d_pour_blue_smooth/id_0_head_cam_arm_gripper_cup_bottle_pad_target/target_with_original_head_cam_plan.mp4
 ```
 
-#### planner wrist
+#### smooth planner wrist
 
 ```text
-/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_realoffset_batch_pure-v3/d_pour_blue_0/left_wrist_cam_plan.mp4
-/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_realoffset_batch_pure-v3/d_pour_blue_0/right_wrist_cam_plan.mp4
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_realoffset_batch_pure-v3_smooth/d_pour_blue_0/left_wrist_cam_plan.mp4
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_realoffset_batch_pure-v3_smooth/d_pour_blue_0/right_wrist_cam_plan.mp4
 ```
 
-#### planner state
+#### smooth planner state
 
 ```text
-/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_realoffset_batch_pure-v3/d_pour_blue_0/pose_debug.jsonl
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_realoffset_batch_pure-v3_smooth/d_pour_blue_0/pose_debug.jsonl
 ```
 
 ---
@@ -372,11 +580,13 @@ pose_debug.jsonl          263 lines
 
 ```text
 run_plan_anygrasp_keyframes_r1_batch.sh
-  先生成 planner 的 head / wrist / pose_debug
-batch_head_cam_repaint_with_auto_pad.sh
-  再把 planner 的 head 做 SAM/repaint
+  先生成原始 planner 的 head / wrist / pose_debug
+batch_smooth_planner_outputs.sh
+  再对 planner 输出去徘徊帧并插值平滑，得到 smooth bundle
+batch_head_cam_repaint_with_auto_pad_from_smooth.sh
+  然后对 smooth 后的 planner head 做 SAM/repaint，并按 smooth 后时长补齐背景
 process_repainted_planner_outputs.py
-  最后用 repaint 后的 head + planner wrist + planner pose_debug 生成 pi0 训练数据
+  最后用 smooth repaint head + smooth planner wrist + smooth planner pose_debug 生成 pi0 训练数据
 ```
 
-这样前后关系最清晰，也最不容易再把 retarget 流和 planner 流混在一起。
+这样四个 step 的前后关系最清晰，也不容易再把 retarget 流和 planner 流混在一起。

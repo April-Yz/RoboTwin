@@ -1,3 +1,28 @@
+## 2026-03-27 00:20:00 +08
+
+- Added smooth-bundle command: `bash code_painting/batch_smooth_planner_outputs.sh`
+  - Entry point:
+    - `code_painting/batch_smooth_planner_outputs.sh`
+    - `code_painting/smooth_planner_outputs_from_pose_debug.py`
+  - Purpose:
+    - remove lingering frames and interpolate key states from the Step-1 planner outputs
+  - Key arguments:
+    - `INPUT_ROOT`
+    - `OUTPUT_ROOT`
+    - `INTERP_FACTOR`
+    - `FPS`
+    - `KEEP_HOVER_FRAMES_EVERY`
+    - `DEDUP_POS_THRESH_M`
+    - `DEDUP_ROT_THRESH_DEG`
+    - `DEDUP_JOINT_THRESH_RAD`
+    - `DEDUP_GRIPPER_THRESH`
+  - Key outputs:
+    - `${OUTPUT_ROOT}/${TASK_NAME}_${idx}/head_cam_plan.mp4`
+    - `${OUTPUT_ROOT}/${TASK_NAME}_${idx}/left_wrist_cam_plan.mp4`
+    - `${OUTPUT_ROOT}/${TASK_NAME}_${idx}/right_wrist_cam_plan.mp4`
+    - `${OUTPUT_ROOT}/${TASK_NAME}_${idx}/pose_debug.jsonl`
+    - `${OUTPUT_ROOT}/${TASK_NAME}_${idx}/smooth_summary.json`
+
 ## 2026-03-27 00:30:00 +08
 
 - Added a planner-consistent pi0 data-conversion command: `process_repainted_planner_outputs.py`

@@ -1,3 +1,28 @@
+## 2026-03-27 00:20:00 +08
+
+- 新增 smooth bundle 命令：`bash code_painting/batch_smooth_planner_outputs.sh`
+  - 入口：
+    - `code_painting/batch_smooth_planner_outputs.sh`
+    - `code_painting/smooth_planner_outputs_from_pose_debug.py`
+  - 用途：
+    - 对 Step1 planner 输出去徘徊帧并插值平滑
+  - 关键参数：
+    - `INPUT_ROOT`
+    - `OUTPUT_ROOT`
+    - `INTERP_FACTOR`
+    - `FPS`
+    - `KEEP_HOVER_FRAMES_EVERY`
+    - `DEDUP_POS_THRESH_M`
+    - `DEDUP_ROT_THRESH_DEG`
+    - `DEDUP_JOINT_THRESH_RAD`
+    - `DEDUP_GRIPPER_THRESH`
+  - 关键输出：
+    - `${OUTPUT_ROOT}/${TASK_NAME}_${idx}/head_cam_plan.mp4`
+    - `${OUTPUT_ROOT}/${TASK_NAME}_${idx}/left_wrist_cam_plan.mp4`
+    - `${OUTPUT_ROOT}/${TASK_NAME}_${idx}/right_wrist_cam_plan.mp4`
+    - `${OUTPUT_ROOT}/${TASK_NAME}_${idx}/pose_debug.jsonl`
+    - `${OUTPUT_ROOT}/${TASK_NAME}_${idx}/smooth_summary.json`
+
 ## 2026-03-27 00:30:00 +08
 
 - 新增 planner 同源 pi0 数据转换命令：`process_repainted_planner_outputs.py`

@@ -2,6 +2,20 @@
 
 ## 2026-03-27
 
+- 新增 smooth bundle 脚本：
+  - `code_painting/smooth_planner_outputs_from_pose_debug.py`
+  - `code_painting/batch_smooth_planner_outputs.sh`
+  - 目的：
+    - 针对 Step1 planner 输出去掉徘徊/近重复帧
+    - 对关键状态做插值平滑
+    - 重新导出同源的：head / left wrist / right wrist / pose_debug
+  - 关键输出目录：
+    - `code_painting/anygrasp_plan_keyframes_realoffset_batch_pure-v3_smooth`
+  - 验证：
+    - `python -m py_compile code_painting/smooth_planner_outputs_from_pose_debug.py`
+    - `bash -n code_painting/batch_smooth_planner_outputs.sh`
+    - 单样本输出：`/tmp/d_pour_blue_0_smooth_bundle`
+
 - 新增脚本：
   - `policy/pi0/scripts/process_repainted_planner_outputs.py`
   - 目的：使用同源 planner 数据做 pi0 处理：
