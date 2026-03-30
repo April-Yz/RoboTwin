@@ -11,6 +11,7 @@
     - `--head-video-name`
     - `--retarget-root`
     - `--retarget-dir-template`
+    - `--review-json`
     - `--ids`
     - `--ignore-ids`
   - 典型命令：

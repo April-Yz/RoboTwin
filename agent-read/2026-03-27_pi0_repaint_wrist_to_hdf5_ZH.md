@@ -226,6 +226,33 @@ episode_0/
 
 ## 6. 新的处理命令
 
+## 6.0 先做人眼筛选（推荐）
+
+先在有头界面里逐个检查 repaint 后的视频质量：
+
+```bash
+cd /home/zaijia001/ssd/inpainting_sam2_robot
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
+conda activate inpainting-sam2-r1
+
+python script/review_repaint_videos.py \
+  /home/zaijia001/ssd/inpainting_sam2_robot/results_repaint/d_pour_blue \
+  --dir-template 'id_{id}_head_cam_arm_gripper_cup_bottle_pad_target' \
+  --video-name target_with_original_head_cam_plan.mp4 \
+  --json-path /home/zaijia001/ssd/inpainting_sam2_robot/results_repaint/d_pour_blue/video_review.json
+```
+
+常用按键：
+- `y`：可用
+- `n`：不可用
+- `a/d`：上一个/下一个视频
+- `j/l`：上一帧/下一帧
+- `r`：重播当前视频
+- `space`：播放/暂停
+- `q`：保存并退出
+
+这个 JSON 可以直接给下面的新处理脚本使用。
+
 ## 6.1 处理“新 head cam repaint + wrist replay”
 
 在 RoboTwin 仓库里执行：
@@ -238,17 +265,19 @@ conda activate RoboTwin_bw
 python scripts/process_repainted_headcam_with_wrist.py \
   d_pour_blue \
   "pour water" \
-  48 \
+  60 \
   --head-root /home/zaijia001/ssd/inpainting_sam2_robot/results_repaint/d_pour_blue \
   --head-dir-template 'id_{id}_head_cam_arm_gripper_cup_bottle_pad_target' \
   --head-video-name target_with_original_head_cam_plan.mp4 \
   --retarget-root /home/zaijia001/ssd/RoboTwin/code_painting/output_hand_retarget_swap_red_blue_keep_green_no_offset_pool_clean/d_pour_blue \
   --retarget-dir-template 'hand_detections_{id}' \
+  --review-json /home/zaijia001/ssd/inpainting_sam2_robot/results_repaint/d_pour_blue/video_review.json \
   --ignore-ids
 ```
 
 说明：
-- 这条命令会自动从 `head-root` 里发现符合模板的 episode id
+- 如果提供了 `--review-json`，脚本会自动只处理 JSON 里标记为 `y` / `usable=true` 的视频
+- 如果不提供 `--review-json`，它会自动从 `head-root` 里发现符合模板的 episode id
 - 再去 `retarget-root` 找同 id 的 wrist 视频和 `world_targets_and_status.npz`
 - `--ignore-ids` 可以空着传，表示本轮不忽略任何 id
 

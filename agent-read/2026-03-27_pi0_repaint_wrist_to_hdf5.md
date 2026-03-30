@@ -226,6 +226,33 @@ Images are resized by default to:
 
 ## 6. New processing commands
 
+## 6.0 Review videos manually first (recommended)
+
+First, inspect the repaint videos one by one in a GUI:
+
+```bash
+cd /home/zaijia001/ssd/inpainting_sam2_robot
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
+conda activate inpainting-sam2-r1
+
+python script/review_repaint_videos.py \
+  /home/zaijia001/ssd/inpainting_sam2_robot/results_repaint/d_pour_blue \
+  --dir-template 'id_{id}_head_cam_arm_gripper_cup_bottle_pad_target' \
+  --video-name target_with_original_head_cam_plan.mp4 \
+  --json-path /home/zaijia001/ssd/inpainting_sam2_robot/results_repaint/d_pour_blue/video_review.json
+```
+
+Common keys:
+- `y`: usable
+- `n`: unusable
+- `a/d`: previous/next video
+- `j/l`: previous/next frame
+- `r`: replay current video
+- `space`: play/pause
+- `q`: save and quit
+
+That JSON can be passed directly to the processing script below.
+
 ## 6.1 Process the new “head-cam repaint + wrist replay” pipeline
 
 Run inside the RoboTwin repo:
@@ -244,12 +271,14 @@ python scripts/process_repainted_headcam_with_wrist.py \
   --head-video-name target_with_original_head_cam_plan.mp4 \
   --retarget-root /home/zaijia001/ssd/RoboTwin/code_painting/output_hand_retarget_swap_red_blue_keep_green_no_offset_pool_clean/d_pour_blue \
   --retarget-dir-template 'hand_detections_{id}' \
+  --review-json /home/zaijia001/ssd/inpainting_sam2_robot/results_repaint/d_pour_blue/video_review.json \
   --ignore-ids
 ```
 
 Notes:
-- this command auto-discovers episode ids from `head-root`
-- then looks up wrist videos and `world_targets_and_status.npz` with the same id under `retarget-root`
+- if `--review-json` is provided, the script automatically processes only videos marked `y` / `usable=true`
+- if `--review-json` is not provided, the script auto-discovers episode ids from `head-root`
+- it then looks up wrist videos and `world_targets_and_status.npz` with the same id under `retarget-root`
 - `--ignore-ids` can be passed with no values, meaning “ignore nothing in this run”
 
 ## 6.2 Only process selected ids
