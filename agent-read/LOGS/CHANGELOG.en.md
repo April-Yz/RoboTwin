@@ -12,6 +12,15 @@
     - if a later viewer/export step plays the result at a higher fps, it will further feel like “only about 1 second”
   - No code changes in this round; only recorded findings and root cause
 
+- Added source-consistency analysis notes:
+  - `agent-read/2026-03-27_head_source_vs_wrist_source_analysis_ZH.md`
+  - `agent-read/2026-03-27_head_source_vs_wrist_source_analysis.md`
+  - Conclusion:
+    - `batch_head_cam_repaint_with_auto_pad.sh` uses planner-side `head_cam_plan.mp4` as the head source
+    - the current pi0 processing step uses hand-retarget `left/right_wrist_replay.mp4` as the wrist source
+    - inside the hand-retarget directory, `zed_replay / wrist / world_targets` are basically aligned in length
+    - but planner head and hand-retarget wrist are not the same source stream, so matching frame counts should not be expected
+
 - Added `policy/pi0/scripts/process_repainted_headcam_with_wrist.py`
   - Purpose:
     - convert the newer “SAM/repainted head-cam video + left/right wrist replays + world_targets_and_status.npz” into the pi0 `processed_data` HDF5 intermediate format

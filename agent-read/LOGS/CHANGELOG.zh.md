@@ -12,6 +12,15 @@
     - 如果后续按更高 fps 查看，会进一步主观感觉“只有约 1 秒”
   - 本轮不改代码，只记录检查结果与原因
 
+- 新增来源一致性分析文档：
+  - `agent-read/2026-03-27_head_source_vs_wrist_source_analysis_ZH.md`
+  - `agent-read/2026-03-27_head_source_vs_wrist_source_analysis.md`
+  - 结论：
+    - `batch_head_cam_repaint_with_auto_pad.sh` 使用的 head 来自 planner 目录下的 `head_cam_plan.mp4`
+    - 当前 pi0 处理用的 wrist 来自 hand-retarget 目录下的 `left/right_wrist_replay.mp4`
+    - hand-retarget 目录内部的 `zed_replay / wrist / world_targets` 长度基本一致
+    - 但 planner head 与 hand-retarget wrist 不是同源流，因此不应期待帧数一致
+
 - 新增 `policy/pi0/scripts/process_repainted_headcam_with_wrist.py`
   - 目的：
     - 把“新的 SAM/repaint 后 head cam 视频 + 左右 wrist replay + world_targets_and_status.npz”统一转成 pi0 的 `processed_data` HDF5 中间格式
