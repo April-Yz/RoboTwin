@@ -2,6 +2,18 @@
 
 ## 2026-03-27
 
+- 新增脚本：
+  - `policy/pi0/scripts/process_repainted_planner_outputs.py`
+  - 目的：使用同源 planner 数据做 pi0 处理：
+    - repaint 后的 planner head
+    - planner 的 `left_wrist_cam_plan.mp4`
+    - planner 的 `right_wrist_cam_plan.mp4`
+    - planner 的 `pose_debug.jsonl`
+  - 不再混用 hand-retarget 的 wrist / `world_targets_and_status.npz`
+  - 最小验证：
+    - `python -m py_compile policy/pi0/scripts/process_repainted_planner_outputs.py`
+    - 单样本测试输出：`/tmp/pi0_planner_repaint_test`
+
 - 新增分析文档：
   - `agent-read/2026-03-27_repaint_duration_mismatch_analysis_ZH.md`
   - `agent-read/2026-03-27_repaint_duration_mismatch_analysis.md`

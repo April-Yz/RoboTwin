@@ -2,6 +2,18 @@
 
 ## 2026-03-27
 
+- Added script:
+  - `policy/pi0/scripts/process_repainted_planner_outputs.py`
+  - Purpose: process pi0 data using source-consistent planner outputs:
+    - repaint planner head
+    - planner `left_wrist_cam_plan.mp4`
+    - planner `right_wrist_cam_plan.mp4`
+    - planner `pose_debug.jsonl`
+  - This avoids mixing hand-retarget wrist / `world_targets_and_status.npz` with planner head videos
+  - Minimal validation:
+    - `python -m py_compile policy/pi0/scripts/process_repainted_planner_outputs.py`
+    - one-sample output test: `/tmp/pi0_planner_repaint_test`
+
 - Added analysis notes:
   - `agent-read/2026-03-27_repaint_duration_mismatch_analysis_ZH.md`
   - `agent-read/2026-03-27_repaint_duration_mismatch_analysis.md`
