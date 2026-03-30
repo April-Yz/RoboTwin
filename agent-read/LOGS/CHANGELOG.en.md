@@ -2,6 +2,16 @@
 
 ## 2026-03-27
 
+- Added analysis notes:
+  - `agent-read/2026-03-27_repaint_duration_mismatch_analysis_ZH.md`
+  - `agent-read/2026-03-27_repaint_duration_mismatch_analysis.md`
+  - Purpose: record why `process_repainted_headcam_with_wrist.py` outputs are much shorter than `head_cam_plan.mp4`
+  - Conclusion:
+    - the current script truncates by minimum frame count rather than aligning by real duration in seconds
+    - the effective length is actually limited by `world_targets_and_status.npz` and the left/right wrist replay streams
+    - if a later viewer/export step plays the result at a higher fps, it will further feel like “only about 1 second”
+  - No code changes in this round; only recorded findings and root cause
+
 - Added `policy/pi0/scripts/process_repainted_headcam_with_wrist.py`
   - Purpose:
     - convert the newer “SAM/repainted head-cam video + left/right wrist replays + world_targets_and_status.npz” into the pi0 `processed_data` HDF5 intermediate format

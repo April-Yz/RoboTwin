@@ -2,6 +2,16 @@
 
 ## 2026-03-27
 
+- 新增分析文档：
+  - `agent-read/2026-03-27_repaint_duration_mismatch_analysis_ZH.md`
+  - `agent-read/2026-03-27_repaint_duration_mismatch_analysis.md`
+  - 目的：记录为什么 `process_repainted_headcam_with_wrist.py` 生成的序列明显短于 `head_cam_plan.mp4`
+  - 结论：
+    - 当前脚本按最短帧数裁切，而不是按真实秒数对齐
+    - 真正限制长度的是 `world_targets_and_status.npz` 与左右 wrist replay 的帧数
+    - 如果后续按更高 fps 查看，会进一步主观感觉“只有约 1 秒”
+  - 本轮不改代码，只记录检查结果与原因
+
 - 新增 `policy/pi0/scripts/process_repainted_headcam_with_wrist.py`
   - 目的：
     - 把“新的 SAM/repaint 后 head cam 视频 + 左右 wrist replay + world_targets_and_status.npz”统一转成 pi0 的 `processed_data` HDF5 中间格式
