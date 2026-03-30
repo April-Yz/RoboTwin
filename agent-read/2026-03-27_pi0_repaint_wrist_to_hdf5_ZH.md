@@ -245,6 +245,7 @@ python script/review_repaint_videos.py \
 常用按键：
 - `y`：可用
 - `n`：不可用
+- `m`：模棱两可
 - `a/d`：上一个/下一个视频
 - `j/l`：上一帧/下一帧
 - `r`：重播当前视频
@@ -272,11 +273,16 @@ python scripts/process_repainted_headcam_with_wrist.py \
   --retarget-root /home/zaijia001/ssd/RoboTwin/code_painting/output_hand_retarget_swap_red_blue_keep_green_no_offset_pool_clean/d_pour_blue \
   --retarget-dir-template 'hand_detections_{id}' \
   --review-json /home/zaijia001/ssd/inpainting_sam2_robot/results_repaint/d_pour_blue/video_review.json \
+  --review-mode strict \
   --ignore-ids
 ```
 
 说明：
-- 如果提供了 `--review-json`，脚本会自动只处理 JSON 里标记为 `y` / `usable=true` 的视频
+- 如果提供了 `--review-json`：
+  - 默认 `--review-mode strict`
+  - 只处理 JSON 里标记为 `y` / `usable=true` 的视频
+- 如果你想把 `m`（模棱两可）的视频也一起处理，改成：
+  - `--review-mode include_ambiguous`
 - 如果不提供 `--review-json`，它会自动从 `head-root` 里发现符合模板的 episode id
 - 再去 `retarget-root` 找同 id 的 wrist 视频和 `world_targets_and_status.npz`
 - `--ignore-ids` 可以空着传，表示本轮不忽略任何 id
@@ -294,6 +300,8 @@ python scripts/process_repainted_headcam_with_wrist.py \
   --retarget-root /home/zaijia001/ssd/RoboTwin/code_painting/output_hand_retarget_swap_red_blue_keep_green_no_offset_pool_clean/d_pour_blue \
   --retarget-dir-template 'hand_detections_{id}' \
   --ids 0 1 2 \
+  --review-json /home/zaijia001/ssd/inpainting_sam2_robot/results_repaint/d_pour_blue/video_review.json \
+  --review-mode include_ambiguous \
   --ignore-ids
 ```
 

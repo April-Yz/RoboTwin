@@ -12,7 +12,8 @@
       - `--retarget-dir-template`
     - 支持新的 head 视频文件名：
       - `target_with_original_head_cam_plan.mp4`
-    - 支持 `--review-json`，自动只处理人工筛选为 `y` / `usable=true` 的视频
+    - 支持 `--review-json`，默认只处理人工筛选为 `y` / `usable=true` 的视频
+    - 支持 `--review-mode include_ambiguous`，把 `m` / `ambiguous` 一起纳入处理
     - 输出仍与现有 pi0 `processed_data/<task>-<num>/episode_x/*.hdf5` 兼容
   - 相关文档：
     - `agent-read/2026-03-27_pi0_repaint_wrist_to_hdf5_ZH.md`

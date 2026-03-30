@@ -12,7 +12,8 @@
       - `--retarget-dir-template`
     - support the new head-video filename:
       - `target_with_original_head_cam_plan.mp4`
-    - support `--review-json` so only videos manually marked `y` / `usable=true` are processed automatically
+    - support `--review-json`, which by default processes only videos manually marked `y` / `usable=true`
+    - support `--review-mode include_ambiguous` to also include `m` / `ambiguous`
     - keep output compatible with the existing pi0 `processed_data/<task>-<num>/episode_x/*.hdf5` layout
   - Related docs:
     - `agent-read/2026-03-27_pi0_repaint_wrist_to_hdf5_ZH.md`

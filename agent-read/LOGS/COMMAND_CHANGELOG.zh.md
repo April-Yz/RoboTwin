@@ -12,6 +12,7 @@
     - `--retarget-root`
     - `--retarget-dir-template`
     - `--review-json`
+    - `--review-mode`
     - `--ids`
     - `--ignore-ids`
   - 典型命令：

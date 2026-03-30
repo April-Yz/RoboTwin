@@ -245,6 +245,7 @@ python script/review_repaint_videos.py \
 Common keys:
 - `y`: usable
 - `n`: unusable
+- `m`: ambiguous
 - `a/d`: previous/next video
 - `j/l`: previous/next frame
 - `r`: replay current video
@@ -272,11 +273,16 @@ python scripts/process_repainted_headcam_with_wrist.py \
   --retarget-root /home/zaijia001/ssd/RoboTwin/code_painting/output_hand_retarget_swap_red_blue_keep_green_no_offset_pool_clean/d_pour_blue \
   --retarget-dir-template 'hand_detections_{id}' \
   --review-json /home/zaijia001/ssd/inpainting_sam2_robot/results_repaint/d_pour_blue/video_review.json \
+  --review-mode strict \
   --ignore-ids
 ```
 
 Notes:
-- if `--review-json` is provided, the script automatically processes only videos marked `y` / `usable=true`
+- if `--review-json` is provided:
+  - the default is `--review-mode strict`
+  - only videos marked `y` / `usable=true` are processed
+- if you also want to include `m` (ambiguous), use:
+  - `--review-mode include_ambiguous`
 - if `--review-json` is not provided, the script auto-discovers episode ids from `head-root`
 - it then looks up wrist videos and `world_targets_and_status.npz` with the same id under `retarget-root`
 - `--ignore-ids` can be passed with no values, meaning “ignore nothing in this run”
@@ -294,6 +300,8 @@ python scripts/process_repainted_headcam_with_wrist.py \
   --retarget-root /home/zaijia001/ssd/RoboTwin/code_painting/output_hand_retarget_swap_red_blue_keep_green_no_offset_pool_clean/d_pour_blue \
   --retarget-dir-template 'hand_detections_{id}' \
   --ids 0 1 2 \
+  --review-json /home/zaijia001/ssd/inpainting_sam2_robot/results_repaint/d_pour_blue/video_review.json \
+  --review-mode include_ambiguous \
   --ignore-ids
 ```
 

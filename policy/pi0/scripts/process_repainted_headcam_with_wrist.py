@@ -10,6 +10,7 @@ python scripts/process_repainted_headcam_with_wrist.py d_pour_blue "pour water" 
   --retarget-root /home/zaijia001/ssd/RoboTwin/code_painting/output_hand_retarget_swap_red_blue_keep_green_no_offset_pool_clean/d_pour_blue \
   --retarget-dir-template 'hand_detections_{id}' \
   --review-json /home/zaijia001/ssd/inpainting_sam2_robot/results_repaint/d_pour_blue/video_review.json \
+  --review-mode strict \
   --ignore-ids
 
 Classic zed-repaint pipeline is also supported:
@@ -239,9 +240,11 @@ def save_episode(
         images.create_dataset("cam_right_wrist", data=cam_right_wrist_enc, dtype=f"S{len_right}")
 
 
-def load_usable_ids_from_review_json(review_json: Path) -> list[int]:
+def load_usable_ids_from_review_json(review_json: Path, review_mode: str = "strict") -> list[int]:
     with review_json.open("r", encoding="utf-8") as f:
         payload: dict[str, Any] = json.load(f)
+
+    allow_ambiguous = review_mode == "include_ambiguous"
 
     if isinstance(payload, dict) and "videos" in payload and isinstance(payload["videos"], dict):
         usable_ids: list[int] = []
@@ -255,7 +258,9 @@ def load_usable_ids_from_review_json(review_json: Path) -> list[int]:
             label = item.get("label")
             usable = item.get("usable")
             reviewed = item.get("reviewed")
-            if label == "y" or usable is True or (reviewed and str(label).lower() in {"usable", "yes", "y"}):
+            is_yes = label == "y" or usable is True or (reviewed and str(label).lower() in {"usable", "yes", "y"})
+            is_ambiguous = label == "m" or usable == "ambiguous" or str(label).lower() in {"m", "maybe", "ambiguous"}
+            if is_yes or (allow_ambiguous and is_ambiguous):
                 usable_ids.append(episode_id)
         return sorted(set(usable_ids))
 
@@ -266,7 +271,7 @@ def load_usable_ids_from_review_json(review_json: Path) -> list[int]:
                 episode_id = int(raw_id)
             except (TypeError, ValueError):
                 continue
-            if usable is True:
+            if usable is True or (allow_ambiguous and usable == "ambiguous"):
                 usable_ids.append(episode_id)
         return sorted(set(usable_ids))
 
@@ -289,8 +294,9 @@ def process_dataset(
     ignore_ids: set[int],
     explicit_ids: list[int] | None,
     review_json: Path | None,
+    review_mode: str,
 ) -> int:
-    reviewed_usable_ids = load_usable_ids_from_review_json(review_json) if review_json else None
+    reviewed_usable_ids = load_usable_ids_from_review_json(review_json, review_mode=review_mode) if review_json else None
 
     if explicit_ids:
         candidate_ids = explicit_ids
@@ -408,7 +414,14 @@ def parse_args() -> argparse.Namespace:
         "--review-json",
         type=Path,
         default=None,
-        help="Optional review JSON produced by review_repaint_videos.py. When provided, only ids marked usable/y are processed automatically.",
+        help="Optional review JSON produced by review_repaint_videos.py. When provided, only reviewed ids allowed by --review-mode are processed automatically.",
+    )
+    parser.add_argument(
+        "--review-mode",
+        type=str,
+        choices=["strict", "include_ambiguous"],
+        default="strict",
+        help="How to use review-json labels. strict: only y/usable=true. include_ambiguous: also include m/ambiguous.",
     )
     parser.add_argument(
         "--ignore-ids",
@@ -447,6 +460,7 @@ def main() -> None:
         ignore_ids=set(args.ignore_ids),
         explicit_ids=args.ids,
         review_json=args.review_json,
+        review_mode=args.review_mode,
     )
     print(f"[done] processed episodes: {processed}")
     print(f"[done] output dir: {save_dir}")
