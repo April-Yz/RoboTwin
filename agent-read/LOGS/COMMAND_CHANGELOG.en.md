@@ -1,5 +1,26 @@
 ## 2026-03-27 00:20:00 +08
 
+- Added review-driven Step-2+Step-3+Step-4 controller command: `bash run_reviewed_smooth_repaint_pi0_pipeline.sh`
+  - Entry point:
+    - `run_reviewed_smooth_repaint_pi0_pipeline.sh`
+  - Purpose:
+    - extract ids labeled `y` from `video_review.json` (or include `m` by mode)
+    - batch-run Step 2 smoothing, Step 3 smooth repaint, and Step 4 pi0 processing
+  - Key arguments:
+    - `TASK_NAME`
+    - `REVIEW_JSON`
+    - `REVIEW_MODE`
+    - `RUN_SMOOTH`
+    - `RUN_REPAINT`
+    - `RUN_PI0`
+    - `DRY_RUN`
+    - `EXPERT_DATA_NUM`
+    - `PI0_OUTPUT_DIR`
+  - Key outputs:
+    - `${SMOOTH_OUTPUT_ROOT}/${TASK_NAME}_${idx}/...`
+    - `${REPAINT_OUTPUT_ROOT}/id_${idx}_head_cam_arm_gripper_cup_bottle_pad_target/target_with_original_head_cam_plan.mp4`
+    - `${PI0_OUTPUT_DIR}/episode_*/episode_*.hdf5`
+
 - Added smooth-bundle command: `bash code_painting/batch_smooth_planner_outputs.sh`
   - Entry point:
     - `code_painting/batch_smooth_planner_outputs.sh`

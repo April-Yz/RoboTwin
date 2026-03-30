@@ -5,6 +5,7 @@
 - 新增 smooth bundle 脚本：
   - `code_painting/smooth_planner_outputs_from_pose_debug.py`
   - `code_painting/batch_smooth_planner_outputs.sh`
+  - `run_reviewed_smooth_repaint_pi0_pipeline.sh`
   - 目的：
     - 针对 Step1 planner 输出去掉徘徊/近重复帧
     - 对关键状态做插值平滑
@@ -14,6 +15,8 @@
   - 验证：
     - `python -m py_compile code_painting/smooth_planner_outputs_from_pose_debug.py`
     - `bash -n code_painting/batch_smooth_planner_outputs.sh`
+    - `bash -n run_reviewed_smooth_repaint_pi0_pipeline.sh`
+    - `DRY_RUN=1 bash run_reviewed_smooth_repaint_pi0_pipeline.sh`
     - 单样本输出：`/tmp/d_pour_blue_0_smooth_bundle`
 
 - 新增脚本：

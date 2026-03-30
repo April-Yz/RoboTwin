@@ -1,5 +1,26 @@
 ## 2026-03-27 00:20:00 +08
 
+- 新增 review 驱动的 Step2+Step3+Step4 总控命令：`bash run_reviewed_smooth_repaint_pi0_pipeline.sh`
+  - 入口：
+    - `run_reviewed_smooth_repaint_pi0_pipeline.sh`
+  - 用途：
+    - 从 `video_review.json` 提取 `y`（或按模式包含 `m`）对应的 id
+    - 批量执行 Step2 smooth、Step3 smooth repaint、Step4 pi0 处理
+  - 关键参数：
+    - `TASK_NAME`
+    - `REVIEW_JSON`
+    - `REVIEW_MODE`
+    - `RUN_SMOOTH`
+    - `RUN_REPAINT`
+    - `RUN_PI0`
+    - `DRY_RUN`
+    - `EXPERT_DATA_NUM`
+    - `PI0_OUTPUT_DIR`
+  - 关键输出：
+    - `${SMOOTH_OUTPUT_ROOT}/${TASK_NAME}_${idx}/...`
+    - `${REPAINT_OUTPUT_ROOT}/id_${idx}_head_cam_arm_gripper_cup_bottle_pad_target/target_with_original_head_cam_plan.mp4`
+    - `${PI0_OUTPUT_DIR}/episode_*/episode_*.hdf5`
+
 - 新增 smooth bundle 命令：`bash code_painting/batch_smooth_planner_outputs.sh`
   - 入口：
     - `code_painting/batch_smooth_planner_outputs.sh`

@@ -234,7 +234,7 @@ Where:
 
 ## 4. Step-2 command: smooth the Step-1 planner bundle
 
-Full example:
+Single-id example:
 
 ```bash
 cd /home/zaijia001/ssd/RoboTwin
@@ -242,6 +242,16 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
 conda activate RoboTwin_bw
 
 bash /home/zaijia001/ssd/RoboTwin/code_painting/batch_smooth_planner_outputs.sh 0
+```
+
+Batch example (try all `0..60`, skip missing episodes automatically):
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
+conda activate RoboTwin_bw
+
+bash /home/zaijia001/ssd/RoboTwin/code_painting/batch_smooth_planner_outputs.sh
 ```
 
 If you want all key parameters written explicitly:
@@ -341,7 +351,7 @@ Where:
 
 ---
 
-Full example:
+Single-id example:
 
 ```bash
 cd /home/zaijia001/ssd/inpainting_sam2_robot
@@ -350,6 +360,18 @@ conda activate inpainting-sam2-r1
 
 bash /home/zaijia001/ssd/inpainting_sam2_robot/script/batch_head_cam_repaint_with_auto_pad_from_smooth.sh 0
 ```
+
+Batch example (try all `0..60`, skip missing episodes automatically):
+
+```bash
+cd /home/zaijia001/ssd/inpainting_sam2_robot
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
+conda activate inpainting-sam2-r1
+
+bash /home/zaijia001/ssd/inpainting_sam2_robot/script/batch_head_cam_repaint_with_auto_pad_from_smooth.sh
+```
+
+This is the Step-3 controller command.
 
 If you want all key parameters written explicitly:
 
@@ -418,7 +440,7 @@ This ensures the repaint head from Step 3 stays aligned with the smooth wrist / 
 
 ## 6. Step-4 command: pi0 processing, fully switched to smooth planner-consistent sources
 
-New recommended command:
+Single-id example:
 
 ```bash
 cd /home/zaijia001/ssd/RoboTwin/policy/pi0
@@ -443,7 +465,66 @@ python scripts/process_repainted_planner_outputs.py \
   --output-dir /home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/d_pour_blue-27-planner-smooth
 ```
 
-If you prefer the wrapper script, you can also run:
+Batch example (process all `y` episodes from review-json):
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin/policy/pi0
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
+conda activate RoboTwin_bw
+
+TASK_NAME=d_pour_blue \
+INSTRUCTION='pour water' \
+EXPERT_DATA_NUM=27 \
+HEAD_ROOT=/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint/d_pour_blue_smooth \
+PLANNER_ROOT=/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_realoffset_batch_pure-v3_smooth \
+REVIEW_JSON=/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint/d_pour_blue/video_review.json \
+REVIEW_MODE=strict \
+OUTPUT_DIR=/home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/d_pour_blue-27-planner-smooth \
+bash /home/zaijia001/ssd/RoboTwin/policy/pi0/run_process_repainted_smoothed_planner_outputs.sh
+```
+
+This is the Step-4 controller command.
+
+If you want to chain Step 2 + Step 3 + Step 4 together and only process episodes marked `y` in the review JSON, you can directly use the new controller batch script:
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
+
+TASK_NAME=d_pour_blue \
+REVIEW_JSON=/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint/d_pour_blue/video_review.json \
+REVIEW_MODE=strict \
+INSTRUCTION='pour water' \
+EXPERT_DATA_NUM=auto \
+PI0_OUTPUT_DIR=/home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/d_pour_blue-reviewed-y-smooth \
+bash /home/zaijia001/ssd/RoboTwin/run_reviewed_smooth_repaint_pi0_pipeline.sh
+```
+
+This script will automatically:
+- extract all `label=y` / `usable=true` ids from `video_review.json`
+- run Step 2 smoothing only for those ids
+- run Step 3 smooth repaint only for those ids
+- run Step 4 pi0 processing using the same review JSON
+
+If you only want to preview the selected ids without actually running the pipeline, use dry-run:
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
+
+TASK_NAME=d_pour_blue \
+REVIEW_JSON=/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint/d_pour_blue/video_review.json \
+REVIEW_MODE=strict \
+DRY_RUN=1 \
+bash /home/zaijia001/ssd/RoboTwin/run_reviewed_smooth_repaint_pi0_pipeline.sh
+```
+
+If you only want some of the steps:
+- Step 2 + Step 3 only, skip Step 4: `RUN_PI0=0`
+- skip Step 2, rerun Step 3 + Step 4: `RUN_SMOOTH=0`
+- rerun only Step 4: `RUN_SMOOTH=0 RUN_REPAINT=0`
+
+If you still prefer the Step-4-only wrapper script, you can also run:
 
 ```bash
 cd /home/zaijia001/ssd/RoboTwin/policy/pi0

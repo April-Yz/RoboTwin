@@ -234,7 +234,7 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_r1_b
 
 ## 4. Step 2 命令：对 Step1 的 planner 结果做 smooth
 
-完整示例：
+单条示例：
 
 ```bash
 cd /home/zaijia001/ssd/RoboTwin
@@ -242,6 +242,16 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
 conda activate RoboTwin_bw
 
 bash /home/zaijia001/ssd/RoboTwin/code_painting/batch_smooth_planner_outputs.sh 0
+```
+
+批处理示例（0~60 全部尝试，缺失样本自动 skip）：
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
+conda activate RoboTwin_bw
+
+bash /home/zaijia001/ssd/RoboTwin/code_painting/batch_smooth_planner_outputs.sh
 ```
 
 如果你要显式写全所有关键参数，可以这样：
@@ -341,7 +351,7 @@ bash /home/zaijia001/ssd/inpainting_sam2_robot/script/batch_head_cam_repaint_wit
 
 ---
 
-完整示例：
+单条示例：
 
 ```bash
 cd /home/zaijia001/ssd/inpainting_sam2_robot
@@ -350,6 +360,18 @@ conda activate inpainting-sam2-r1
 
 bash /home/zaijia001/ssd/inpainting_sam2_robot/script/batch_head_cam_repaint_with_auto_pad_from_smooth.sh 0
 ```
+
+批处理示例（0~60 全部尝试，缺失样本自动 skip）：
+
+```bash
+cd /home/zaijia001/ssd/inpainting_sam2_robot
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
+conda activate inpainting-sam2-r1
+
+bash /home/zaijia001/ssd/inpainting_sam2_robot/script/batch_head_cam_repaint_with_auto_pad_from_smooth.sh
+```
+
+这就是 Step 3 的总控命令。
 
 如果你要显式写全所有关键参数，可以这样：
 
@@ -418,7 +440,7 @@ bash /home/zaijia001/ssd/inpainting_sam2_robot/script/batch_head_cam_repaint_wit
 
 ## 6. Step 4 命令：pi0 处理，全部改用 smooth planner 同源数据
 
-新的推荐命令：
+单条示例：
 
 ```bash
 cd /home/zaijia001/ssd/RoboTwin/policy/pi0
@@ -443,7 +465,66 @@ python scripts/process_repainted_planner_outputs.py \
   --output-dir /home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/d_pour_blue-27-planner-smooth
 ```
 
-如果你想用包装脚本，也可以：
+批处理示例（按 review-json 批量处理所有 `y` 样本）：
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin/policy/pi0
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
+conda activate RoboTwin_bw
+
+TASK_NAME=d_pour_blue \
+INSTRUCTION='pour water' \
+EXPERT_DATA_NUM=27 \
+HEAD_ROOT=/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint/d_pour_blue_smooth \
+PLANNER_ROOT=/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_realoffset_batch_pure-v3_smooth \
+REVIEW_JSON=/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint/d_pour_blue/video_review.json \
+REVIEW_MODE=strict \
+OUTPUT_DIR=/home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/d_pour_blue-27-planner-smooth \
+bash /home/zaijia001/ssd/RoboTwin/policy/pi0/run_process_repainted_smoothed_planner_outputs.sh
+```
+
+这就是 Step 4 的总控命令。
+
+如果你想把 Step 2 + Step 3 + Step 4 串起来，并且只处理 review 里标记为 `y` 的样本，也可以直接用新的总控批处理脚本：
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
+
+TASK_NAME=d_pour_blue \
+REVIEW_JSON=/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint/d_pour_blue/video_review.json \
+REVIEW_MODE=strict \
+INSTRUCTION='pour water' \
+EXPERT_DATA_NUM=auto \
+PI0_OUTPUT_DIR=/home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/d_pour_blue-reviewed-y-smooth \
+bash /home/zaijia001/ssd/RoboTwin/run_reviewed_smooth_repaint_pi0_pipeline.sh
+```
+
+上面这个脚本会自动：
+- 从 `video_review.json` 里找出所有 `label=y` / `usable=true` 的 id
+- 对这些 id 跑 Step 2 smooth
+- 对这些 id 跑 Step 3 smooth repaint
+- 最后用同一个 review-json 在 Step 4 生成 pi0 数据
+
+如果你只想先看会选到哪些 id，不真正执行，可以这样 dry-run：
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
+
+TASK_NAME=d_pour_blue \
+REVIEW_JSON=/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint/d_pour_blue/video_review.json \
+REVIEW_MODE=strict \
+DRY_RUN=1 \
+bash /home/zaijia001/ssd/RoboTwin/run_reviewed_smooth_repaint_pi0_pipeline.sh
+```
+
+如果你想只跑其中某几步，也可以：
+- 只跑 Step 2 + Step 3，不跑 Step 4：`RUN_PI0=0`
+- 跳过 Step 2，只重跑 Step 3 + Step 4：`RUN_SMOOTH=0`
+- 只重跑 Step 4：`RUN_SMOOTH=0 RUN_REPAINT=0`
+
+如果你只想用 Step 4 的包装脚本，也可以：
 
 ```bash
 cd /home/zaijia001/ssd/RoboTwin/policy/pi0

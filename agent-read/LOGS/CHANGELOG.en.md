@@ -5,6 +5,7 @@
 - Added smooth-bundle scripts:
   - `code_painting/smooth_planner_outputs_from_pose_debug.py`
   - `code_painting/batch_smooth_planner_outputs.sh`
+  - `run_reviewed_smooth_repaint_pi0_pipeline.sh`
   - Purpose:
     - remove lingering / near-duplicate frames from the Step-1 planner outputs
     - interpolate key states to smooth jumps
@@ -14,6 +15,8 @@
   - Validation:
     - `python -m py_compile code_painting/smooth_planner_outputs_from_pose_debug.py`
     - `bash -n code_painting/batch_smooth_planner_outputs.sh`
+    - `bash -n run_reviewed_smooth_repaint_pi0_pipeline.sh`
+    - `DRY_RUN=1 bash run_reviewed_smooth_repaint_pi0_pipeline.sh`
     - one-sample output: `/tmp/d_pour_blue_0_smooth_bundle`
 
 - Added script:
