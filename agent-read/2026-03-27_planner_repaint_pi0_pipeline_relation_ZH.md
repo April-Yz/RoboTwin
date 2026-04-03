@@ -1,6 +1,330 @@
 # 2026-03-27：planner -> SAM repaint -> pi0 处理 的前后关系说明
 
-## 1. 这条链路现在推荐怎么理解
+## 1. 完整链路怎么理解（把当前 Step1~4 前面的步骤也补齐）
+
+如果把你现在这一套流程从更上游开始完整串起来，可以按下面这条 **10 段链路** 理解。
+
+其中：
+- 前 6 段是当前 Step1~4 之前的准备链路
+- 后 4 段就是你现在正在实际使用的 `planner -> smooth -> repaint -> pi0`
+
+### Stage A：上游做人手检测 / HaMeR，生成 hand_vis 与 hand_detections
+
+这一段不在 RoboTwin 里实现，但当前链路依赖它的输出。
+
+你在 `usage.sh` 里记录的典型命令是：
+
+```bash
+python /home/zaijia001/ssd/hamer_r1/detect_hands_realr1.py \
+  --data_dir /home/zaijia001/ssd/data/R1/hand/gt_depth/d_pour_blue \
+  --output_dir /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis
+```
+
+它的作用：
+- 输入真人采集序列：
+  - `/home/zaijia001/ssd/data/R1/hand/gt_depth/d_pour_blue`
+- 输出手部检测与可视化：
+  - `/home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis`
+
+这一步的关键下游产物通常包括：
+- `hand_vis_<id>.mp4`
+- `hand_vis_gripper_<id>.mp4`
+- `hand_detections_<id>.npz`
+
+也就是说，后面所有“手关键帧、planner 关键帧选择、手 replay / retarget”都以这里的结果为起点。
+
+### Stage B：上游做 FoundationPose，生成物体轨迹
+
+这一步同样是上游步骤，不在 RoboTwin repo 内部实现，但 `usage.sh` 里记录了当前常用命令。
+
+单物体示例：
+
+```bash
+CUDA_VISIBLE_DEVICES=1 python /home/zaijia001/FoundationPose/run_realr1_dino_sam_batch.py \
+  --data_dir /home/zaijia001/ssd/data/R1/hand/gt_depth/d_pour_blue \
+  --mesh_file /home/zaijia001/ssd/data/R1/hand/obj_mesh/bottle.obj \
+  --output_root /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/obj_vis \
+  --prompt bottle \
+  --save_video 1 \
+  --save_mesh_overlay_video 1 \
+  --save_bbox_overlay_video 1 \
+  --mesh_overlay_alpha 0.45
+```
+
+多物体示例：
+
+```bash
+source /home/zaijia001/FoundationPose/source_foundationpose_env.sh
+cd /home/zaijia001/FoundationPose
+
+CUDA_VISIBLE_DEVICES=2 python run_realr1_dino_sam_batch.py \
+  --data_dir /home/zaijia001/ssd/data/R1/hand/gt_depth/d_pour_blue \
+  --output_root /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/obj_vis_multi \
+  --object bottle=/home/zaijia001/ssd/data/R1/hand/obj_mesh/bottle.obj \
+  --object cup=/home/zaijia001/ssd/data/R1/hand/obj_mesh/cup.obj \
+  --save_video 1 \
+  --save_mesh_overlay_video 1 \
+  --save_bbox_overlay_video 1 \
+  --mesh_overlay_alpha 0.45
+```
+
+这一步的关键下游产物是：
+- `obj_vis/.../poses.npz`
+
+后面的物体 replay 会消费这些 `poses.npz`。
+
+### Stage C：在 RoboTwin 中 replay FoundationPose 物体，同时隐藏机器人并导出 AnyGrasp 用的 RGB-D
+
+这一步就是你提到的：
+- 借助 foundation 的结果
+- 在 **不显示机器人** 的情况下
+- 在 RoboTwin 中 replay 物体
+- 并导出给 AnyGrasp 用的 `head_anygrasp_frames`
+
+当前常用全参数命令是：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_multi_object_pose_r1_npz_batch.sh \
+  /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue_multi_clean/obj_vis \
+  /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_d_pour_blue_norobot \
+  5 \
+  --lighting_mode front_no_shadow \
+  --hide_robot 1 \
+  --save_head_depth 1 \
+  --save_anygrasp_frames 1 \
+  --object bottle=/home/zaijia001/ssd/data/R1/hand/obj_mesh/bottle/bottle.obj \
+  --object cup=/home/zaijia001/ssd/data/R1/hand/obj_mesh/blue_cup/blue_cup.obj
+```
+
+这一步的作用：
+- 消费 FoundationPose 的 `poses.npz`
+- 在 RoboTwin 中把物体重放到统一世界系
+- 隐藏机器人，只保留物体与相机
+- 导出 AnyGrasp 需要的 RGB / depth / camera 数据
+
+关键输出目录：
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_d_pour_blue_norobot/d_pour_blue_<id>/
+```
+
+关键输出文件通常包括：
+- `head_cam_replay.mp4`
+- `head_depth_frames/`
+- `head_anygrasp_frames/`
+- `multi_object_world_poses.npz`
+
+### Stage D：在 RoboTwin 中只 replay 人手逐帧 retarget 得到的 R1 末端执行器轨迹
+
+这一步是你说的“只 replay 人手，逐帧 retarget 得到 R1 机器人 ee pose”。
+
+`usage.sh` 里记录的代表性命令是：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_hand_retarget_r1_npz_urdfik.sh \
+  /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis/hand_detections_1.npz \
+  /home/zaijia001/ssd/RoboTwin/code_painting/output_hand_retarget_swap_red_blue_keep_green \
+  5 \
+  --require_stored_gripper_pose 1 \
+  --pose_source gripper \
+  --orientation_remap_label swap_red_blue_keep_green \
+  --stored_orientation_post_rot_xyz_deg 0 0 0 \
+  --debug_force_orientation none \
+  --enable_viewer 1 \
+  --viewer_wait_at_end 1
+```
+
+无窗口批处理版本（这一类是历史上用于生成 retarget replay 的来源）：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_hand_retarget_r1_npz_urdfik_pool.sh \
+  --variant clean \
+  --workers 2,2,2,3,3,3 \
+  --lighting_mode front_no_shadow \
+  --smooth_mode 1 \
+  --smooth_interp_frames 1
+```
+
+这一步的关键意义：
+- 它给了你一条“人手 -> R1 ee pose / wrist / zed replay”的参考支线
+- 历史上旧版 repaint/pi0 流程大量使用过这条支线
+- 但当前推荐主线已经切换为 planner 同源数据，不再把它当最终 Step4 的状态来源
+
+### Stage E：把 Stage C 产出的无机器人物体 replay 包送到 Luka 服务器，在 AnyGrasp 上生成抓取候选
+
+你在 `usage.sh` 里记录的流程是：
+
+本机侧先打包：
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_d_pour_blue_norobot
+tar -czvf blue_pour_norobot.tar.gz replay_m_obj_pose_d_pour_blue_norobot
+```
+
+Luka 服务器侧解包并运行 AnyGrasp：
+
+```bash
+cd /home/luka/yzj/
+tar -xzvf blue_pour_norobot.tar.gz
+
+cd /home/luka/yzj/anygrasp_sdk/grasp_detection
+conda activate a1_anygrasp
+python run_robotwin_replay_batch.py \
+  --input_root /home/luka/yzj/replay_m_obj_pose_d_pour_blue_norobot \
+  --checkpoint_path log/checkpoint_detection.tar
+
+tar -czvf blue_pour_bg_anygrasp_norobot.tar.gz anygrasp_batch_results
+```
+
+再把 AnyGrasp 结果带回本机后，解包到 RoboTwin 侧使用：
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin/code_painting
+tar -xzvf blue_pour_bg_anygrasp_norobot.tar.gz
+```
+
+最终你在本机上会得到：
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_batch_results/d_pour_blue_<id>/
+  grasps/grasp_000000.json
+  grasps/grasp_000001.json
+  ...
+```
+
+### Stage F：先可视化 AnyGrasp top 候选，再对 hand_vis 标关键帧
+
+你提到这一段顺序上包含两件事：
+1. 先可视化 top 候选（你说过常看 top3）
+2. 再标注 `hand_vis` 的关键帧
+
+这两个动作本质上都是在为后面的 planner 选关键帧 / 选 candidate 做准备。
+
+#### F1. 先看 AnyGrasp top3 候选预览
+
+推荐单样本命令：
+
+```bash
+/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python \
+  /home/zaijia001/ssd/RoboTwin/code_painting/render_anygrasp_ranked_preview.py \
+  --anygrasp_dir /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_batch_results/d_pour_blue_1 \
+  --replay_dir /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_d_pour_blue_norobot/d_pour_blue_1 \
+  --hand_npz /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis/hand_detections_1.npz \
+  --base_image_dir /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_d_pour_blue_norobot/d_pour_blue_1/head_anygrasp_frames \
+  --base_image_mode raw \
+  --output_dir /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_direct_preview_top3/d_pour_blue_1 \
+  --frames 1 22 -10 \
+  --top_k 3 \
+  --left_target_object cup \
+  --right_target_object bottle \
+  --draw_grasp_boxes 1
+```
+
+如果你已经做完关键帧标注，想按 `frame 0 + 标注关键帧` 批量预览，也可以：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_render_anygrasp_ranked_preview_keyframes_batch.sh \
+  /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_batch_results \
+  /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_d_pour_blue_norobot \
+  /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis \
+  /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_direct_preview_keyframes_batch_top3 \
+  --top_k 3 \
+  --left_target_object cup \
+  --right_target_object bottle \
+  --draw_grasp_boxes 1
+```
+
+#### F2. 标注 hand_vis 关键帧
+
+你提到的脚本就是：
+
+```bash
+python3 /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis/annotate_hand_keyframes.py
+```
+
+如果要调播放速度：
+
+```bash
+python3 /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis/annotate_hand_keyframes.py --delay-ms 150
+```
+
+关键输出：
+
+```text
+/home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis/hand_keyframes_all.json
+```
+
+这个 JSON 后面会被 preview / planner 复用。
+
+### Stage G：生成 planner 的 pure-v3 原始执行 bundle（也就是现在 smooth 之前那一步）
+
+你特别提醒了这一点：
+- `smooth` 的前一步，不是泛指 planner
+- 而是你现在正在用的 **v3 planner 输出**
+
+当前推荐的 full command 是：
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
+conda activate RoboTwin_bw
+
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_r1_batch.sh \
+  /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_batch_results \
+  /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_d_pour_blue_norobot \
+  /home/zaijia001/ssd/data/R1/gt_depth_vis/d_pour_blue/hand_vis \
+  /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_realoffset_batch_pure-v3 \
+  --ids 0 \
+  --skip_existing 0 \
+  --reuse_preview_summary_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_direct_preview_keyframes_batch \
+  --reuse_preview_frame_mode annotated_json_keyframes \
+  --reuse_preview_candidate_group orientation \
+  --reuse_preview_top_rank 1 \
+  --arm auto \
+  --execute_both_arms 1 \
+  --planner_backend urdfik \
+  --urdfik_trajectory_mode cartesian_interp_ik \
+  --urdfik_cartesian_interp_steps 20 \
+  --urdfik_cartesian_interp_auto_step_m 0.05 \
+  --candidate_selection_mode planner \
+  --left_target_object cup \
+  --right_target_object bottle \
+  --candidate_target_local_x_offset_m -0.05 \
+  --approach_offset_m 0.20 \
+  --reach_error_pose_source tcp \
+  --replan_until_reached 1 \
+  --replan_until_reached_max_attempts 3 \
+  --save_debug_preview 1 \
+  --save_debug_execution_preview 1 \
+  --reach_pos_tol_m 0.03 \
+  --reach_rot_tol_deg 20 \
+  --enable_grasp_action_object_collision 1 \
+  --grasp_action_object_collision_start_stage pregrasp \
+  --execution_object_collision_mode convex \
+  --execution_object_visual_scale_override cup=0.7 \
+  --execution_object_collision_scale_override cup=0.3 \
+  --execution_object_visual_scale_override bottle=0.7 \
+  --execution_object_collision_scale_override bottle=0.3 \
+  --debug_visualize_targets 1 \
+  --debug_visualize_ik_waypoints 1 \
+  --debug_collision_report 1 \
+  --debug_visualize_object_collision_bbox 1 \
+  --gripper_contact_monitor_mode all_robot_links \
+  --pure_scene_output 1 \
+  --overlay_text 0 \
+  --viewer_show_camera_frustums 0 \
+  --viewer_frame_delay 0.02 \
+  --viewer_wait_at_end 1 \
+  --settle_steps 10 \
+  --joint_target_wait_steps 70 \
+  --disable_table 1 \
+  --base_occluder_enable 0 \
+  --enable_viewer 1
+```
+
+到这里为止，才进入你当前正在使用的后四步。
+
+## 2. 当前关心的主干怎么理解（保留原来的 Step1~4）
 
 保留原来“planner -> repaint -> pi0”的主干结构，但在 Step1 和 Step2 之间插入一个 **smooth 中间步骤**。因此当前更推荐按连续四步理解：
 
