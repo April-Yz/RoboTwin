@@ -1,6 +1,68 @@
 # CHANGELOG.en
 
+## 2026-04-03
+
+- Added smooth-focused documentation:
+  - `agent-read/smooth/README.zh.md`
+  - `agent-read/smooth/README.en.md`
+- Purpose:
+  - document the current smooth-related handling in the AnyGrasp keyframe planner
+  - explain why large `joint_target_wait_steps` can create jump / teleport-like motion in exported videos
+  - summarize practical no-code-change ways to reduce jumps while keeping accuracy, including pros and cons
+- Covered topics:
+  - current path structure: `init -> pregrasp -> grasp -> action`
+  - current offset semantics: `candidate_target_local_x_offset_m=-0.03` and `approach_offset_m=0.08`
+  - current smoothing logic: EE/TCP-pose interpolation followed by per-waypoint IK
+  - existing post-hoc smooth tools:
+    - `code_painting/replay_pose_debug_smooth.py`
+    - `code_painting/smooth_planner_outputs_from_pose_debug.py`
+    - `code_painting/batch_smooth_planner_outputs.sh`
+- Expanded the analysis with new candidate methods:
+  - added a dedicated evaluation of the “sample one EE point every 1 cm + use previous IK solution as the seed + reject the whole segment if adjacent joint deltas exceed a threshold” idea
+  - clarified its relationship to the current `cartesian_interp_ik` mode: the current code already has waypoint IK + previous-seed chaining; what is missing is denser sampling and explicit jump-threshold rejection
+  - added pros/cons and implementation difficulty for several alternatives:
+    - fixed-step dense sampling
+    - position+rotation dual-threshold sampling
+    - joint jump-threshold filtering
+    - soft continuity preferences inside IK
+    - post-IK joint smoothing
+    - extra semantic intermediate poses
+    - switching to global trajectory optimization
+- Expanded again with V7 debug analysis:
+  - explained why accuracy drops without try / replanning: the current system behaves more like a `plan-execute-correct` closed loop than a single-shot open-loop path that fully lands inside tolerance
+  - explained why try improves accuracy but makes the video look more segmented: multiple short corrections inside one stage plus settle tails that are not serialized frame by frame
+  - added a proposed new diagnostic quantity:
+    - lateral distance from the current point to the target forward axis
+    - useful for separating front/back error from lateral miss relative to the intended approach line
+- Implemented the code change in this round:
+  - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - added new breakdown fields:
+    - `lateral_to_forward_axis_m`
+    - `lateral_to_forward_axis_cm`
+  - added new terminal output field:
+    - `lat_cm`
+  - integrated into:
+    - single-arm / dual-arm `plan-request`
+    - single-arm / dual-arm `plan-solution`
+    - single-arm / dual-arm `attempt`
+    - single-arm `attempt-supervision`
+    - `attempt_history` / supervision-error structures
+- Validation:
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/plan_anygrasp_keyframes_r1.py`
+- Validation:
+  - documentation-only task, so no extra code validation command was run
+
 ## 2026-03-27
+
+- Added a raw-planner-v7 -> repaint -> review -> pi0 wrapper script:
+  - `run_planner_v7_repaint_review_pi0.sh`
+  - Purpose:
+    - skip smoothing and directly consume `anygrasp_plan_keyframes_realoffset_batch_pure-v7`
+    - call the original `batch_head_cam_repaint_with_auto_pad.sh`
+    - call `review_repaint_videos.py` for manual filtering
+    - call `process_repainted_planner_outputs.py` to generate pi0 / robotwin processed_data
+  - Validation:
+    - `bash -n run_planner_v7_repaint_review_pi0.sh`
 
 - Added smooth-bundle scripts:
   - `code_painting/smooth_planner_outputs_from_pose_debug.py`

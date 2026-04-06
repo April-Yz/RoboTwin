@@ -1,4 +1,43 @@
+## 2026-04-03 00:00:00 +08
+
+- Added a smooth-handling note: `agent-read/smooth/README.en.md`
+  - Related commands:
+    - `bash code_painting/run_plan_anygrasp_keyframes_r1_batch.sh ...`
+    - `bash code_painting/run_replay_pose_debug_smooth.sh ...`
+    - `bash code_painting/batch_smooth_planner_outputs.sh`
+  - Main arguments discussed:
+    - `--urdfik_trajectory_mode cartesian_interp_ik`
+    - `--urdfik_cartesian_interp_steps`
+    - `--urdfik_cartesian_interp_auto_step_m`
+    - `--settle_steps`
+    - `--joint_target_wait_steps`
+    - `--replan_until_reached`
+    - `--replan_until_reached_max_attempts`
+  - Purpose:
+    - explain the difference between planner smoothing, settle/wait behavior, and post-hoc replay smoothing
+    - record how to balance exported-video smoothness against final execution accuracy without changing code
+  - Expanded this round with:
+    - an evaluation of the strengthened waypoint-IK idea: fixed 1 cm EE sampling + previous-solution seed + joint jump-threshold rejection
+    - a comparison between that idea and the current `cartesian_interp_ik` implementation
+    - a ranked difficulty discussion for several continuity / smoothing improvement options
+    - a V7-debug-specific analysis of the tradeoff among try/replan, `joint_target_wait_steps`, final accuracy, and exported-video smoothness
+    - a new implemented diagnostic metric: lateral distance from the current point to the target forward axis
+    - new output field: `lat_cm`
+
 ## 2026-03-27 00:20:00 +08
+
+- Added raw-planner-v7 wrapper command: `bash run_planner_v7_repaint_review_pi0.sh`
+  - Entry point:
+    - `run_planner_v7_repaint_review_pi0.sh`
+  - Purpose:
+    - run repaint directly on `anygrasp_plan_keyframes_realoffset_batch_pure-v7`
+    - manually review repaint videos
+    - then convert them into pi0 / robotwin processed_data
+  - Key paths:
+    - planner root: `/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_realoffset_batch_pure-v7`
+    - repaint root: `/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint/d_pour_blue_v7`
+    - review json: `/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint/d_pour_blue_v7/video_review.json`
+    - processed_data: `/home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/d_pour_blue-27-planner-v7`
 
 - Added review-driven Step-2+Step-3+Step-4 controller command: `bash run_reviewed_smooth_repaint_pi0_pipeline.sh`
   - Entry point:

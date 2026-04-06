@@ -1,6 +1,68 @@
 # CHANGELOG.zh
 
+## 2026-04-03
+
+- 新增 smooth 专题文档：
+  - `agent-read/smooth/README.zh.md`
+  - `agent-read/smooth/README.en.md`
+- 目的：
+  - 记录 AnyGrasp keyframe planner 当前 smooth 相关处理方式
+  - 梳理 `joint_target_wait_steps` 过大时，为什么导出视频会出现跳变/瞬移感
+  - 在“不改代码”的前提下，总结降低跳变并兼顾精度的可行办法，以及各自优缺点
+- 文档覆盖内容：
+  - 当前路径结构：`init -> pregrasp -> grasp -> action`
+  - 当前常用 offset 语义：`candidate_target_local_x_offset_m=-0.03` 与 `approach_offset_m=0.08`
+  - 当前平滑方式：EE/TCP pose 插值后逐 waypoint 求 IK
+  - 现有 post-hoc smooth 工具：
+    - `code_painting/replay_pose_debug_smooth.py`
+    - `code_painting/smooth_planner_outputs_from_pose_debug.py`
+    - `code_painting/batch_smooth_planner_outputs.sh`
+- 继续补充新方案分析：
+  - 对“每 1cm 采样一个 EE 点 + 前一解作 seed + 相邻 joint 跳变超阈值则整段拒绝”的方案做了专门评估
+  - 明确指出它与当前 `cartesian_interp_ik` 的关系：当前已具备 waypoint IK + previous-seed，缺的是更密采样与显式 jump-threshold 拒绝
+  - 补充了多种备选方案的优缺点与实现难度：
+    - 固定步长密采样
+    - 位置+旋转双阈值采样
+    - joint jump threshold 过滤
+    - IK 软连续性偏好
+    - waypoint IK 后 joint smoothing
+    - 增加语义中间 pose
+    - 切到全局轨迹优化
+- 继续补充 V7 debug 分析：
+  - 说明为什么“不使用 try / replan”时更难到精确位置：当前系统更像 `plan-execute-correct` 闭环，而不是一次 open-loop 就完全到位
+  - 说明为什么 try 能提精度但会让视频更 segmented：阶段内多次短修正 + settle 尾段未逐帧录制
+  - 新增一个建议诊断量：
+    - 点到目标前进轴的横向距离（axis lateral distance）
+    - 用于区分“前后没到位”和“横向偏离目标前进轴”
+- 本轮落实代码改动：
+  - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - 新增误差分解字段：
+    - `lateral_to_forward_axis_m`
+    - `lateral_to_forward_axis_cm`
+  - 新增终端输出字段：
+    - `lat_cm`
+  - 接入范围：
+    - 单臂 / 双臂 `plan-request`
+    - 单臂 / 双臂 `plan-solution`
+    - 单臂 / 双臂 `attempt`
+    - 单臂 `attempt-supervision`
+    - `attempt_history` / supervision error 结构
+- 验证：
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/plan_anygrasp_keyframes_r1.py`
+- 验证：
+  - 文档整理任务，无代码改动，未运行额外脚本验证
+
 ## 2026-03-27
+
+- 新增 raw planner v7 → repaint → review → pi0 串联脚本：
+  - `run_planner_v7_repaint_review_pi0.sh`
+  - 用途：
+    - 不经过 smooth，直接消费 `anygrasp_plan_keyframes_realoffset_batch_pure-v7`
+    - 调用原始 `batch_head_cam_repaint_with_auto_pad.sh`
+    - 调用 `review_repaint_videos.py` 做人工筛选
+    - 调用 `process_repainted_planner_outputs.py` 生成 pi0 / robotwin processed_data
+  - 验证：
+    - `bash -n run_planner_v7_repaint_review_pi0.sh`
 
 - 新增 smooth bundle 脚本：
   - `code_painting/smooth_planner_outputs_from_pose_debug.py`

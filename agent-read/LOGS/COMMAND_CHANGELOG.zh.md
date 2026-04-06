@@ -1,4 +1,43 @@
+## 2026-04-03 00:00:00 +08
+
+- 新增 smooth 处理专题说明：`agent-read/smooth/README.zh.md`
+  - 相关命令：
+    - `bash code_painting/run_plan_anygrasp_keyframes_r1_batch.sh ...`
+    - `bash code_painting/run_replay_pose_debug_smooth.sh ...`
+    - `bash code_painting/batch_smooth_planner_outputs.sh`
+  - 重点参数：
+    - `--urdfik_trajectory_mode cartesian_interp_ik`
+    - `--urdfik_cartesian_interp_steps`
+    - `--urdfik_cartesian_interp_auto_step_m`
+    - `--settle_steps`
+    - `--joint_target_wait_steps`
+    - `--replan_until_reached`
+    - `--replan_until_reached_max_attempts`
+  - 用途：
+    - 解释 planner smooth、settle/wait、post-hoc replay smooth 的区别
+    - 记录如何在不改代码时平衡导出视频观感与末端执行精度
+  - 本轮继续补充：
+    - 评估“固定 1cm EE 采样 + 前一解 seed + joint jump threshold 拒绝”的增强型 waypoint IK 方案
+    - 对比其与当前 `cartesian_interp_ik` 的重合与差异
+    - 补充多种连续性/平滑改进方案的实现难度排序
+    - 结合 V7 debug 命令分析 try/replan 与 `joint_target_wait_steps` 的精度/观感权衡
+    - 记录并实现一个新增误差指标：点到目标前进轴的横向距离（axis lateral distance）
+    - 新增输出字段：`lat_cm`
+
 ## 2026-03-27 00:20:00 +08
+
+- 新增 raw planner v7 串联命令：`bash run_planner_v7_repaint_review_pi0.sh`
+  - 入口：
+    - `run_planner_v7_repaint_review_pi0.sh`
+  - 用途：
+    - 对 `anygrasp_plan_keyframes_realoffset_batch_pure-v7` 直接执行 repaint
+    - 手动 review repaint 视频
+    - 再转成 pi0 / robotwin processed_data
+  - 关键路径：
+    - planner root: `/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_realoffset_batch_pure-v7`
+    - repaint root: `/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint/d_pour_blue_v7`
+    - review json: `/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint/d_pour_blue_v7/video_review.json`
+    - processed_data: `/home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/d_pour_blue-27-planner-v7`
 
 - 新增 review 驱动的 Step2+Step3+Step4 总控命令：`bash run_reviewed_smooth_repaint_pi0_pipeline.sh`
   - 入口：
