@@ -1,3 +1,11 @@
+## 2026-04-27 14:20:00 +08
+
+- Updated the FoundationPose multi-object prompt for star-shaped fruit from `star` to `star fruit` to reduce DINO miss-detections.
+- Synced in:
+  - `agent-read/2026-04-24_piper_hamer_hand_pipeline_ZH.md`
+  - `agent-read/2026-04-24_piper_hamer_hand_pipeline.md`
+  - `/home/zaijia001/ssd/COMMAND_LIBRARY.zh.md`
+
 ## 2026-04-27 13:55:00 +08
 
 - Added FoundationPose preparation and execution commands for Piper:

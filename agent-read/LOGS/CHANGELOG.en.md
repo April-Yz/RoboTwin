@@ -1,5 +1,14 @@
 # CHANGELOG.en
 
+## 2026-04-27 (FoundationPose prompt fix + tmux exit root-cause)
+
+- Conclusion: prompt `star` fails Grounding DINO init on this dataset; `star fruit` enters tracking correctly.
+- Updated command docs:
+  - `agent-read/2026-04-24_piper_hamer_hand_pipeline_ZH.md`
+  - `agent-read/2026-04-24_piper_hamer_hand_pipeline.md`
+  - `/home/zaijia001/ssd/COMMAND_LIBRARY.zh.md`
+- Recorded tmux pane-exit root cause: `set -e` in `source_foundationpose_env.sh` propagates to caller shell and exits pane on non-zero commands.
+
 ## 2026-04-27 (pnp_star_pear: FoundationPose pear+star stage completed)
 
 - Added a Piper-specific FoundationPose preparation script:

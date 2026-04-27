@@ -132,7 +132,7 @@ CUDA_VISIBLE_DEVICES=1 python run_realr1_dino_sam_batch.py \
   --data_dir /home/zaijia001/ssd/data/piper/hand/pnp_star_pear_foundation_input \
   --output_root /home/zaijia001/ssd/data/piper/hand/pnp_star_pear_foundation_vis/obj_vis \
   --object pear=/home/zaijia001/ssd/data/R1/hand/obj_mesh/pear/pear.obj \
-  --object star=/home/zaijia001/ssd/data/R1/hand/obj_mesh/star/star.obj \
+  --object "star fruit=/home/zaijia001/ssd/data/R1/hand/obj_mesh/star/star.obj" \
   --save_video 1 \
   --save_mesh_overlay_video 1 \
   --save_bbox_overlay_video 1 \
@@ -159,7 +159,7 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_multi_object_pose_r1_npz_bat
   --save_head_depth 1 \
   --save_anygrasp_frames 1 \
   --object pear=/home/zaijia001/ssd/data/R1/hand/obj_mesh/pear/pear.obj \
-  --object star=/home/zaijia001/ssd/data/R1/hand/obj_mesh/star/star.obj
+  --object "star fruit=/home/zaijia001/ssd/data/R1/hand/obj_mesh/star/star.obj"
 ```
 
 ---

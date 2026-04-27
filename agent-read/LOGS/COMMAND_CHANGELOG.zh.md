@@ -1,3 +1,11 @@
+## 2026-04-27 14:20:00 +08
+
+- 将 FoundationPose 双物体命令中的星形物体提示词从 `star` 改为 `star fruit`（杨桃），减少 DINO 漏检。
+- 同步更新：
+  - `agent-read/2026-04-24_piper_hamer_hand_pipeline_ZH.md`
+  - `agent-read/2026-04-24_piper_hamer_hand_pipeline.md`
+  - `/home/zaijia001/ssd/COMMAND_LIBRARY.zh.md`
+
 ## 2026-04-27 13:55:00 +08
 
 - 新增 FoundationPose 的 piper 准备与执行命令：

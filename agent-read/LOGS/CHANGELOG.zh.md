@@ -1,5 +1,14 @@
 # CHANGELOG.zh
 
+## 2026-04-27（FoundationPose 提示词修正 + tmux 退出问题定位）
+
+- 结论：`star` 提示词在当前数据上会导致 Grounding DINO 初始化失败；改为 `star fruit` 可正常进入跟踪。
+- 更新文档命令：
+  - `agent-read/2026-04-24_piper_hamer_hand_pipeline_ZH.md`
+  - `agent-read/2026-04-24_piper_hamer_hand_pipeline.md`
+  - `/home/zaijia001/ssd/COMMAND_LIBRARY.zh.md`
+- 记录了 tmux 面板“像被 kill” 的原因：`source_foundationpose_env.sh` 中 `set -e` 会传播到当前 shell，失败时直接退出当前 pane。
+
 ## 2026-04-27（pnp_star_pear：FoundationPose pear+star 阶段补齐）
 
 - 新增 FoundationPose 的 Piper 专用准备脚本：
