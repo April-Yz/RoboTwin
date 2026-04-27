@@ -1,5 +1,416 @@
 # CHANGELOG.zh
 
+## 2026-04-27（pnp_star_pear：FoundationPose pear+star 阶段补齐）
+
+- 新增 FoundationPose 的 Piper 专用准备脚本：
+  - `/home/zaijia001/FoundationPose/prepare_piper_for_foundationpose.py`
+- 新增 FoundationPose 的 pear+star 专用运行脚本：
+  - `/home/zaijia001/FoundationPose/run_piper_star_pear_foundation.sh`
+- 更新流程文档：
+  - `agent-read/2026-04-24_piper_hamer_hand_pipeline_ZH.md`
+  - `agent-read/2026-04-24_piper_hamer_hand_pipeline.md`
+- 新增并补全了“HaMeR -> FoundationPose(pear+star) -> RoboTwin 回放”的完整命令链。
+- 验证：
+  - 已将 `pnp_star_pear` 的 16 个 episode 转换到 `pnp_star_pear_foundation_input`（含 `depth_<id>/*.npy` metric depth）。
+
+## 2026-04-16（标定场景脚本新增 viewer 支持）
+
+- 更新 `code_painting/pika/visualize_calibrated_piper_pika_scene.py`
+- 更新 `code_painting/pika/visualize_calibrated_piper_pika_scene_vb.py`
+- 新增交互 viewer 参数：
+  - `--viewer 1`
+  - `--viewer-camera overview|head`
+- 修复了之前 `unrecognized arguments: --viewer 1` 的问题。
+- 同步更新了命令库文档，补充标定场景的 viewer 命令。
+
+
+## 2026-04-24（Piper 新手部数据 -> HaMeR -> RoboTwin 文档补全）
+
+- 新增文档：
+  - `agent-read/2026-04-24_piper_hamer_hand_pipeline_ZH.md`
+  - `agent-read/2026-04-24_piper_hamer_hand_pipeline.md`
+- 更新索引：
+  - `agent-read/README.md`（加入新文档链接）
+- 记录了针对新数据结构（`episode*/camera/color|depth/headD435`）的完整操作链路：
+  - 数据转换为 `rgb_<id>.mp4/depth_<id>.mp4/params_<id>.json`
+  - HaMeR 检测输出 `hand_detections_<id>.npz`
+  - 可视化检查 `hand_vis_<id>.mp4`
+  - RoboTwin 下游回放入口命令
+- 验证：
+  - `video_id=0` 已生成 `hand_vis_0.mp4` 与 `hand_vis_gripper_0.mp4`
+
+## 2026-04-16（head cam / wrist 指令说明补充）
+
+- 更新 `agent-read/COMMANDS/pika_scene_commands.en.md`
+- 更新 `agent-read/COMMANDS/pika_scene_commands.zh.md`
+- 明确了哪些命令会导出 head cam 视角图。
+- 明确了当前标定场景脚本还没有 wrist 视角导出能力。
+
+
+## 2026-04-16（viewer/head cam 说明补充）
+
+- 更新 `agent-read/COMMANDS/pika_scene_commands.en.md`
+- 更新 `agent-read/COMMANDS/pika_scene_commands.zh.md`
+- 补充说明：
+  - 标定场景脚本确实使用了 calibration bundle 来放置第二台机械臂和 head cam
+  - head cam 在总览图里目前只是一个较小的 marker 加 RGB 坐标轴，所以不一定一眼能看出来
+  - 目前只有手动桌面场景脚本支持交互 viewer 模式
+
+
+## 2026-04-16（pika 指令库 + base 长在桌侧原因分析）
+
+- 在 `agent-read/COMMANDS/` 下新增指令库文档：
+  - `README.en.md`
+  - `README.zh.md`
+  - `pika_scene_commands.en.md`
+  - `pika_scene_commands.zh.md`
+- 新增了可直接复制的命令，覆盖：
+  - 手动桌面场景的交互 viewer 运行
+  - 手动桌面场景的离屏重导出
+  - 标定场景导出
+  - 标定 version-B 场景导出
+- 分析了为什么 version-B 里 base 看起来长在桌子侧面：
+  - version B 把桌子的约定旋转了 90 度
+  - 然后又把之前手动内缩量复用成了 world-x 内缩
+  - 所以 base 会有意靠近旋转后桌子的侧面，而不是原先理解中的前边缘
+
+
+## 2026-04-16（标定场景 Version B）
+
+- 在 `code_painting/pika/` 下实现了 version B 对齐方式：
+  - 去掉第一台机械臂原先手动加的 +90° 锚定旋转
+  - 尽量保持标定里的左右分离继续对齐到 world y
+  - 通过旋转桌子约定，而不是旋转锚定机械臂，来适配场景
+- 新增脚本：
+  - `code_painting/pika/visualize_calibrated_piper_pika_scene_vb.py`
+- 生成输出：
+  - `code_painting/pika/output_calibrated_scene_vb/calibrated_scene_vb_overview.png`
+  - `code_painting/pika/output_calibrated_scene_vb/calibrated_scene_vb_overview.mp4`
+  - `code_painting/pika/output_calibrated_scene_vb/calibrated_scene_vb_headcam.png`
+- 明确记录了 `robot_config_PiperPika_agx_dual_table.json` 中哪些字段在 version B 中被复用，哪些被有意忽略。
+
+
+## 2026-04-16（在 code_painting/pika 下重建真实标定场景）
+
+- 读取了真实场景标定输入：
+  - `CALIBRATION_TRANSFORMS_README.md`
+  - `calibration_bundle_try2.json`
+- 在 `code_painting/pika/` 下重建了一个模拟场景，使用：
+  - 第一台机械臂 = `robot_config_PiperPika_agx_dual_table.json` 中当前手动调好的桌面摆位
+  - 第二台机械臂 = `left_base_T_right_base`
+  - head camera = `left_base_T_head_camera`
+- 新增脚本：
+  - `code_painting/pika/visualize_calibrated_piper_pika_scene.py`
+- 生成输出：
+  - `code_painting/pika/output_calibrated_scene/calibrated_scene_overview.png`
+  - `code_painting/pika/output_calibrated_scene/calibrated_scene_overview.mp4`
+  - `code_painting/pika/output_calibrated_scene/calibrated_scene_headcam.png`
+- 验证时打印了 left base、right base、head camera 的世界位姿。
+
+
+## 2026-04-16（桌边安装修正）
+
+- 确认之前的双臂桌边配置其实并没有固定在桌面上：
+  - 桌子长边边线在 `y = -0.30`
+  - 机器人 base 在 `y = -0.60`
+  - 所以虽然 `z = 0.75` 和桌面高度一致，但平面位置仍在桌外
+- 更新 `robot_config_PiperPika_agx_dual_table.json`
+  - 将共享 base pose 的 `y` 从 `-0.60` 改成 `-0.30`
+  - 保留已经修正好的朝向四元数
+- 新的验证 base pose：
+  - 左 `[-0.30, -0.30, 0.75]`
+  - 右 `[0.30, -0.30, 0.75]`
+- 生成桌边安装预览：
+  - `code_painting/output_piper_pika_agx_dual_table_edge_mount/piper_pika_agx_dual_table_edge_mount.png`
+  - `code_painting/output_piper_pika_agx_dual_table_edge_mount/piper_pika_agx_dual_table_edge_mount.mp4`
+
+
+## 2026-04-16（双臂桌边朝向与斜视相机修正）
+
+- 检查了 RoboTwin 中现有的 UR 风格相机参考：
+  - `code_painting/replay_piper_dual_h5.py` 使用固定的 overview/head camera fallback
+  - `code_painting/render_hand_retarget_r1_npz.py` 的第三视角是根据机器人前向和世界上方向构造的
+- 定位了桌边布局的朝向问题：
+  - 之前配置使用单位四元数 `[1, 0, 0, 0]`
+  - 这会让机械臂正前方沿 `+x`，也就是平行于桌子长边
+  - 这与“从桌子长边一侧伸向桌面操作物体”的目标不一致
+- 修正 `robot_config_PiperPika_agx_dual_table.json`
+  - 将 base 四元数改为 `[0.70710678, 0.0, 0.0, 0.70710678]`
+  - 两个机械臂现在都朝向 `+y`
+- 更新 `code_painting/visualize_piper_pika_agx_dual_table.py`
+  - 把 oblique 视角修正为位于机械臂后方、朝桌面看的正常斜视角
+- 生成修正后的输出：
+  - `code_painting/output_piper_pika_agx_dual_table_oblique_fixed/piper_pika_agx_dual_table_oblique_fixed.png`
+  - `code_painting/output_piper_pika_agx_dual_table_oblique_fixed/piper_pika_agx_dual_table_oblique_fixed.mp4`
+  - `code_painting/output_piper_pika_agx_dual_table_topdown_fixed/piper_pika_agx_dual_table_topdown_fixed.png`
+  - `code_painting/output_piper_pika_agx_dual_table_topdown_fixed/piper_pika_agx_dual_table_topdown_fixed.mp4`
+
+
+## 2026-04-16（双臂桌边俯视相机调整）
+
+- 进一步明确了双臂 Piper+Pika 桌边布局解释：
+  - 两个机械臂位于桌子同一条长边外侧
+  - 两个 base 分别距离左右短边 0.30 m
+  - 两个 base 之间间距为 0.60 m
+- 更新 `code_painting/visualize_piper_pika_agx_dual_table.py`
+  - 新增 `--camera-mode {top_down,oblique}`
+  - 临时俯视相机放在两个 base 中点上方，直接向下看桌面
+- 生成临时俯视输出：
+  - `code_painting/output_piper_pika_agx_dual_table_topdown/piper_pika_agx_dual_table_topdown.png`
+  - `code_painting/output_piper_pika_agx_dual_table_topdown/piper_pika_agx_dual_table_topdown.mp4`
+- 验证：
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python code_painting/visualize_piper_pika_agx_dual_table.py --offscreen-only 1 --camera-mode top_down --output-dir code_painting/output_piper_pika_agx_dual_table_topdown --image-name piper_pika_agx_dual_table_topdown.png --video-name piper_pika_agx_dual_table_topdown.mp4`
+
+
+## 2026-04-16（piper_pika_agx 双臂桌边布局）
+
+- 新增一个彩色版 Piper+Pika 组合 embodiment：
+  - `assets/embodiments/piper_pika_agx/piper_pika_agx.urdf`
+- 这个新组合使用：
+  - Piper 手臂：原始 DAE 版本
+  - Pika 夹爪：来自 `agx_arm_sim` 的 `pika2_gripper.urdf` + DAE mesh
+- 新增适用于 120x60x75 cm 桌子的双臂布局配置：
+  - `robot_config_PiperPika_agx_dual_table.json`
+- 本轮采用的布局假设：
+  - 对称的 UR 风格左右拆分
+  - 分裂前共享 base pose：`[0.0, -0.60, 0.75]`
+  - `embodiment_dis = 0.60`
+  - 实际左右 base：
+    - 左 `[-0.30, -0.60, 0.75]`
+    - 右 `[0.30, -0.60, 0.75]`
+- 新增预览脚本：
+  - `code_painting/visualize_piper_pika_agx_dual_table.py`
+- 生成输出：
+  - `code_painting/output_piper_pika_agx_dual_table/piper_pika_agx_dual_table.png`
+  - `code_painting/output_piper_pika_agx_dual_table/piper_pika_agx_dual_table.mp4`
+- 验证：
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python code_painting/visualize_piper_pika_agx_dual_table.py --offscreen-only 1`
+
+
+## 2026-04-16（agx_arm_sim 新来源检查）
+
+- 检查了新引入的仓库：
+  - `/home/zaijia001/Downloads/agx_arm_sim`
+- 确认：
+  - `ros2 launch agx_arm_description display.launch.py arm_type:=piper end_effector:=pika`
+  - 实际路由到的是 **Piper + Pika** 组合模型
+- 发现一个关键仓库状态问题：
+  - 当前 checkout 里的 `agx_arm_description/agx_arm_urdf/` 是空目录
+  - 因而 xacro 引用的 Piper 手臂资源并不完整地包含在这份仓库快照里
+- 确认新的 `pika2_gripper.urdf` 使用的是带内嵌颜色/材质信息的 DAE mesh
+- 新增预览脚本：
+  - `code_painting/visualize_agx_arm_sim_source.py`
+- 生成预览输出：
+  - `code_painting/output_agx_arm_sim_preview/piper_only.png`
+  - `code_painting/output_agx_arm_sim_preview/piper_only.mp4`
+  - `code_painting/output_agx_arm_sim_preview/pika_only.png`
+  - `code_painting/output_agx_arm_sim_preview/pika_only.mp4`
+  - `code_painting/output_agx_arm_sim_preview/piper_pika_combo.png`
+  - `code_painting/output_agx_arm_sim_preview/piper_pika_combo.mp4`
+- 验证：
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python code_painting/visualize_agx_arm_sim_source.py --target all --output-root code_painting/output_agx_arm_sim_preview --video-frames 36 --fps 12`
+
+
+## 2026-04-16（Piper 颜色诊断与量化）
+
+- 新增一轮只做诊断、不改代码的整理，针对当前观察：
+  - 原始 Piper 单独显示为灰色
+  - 原始 Pika 单独显示为白色
+  - 组合 `piper_pika` 后整体发白
+- 确认了源证据：
+  - Piper 的 DAE 内含深灰 diffuse（`0.113725 0.113725 0.113725`）
+  - 组合版 `piper_pika.urdf` 中 Piper 手臂 link 仍保留显式浅色 URDF material（`rgba="0.792156862745098 0.819607843137255 0.933333333333333 1"`）
+- 增加了渲染图像颜色的近似统计，对比：
+  - 原始 Piper 亮灯光
+  - 原始 Piper 暗灯光
+  - 组合版亮灯光
+  - 组合版暗灯光
+- 主要结论：
+  - 用户的总结是对的：Piper 原始灰色来自 DAE，而组合后发白极可能是被 URDF material 覆盖
+
+
+## 2026-04-16（暗灯光分步验证）
+
+- 新增了一轮暗灯光分步验证，分别检查：
+  - 原始 Piper 手臂
+  - 原始 Pika gripper
+  - 组合后的 `piper_pika`
+- 新增/更新脚本：
+  - `code_painting/visualize_original_source_urdfs.py` 现在支持 `--lighting {bright,dark}`
+  - `code_painting/visualize_piper_pika_single.py` 已支持 `--lighting {bright,dark}`
+- 生成输出：
+  - `code_painting/output_original_source_urdf_preview_dark/piper_arm.png`
+  - `code_painting/output_original_source_urdf_preview_dark/piper_arm.mp4`
+  - `code_painting/output_original_source_urdf_preview_dark/pika_gripper.png`
+  - `code_painting/output_original_source_urdf_preview_dark/pika_gripper.mp4`
+  - `code_painting/output_piper_pika_preview_dark/piper_pika_dark.png`
+  - `code_painting/output_piper_pika_preview_dark/piper_pika_dark.mp4`
+- 主要结论：
+  - 组合模型发白的主要原因，很可能不是单纯灯光，而是 `assets/embodiments/piper_pika/piper_pika.urdf` 中 Piper 手臂 link 仍保留了显式的浅色 URDF material 覆盖
+
+
+## 2026-04-16（piper_pika 暗灯光预览）
+
+- 更新 `code_painting/visualize_piper_pika_single.py`，支持两种灯光预设：
+  - `bright`
+  - `dark`
+- 为当前组合模型（有色 Piper 手臂 + 白色 Pika 夹爪）生成了一套暗灯光预览：
+  - `code_painting/output_piper_pika_preview_dark/piper_pika_dark.png`
+  - `code_painting/output_piper_pika_preview_dark/piper_pika_dark.mp4`
+- 目的：
+  - 降低过亮环境，便于观察 Piper 手臂更接近原始的深灰外观
+- 验证：
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python code_painting/visualize_piper_pika_single.py --offscreen-only 1 --lighting dark --output-dir code_painting/output_piper_pika_preview_dark --image-name piper_pika_dark.png --video-name piper_pika_dark.mp4 --video-frames 36 --fps 12`
+
+
+## 2026-04-16（原始源 URDF 预览对比）
+
+- 新增 `code_painting/visualize_original_source_urdfs.py`，用于直接预览下载目录中的原始源 URDF。
+- 测试对象：
+  - `/home/zaijia001/Downloads/agx_arm_urdf/piper/urdf/piper_description.urdf`
+  - `/home/zaijia001/Downloads/pika_ros/src/pika_gripper_description/urdf/pika_gripper_description.urdf`
+- 生成输出：
+  - `code_painting/output_original_source_urdf_preview/piper_arm.png`
+  - `code_painting/output_original_source_urdf_preview/piper_arm.mp4`
+  - `code_painting/output_original_source_urdf_preview/pika_gripper.png`
+  - `code_painting/output_original_source_urdf_preview/pika_gripper.mp4`
+- 目的：
+  - 在继续修改组装版本前，先比较原始 Piper 手臂和原始 Pika gripper 的外观
+  - 验证发白现象是否来自原始源资产本身
+- 验证：
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python code_painting/visualize_original_source_urdfs.py --target both --output-root code_painting/output_original_source_urdf_preview --video-frames 30 --fps 12`
+
+
+## 2026-04-16（piper_pika DAE 颜色恢复）
+
+- 将组装后的 `assets/embodiments/piper_pika/piper_pika.urdf` 中手臂 visual mesh 切回 DAE，以尽量恢复原始 Piper 手臂外观。
+- 新增复制的 DAE 资源目录：
+  - `assets/embodiments/piper_pika/meshes/dae/*`
+- 颜色来源结论：
+  - 原始 Piper 手臂颜色看起来是嵌在 `/home/zaijia001/Downloads/agx_arm_urdf/piper/meshes/dae/` 下的 Collada DAE 文件里
+  - 当前检查到的 Pika gripper 源码树中，没有发现 DAE/OBJ/MTL/纹理资源，只发现 STL mesh 和 URDF 里写死的白色 material
+- 生成了新的基于 DAE 的预览输出：
+  - `code_painting/output_piper_pika_preview_dae/piper_pika_preview.png`
+  - `code_painting/output_piper_pika_preview_dae/piper_pika_preview.mp4`
+- 验证：
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python code_painting/visualize_piper_pika_single.py --offscreen-only 1 --output-dir code_painting/output_piper_pika_preview_dae --video-frames 24 --fps 12`
+
+
+## 2026-04-16（piper_pika 预览导出）
+
+- 增强了 `code_painting/visualize_piper_pika_single.py`。
+- 新增功能：
+  - 一个能完整拍到单臂的固定预览相机位姿
+  - 静态图片导出
+  - 带小幅关节动作的短视频导出
+- 默认输出：
+  - `code_painting/output_piper_pika_preview/piper_pika_preview.png`
+  - `code_painting/output_piper_pika_preview/piper_pika_preview.mp4`
+- 验证：
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/visualize_piper_pika_single.py`
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python code_painting/visualize_piper_pika_single.py --offscreen-only 1 --video-frames 24 --fps 12`
+  - 已确认两份预览文件成功写出
+
+
+## 2026-04-16
+
+- 在原有 assets 目录下新增了一个独立组装的 URDF：
+  - `assets/embodiments/piper_pika/piper_pika.urdf`
+  - `assets/embodiments/piper_pika/meshes/*`
+- 输入来源：
+  - 手臂 URDF/mesh 来自 `/home/zaijia001/Downloads/agx_arm_urdf/piper/`
+  - 夹爪 URDF/mesh 来自 `/home/zaijia001/Downloads/pika_ros/src/pika_gripper_description/`
+- 组装说明：
+  - 以现成的组合参考 `piper_pika_gripper_description.urdf` 为起点
+  - 将 package mesh URI 转换成本地相对 `meshes/...` 路径
+  - 将 robot 名称改为 `piper_pika`
+  - 将 `dummy_link` 重命名为 `piper_pika_dummy_link`
+  - 将 `gripper_base` 重命名为 `pika_gripper_base`
+  - 将所需手臂与夹爪 mesh 复制到了新 embodiment 文件夹中
+- 新增了一个最小单臂可视化脚本：
+  - `code_painting/visualize_piper_pika_single.py`
+- 验证：
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/visualize_piper_pika_single.py`
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python code_painting/visualize_piper_pika_single.py --offscreen-only 1`
+  - 离屏加载确认 active joints：
+    - `joint1 joint2 joint3 joint4 joint5 joint6 joint7 joint8`
+- 仓库说明：
+  - 当前 `.gitignore` 忽略了 `assets/*`，所以新的 embodiment 文件已在本地创建，但不会出现在 `git status` 中
+
+
+## 2026-04-14（Piper V2 batch 修复）
+
+- 修复了 `code_painting/plan_anygrasp_keyframes_piper_v2_batch.py` 的 Piper V2 batch 参数污染问题。
+- 根因：
+  - 复用的 `plan_anygrasp_keyframes_r1_batch.py` parser 仍然会给出默认 `--robot_config robot_config_R1.json`
+  - 导致 batch 模式启动 Piper V2 单视频脚本时，显式传入了 R1 config，因此 viewer/rendering 仍然表现成 R1 风格
+- 修复方式：
+  - 在调用复用的 batch launcher 前，先注入 Piper 默认参数：
+    - `--robot_config /home/zaijia001/ssd/RoboTwin/robot_config_Piper_dual_v2.json`
+    - `--head_camera_local_quat_wxyz 1.0 0.0 0.0 0.0`
+    - `--head_camera_local_pos 0.0 0.0 0.0`
+- 验证：
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/plan_anygrasp_keyframes_piper_v2_batch.py`
+  - 命令探针确认 batch 打印出的命令现在包含：
+    - `--robot_config /home/zaijia001/ssd/RoboTwin/robot_config_Piper_dual_v2.json`
+    - `--head_camera_local_quat_wxyz 1.0 0.0 0.0 0.0`
+
+
+## 2026-04-14
+
+- 新增一个真正的 Piper V2 双臂风格实现，仿照现有 UR 的双单臂拼接方式，且不修改任何 R1 / R1 Pro 文件。
+- 新增文件：
+  - `robot_config_Piper_dual_v2.json`
+  - `code_painting/replay_piper_dual_h5.py`
+  - `code_painting/render_hand_retarget_piper_dual_npz_urdfik.py`
+  - `code_painting/plan_anygrasp_keyframes_piper_v2.py`
+  - `code_painting/plan_anygrasp_keyframes_piper_v2_batch.py`
+  - `code_painting/run_plan_anygrasp_keyframes_piper_v2_batch.sh`
+  - `agent-read/V2.0_piper_dual_ur_style.md`
+  - `agent-read/V2.0_piper_dual_ur_style_ZH.md`
+- V2 实现说明：
+  - 使用 `dual_arm_embodied=false`，加载两个独立的 Piper URDF 实例
+  - 保留 left/right 各自独立的 base pose，不再把两臂压回同一个 root pose
+  - 新增独立的 Piper replay renderer 与 Piper URDFIK renderer
+  - 左右 URDF 加载与 IK 都使用 `assets/embodiments/piper/piper.urdf`
+  - 已验证实际 base pose：
+    - left = `[-0.4, -0.65, 0.72]`
+    - right = `[0.4, -0.65, 0.72]`
+- 验证：
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/replay_piper_dual_h5.py code_painting/render_hand_retarget_piper_dual_npz_urdfik.py code_painting/plan_anygrasp_keyframes_piper_v2.py code_painting/plan_anygrasp_keyframes_piper_v2_batch.py`
+  - `bash -n code_painting/run_plan_anygrasp_keyframes_piper_v2_batch.sh`
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python code_painting/plan_anygrasp_keyframes_piper_v2.py --help`
+  - 直接配置探针确认：
+    - `left_urdf_path=./assets/embodiments/piper/piper.urdf`
+    - `right_urdf_path=./assets/embodiments/piper/piper.urdf`
+    - `left_origin=[-0.4, -0.65, 0.72]`
+    - `right_origin=[0.4, -0.65, 0.72]`
+  - renderer 探针确认：
+    - `[piper-v2-bases] left=[-0.4, -0.65, 0.72] right=[0.4, -0.65, 0.72]`
+
+
+## 2026-04-14
+
+- 新增一个兼容 Piper 的 AnyGrasp planner 包装层，不修改原有 R1 / R1 Pro planner 文件。
+- 新增文件：
+  - `robot_config_Piper_dual.json`
+  - `code_painting/plan_anygrasp_keyframes_piper.py`
+  - `code_painting/plan_anygrasp_keyframes_piper_batch.py`
+  - `code_painting/run_plan_anygrasp_keyframes_piper_batch.sh`
+  - `agent-read/2026-04-14_piper_anygrasp_wrapper.md`
+  - `agent-read/2026-04-14_piper_anygrasp_wrapper_ZH.md`
+- 实现方式：
+  - 保持 `plan_anygrasp_keyframes_r1.py` 原始执行链不变
+  - 在运行时注入 Piper robot config
+  - 将 replay / URDFIK renderer 切换为 Piper 专用适配类
+  - URDF IK 使用 `assets/embodiments/piper/piper.urdf`
+  - 为了兼容现有 left/right 双执行结构，当前将其映射为两个 Piper 实例
+- 验证：
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/plan_anygrasp_keyframes_piper.py code_painting/plan_anygrasp_keyframes_piper_batch.py`
+  - `bash -n code_painting/run_plan_anygrasp_keyframes_piper_batch.sh`
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python code_painting/plan_anygrasp_keyframes_piper.py --help`
+
+
 ## 2026-04-03
 
 - 新增 smooth 专题文档：
@@ -47,6 +458,14 @@
     - 单臂 / 双臂 `attempt`
     - 单臂 `attempt-supervision`
     - `attempt_history` / supervision error 结构
+- 继续补充一种不改现有主链的设计方向：
+  - 在物体坐标系里表达人手相对位姿 `T_obj_hand_demo`
+  - 再通过机器人专用修正 `Δ_robot` 生成更可执行的机器人 target
+  - 推荐把这层做成独立 target adapter，而不是直接改 IK solver 核心
+  - 建议优先尝试：
+    - 常量刚体修正
+    - 分阶段修正
+    - 物体类别/尺寸自适应修正
 - 验证：
   - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/plan_anygrasp_keyframes_r1.py`
 - 验证：

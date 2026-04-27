@@ -27,6 +27,8 @@ Only stages 2, 4, and 5 are implemented in this repo. Stages 1 and 3 are upstrea
 - AnyGrasp IK/execution logic (ZH): [V1.9_anygrasp_ik_execution_logic_ZH.md](/home/zaijia001/ssd/RoboTwin/agent-read/V1.9_anygrasp_ik_execution_logic_ZH.md)
 - AnyGrasp target-pose offset: [V1.11_anygrasp_target_pose_offset.md](/home/zaijia001/ssd/RoboTwin/agent-read/V1.11_anygrasp_target_pose_offset.md)
 - AnyGrasp target-pose offset (ZH): [V1.11_anygrasp_target_pose_offset_ZH.md](/home/zaijia001/ssd/RoboTwin/agent-read/V1.11_anygrasp_target_pose_offset_ZH.md)
+- Piper -> HaMeR -> RoboTwin hand pipeline (new): [2026-04-24_piper_hamer_hand_pipeline.md](/home/zaijia001/ssd/RoboTwin/agent-read/2026-04-24_piper_hamer_hand_pipeline.md)
+- Piper -> HaMeR -> RoboTwin hand pipeline (ZH): [2026-04-24_piper_hamer_hand_pipeline_ZH.md](/home/zaijia001/ssd/RoboTwin/agent-read/2026-04-24_piper_hamer_hand_pipeline_ZH.md)
 
 ## Current State
 

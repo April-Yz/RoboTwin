@@ -1,5 +1,416 @@
 # CHANGELOG.en
 
+## 2026-04-27 (pnp_star_pear: FoundationPose pear+star stage completed)
+
+- Added a Piper-specific FoundationPose preparation script:
+  - `/home/zaijia001/FoundationPose/prepare_piper_for_foundationpose.py`
+- Added a dedicated pear+star FoundationPose runner:
+  - `/home/zaijia001/FoundationPose/run_piper_star_pear_foundation.sh`
+- Updated workflow docs:
+  - `agent-read/2026-04-24_piper_hamer_hand_pipeline_ZH.md`
+  - `agent-read/2026-04-24_piper_hamer_hand_pipeline.md`
+- Added full command chain for "HaMeR -> FoundationPose(pear+star) -> RoboTwin replay".
+- Validation:
+  - converted all 16 episodes into `pnp_star_pear_foundation_input` (with metric `depth_<id>/*.npy`).
+
+## 2026-04-16 (added viewer support for calibrated scene scripts)
+
+- Updated `code_painting/pika/visualize_calibrated_piper_pika_scene.py`
+- Updated `code_painting/pika/visualize_calibrated_piper_pika_scene_vb.py`
+- Added interactive viewer support:
+  - `--viewer 1`
+  - `--viewer-camera overview|head`
+- This fixes the previous error: `unrecognized arguments: --viewer 1`.
+- Updated command-library docs to include calibrated-scene viewer commands.
+
+
+## 2026-04-24 (Piper hand dataset -> HaMeR -> RoboTwin documentation refresh)
+
+- Added docs:
+  - `agent-read/2026-04-24_piper_hamer_hand_pipeline_ZH.md`
+  - `agent-read/2026-04-24_piper_hamer_hand_pipeline.md`
+- Updated index:
+  - `agent-read/README.md` (new links added)
+- Documented the full runnable path for the new dataset layout (`episode*/camera/color|depth/headD435`):
+  - convert to `rgb_<id>.mp4/depth_<id>.mp4/params_<id>.json`
+  - run HaMeR to produce `hand_detections_<id>.npz`
+  - visualize with `hand_vis_<id>.mp4`
+  - run RoboTwin downstream replay command
+- Validation:
+  - `video_id=0` produced `hand_vis_0.mp4` and `hand_vis_gripper_0.mp4`
+
+## 2026-04-16 (command-library clarification for headcam/wrist)
+
+- Updated `agent-read/COMMANDS/pika_scene_commands.en.md`
+- Updated `agent-read/COMMANDS/pika_scene_commands.zh.md`
+- Clarified exactly which commands export head-cam images.
+- Clarified that wrist-view export is not implemented yet in the calibrated-scene scripts.
+
+
+## 2026-04-16 (command-doc update for viewer/headcam clarification)
+
+- Updated `agent-read/COMMANDS/pika_scene_commands.en.md`
+- Updated `agent-read/COMMANDS/pika_scene_commands.zh.md`
+- Clarified that:
+  - calibrated scene scripts do use the calibration bundle for the second robot and head camera
+  - the head camera may be hard to notice in the overview because it is currently rendered only as a small marker with RGB axes
+  - only the manual tabletop script currently supports interactive viewer mode
+
+
+## 2026-04-16 (pika command library + base-on-side analysis)
+
+- Added command-library docs under `agent-read/COMMANDS/`:
+  - `README.en.md`
+  - `README.zh.md`
+  - `pika_scene_commands.en.md`
+  - `pika_scene_commands.zh.md`
+- Added copyable commands for:
+  - interactive viewer runs of the manual tabletop scene
+  - offscreen re-export of manual tabletop previews
+  - calibrated scene export
+  - calibrated version-B export
+- Analyzed why the version-B bases look attached to the table side:
+  - version B rotates the table convention by 90 degrees
+  - then reuses the previous manual inset magnitude as world-x inset
+  - so the bases are intentionally placed close to the rotated table side face rather than the former front edge
+
+
+## 2026-04-16 (calibrated scene version B)
+
+- Implemented version B scene alignment under `code_painting/pika/`:
+  - removed the earlier +90deg anchor rotation on the first robot
+  - kept the calibration left/right spread aligned with world y as much as possible
+  - rotated the table convention instead of rotating the anchor robot
+- Added script:
+  - `code_painting/pika/visualize_calibrated_piper_pika_scene_vb.py`
+- Generated outputs:
+  - `code_painting/pika/output_calibrated_scene_vb/calibrated_scene_vb_overview.png`
+  - `code_painting/pika/output_calibrated_scene_vb/calibrated_scene_vb_overview.mp4`
+  - `code_painting/pika/output_calibrated_scene_vb/calibrated_scene_vb_headcam.png`
+- Explicitly documented which fields from `robot_config_PiperPika_agx_dual_table.json` are reused and which are intentionally ignored in version B.
+
+
+## 2026-04-16 (calibrated real-scene reconstruction in code_painting/pika)
+
+- Read real-scene calibration inputs:
+  - `CALIBRATION_TRANSFORMS_README.md`
+  - `calibration_bundle_try2.json`
+- Reconstructed a simulated scene under `code_painting/pika/` using:
+  - first robot = current manual tabletop placement from `robot_config_PiperPika_agx_dual_table.json`
+  - second robot = `left_base_T_right_base`
+  - head camera = `left_base_T_head_camera`
+- Added script:
+  - `code_painting/pika/visualize_calibrated_piper_pika_scene.py`
+- Generated outputs:
+  - `code_painting/pika/output_calibrated_scene/calibrated_scene_overview.png`
+  - `code_painting/pika/output_calibrated_scene/calibrated_scene_overview.mp4`
+  - `code_painting/pika/output_calibrated_scene/calibrated_scene_headcam.png`
+- Validation printed derived world poses for left base, right base, and head camera.
+
+
+## 2026-04-16 (edge-mount base correction)
+
+- Confirmed that the previous dual-table configuration was not mounted on the tabletop:
+  - table long-edge line was `y = -0.30`
+  - robot bases were at `y = -0.60`
+  - so the bases were outside the table even though `z = 0.75` matched tabletop height
+- Updated `robot_config_PiperPika_agx_dual_table.json`
+  - moved the shared base pose from `y = -0.60` to `y = -0.30`
+  - kept the corrected tabletop-facing quaternion
+- New validated base poses:
+  - left `[-0.30, -0.30, 0.75]`
+  - right `[0.30, -0.30, 0.75]`
+- Generated edge-mounted preview:
+  - `code_painting/output_piper_pika_agx_dual_table_edge_mount/piper_pika_agx_dual_table_edge_mount.png`
+  - `code_painting/output_piper_pika_agx_dual_table_edge_mount/piper_pika_agx_dual_table_edge_mount.mp4`
+
+
+## 2026-04-16 (dual table orientation + oblique camera fix)
+
+- Checked the existing UR-style camera reference in RoboTwin:
+  - `code_painting/replay_piper_dual_h5.py` uses a fixed overview/head camera fallback
+  - `code_painting/render_hand_retarget_r1_npz.py` builds third-person views from robot forward + world up
+- Diagnosed the table-layout orientation issue:
+  - the previous config used identity quaternion `[1, 0, 0, 0]`
+  - that made the robot front align with `+x`, i.e. parallel to the table long edge
+  - this was inconsistent with the intended use of approaching tabletop objects from one long-edge side
+- Fixed `robot_config_PiperPika_agx_dual_table.json`
+  - updated base quaternion to `[0.70710678, 0.0, 0.0, 0.70710678]`
+  - both robots now face `+y`
+- Updated `code_painting/visualize_piper_pika_agx_dual_table.py`
+  - corrected oblique camera to sit behind the robots and look toward the tabletop
+- Generated corrected outputs:
+  - `code_painting/output_piper_pika_agx_dual_table_oblique_fixed/piper_pika_agx_dual_table_oblique_fixed.png`
+  - `code_painting/output_piper_pika_agx_dual_table_oblique_fixed/piper_pika_agx_dual_table_oblique_fixed.mp4`
+  - `code_painting/output_piper_pika_agx_dual_table_topdown_fixed/piper_pika_agx_dual_table_topdown_fixed.png`
+  - `code_painting/output_piper_pika_agx_dual_table_topdown_fixed/piper_pika_agx_dual_table_topdown_fixed.mp4`
+
+
+## 2026-04-16 (dual table top-down camera adjustment)
+
+- Refined the table-edge interpretation for the dual Piper+Pika layout:
+  - both robots are on one long-edge side of the table
+  - bases are 0.30 m from the two short-side ends
+  - base-to-base spacing is 0.60 m
+- Updated `code_painting/visualize_piper_pika_agx_dual_table.py`
+  - added `--camera-mode {top_down,oblique}`
+  - temporary top-down camera is placed above the midpoint between the two bases and looks downward to the tabletop
+- Generated temporary top-down outputs:
+  - `code_painting/output_piper_pika_agx_dual_table_topdown/piper_pika_agx_dual_table_topdown.png`
+  - `code_painting/output_piper_pika_agx_dual_table_topdown/piper_pika_agx_dual_table_topdown.mp4`
+- Validation:
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python code_painting/visualize_piper_pika_agx_dual_table.py --offscreen-only 1 --camera-mode top_down --output-dir code_painting/output_piper_pika_agx_dual_table_topdown --image-name piper_pika_agx_dual_table_topdown.png --video-name piper_pika_agx_dual_table_topdown.mp4`
+
+
+## 2026-04-16 (piper_pika_agx dual table layout)
+
+- Added a new colored combo embodiment for the newer Piper+Pika appearance:
+  - `assets/embodiments/piper_pika_agx/piper_pika_agx.urdf`
+- The new combo uses:
+  - Piper arm from the original DAE-based Piper source
+  - Pika gripper from `agx_arm_sim` `pika2_gripper.urdf` + DAE meshes
+- Added dual-arm layout config for a 120x60x75 cm table:
+  - `robot_config_PiperPika_agx_dual_table.json`
+- Layout assumption used in this round:
+  - symmetric UR-style split
+  - shared base pose before split: `[0.0, -0.60, 0.75]`
+  - `embodiment_dis = 0.60`
+  - effective bases:
+    - left `[-0.30, -0.60, 0.75]`
+    - right `[0.30, -0.60, 0.75]`
+- Added preview script:
+  - `code_painting/visualize_piper_pika_agx_dual_table.py`
+- Generated outputs:
+  - `code_painting/output_piper_pika_agx_dual_table/piper_pika_agx_dual_table.png`
+  - `code_painting/output_piper_pika_agx_dual_table/piper_pika_agx_dual_table.mp4`
+- Validation:
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python code_painting/visualize_piper_pika_agx_dual_table.py --offscreen-only 1`
+
+
+## 2026-04-16 (agx_arm_sim source inspection)
+
+- Inspected the newly introduced repository:
+  - `/home/zaijia001/Downloads/agx_arm_sim`
+- Confirmed that:
+  - `ros2 launch agx_arm_description display.launch.py arm_type:=piper end_effector:=pika`
+  - routes to a **Piper + Pika** combined model
+- Found an important repository state issue:
+  - `agx_arm_description/agx_arm_urdf/` is empty in the current checkout
+  - so the xacro-referenced Piper arm assets are missing locally from this repo snapshot
+- Confirmed that the new `pika2_gripper.urdf` uses DAE meshes with embedded color/material data
+- Added preview script:
+  - `code_painting/visualize_agx_arm_sim_source.py`
+- Generated preview outputs:
+  - `code_painting/output_agx_arm_sim_preview/piper_only.png`
+  - `code_painting/output_agx_arm_sim_preview/piper_only.mp4`
+  - `code_painting/output_agx_arm_sim_preview/pika_only.png`
+  - `code_painting/output_agx_arm_sim_preview/pika_only.mp4`
+  - `code_painting/output_agx_arm_sim_preview/piper_pika_combo.png`
+  - `code_painting/output_agx_arm_sim_preview/piper_pika_combo.mp4`
+- Validation:
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python code_painting/visualize_agx_arm_sim_source.py --target all --output-root code_painting/output_agx_arm_sim_preview --video-frames 36 --fps 12`
+
+
+## 2026-04-16 (Piper color diagnosis and quantification)
+
+- Added a diagnosis-only documentation pass for the current observation:
+  - original Piper alone looks gray
+  - original Pika alone looks white
+  - combined `piper_pika` looks whitened
+- Confirmed source evidence:
+  - Piper DAE contains intrinsic dark-gray diffuse color (`0.113725 0.113725 0.113725`)
+  - combined `piper_pika.urdf` still contains explicit light-colored URDF material blocks on Piper arm links (`rgba="0.792156862745098 0.819607843137255 0.933333333333333 1"`)
+- Added approximate rendered-image color statistics comparing:
+  - original Piper bright
+  - original Piper dark
+  - combined bright
+  - combined dark
+- Main conclusion:
+  - the user's summary is correct: Piper's original gray comes from DAE, and the combined model is very likely whitened by the URDF material override
+
+
+## 2026-04-16 (dark stepwise validation)
+
+- Added a stepwise dark-lighting validation pass for:
+  - original Piper arm
+  - original Pika gripper
+  - combined `piper_pika`
+- Added/updated scripts:
+  - `code_painting/visualize_original_source_urdfs.py` now supports `--lighting {bright,dark}`
+  - `code_painting/visualize_piper_pika_single.py` already supports `--lighting {bright,dark}`
+- Generated outputs:
+  - `code_painting/output_original_source_urdf_preview_dark/piper_arm.png`
+  - `code_painting/output_original_source_urdf_preview_dark/piper_arm.mp4`
+  - `code_painting/output_original_source_urdf_preview_dark/pika_gripper.png`
+  - `code_painting/output_original_source_urdf_preview_dark/pika_gripper.mp4`
+  - `code_painting/output_piper_pika_preview_dark/piper_pika_dark.png`
+  - `code_painting/output_piper_pika_preview_dark/piper_pika_dark.mp4`
+- Main conclusion:
+  - the combined model whitening is likely caused by explicit light-colored URDF material blocks still present on the Piper arm links inside `assets/embodiments/piper_pika/piper_pika.urdf`, not only by lighting
+
+
+## 2026-04-16 (piper_pika dark preview)
+
+- Updated `code_painting/visualize_piper_pika_single.py` to support two lighting presets:
+  - `bright`
+  - `dark`
+- Generated a dark-lighting preview for the current combined model (colored Piper arm + white Pika gripper):
+  - `code_painting/output_piper_pika_preview_dark/piper_pika_dark.png`
+  - `code_painting/output_piper_pika_preview_dark/piper_pika_dark.mp4`
+- Purpose:
+  - reduce over-bright lighting so the original deeper Piper arm tone is easier to inspect
+- Validation:
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python code_painting/visualize_piper_pika_single.py --offscreen-only 1 --lighting dark --output-dir code_painting/output_piper_pika_preview_dark --image-name piper_pika_dark.png --video-name piper_pika_dark.mp4 --video-frames 36 --fps 12`
+
+
+## 2026-04-16 (original source URDF preview comparison)
+
+- Added `code_painting/visualize_original_source_urdfs.py` to preview the original source URDFs directly from the download folders.
+- Tested sources:
+  - `/home/zaijia001/Downloads/agx_arm_urdf/piper/urdf/piper_description.urdf`
+  - `/home/zaijia001/Downloads/pika_ros/src/pika_gripper_description/urdf/pika_gripper_description.urdf`
+- Generated outputs:
+  - `code_painting/output_original_source_urdf_preview/piper_arm.png`
+  - `code_painting/output_original_source_urdf_preview/piper_arm.mp4`
+  - `code_painting/output_original_source_urdf_preview/pika_gripper.png`
+  - `code_painting/output_original_source_urdf_preview/pika_gripper.mp4`
+- Purpose:
+  - compare the appearance of the original Piper arm and original Pika gripper before further assembly edits
+  - verify whether the whiteness comes from the original source assets themselves
+- Validation:
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python code_painting/visualize_original_source_urdfs.py --target both --output-root code_painting/output_original_source_urdf_preview --video-frames 30 --fps 12`
+
+
+## 2026-04-16 (piper_pika DAE color recovery)
+
+- Switched the assembled `assets/embodiments/piper_pika/piper_pika.urdf` arm visual meshes back to DAE to better recover the original Piper arm appearance.
+- Added copied DAE assets under:
+  - `assets/embodiments/piper_pika/meshes/dae/*`
+- Color-source findings:
+  - the original Piper arm color appears to be embedded in the Collada DAE files under `/home/zaijia001/Downloads/agx_arm_urdf/piper/meshes/dae/`
+  - the checked Pika gripper source tree did not contain DAE/OBJ/MTL/texture assets; only STL meshes plus white URDF material values were found
+- Generated new DAE-based preview outputs:
+  - `code_painting/output_piper_pika_preview_dae/piper_pika_preview.png`
+  - `code_painting/output_piper_pika_preview_dae/piper_pika_preview.mp4`
+- Validation:
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python code_painting/visualize_piper_pika_single.py --offscreen-only 1 --output-dir code_painting/output_piper_pika_preview_dae --video-frames 24 --fps 12`
+
+
+## 2026-04-16 (piper_pika preview export)
+
+- Enhanced `code_painting/visualize_piper_pika_single.py`.
+- Added:
+  - a fixed preview camera position that clearly sees the whole single arm
+  - still image export
+  - short preview video export with a small joint-space motion
+- Default outputs:
+  - `code_painting/output_piper_pika_preview/piper_pika_preview.png`
+  - `code_painting/output_piper_pika_preview/piper_pika_preview.mp4`
+- Validation:
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/visualize_piper_pika_single.py`
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python code_painting/visualize_piper_pika_single.py --offscreen-only 1 --video-frames 24 --fps 12`
+  - confirmed both preview files were written successfully
+
+
+## 2026-04-16
+
+- Added a new standalone assembled URDF under the original assets tree:
+  - `assets/embodiments/piper_pika/piper_pika.urdf`
+  - `assets/embodiments/piper_pika/meshes/*`
+- Source inputs:
+  - arm URDF/meshes from `/home/zaijia001/Downloads/agx_arm_urdf/piper/`
+  - gripper URDF/meshes from `/home/zaijia001/Downloads/pika_ros/src/pika_gripper_description/`
+- Assembly notes:
+  - used the existing combined reference `piper_pika_gripper_description.urdf` as the starting point
+  - converted package mesh URIs to local relative `meshes/...` paths
+  - renamed the robot to `piper_pika`
+  - renamed `dummy_link` -> `piper_pika_dummy_link`
+  - renamed `gripper_base` -> `pika_gripper_base`
+  - copied required arm and gripper meshes into the new embodiment folder
+- Added a minimal single-arm visualization script:
+  - `code_painting/visualize_piper_pika_single.py`
+- Validation:
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/visualize_piper_pika_single.py`
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python code_painting/visualize_piper_pika_single.py --offscreen-only 1`
+  - offscreen load confirmed active joints:
+    - `joint1 joint2 joint3 joint4 joint5 joint6 joint7 joint8`
+- Repository note:
+  - `assets/*` is currently ignored by `.gitignore`, so the new embodiment files exist locally but do not show up in `git status`
+
+
+## 2026-04-14 (Piper V2 batch fix)
+
+- Fixed Piper V2 batch argument pollution in `code_painting/plan_anygrasp_keyframes_piper_v2_batch.py`.
+- Root cause:
+  - the reused `plan_anygrasp_keyframes_r1_batch.py` parser was still supplying its own default `--robot_config robot_config_R1.json`
+  - as a result, batch mode launched the Piper V2 single-video script with an explicit R1 config, so viewer/rendering still showed R1-style behavior
+- Fix:
+  - inject Piper defaults before calling the reused batch launcher:
+    - `--robot_config /home/zaijia001/ssd/RoboTwin/robot_config_Piper_dual_v2.json`
+    - `--head_camera_local_quat_wxyz 1.0 0.0 0.0 0.0`
+    - `--head_camera_local_pos 0.0 0.0 0.0`
+- Validation:
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/plan_anygrasp_keyframes_piper_v2_batch.py`
+  - command probe confirmed printed batch command now contains:
+    - `--robot_config /home/zaijia001/ssd/RoboTwin/robot_config_Piper_dual_v2.json`
+    - `--head_camera_local_quat_wxyz 1.0 0.0 0.0 0.0`
+
+
+## 2026-04-14
+
+- Added a true Piper V2 dual-arm-style implementation following the existing UR dual-single-arm setup, without modifying any R1 / R1 Pro files.
+- Added files:
+  - `robot_config_Piper_dual_v2.json`
+  - `code_painting/replay_piper_dual_h5.py`
+  - `code_painting/render_hand_retarget_piper_dual_npz_urdfik.py`
+  - `code_painting/plan_anygrasp_keyframes_piper_v2.py`
+  - `code_painting/plan_anygrasp_keyframes_piper_v2_batch.py`
+  - `code_painting/run_plan_anygrasp_keyframes_piper_v2_batch.sh`
+  - `agent-read/V2.0_piper_dual_ur_style.md`
+  - `agent-read/V2.0_piper_dual_ur_style_ZH.md`
+- V2 implementation notes:
+  - uses `dual_arm_embodied=false` and two independent Piper URDF instances
+  - keeps separate left/right base poses instead of collapsing both arms back to one shared root pose
+  - uses a dedicated Piper replay renderer and a dedicated Piper URDFIK renderer
+  - uses `assets/embodiments/piper/piper.urdf` for both left and right URDF loading and IK
+  - validated effective base poses:
+    - left = `[-0.4, -0.65, 0.72]`
+    - right = `[0.4, -0.65, 0.72]`
+- Validation:
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/replay_piper_dual_h5.py code_painting/render_hand_retarget_piper_dual_npz_urdfik.py code_painting/plan_anygrasp_keyframes_piper_v2.py code_painting/plan_anygrasp_keyframes_piper_v2_batch.py`
+  - `bash -n code_painting/run_plan_anygrasp_keyframes_piper_v2_batch.sh`
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python code_painting/plan_anygrasp_keyframes_piper_v2.py --help`
+  - direct config probe confirmed:
+    - `left_urdf_path=./assets/embodiments/piper/piper.urdf`
+    - `right_urdf_path=./assets/embodiments/piper/piper.urdf`
+    - `left_origin=[-0.4, -0.65, 0.72]`
+    - `right_origin=[0.4, -0.65, 0.72]`
+  - renderer probe confirmed:
+    - `[piper-v2-bases] left=[-0.4, -0.65, 0.72] right=[0.4, -0.65, 0.72]`
+
+
+## 2026-04-14
+
+- Added a Piper-compatible AnyGrasp planner wrapper without modifying the original R1 / R1 Pro planner files.
+- Added files:
+  - `robot_config_Piper_dual.json`
+  - `code_painting/plan_anygrasp_keyframes_piper.py`
+  - `code_painting/plan_anygrasp_keyframes_piper_batch.py`
+  - `code_painting/run_plan_anygrasp_keyframes_piper_batch.sh`
+  - `agent-read/2026-04-14_piper_anygrasp_wrapper.md`
+  - `agent-read/2026-04-14_piper_anygrasp_wrapper_ZH.md`
+- Implementation notes:
+  - keeps the original `plan_anygrasp_keyframes_r1.py` code path untouched
+  - injects a Piper robot config at runtime
+  - swaps the replay / URDFIK renderer classes to Piper-specific adapters
+  - uses `assets/embodiments/piper/piper.urdf` for URDF IK
+  - maps the existing left/right execution structure onto two Piper instances for compatibility
+- Validation:
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/plan_anygrasp_keyframes_piper.py code_painting/plan_anygrasp_keyframes_piper_batch.py`
+  - `bash -n code_painting/run_plan_anygrasp_keyframes_piper_batch.sh`
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python code_painting/plan_anygrasp_keyframes_piper.py --help`
+
+
 ## 2026-04-03
 
 - Added smooth-focused documentation:
@@ -47,6 +458,14 @@
     - single-arm / dual-arm `attempt`
     - single-arm `attempt-supervision`
     - `attempt_history` / supervision-error structures
+- Added another analysis-only design direction that preserves the current main workflow:
+  - express the human-hand target as an object-relative pose `T_obj_hand_demo`
+  - then generate a more executable robot target through a robot-specific correction `Δ_robot`
+  - recommend implementing this later as an independent target-adapter layer rather than modifying the IK solver core first
+  - recommended progression:
+    - constant rigid correction
+    - stage-specific correction
+    - object-type/size adaptive correction
 - Validation:
   - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/plan_anygrasp_keyframes_r1.py`
 - Validation:
