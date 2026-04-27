@@ -49,6 +49,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--save_png_frames", type=int, default=0)
     parser.add_argument("--save_head_depth", type=int, default=0)
     parser.add_argument("--save_anygrasp_frames", type=int, default=0)
+    parser.add_argument("--save_pose_debug", type=int, default=0)
     parser.add_argument("--enable_viewer", type=int, default=0)
     parser.add_argument("--viewer_frame_delay", type=float, default=0.0)
     parser.add_argument("--viewer_wait_at_end", type=int, default=0)
@@ -135,6 +136,8 @@ def build_single_command(args: argparse.Namespace, video_dir: Path, output_dir: 
         str(args.save_head_depth),
         "--save_anygrasp_frames",
         str(args.save_anygrasp_frames),
+        "--save_pose_debug",
+        str(args.save_pose_debug),
         "--enable_viewer",
         str(args.enable_viewer),
         "--viewer_frame_delay",

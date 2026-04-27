@@ -1,5 +1,17 @@
 # CHANGELOG.zh
 
+## 2026-04-27（Piper 物体 replay：head cam link 缺失兼容修复）
+
+- 修复 `code_painting/replay_r1_h5.py`：
+  - 当机器人配置中不存在 R1 的 `zed_link/head_camera` 时，不再直接报错退出。
+  - 新增 fallback：使用 `robot_base_pose + head_camera_local_*` 计算 head cam 姿态。
+- 修复 `code_painting/render_multi_object_pose_r1_npz_batch.py`：
+  - 增加并转发 `--save_pose_debug` 参数，避免 batch 模式参数不识别。
+- 更新文档命令：
+  - `agent-read/2026-04-24_piper_hamer_hand_pipeline_ZH.md`
+  - `agent-read/2026-04-24_piper_hamer_hand_pipeline.md`
+  - 回放阶段 mesh override 名称统一为 `star_fruit=...`（与对象目录名一致）。
+
 ## 2026-04-27（补充两阶段 I/O 格式 + 分对象 replay）
 
 - 更新了 `agent-read/2026-04-24_piper_hamer_hand_pipeline_ZH.md` 与英文对应文档，补充：

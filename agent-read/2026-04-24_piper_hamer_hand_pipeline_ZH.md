@@ -165,8 +165,12 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_multi_object_pose_r1_npz_bat
   --save_head_depth 1 \
   --save_anygrasp_frames 1 \
   --save_pose_debug 1 \
+  --robot_config /home/zaijia001/ssd/RoboTwin/robot_config_PiperPika_agx_dual_table.json \
+  --camera_cv_axis_mode legacy_r1 \
+  --head_camera_local_pos 0.107882 -0.2693875 0.464396 \
+  --head_camera_local_quat_wxyz 0.85401166 0.01255256 0.51885652 -0.0359783 \
   --object pear=/home/zaijia001/ssd/data/R1/hand/obj_mesh/pear/pear.obj \
-  --object "star fruit=/home/zaijia001/ssd/data/R1/hand/obj_mesh/star/star.obj"
+  --object star_fruit=/home/zaijia001/ssd/data/R1/hand/obj_mesh/star/star.obj
 ```
 
 ### Step H：分别重演轨迹/位姿结果（按对象拆开检查）

@@ -1,3 +1,10 @@
+## 2026-04-27 17:35:00 +08
+
+- `run_multi_object_pose_r1_npz_batch.sh` 所调用的 batch 入口现已支持：
+  - `--save_pose_debug 1`
+- Piper 标定 head cam 回放命令建议使用：
+  - `--object star_fruit=/.../star.obj`（不要写成 `star fruit=`，避免对象名不匹配）
+
 ## 2026-04-27 14:55:00 +08
 
 - 在 `/home/zaijia001/ssd/COMMAND_LIBRARY.zh.md` 增加了分对象重演命令：

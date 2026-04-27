@@ -1,5 +1,17 @@
 # CHANGELOG.en
 
+## 2026-04-27 (Piper object replay: head-camera link fallback fix)
+
+- Fixed `code_painting/replay_r1_h5.py`:
+  - no longer exits when R1-style `zed_link/head_camera` is missing in non-R1 robot configs.
+  - added fallback head-camera pose computed from `robot_base_pose + head_camera_local_*`.
+- Fixed `code_painting/render_multi_object_pose_r1_npz_batch.py`:
+  - added and forwarded `--save_pose_debug` so batch mode accepts the flag.
+- Updated command docs:
+  - `agent-read/2026-04-24_piper_hamer_hand_pipeline_ZH.md`
+  - `agent-read/2026-04-24_piper_hamer_hand_pipeline.md`
+  - replay-stage mesh override name normalized to `star_fruit=...` to match object folder naming.
+
 ## 2026-04-27 (added stage I/O formats + per-object replay)
 
 - Updated `agent-read/2026-04-24_piper_hamer_hand_pipeline_ZH.md` and its English pair to include:

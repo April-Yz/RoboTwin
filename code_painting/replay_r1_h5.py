@@ -102,7 +102,7 @@ class ReplayRenderer(base.HandRetargetR1Renderer):
 
         self._head_camera_link = self._find_robot_link(["zed_link", "head_camera", "head", "camera_link"])
         if self._head_camera_link is None:
-            raise RuntimeError("Could not find zed/head camera link on R1.")
+            print("[camera] head link not found on this robot config; using base-pose fallback head camera.")
         self._base_occluder_link = self._find_robot_link(["base_link"])
         self._left_wrist_camera_link = self._find_robot_link(["left_realsense_link", "left_D405_link", "left_camera"])
         self._right_wrist_camera_link = self._find_robot_link(["right_realsense_link", "right_D405_link", "right_camera"])
@@ -141,6 +141,11 @@ class ReplayRenderer(base.HandRetargetR1Renderer):
                 np.asarray(self._fixed_head_camera_pose.p, dtype=np.float64).tolist(),
                 np.asarray(self._fixed_head_camera_pose.q, dtype=np.float64).tolist(),
             )
+        if self._head_camera_link is None:
+            if self._base_pose is None:
+                raise RuntimeError("Base pose is unavailable for fallback head camera pose.")
+            local_pose = sapien.Pose(self.head_camera_local_pos, self.head_camera_local_quat_wxyz)
+            return base.matrix_to_pose(base.pose_to_matrix(self._base_pose) @ base.pose_to_matrix(local_pose))
         return super().get_head_camera_pose()
 
     def update_robot_link_cameras(self) -> None:
@@ -152,6 +157,16 @@ class ReplayRenderer(base.HandRetargetR1Renderer):
                 self.right_wrist_camera.set_entity_pose(base.HIDDEN_DEBUG_POSE)
             if self.third_person_view:
                 self.third_camera.set_entity_pose(self._build_third_camera_pose(self._fixed_head_camera_pose))
+            return
+        if self._head_camera_link is None:
+            head_pose = self.get_head_camera_pose()
+            self.zed_camera.set_entity_pose(head_pose)
+            if self._left_wrist_camera_link is not None:
+                self.left_wrist_camera.set_entity_pose(self.get_wrist_camera_pose("left"))
+            if self._right_wrist_camera_link is not None:
+                self.right_wrist_camera.set_entity_pose(self.get_wrist_camera_pose("right"))
+            if self.third_person_view:
+                self.third_camera.set_entity_pose(self._build_third_camera_pose(head_pose))
             return
         super().update_robot_link_cameras()
 

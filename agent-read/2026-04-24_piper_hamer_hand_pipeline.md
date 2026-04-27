@@ -166,7 +166,7 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_multi_object_pose_r1_npz_bat
   --save_anygrasp_frames 1 \
   --save_pose_debug 1 \
   --object pear=/home/zaijia001/ssd/data/R1/hand/obj_mesh/pear/pear.obj \
-  --object "star fruit=/home/zaijia001/ssd/data/R1/hand/obj_mesh/star/star.obj"
+  --object star_fruit=/home/zaijia001/ssd/data/R1/hand/obj_mesh/star/star.obj
 ```
 
 ### Step H: Replay trajectory/pose separately by object

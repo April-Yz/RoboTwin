@@ -1,3 +1,10 @@
+## 2026-04-27 17:35:00 +08
+
+- Batch entry behind `run_multi_object_pose_r1_npz_batch.sh` now accepts:
+  - `--save_pose_debug 1`
+- For Piper calibrated head-cam replay, prefer:
+  - `--object star_fruit=/.../star.obj` (avoid `star fruit=`, which can mismatch object-folder names)
+
 ## 2026-04-27 14:55:00 +08
 
 - Added per-object replay commands to `/home/zaijia001/ssd/COMMAND_LIBRARY.zh.md`:
