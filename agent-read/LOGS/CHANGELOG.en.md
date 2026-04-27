@@ -1,5 +1,19 @@
 # CHANGELOG.en
 
+## 2026-04-27 (added stage I/O formats + per-object replay)
+
+- Updated `agent-read/2026-04-24_piper_hamer_hand_pipeline_ZH.md` and its English pair to include:
+  - HaMeR stage input/output roots and key format fields
+  - FoundationPose stage input/output roots and key format fields
+  - FoundationPose object folder naming (`pear`, `star_fruit`)
+- Added split replay commands for trajectory/pose inspection:
+  - pear-only replay
+  - star_fruit-only replay
+- Added replay output notes:
+  - `head_cam_replay.mp4`
+  - `multi_object_world_poses.npz`
+  - `pose_debug.jsonl`
+
 ## 2026-04-27 (FoundationPose prompt fix + tmux exit root-cause)
 
 - Conclusion: prompt `star` fails Grounding DINO init on this dataset; `star fruit` enters tracking correctly.

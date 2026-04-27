@@ -49,7 +49,7 @@ This update complements the upstream detection stages by:
 
 ---
 
-## 4. Data mapping (Piper -> HaMeR input)
+## 4. Data mapping (Piper -> HaMeR / FoundationPose input)
 
 ### Original Piper layout (per episode)
 
@@ -57,11 +57,17 @@ This update complements the upstream detection stages by:
 - Depth: `episodeX/camera/depth/headD435/*.png` and `*_meters.npy`
 - Intrinsics: `episodeX/camera/color/headD435_camera_info.json`
 
-### Converted RealR1-style layout (flat directory)
+### Converted layout for HaMeR (flat directory)
 
 - `rgb_<id>.mp4`
 - `depth_<id>.mp4`
 - `params_<id>.json`
+
+### Converted layout for FoundationPose (flat + metric depth)
+
+- `rgb_<id>.mp4`
+- `params_<id>.json`
+- `depth_<id>/000000.npy ...` (RGB-aligned metric depth, meters)
 
 `<id>` matches the episode number (`episode0 -> 0`).
 
@@ -158,13 +164,62 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_multi_object_pose_r1_npz_bat
   --hide_robot 1 \
   --save_head_depth 1 \
   --save_anygrasp_frames 1 \
+  --save_pose_debug 1 \
   --object pear=/home/zaijia001/ssd/data/R1/hand/obj_mesh/pear/pear.obj \
   --object "star fruit=/home/zaijia001/ssd/data/R1/hand/obj_mesh/star/star.obj"
 ```
 
+### Step H: Replay trajectory/pose separately by object
+
+Replay pear only:
+
+```bash
+python /home/zaijia001/ssd/RoboTwin/code_painting/render_multi_object_pose_r1_npz_batch.py \
+  --input_root /home/zaijia001/ssd/data/piper/hand/pnp_star_pear_foundation_vis/obj_vis \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_pnp_star_pear_only \
+  --fps 5 \
+  --head_only 1 \
+  --hide_robot 1 \
+  --save_pose_debug 1 \
+  --objects pear \
+  --object pear=/home/zaijia001/ssd/data/R1/hand/obj_mesh/pear/pear.obj
+```
+
+Replay star_fruit only:
+
+```bash
+python /home/zaijia001/ssd/RoboTwin/code_painting/render_multi_object_pose_r1_npz_batch.py \
+  --input_root /home/zaijia001/ssd/data/piper/hand/pnp_star_pear_foundation_vis/obj_vis \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_pnp_star_fruit_only \
+  --fps 5 \
+  --head_only 1 \
+  --hide_robot 1 \
+  --save_pose_debug 1 \
+  --objects star_fruit \
+  --object star_fruit=/home/zaijia001/ssd/data/R1/hand/obj_mesh/star/star.obj
+```
+
+Per video replay folder, key outputs are:
+- `head_cam_replay.mp4`
+- `multi_object_world_poses.npz` (world-aligned per-frame poses, including `*_pose_world_wxyz`)
+- `pose_debug.jsonl` (when `--save_pose_debug 1`)
+
 ---
 
-## 6. Output files
+## 6. Output files (paths + formats)
+
+### Stage-1: HaMeR (hand keypoints)
+
+**Input root**:
+- `/home/zaijia001/ssd/data/piper/hand/pnp_star_pear_hamer_input`
+
+**Input format**:
+- `rgb_<id>.mp4`
+- `depth_<id>.mp4`
+- `params_<id>.json` (`fx/fy/cx/cy/width/height`)
+
+**Output root**:
+- `/home/zaijia001/ssd/data/piper/hand/pnp_star_pear_hamer_output`
 
 For each `<id>`, HaMeR outputs are:
 
@@ -177,10 +232,27 @@ RoboTwin downstream primarily consumes:
 
 - `hand_detections_<id>.npz`
 
+### Stage-2: FoundationPose (multi-object poses)
+
+**Input root**:
+- `/home/zaijia001/ssd/data/piper/hand/pnp_star_pear_foundation_input`
+
+**Input format**:
+- `rgb_<id>.mp4`
+- `params_<id>.json`
+- `depth_<id>/*.npy` (metric depth in meters)
+
+**Output root**:
+- `/home/zaijia001/ssd/data/piper/hand/pnp_star_pear_foundation_vis/obj_vis`
+
 FoundationPose multi-object outputs (per id) include:
 
 - `.../obj_vis/pnp_star_pear_foundation_input_<id>/pear/poses.npz`
-- `.../obj_vis/pnp_star_pear_foundation_input_<id>/star/poses.npz`
+- `.../obj_vis/pnp_star_pear_foundation_input_<id>/star_fruit/poses.npz`
+
+Each object folder also contains:
+- `run_config.json`
+- visualization videos (if save-video flags are enabled)
 
 ---
 

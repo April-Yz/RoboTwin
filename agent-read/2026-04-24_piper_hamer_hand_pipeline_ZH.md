@@ -49,7 +49,7 @@
 
 ---
 
-## 4. 数据结构映射（Piper -> HaMeR 输入）
+## 4. 数据结构映射（Piper -> HaMeR / FoundationPose 输入）
 
 ### Piper 原始结构（每个 episode）
 
@@ -57,11 +57,17 @@
 - Depth：`episodeX/camera/depth/headD435/*.png` 与 `*_meters.npy`
 - 内参：`episodeX/camera/color/headD435_camera_info.json`
 
-### 转换后的 RealR1 风格结构（扁平目录）
+### 转换后的 HaMeR 输入结构（扁平目录）
 
 - `rgb_<id>.mp4`
 - `depth_<id>.mp4`
 - `params_<id>.json`
+
+### 转换后的 FoundationPose 输入结构（扁平目录 + metric depth）
+
+- `rgb_<id>.mp4`
+- `params_<id>.json`
+- `depth_<id>/000000.npy ...`（与 RGB 对齐，优先 meters.npy，单位米）
 
 其中 `<id>` 与 `episode` 数字一致（`episode0 -> 0`）。
 
@@ -158,13 +164,62 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_multi_object_pose_r1_npz_bat
   --hide_robot 1 \
   --save_head_depth 1 \
   --save_anygrasp_frames 1 \
+  --save_pose_debug 1 \
   --object pear=/home/zaijia001/ssd/data/R1/hand/obj_mesh/pear/pear.obj \
   --object "star fruit=/home/zaijia001/ssd/data/R1/hand/obj_mesh/star/star.obj"
 ```
 
+### Step H：分别重演轨迹/位姿结果（按对象拆开检查）
+
+只重演 pear：
+
+```bash
+python /home/zaijia001/ssd/RoboTwin/code_painting/render_multi_object_pose_r1_npz_batch.py \
+  --input_root /home/zaijia001/ssd/data/piper/hand/pnp_star_pear_foundation_vis/obj_vis \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_pnp_star_pear_only \
+  --fps 5 \
+  --head_only 1 \
+  --hide_robot 1 \
+  --save_pose_debug 1 \
+  --objects pear \
+  --object pear=/home/zaijia001/ssd/data/R1/hand/obj_mesh/pear/pear.obj
+```
+
+只重演 star_fruit（杨桃）：
+
+```bash
+python /home/zaijia001/ssd/RoboTwin/code_painting/render_multi_object_pose_r1_npz_batch.py \
+  --input_root /home/zaijia001/ssd/data/piper/hand/pnp_star_pear_foundation_vis/obj_vis \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/replay_m_obj_pose_pnp_star_fruit_only \
+  --fps 5 \
+  --head_only 1 \
+  --hide_robot 1 \
+  --save_pose_debug 1 \
+  --objects star_fruit \
+  --object star_fruit=/home/zaijia001/ssd/data/R1/hand/obj_mesh/star/star.obj
+```
+
+上述 replay 每个 video 子目录关键输出：
+- `head_cam_replay.mp4`
+- `multi_object_world_poses.npz`（对齐到世界坐标的每帧位姿，含 `*_pose_world_wxyz`）
+- `pose_debug.jsonl`（开启 `--save_pose_debug 1` 时）
+
 ---
 
-## 6. 输出产物说明
+## 6. 输出产物说明（含路径与格式）
+
+### Stage-1：HaMeR（手关键点）
+
+**输入根目录**：
+- `/home/zaijia001/ssd/data/piper/hand/pnp_star_pear_hamer_input`
+
+**输入格式**：
+- `rgb_<id>.mp4`：彩色视频
+- `depth_<id>.mp4`：深度可视化视频（HaMeR脚本内部做融合）
+- `params_<id>.json`：相机内参（`fx/fy/cx/cy/width/height`）
+
+**输出根目录**：
+- `/home/zaijia001/ssd/data/piper/hand/pnp_star_pear_hamer_output`
 
 HaMeR 检测完成后，每个 `<id>` 对应：
 
@@ -177,10 +232,27 @@ RoboTwin 下游通常直接消费：
 
 - `hand_detections_<id>.npz`
 
+### Stage-2：FoundationPose（双物体位姿）
+
+**输入根目录**：
+- `/home/zaijia001/ssd/data/piper/hand/pnp_star_pear_foundation_input`
+
+**输入格式**：
+- `rgb_<id>.mp4`
+- `params_<id>.json`
+- `depth_<id>/*.npy`（metric depth，单位米，逐帧）
+
+**输出根目录**：
+- `/home/zaijia001/ssd/data/piper/hand/pnp_star_pear_foundation_vis/obj_vis`
+
 FoundationPose 双物体输出（每个 id）：
 
 - `.../obj_vis/pnp_star_pear_foundation_input_<id>/pear/poses.npz`
-- `.../obj_vis/pnp_star_pear_foundation_input_<id>/star/poses.npz`
+- `.../obj_vis/pnp_star_pear_foundation_input_<id>/star_fruit/poses.npz`
+
+其中每个对象目录还包含：
+- `run_config.json`（mesh_file、prompt等）
+- 可视化视频（若开启 `--save_video/--save_*_overlay_video`）
 
 ---
 

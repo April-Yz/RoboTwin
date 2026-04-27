@@ -1,3 +1,10 @@
+## 2026-04-27 14:55:00 +08
+
+- 在 `/home/zaijia001/ssd/COMMAND_LIBRARY.zh.md` 增加了分对象重演命令：
+  - `render_multi_object_pose_r1_npz_batch.py --objects pear ...`
+  - `render_multi_object_pose_r1_npz_batch.py --objects star_fruit ...`
+- 在 FoundationPose -> RoboTwin 批量回放命令中补充 `--save_pose_debug 1`。
+
 ## 2026-04-27 14:20:00 +08
 
 - 将 FoundationPose 双物体命令中的星形物体提示词从 `star` 改为 `star fruit`（杨桃），减少 DINO 漏检。

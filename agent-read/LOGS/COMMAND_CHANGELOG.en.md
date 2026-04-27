@@ -1,3 +1,10 @@
+## 2026-04-27 14:55:00 +08
+
+- Added per-object replay commands to `/home/zaijia001/ssd/COMMAND_LIBRARY.zh.md`:
+  - `render_multi_object_pose_r1_npz_batch.py --objects pear ...`
+  - `render_multi_object_pose_r1_npz_batch.py --objects star_fruit ...`
+- Added `--save_pose_debug 1` to the FoundationPose -> RoboTwin batch replay command.
+
 ## 2026-04-27 14:20:00 +08
 
 - Updated the FoundationPose multi-object prompt for star-shaped fruit from `star` to `star fruit` to reduce DINO miss-detections.

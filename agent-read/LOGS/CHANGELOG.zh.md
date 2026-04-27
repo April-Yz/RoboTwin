@@ -1,5 +1,19 @@
 # CHANGELOG.zh
 
+## 2026-04-27（补充两阶段 I/O 格式 + 分对象 replay）
+
+- 更新了 `agent-read/2026-04-24_piper_hamer_hand_pipeline_ZH.md` 与英文对应文档，补充：
+  - HaMeR 阶段输入/输出根路径与关键格式字段
+  - FoundationPose 阶段输入/输出根路径与关键格式字段
+  - FoundationPose 输出对象目录命名（`pear`、`star_fruit`）
+- 新增“分别重演轨迹/pos”命令：
+  - 仅重演 `pear`
+  - 仅重演 `star_fruit`
+- 补充了 replay 输出关键文件说明：
+  - `head_cam_replay.mp4`
+  - `multi_object_world_poses.npz`
+  - `pose_debug.jsonl`
+
 ## 2026-04-27（FoundationPose 提示词修正 + tmux 退出问题定位）
 
 - 结论：`star` 提示词在当前数据上会导致 Grounding DINO 初始化失败；改为 `star fruit` 可正常进入跟踪。
