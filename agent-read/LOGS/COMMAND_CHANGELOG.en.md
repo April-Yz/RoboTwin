@@ -1,3 +1,47 @@
+## 2026-05-06 11:40:00 +08
+
+- Added explicit URDFIK execution-step CLI controls:
+  - `--execute_waypoint_scene_steps` (scene steps per trajectory waypoint, default 1)
+  - `--execute_settle_scene_steps` (extra settle steps per frame, default 4)
+  - `--urdfik_joint_interp_waypoints` (joint_interp waypoint count, default 2)
+- Applied to:
+  - `render_hand_retarget_piper_dual_npz_urdfik_main.py`
+  - `render_hand_retarget_r1_npz_urdfik.py`
+- Added runtime print: `[execute-steps] ...` for easier verification.
+- Synced docs: `/home/zaijia001/ssd/COMMAND_LIBRARY.zh.md` (D6 execution-step probe command).
+
+## 2026-04-29 17:10:00 +08
+
+- Updated command tool: `run_piper_gripper_standard_pose_guess.sh`
+  - added default forward/up offsets (`TARGET_DY=0.1 TARGET_DZ=0.1`)
+  - outputs are now images-only (`zed/third` PNG) + `index.csv` + `world_targets_and_status.npz`
+  - emits `left_status/right_status` to diagnose IK reachability vs orientation-definition issues
+- Synced command docs: `/home/zaijia001/ssd/COMMAND_LIBRARY.zh.md` D6
+  - clarified images-only usage
+  - clarified that frequent `Fail` is typically IK reachability, not necessarily wrong orientation semantics
+
+## 2026-04-29 16:30:00 +08
+
+- Added command entry:
+  - `bash /home/zaijia001/ssd/RoboTwin/code_painting/run_piper_gripper_standard_pose_guess.sh ...`
+- Purpose:
+  - generate a single-folder Piper gripper “standard orientation guess board” under `.../board/`
+  - emit `index.csv` for manual per-image semantic feedback
+- Related code:
+  - `code_painting/run_piper_gripper_standard_pose_guess.sh`
+  - `code_painting/run_piper_gripper_orientation_guess_board.sh`
+- Synced command library update: `/home/zaijia001/ssd/COMMAND_LIBRARY.zh.md` (new D6)
+
+## 2026-04-29 16:00:00 +08
+
+- Updated HaMeR commands in `/home/zaijia001/ssd/COMMAND_LIBRARY.zh.md`:
+  - switched GPU commands from `hamer-r1` to `hamer-r1-gpu`
+  - added `unset LD_LIBRARY_PATH` to match the original README convention
+- Added a quick detection-count check command:
+  - reads `left_hand_detected/right_hand_detected` directly from `hand_detections_*.npz`
+- Added a debug baseline command:
+  - `CUDA_VISIBLE_DEVICES=2 + hamer-r1-gpu + video_id=0 + --no_visualize`
+
 ## 2026-04-27 17:35:00 +08
 
 - Batch entry behind `run_multi_object_pose_r1_npz_batch.sh` now accepts:
@@ -744,3 +788,235 @@
   - `--execution_object_visual_scale_override NAME=S|SX,SY,SZ`
   - `--execution_object_collision_scale_override NAME=S|SX,SY,SZ`
   - Purpose: independently control execution-object visual-mesh scale and collision-shape scale
+- 2026-05-07
+  - Added a retarget post-rotation board video command:
+    - `code_painting/run_piper_retarget_postrot_board_video.sh`
+  - Key environment variables:
+    - `CASE_MODE=standard|axis90|grid`
+    - `ORIENTATION_REMAP_LABEL`
+    - `TARGET_DX/TARGET_DY/TARGET_DZ`
+    - `ARMS`
+    - `MAX_FRAMES`
+  - Outputs:
+    - `board/board_zed.mp4`
+    - `board/board_third.mp4`
+    - `board/board_zed_frame0000.png`
+    - `board/board_third_frame0000.png`
+    - `index.csv`
+
+- 2026-05-07
+  - Extended the local-axis sweep command:
+    - `VIDEO_MODE=1`: generate `board_all_zed.mp4` and `board_success_zed.mp4`
+    - `CANDIDATE_MODE=semantic`: generate `forward_from_*` / `open_from_*` semantic candidates
+    - `FRAME_END` / `MAX_FRAMES` / `FRAME_STRIDE`: control the multi-frame range
+  - Representative command:
+    - `GPU=3 FRAME_IDX=0 FRAME_END=-1 MAX_FRAMES=32 ARM=left EXECUTE=1 CANDIDATE_MODE=remap VIDEO_MODE=1 FPS=5 SAVE_WRIST_VIEWS=0 bash code_painting/run_piper_local_axis_sweep_board.sh <input_npz> <output_dir>`
+
+- 2026-05-07
+  - Added a local-axis sweep command:
+    - `bash code_painting/run_piper_local_axis_sweep_board.sh <input_npz> <output_dir>`
+  - Related code:
+    - `code_painting/build_piper_local_axis_sweep_board.py`
+    - `code_painting/run_piper_local_axis_sweep_board.sh`
+  - Important parameters:
+    - `FRAME_IDX`
+    - `ARM`
+    - `EXECUTE`
+    - `SAVE_WRIST_VIEWS`
+  - Usage notes:
+    - Keeps the current calibrated `PiperPika` head-camera pose by default
+    - Defaults to a pure sweep without IK execution
+    - Set `EXECUTE=1` when you specifically want to test whether execution lag/reaching error is the main issue
+
+- 2026-05-11
+  - Added a final HaMeR-axis replay batch command:
+    - `code_painting/run_piper_hamer_axes_replay_batch.sh <input_npz_or_dir> <output_root>`
+  - Key environment variables:
+    - `GPU`
+    - `FPS`
+    - `MAX_FRAMES`
+    - `ARMS=both|left|right`
+    - `ID_FILTER=0,2,5-8`
+    - `KEEP_ONLY_ZED_THIRD=1`
+  - Fixed replay rule:
+    - `--require_stored_gripper_pose 1`
+    - `--pose_source gripper`
+    - `--orientation_remap_label identity`
+    - `--stored_orientation_post_rot_xyz_deg 0 0 0`
+  - Outputs:
+    - Each ID is written under `<output_root>/id_<id>`
+    - `frames/` keeps only zed/third RGB PNGs by default
+  - Documentation update:
+    - The D section in `/home/zaijia001/ssd/COMMAND_LIBRARY.zh.md` now keeps only final replay commands
+    - Detailed debug commands were moved to `/home/zaijia001/ssd/PIPER_GRIPPER_ORIENTATION_DEBUG.zh.md`
+
+- 2026-05-11
+  - Added a "HaMeR hands + FoundationPose objects in one replay" command:
+    - `code_painting/run_piper_hamer_axes_with_objects_replay_batch.sh <hand_npz_or_dir> <foundation_obj_vis_root> <output_root>`
+  - Key environment variables:
+    - `GPU`
+    - `FPS`
+    - `MAX_FRAMES`
+    - `ARMS=both|left|right`
+    - `ID_FILTER=0,2,5-8`
+    - `KEEP_ONLY_ZED_THIRD=0|1`
+    - `OBJECT_MISSING_FRAME_POLICY=hide|hold_last`
+  - New low-level replay flags:
+    - `--object_replay_input_dir`
+    - `--object_missing_frame_policy`
+    - `--objects`
+    - `--object NAME=/path/to/mesh.obj`
+  - Usage location:
+    - Section E in `/home/zaijia001/ssd/COMMAND_LIBRARY.zh.md`
+  - Validation:
+    - A 1-frame smoke test passed and generated `/tmp/piper_hamer_axes_with_objects_smoke/id_0/zed_replay.mp4` and `third_replay.mp4`
+
+- 2026-05-11
+  - Added a world-axis distance plot command for gripper/wrist-retreat points to objects:
+    - `code_painting/plot_piper_gripper_wrist_object_axis_distances.py`
+  - Key flags:
+    - `--hand_npz`
+    - `--object_dir`
+    - `--output_png`
+    - `--target_world_offset_xyz`
+    - `--left_object`
+    - `--right_object`
+  - Outputs:
+    - PNG plot
+    - Matching CSV table
+  - Usage location:
+    - D-debug-9 in `/home/zaijia001/ssd/PIPER_GRIPPER_ORIENTATION_DEBUG.zh.md`
+
+- 2026-05-18
+  - Updated Piper replay commands to the 0515/new_table calibration:
+    - Sections C/D/E in `/home/zaijia001/ssd/COMMAND_LIBRARY.zh.md`
+  - Added a calibration note section:
+    - C0 in `COMMAND_LIBRARY.zh.md`
+  - Current default configuration:
+    - `--robot_config /home/zaijia001/ssd/RoboTwin/robot_config_PiperPika_agx_dual_table_0515.json`
+    - `--head_camera_local_pos 0.11210396690038413 -0.39189397826604927 0.4753892624100325`
+    - `--head_camera_local_quat_wxyz -0.16972170030359832 0.6934883729683636 -0.6816465914025073 0.16008230830760367`
+  - Synchronized wrapper defaults:
+    - `code_painting/run_piper_hamer_axes_replay_batch.sh`
+    - `code_painting/run_piper_hamer_axes_with_objects_replay_batch.sh`
+
+- 2026-05-18
+  - Corrected the Piper calibration command notes in `/home/zaijia001/ssd/COMMAND_LIBRARY.zh.md`:
+    - C0 calibration sources now list four files instead of three, adding `left_wrist_new_table_eye_in_hand.json`
+    - C0 records both left and right wrist `gripper_T_camera` pos/quat values so future wrist-camera rendering does not wire only the right wrist
+    - C0 adds the current base/head-camera placement estimate
+    - The section F distance-plot command was restored as a single copyable command
+  - Key paths:
+    - `head_d435_new_table_0515_head_from_wrist.json`
+    - `left_base_T_right_base_new_table.json`
+    - `left_wrist_new_table_eye_in_hand.json`
+    - `right_wrist_new_table_eye_in_hand.json`
+
+- 2026-05-18
+  - Added `place_bread_basket` HaMeR/Piper debugging commands:
+    - Location: D0 in `/home/zaijia001/ssd/COMMAND_LIBRARY.zh.md`
+  - New command types:
+    - HaMeR GPU detection: `detect_hands_realr1.py --data_dir .../place_bread_basket/harmer_input --output_dir .../place_bread_basket/harmer_output`
+    - HaMeR native gripper visualization inspection: `hand_vis_gripper_*.mp4`
+    - Piper replay check: `run_piper_hamer_axes_replay_batch.sh .../place_bread_basket/harmer_output .../output_place_bread_basket_piper_hamer_axes`
+  - Important parameters:
+    - `GPU_ID=2`
+    - `GPU=2`
+    - `ARMS=both`
+    - `KEEP_ONLY_ZED_THIRD=1`
+    - `ID_FILTER=0`
+
+- 2026-05-18
+  - Added Piper calibration bundle commands:
+    - Location: C0 and D0 in `/home/zaijia001/ssd/COMMAND_LIBRARY.zh.md`
+  - New tools:
+    - `code_painting/build_piper_calibration_bundle.py`
+    - `code_painting/visualize_piper_calibration_bundle.py`
+  - New replay parameter/environment variable:
+    - `--piper_calibration_bundle`
+    - `CALIBRATION_BUNDLE=/home/zaijia001/ssd/RoboTwin/calibration_bundle_piper_new_table_0515.json`
+  - New visualization commands:
+    - Outputs `/home/zaijia001/ssd/RoboTwin/code_painting/output_piper_calibration_bundle_0515/axes_compare_old_head.png`
+    - Opens the viewer for `place_bread_basket` id0 camera/scene inspection
+
+- 2026-05-18
+  - Added commands for a head-camera marker visible in third-person renders:
+    - `DEBUG_VISUALIZE_CAMERAS=1`
+    - `DEBUG_CAMERA_AXIS_LENGTH=0.22`
+  - Added three-version comparison commands:
+    - `output_place_bread_basket_camera_compare/old_manual`
+    - `output_place_bread_basket_camera_compare/new_table_pre0515`
+    - `output_place_bread_basket_camera_compare/new_table_0515`
+  - Usage:
+    - Inspect `id_0/frames/third_0000.png` under each output directory
+    - Marker colors: white body, red/green/blue for local `+x/+y/+z`, yellow for the camera `-Z` optical ray
+
+- 2026-05-18
+  - Added viewer diagnostic command:
+    - `code_painting/probe_sapien_viewer.py`
+  - Updated the viewer command:
+    - Prints `DISPLAY/WAYLAND_DISPLAY/XDG_SESSION_TYPE` before running
+    - The hand replay code prints `[viewer] ...` diagnostics internally
+    - Adds `--debug_visualize_cameras 1` so the third-person output also shows the head-camera marker
+
+- 2026-05-18
+  - Corrected the viewer debugging command:
+    - Removed `CUDA_VISIBLE_DEVICES=2`
+    - Added `CUDA_VISIBLE_DEVICES` to viewer diagnostics
+    - Added a negative-control minimal viewer probe with `CUDA_VISIBLE_DEVICES=2`
+  - Reason:
+    - SAPIEN viewer needs the display GPU to remain visible; setting `CUDA_VISIBLE_DEVICES=2` can hide the GPU backing the VNC/X display and produce `Renderer does not support display`
+
+- 2026-05-18
+  - Corrected the 0515 Piper head-camera command parameters:
+    - Old direct quaternion: raw/optical hand-eye quaternion
+    - New direct quaternion: `0.8524694864910365 -0.0011011947849308937 0.5226654778798345 0.010740586780925399`
+    - The new quaternion is the render/SAPIEN camera pose after `raw_optical @ legacy_r1.T`, matching `--camera_cv_axis_mode legacy_r1`
+  - Updated locations:
+    - C0/C1/C2/C3/D1/E2 in `/home/zaijia001/ssd/COMMAND_LIBRARY.zh.md`
+    - `code_painting/run_piper_hamer_axes_replay_batch.sh`
+    - `code_painting/run_piper_hamer_axes_with_objects_replay_batch.sh`
+    - `code_painting/plot_piper_gripper_wrist_object_axis_distances.py`
+  - The bundle-generation command format is unchanged, but `build_piper_calibration_bundle.py` now converts raw head transforms into the render/SAPIEN head pose required by replay; the 0515 and pre-0515 bundles were regenerated.
+
+- 2026-05-18
+  - Updated section D replay commands in `/home/zaijia001/ssd/COMMAND_LIBRARY.zh.md` to prefer the calibration bundle:
+    - Explicitly added `CALIBRATION_BUNDLE=/home/zaijia001/ssd/RoboTwin/calibration_bundle_piper_new_table_0515.json` to the place_bread_basket id0/id1/batch commands
+    - Changed the D1 low-level single replay command to use `--piper_calibration_bundle`
+    - Explicitly added `CALIBRATION_BUNDLE` to the D2 final batch, ID-filtered, and right-hand-only commands
+  - Reason:
+    - The wrapper defaults already contain the correct 0515 render/SAPIEN head parameters, but the bundle form is safer. After the next calibration update, regenerate or replace the bundle first instead of manually syncing scattered `robot_config/head_pos/head_quat` values.
+
+- 2026-05-19
+  - Updated section D debug commands in `/home/zaijia001/ssd/COMMAND_LIBRARY.zh.md`:
+    - Added a HaMeR command for selected video IDs only: `--video_ids $(seq 0 10)`
+    - Added a Piper replay command for id0-id10 only: `ID_FILTER=0-10`
+    - Added `D4. HaMeR visualization video + Piper retarget replay side-by-side comparison`
+  - Added ffmpeg stacking commands:
+    - Single ID: `hand_vis_gripper_<id>.mp4` + `zed_replay.mp4`
+    - Single ID: `hand_vis_gripper_<id>.mp4` + `zed_replay.mp4` + `third_replay.mp4`
+    - Batch id0-id10: generate `compare_hamer_gripper_piper_zed_third_<id>.mp4` for each ID
+  - Validation:
+    - Ran the three-panel command for id0 successfully and generated `output_place_bread_basket_piper_hamer_axes/id_0/compare_hamer_gripper_piper_zed_third_0.mp4`
+
+- 2026-05-19
+  - Fixed the time-alignment issue in the D4 video-stacking commands:
+    - HaMeR `hand_vis_gripper` is usually 30fps while Piper replay is 5fps, so direct `hstack` makes the left HaMeR panel play too fast
+    - Added aligned commands that use `ffprobe` to compute `zed_replay_duration / hamer_duration`, then apply `setpts=R*PTS,fps=5` to the HaMeR input
+    - Added single-ID aligned output: `compare_aligned_hamer_gripper_piper_zed_third_<id>.mp4`
+    - Added a batch aligned stacking command for id0-id10
+  - Validation:
+    - Successfully generated `output_place_bread_basket_piper_hamer_axes/id_0/compare_aligned_hamer_gripper_piper_zed_third_0.mp4`
+    - The auto-computed id0 stretch ratio was about `R=6.0`, matching HaMeR 30fps to Piper 5fps
+
+- 2026-05-19
+  - Added a command format for retreating replay targets along the local blue axis:
+    - Added `TARGET_LOCAL_FORWARD_RETREAT_M=0.05` to D2 in `/home/zaijia001/ssd/RoboTwin/COMMAND_LIBRARY.zh.md`
+    - The underlying CLI flag is `--target_local_forward_retreat_m 0.05`
+  - Parameter meaning:
+    - Positive values retreat opposite the gripper-local `+Z` blue approach axis
+    - Unlike `--target_world_offset_xyz`, this is not a fixed world-coordinate offset; it follows each frame's eepose orientation
+  - Related entrypoints:
+    - `code_painting/render_hand_retarget_r1_npz.py`
+    - `code_painting/run_piper_hamer_axes_replay_batch.sh`
+    - `code_painting/run_piper_hamer_axes_with_objects_replay_batch.sh`

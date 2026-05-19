@@ -480,6 +480,106 @@ class HandRetargetTrajectory:
         return SideFrameTarget(False, np.full(3, np.nan), np.full((3, 3), np.nan), None)
 
 
+@dataclass
+class ObjectReplayEntry:
+    name: str
+    actor: sapien.Entity
+    poses_cam: np.ndarray
+    frame_to_npz_index: Dict[int, int]
+    mesh_file: Path
+    last_pose_world: Optional[np.ndarray] = None
+
+
+def parse_object_mesh_overrides(specs: Optional[Sequence[str]]) -> Dict[str, Path]:
+    overrides: Dict[str, Path] = {}
+    if not specs:
+        return overrides
+    for spec in specs:
+        if "=" not in spec:
+            raise ValueError(f"Invalid --object value '{spec}'. Expected NAME=/path/to/mesh.obj")
+        name, mesh_file = spec.split("=", 1)
+        name = name.strip()
+        mesh_path = Path(mesh_file.strip()).resolve()
+        if not name:
+            raise ValueError(f"Invalid --object value '{spec}'. Empty object name.")
+        if not mesh_path.is_file():
+            raise FileNotFoundError(f"Object mesh override does not exist: {mesh_path}")
+        overrides[name] = mesh_path
+    return overrides
+
+
+def load_object_mesh_from_run_config(pose_dir: Path) -> Path:
+    run_config_path = pose_dir / "run_config.json"
+    if not run_config_path.is_file():
+        raise FileNotFoundError(f"Missing run_config.json in {pose_dir}")
+    with run_config_path.open("r", encoding="utf-8") as f:
+        run_config = json.load(f)
+    mesh_file = run_config.get("mesh_file")
+    if not mesh_file:
+        raise KeyError(f"run_config.json in {pose_dir} does not contain mesh_file")
+    mesh_path = Path(mesh_file).resolve()
+    if not mesh_path.is_file():
+        raise FileNotFoundError(f"Object mesh from run_config does not exist: {mesh_path}")
+    return mesh_path
+
+
+def discover_object_replay_dirs(input_dir: Path, selected_names: Optional[Sequence[str]]) -> List[Path]:
+    root = input_dir.resolve()
+    if not root.is_dir():
+        raise NotADirectoryError(f"--object_replay_input_dir is not a directory: {root}")
+    allowed = None if not selected_names else {name.strip() for name in selected_names if name.strip()}
+    dirs: List[Path] = []
+    for child in sorted(root.iterdir()):
+        if not child.is_dir() or not (child / "poses.npz").is_file():
+            continue
+        if allowed is not None and child.name not in allowed:
+            continue
+        dirs.append(child)
+    if not dirs:
+        raise RuntimeError(f"No object pose folders with poses.npz found under {root}")
+    return dirs
+
+
+def build_object_replay_entries(renderer, args: argparse.Namespace) -> List[ObjectReplayEntry]:
+    if args.object_replay_input_dir is None:
+        return []
+    from render_object_pose_r1_npz import create_object_actor, load_pose_sequence
+
+    mesh_overrides = parse_object_mesh_overrides(args.object)
+    entries: List[ObjectReplayEntry] = []
+    for pose_dir in discover_object_replay_dirs(args.object_replay_input_dir, args.objects):
+        poses_cam, source_frame_indices = load_pose_sequence(pose_dir / "poses.npz")
+        mesh_file = mesh_overrides.get(pose_dir.name, load_object_mesh_from_run_config(pose_dir))
+        actor = create_object_actor(renderer.scene, mesh_file, f"tracked_object_{pose_dir.name}")
+        actor.set_pose(HIDDEN_DEBUG_POSE)
+        frame_to_npz_index = {int(frame_idx): idx for idx, frame_idx in enumerate(source_frame_indices.tolist())}
+        entries.append(ObjectReplayEntry(pose_dir.name, actor, poses_cam, frame_to_npz_index, mesh_file))
+    print(f"[object-replay] enabled objects={[entry.name for entry in entries]} input_dir={args.object_replay_input_dir}")
+    return entries
+
+
+def update_object_replay_entries(renderer, entries: Sequence[ObjectReplayEntry], frame_idx: int, missing_frame_policy: str) -> List[str]:
+    from render_object_pose_r1_npz import camera_pose_matrix_to_world_pose
+
+    visible_names: List[str] = []
+    for entry in entries:
+        npz_idx = entry.frame_to_npz_index.get(int(frame_idx))
+        pose_world = None
+        if npz_idx is not None:
+            pose_cam_matrix = np.asarray(entry.poses_cam[npz_idx], dtype=np.float64).reshape(4, 4)
+            pose_world = camera_pose_matrix_to_world_pose(renderer, pose_cam_matrix)
+            entry.last_pose_world = pose_world.copy()
+        elif missing_frame_policy == "hold_last" and entry.last_pose_world is not None:
+            pose_world = entry.last_pose_world.copy()
+
+        if pose_world is None:
+            entry.actor.set_pose(HIDDEN_DEBUG_POSE)
+            continue
+        entry.actor.set_pose(sapien.Pose(pose_world[:3], normalize_quat_wxyz(pose_world[3:])))
+        visible_names.append(entry.name)
+    return visible_names
+
+
 class HandRetargetR1Renderer:
     def __init__(
         self,
@@ -509,9 +609,13 @@ class HandRetargetR1Renderer:
         debug_visualize_targets: bool,
         debug_target_axis_length: float,
         debug_target_axis_thickness: float,
+        debug_visualize_cameras: bool,
+        debug_camera_axis_length: float,
+        debug_camera_axis_thickness: float,
         orientation_remap_label: str,
         orientation_remap_matrix: Sequence[Sequence[float]],
         stored_orientation_post_rot_xyz_deg: Sequence[float],
+        target_local_forward_retreat_m: float,
         target_world_offset_xyz: Sequence[float],
         left_target_world_offset_xyz: Sequence[float],
         right_target_world_offset_xyz: Sequence[float],
@@ -526,6 +630,9 @@ class HandRetargetR1Renderer:
         init_left_arm_joints: Optional[Sequence[float]],
         init_right_arm_joints: Optional[Sequence[float]],
         init_gripper_open: Optional[float],
+        execute_waypoint_scene_steps: int = 1,
+        execute_settle_scene_steps: int = 4,
+        urdfik_joint_interp_waypoints: int = 2,
         lighting_mode: str = "default",
     ):
         self.robot_config_path = robot_config_path
@@ -554,12 +661,16 @@ class HandRetargetR1Renderer:
         self.debug_visualize_targets = bool(debug_visualize_targets)
         self.debug_target_axis_length = max(float(debug_target_axis_length), 0.01)
         self.debug_target_axis_thickness = max(float(debug_target_axis_thickness), 0.001)
+        self.debug_visualize_cameras = bool(debug_visualize_cameras)
+        self.debug_camera_axis_length = max(float(debug_camera_axis_length), 0.02)
+        self.debug_camera_axis_thickness = max(float(debug_camera_axis_thickness), 0.001)
         self.orientation_remap_label = str(orientation_remap_label).strip()
         self.orientation_remap_matrix = orthonormalize_rotation(np.asarray(orientation_remap_matrix, dtype=np.float64).reshape(3, 3))
         self.stored_orientation_post_rot_xyz_deg = np.asarray(stored_orientation_post_rot_xyz_deg, dtype=np.float64).reshape(3)
         self.stored_orientation_post_rot_matrix = orthonormalize_rotation(
             R.from_euler("xyz", self.stored_orientation_post_rot_xyz_deg, degrees=True).as_matrix()
         )
+        self.target_local_forward_retreat_m = float(target_local_forward_retreat_m)
         self.target_world_offset_xyz = np.asarray(target_world_offset_xyz, dtype=np.float64).reshape(3)
         self.left_target_world_offset_xyz = np.asarray(left_target_world_offset_xyz, dtype=np.float64).reshape(3)
         self.right_target_world_offset_xyz = np.asarray(right_target_world_offset_xyz, dtype=np.float64).reshape(3)
@@ -574,6 +685,9 @@ class HandRetargetR1Renderer:
         self.init_left_arm_joints = None if init_left_arm_joints is None else np.asarray(init_left_arm_joints, dtype=np.float64).reshape(6)
         self.init_right_arm_joints = None if init_right_arm_joints is None else np.asarray(init_right_arm_joints, dtype=np.float64).reshape(6)
         self.init_gripper_open = None if init_gripper_open is None else float(init_gripper_open)
+        self.execute_waypoint_scene_steps = max(int(execute_waypoint_scene_steps), 1)
+        self.execute_settle_scene_steps = max(int(execute_settle_scene_steps), 0)
+        self.urdfik_joint_interp_waypoints = max(int(urdfik_joint_interp_waypoints), 2)
         self.lighting_mode = str(lighting_mode).strip().lower()
 
         self.robot: Optional["Robot"] = None
@@ -587,6 +701,7 @@ class HandRetargetR1Renderer:
         self._base_pose = None
         self._left_target_axis_actor = None
         self._right_target_axis_actor = None
+        self._head_camera_axis_actor = None
 
         self._setup_scene()
         self._setup_cameras()
@@ -637,13 +752,21 @@ class HandRetargetR1Renderer:
             from sapien.utils.viewer import Viewer
 
             try:
+                print(
+                    "[viewer] creating interactive viewer "
+                    f"DISPLAY={os.environ.get('DISPLAY')} "
+                    f"WAYLAND_DISPLAY={os.environ.get('WAYLAND_DISPLAY')} "
+                    f"XDG_SESSION_TYPE={os.environ.get('XDG_SESSION_TYPE')} "
+                    f"CUDA_VISIBLE_DEVICES={os.environ.get('CUDA_VISIBLE_DEVICES')}"
+                )
                 self.viewer = Viewer(self.renderer)
                 self.viewer.set_scene(self.scene)
                 self.viewer.set_camera_xyz(x=0.55, y=0.2, z=1.45)
                 self.viewer.set_camera_rpy(r=0.0, p=-0.6, y=2.6)
-            except RuntimeError as exc:
+                print("[viewer] interactive viewer created")
+            except Exception as exc:
                 self.viewer = None
-                print(f"[viewer-warning] failed to create interactive viewer, falling back to offscreen only: {exc}")
+                print(f"[viewer-warning] failed to create interactive viewer, falling back to offscreen only: {type(exc).__name__}: {exc}")
 
     def _setup_cameras(self) -> None:
         self.zed_camera = self.scene.add_camera(
@@ -714,6 +837,22 @@ class HandRetargetR1Renderer:
         actor.set_pose(HIDDEN_DEBUG_POSE)
         return actor
 
+    def _create_debug_camera_actor(self, name: str) -> sapien.Entity:
+        builder = self.scene.create_actor_builder()
+        axis_len = self.debug_camera_axis_length
+        axis_half = axis_len * 0.5
+        thick = self.debug_camera_axis_thickness
+        body = max(thick * 3.0, 0.012)
+        builder.add_box_visual(half_size=[body, body * 0.7, body * 0.45], material=[1.0, 1.0, 1.0])
+        builder.add_box_visual(pose=sapien.Pose([axis_half, 0.0, 0.0]), half_size=[axis_half, thick, thick], material=[1.0, 0.0, 0.0])
+        builder.add_box_visual(pose=sapien.Pose([0.0, axis_half, 0.0]), half_size=[thick, axis_half, thick], material=[0.0, 1.0, 0.0])
+        builder.add_box_visual(pose=sapien.Pose([0.0, 0.0, axis_half]), half_size=[thick, thick, axis_half], material=[0.0, 0.35, 1.0])
+        # SAPIEN cameras conventionally look along local -Z; draw it as a long yellow optical ray.
+        builder.add_box_visual(pose=sapien.Pose([0.0, 0.0, -axis_len * 0.65]), half_size=[thick * 1.4, thick * 1.4, axis_len * 0.65], material=[1.0, 0.85, 0.0])
+        actor = builder.build_kinematic(name=name)
+        actor.set_pose(HIDDEN_DEBUG_POSE)
+        return actor
+
     def _load_robot(self) -> None:
         from envs.robot import Robot
 
@@ -751,6 +890,8 @@ class HandRetargetR1Renderer:
         if self.debug_visualize_targets:
             self._left_target_axis_actor = self._create_debug_axis_actor("left_target_axis")
             self._right_target_axis_actor = self._create_debug_axis_actor("right_target_axis")
+        if self.debug_visualize_cameras:
+            self._head_camera_axis_actor = self._create_debug_camera_actor("head_camera_debug_axis")
 
         self._update_table_pose()
         self._update_base_occluder_pose()
@@ -1004,6 +1145,15 @@ class HandRetargetR1Renderer:
         target[2] += self.target_world_z_offset
         return target
 
+    def apply_target_local_forward_retreat(self, target_pose_world: np.ndarray) -> np.ndarray:
+        target = np.asarray(target_pose_world, dtype=np.float64).reshape(7).copy()
+        distance = float(self.target_local_forward_retreat_m)
+        if abs(distance) <= 1e-12:
+            return target
+        rot_world = R.from_quat(quat_wxyz_to_xyzw(normalize_quat_wxyz(target[3:]))).as_matrix()
+        target[:3] -= distance * rot_world[:, 2]
+        return target
+
     def remap_target_rotation(self, rotation_cam: np.ndarray) -> np.ndarray:
         rotation_cam = orthonormalize_rotation(rotation_cam)
         return orthonormalize_rotation(
@@ -1035,6 +1185,10 @@ class HandRetargetR1Renderer:
     def update_robot_link_cameras(self) -> None:
         head_pose = self.get_head_camera_pose()
         self.zed_camera.set_entity_pose(head_pose)
+        self._set_axis_actor_pose(
+            self._head_camera_axis_actor,
+            np.concatenate([np.asarray(head_pose.p, dtype=np.float64), normalize_quat_wxyz(head_pose.q)]),
+        )
         if self._left_wrist_camera_link is not None:
             self.left_wrist_camera.set_entity_pose(self.get_wrist_camera_pose("left"))
         if self._right_wrist_camera_link is not None:
@@ -1118,9 +1272,10 @@ class HandRetargetR1Renderer:
             if right_ok and right_idx < right_n and (not left_ok or right_idx / right_n <= left_idx / max(left_n, 1)):
                 self.robot.set_arm_joints(right_pos[right_idx], right_vel[right_idx], "right")
                 right_idx += 1
-            self.step_scene(steps=1)
+            self.step_scene(steps=self.execute_waypoint_scene_steps)
 
-        self.step_scene(steps=4)
+        if self.execute_settle_scene_steps > 0:
+            self.step_scene(steps=self.execute_settle_scene_steps)
         return left_status, right_status
 
     def set_grippers(self, left_value: Optional[float], right_value: Optional[float]) -> None:
@@ -1659,6 +1814,7 @@ def build_world_target_pose(
         return None
     remapped_rotation = renderer.remap_target_rotation(target_cam.rotation_cam)
     pose_world = renderer.camera_to_world_pose(target_cam.position_cam, remapped_rotation)
+    pose_world = renderer.apply_target_local_forward_retreat(pose_world)
     pose_world = renderer.apply_target_world_offset(arm, pose_world)
     if apply_forced_orientation:
         pose_world = renderer.align_target_orientation(arm, pose_world)
@@ -1693,11 +1849,46 @@ def parse_optional_base_pose(values: Optional[Sequence[float]]) -> Optional[List
     return [float(v) for v in values]
 
 
+def apply_piper_calibration_bundle(args: argparse.Namespace) -> None:
+    bundle_path = getattr(args, "piper_calibration_bundle", None)
+    if bundle_path is None:
+        return
+    bundle_path = Path(bundle_path).expanduser().resolve()
+    with bundle_path.open("r", encoding="utf-8") as f:
+        bundle = json.load(f)
+    if bundle.get("schema") != "piper_calibration_bundle.v1":
+        raise ValueError(f"Unsupported Piper calibration bundle schema in {bundle_path}: {bundle.get('schema')!r}")
+
+    robot_config = bundle.get("robot_config")
+    if not isinstance(robot_config, dict):
+        raise ValueError(f"Piper calibration bundle is missing embedded robot_config: {bundle_path}")
+    generated_config = args.output_dir / "calibration_bundle_robot_config.json"
+    generated_config.parent.mkdir(parents=True, exist_ok=True)
+    generated_config.write_text(json.dumps(robot_config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    args.robot_config = generated_config
+
+    head = bundle["head_camera"]["left_base_T_head_camera"]
+    args.head_camera_local_pos = [float(v) for v in head["translation"]]
+    args.head_camera_local_quat_wxyz = [float(v) for v in head["quat_wxyz"]]
+
+    # Current renderer exposes one shared wrist-camera local pose. Keep left as
+    # the generic default and record both source values in the bundle for future
+    # left/right-specific wrist rendering.
+    wrist = bundle.get("wrist_cameras", {}).get("left_gripper_T_camera")
+    if wrist is not None:
+        args.wrist_camera_local_pos = [float(v) for v in wrist["translation"]]
+        args.wrist_camera_local_quat_wxyz = [float(v) for v in wrist["quat_wxyz"]]
+
+    print(f"[piper-calibration-bundle] loaded {bundle_path}")
+    print(f"[piper-calibration-bundle] generated_robot_config={generated_config}")
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Replay hand-retargeted gripper poses in RoboTwin R1.")
     parser.add_argument("--input_npz", type=Path, required=True, help="hand_detections_*.npz or *_with_gripper.npz")
     parser.add_argument("--output_dir", type=Path, required=True, help="Directory for videos, frames, and world targets")
     parser.add_argument("--robot_config", type=Path, default=DEFAULT_ROBOT_CONFIG)
+    parser.add_argument("--piper_calibration_bundle", type=Path, default=None, help="Optional self-contained Piper calibration bundle; overrides robot_config and camera local poses.")
     parser.add_argument("--image_width", type=int, default=640)
     parser.add_argument("--image_height", type=int, default=360)
     parser.add_argument("--fps", type=int, default=5)
@@ -1754,6 +1945,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--debug_visualize_targets", type=int, default=1)
     parser.add_argument("--debug_target_axis_length", type=float, default=0.08)
     parser.add_argument("--debug_target_axis_thickness", type=float, default=0.004)
+    parser.add_argument("--debug_visualize_cameras", type=int, default=0, help="Draw visible camera body/axes in third-person render.")
+    parser.add_argument("--debug_camera_axis_length", type=float, default=0.16)
+    parser.add_argument("--debug_camera_axis_thickness", type=float, default=0.006)
     parser.add_argument(
         "--orientation_remap_label",
         type=str,
@@ -1773,6 +1967,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--orientation_remap_sweep_enable", type=int, default=0)
     parser.add_argument("--orientation_remap_sweep_execute", type=int, default=1)
     parser.add_argument("--orientation_remap_sweep_save_images", type=int, default=1)
+    parser.add_argument("--target_local_forward_retreat_m", type=float, default=0.0, help="Meters to move each target backward along its own local +Z blue/approach axis after camera-to-world conversion. Positive values retreat opposite local +Z.")
     parser.add_argument("--target_world_offset_xyz", type=float, nargs=3, default=[0.0, 0.0, 0.0], metavar=("DX", "DY", "DZ"), help="Meters to add to every world-space target position before planning")
     parser.add_argument("--left_target_world_offset_xyz", type=float, nargs=3, default=[0.0, 0.0, 0.0], metavar=("DX", "DY", "DZ"), help="Extra meters to add only to left-arm world-space targets")
     parser.add_argument("--right_target_world_offset_xyz", type=float, nargs=3, default=[0.0, 0.0, 0.0], metavar=("DX", "DY", "DZ"), help="Extra meters to add only to right-arm world-space targets")
@@ -1801,6 +1996,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--init_left_arm_joints", type=float, nargs=6, default=None, metavar=("J1", "J2", "J3", "J4", "J5", "J6"))
     parser.add_argument("--init_right_arm_joints", type=float, nargs=6, default=None, metavar=("J1", "J2", "J3", "J4", "J5", "J6"))
     parser.add_argument("--init_gripper_open", type=float, default=None, help="Initial normalized gripper opening in [0,1] applied before replay")
+    parser.add_argument("--execute_waypoint_scene_steps", type=int, default=1, help="Scene steps to simulate after each waypoint joint command during plan execution")
+    parser.add_argument("--execute_settle_scene_steps", type=int, default=4, help="Extra scene steps to simulate after finishing one frame execution")
+    parser.add_argument("--urdfik_joint_interp_waypoints", type=int, default=2, help="URDFIK only: number of waypoints used by joint_interp mode (>=2)")
     parser.add_argument("--orientation_sweep_enable", type=int, default=0)
     parser.add_argument(
         "--frame_plan_mode",
@@ -1835,6 +2033,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--orientation_sweep_save_images", type=int, default=1)
     parser.add_argument("--overlay_text_enable", type=int, default=1, help="Overlay status text on output RGB frames")
     parser.add_argument("--save_world_targets", type=int, default=1, help="Save world_targets_and_status.npz")
+    parser.add_argument("--object_replay_input_dir", type=Path, default=None, help="Optional FoundationPose video-level object directory containing object subdirs with poses.npz; objects are overlaid in the hand replay scene.")
+    parser.add_argument("--object_missing_frame_policy", choices=["hide", "hold_last"], default="hide")
+    parser.add_argument("--objects", type=str, nargs="*", default=None, help="Optional subset of object folder names to overlay from --object_replay_input_dir.")
+    parser.add_argument("--object", action="append", default=None, help="Repeatable object mesh override NAME=/path/to/mesh.obj for overlaid FoundationPose objects.")
     parser.add_argument(
         "--clean_output",
         type=int,
@@ -1850,6 +2052,7 @@ def main() -> None:
         args.overlay_text_enable = 0
         args.debug_visualize_targets = 0
     args.output_dir.mkdir(parents=True, exist_ok=True)
+    apply_piper_calibration_bundle(args)
     frames_dir = args.output_dir / "frames"
     if args.save_png_frames:
         frames_dir.mkdir(parents=True, exist_ok=True)
@@ -1931,9 +2134,13 @@ def main() -> None:
         debug_visualize_targets=bool(args.debug_visualize_targets),
         debug_target_axis_length=args.debug_target_axis_length,
         debug_target_axis_thickness=args.debug_target_axis_thickness,
+        debug_visualize_cameras=bool(args.debug_visualize_cameras),
+        debug_camera_axis_length=args.debug_camera_axis_length,
+        debug_camera_axis_thickness=args.debug_camera_axis_thickness,
         orientation_remap_label=orientation_remap_label,
         orientation_remap_matrix=orientation_remap_matrix,
         stored_orientation_post_rot_xyz_deg=args.stored_orientation_post_rot_xyz_deg,
+        target_local_forward_retreat_m=args.target_local_forward_retreat_m,
         target_world_offset_xyz=args.target_world_offset_xyz,
         left_target_world_offset_xyz=args.left_target_world_offset_xyz,
         right_target_world_offset_xyz=args.right_target_world_offset_xyz,
@@ -1948,6 +2155,9 @@ def main() -> None:
         init_left_arm_joints=args.init_left_arm_joints,
         init_right_arm_joints=args.init_right_arm_joints,
         init_gripper_open=args.init_gripper_open,
+        execute_waypoint_scene_steps=args.execute_waypoint_scene_steps,
+        execute_settle_scene_steps=args.execute_settle_scene_steps,
+        urdfik_joint_interp_waypoints=args.urdfik_joint_interp_waypoints,
         lighting_mode=args.lighting_mode,
     )
     print(f"[orientation-remap] label={renderer.orientation_remap_label} (shared_by_left_and_right)")
@@ -1955,6 +2165,7 @@ def main() -> None:
         "[orientation-post-rot] "
         f"local_xyz_deg={np.round(renderer.stored_orientation_post_rot_xyz_deg, 4).tolist()}"
     )
+    print(f"[target-local-retreat] along_local_plus_z_blue_m={renderer.target_local_forward_retreat_m:.4f}")
     print(
         "[target-offset] "
         f"global_xyz={np.round(renderer.target_world_offset_xyz, 4).tolist()} "
@@ -1963,6 +2174,13 @@ def main() -> None:
         f"z_extra={renderer.target_world_z_offset:+.4f}"
     )
     print(f"[frame-plan-mode] {args.frame_plan_mode}")
+    print(
+        "[execute-steps] "
+        f"waypoint_scene_steps={renderer.execute_waypoint_scene_steps} "
+        f"settle_scene_steps={renderer.execute_settle_scene_steps} "
+        f"urdfik_joint_interp_waypoints={renderer.urdfik_joint_interp_waypoints}"
+    )
+    object_replay_entries = build_object_replay_entries(renderer, args)
 
     indices = list(range(max(args.frame_start, 0), trajectory.length if args.frame_end < 0 else min(args.frame_end + 1, trajectory.length), max(args.frame_stride, 1)))
     if args.debug_mode and args.debug_frame_limit > 0:
@@ -2547,6 +2765,12 @@ def main() -> None:
                 if right_gripper is not None:
                     right_values[frame_idx] = right_gripper
 
+            visible_objects = update_object_replay_entries(
+                renderer,
+                object_replay_entries,
+                frame_idx,
+                args.object_missing_frame_policy,
+            )
             renderer.update_robot_link_cameras()
             rgb, depth = renderer.capture_camera(renderer.zed_camera)
             overlay_lines: List[str] = []
@@ -2560,6 +2784,8 @@ def main() -> None:
                 overlay_lines.append(f"Frame {frame_idx} ({smooth_idx + 1}/{total_playback})")
             overlay_lines.append(f"Left plan: {left_status or 'Skipped'}")
             overlay_lines.append(f"Right plan: {right_status or 'Skipped'}")
+            if object_replay_entries:
+                overlay_lines.append(f"Objects: {','.join(visible_objects) if visible_objects else 'none'}")
             if bool(args.overlay_text_enable):
                 main_bgr = overlay_text(rgb, overlay_lines)
             else:

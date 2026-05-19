@@ -1,3 +1,47 @@
+## 2026-05-06 11:40:00 +08
+
+- 为 URDFIK replay 新增显式执行步数参数（可直接从命令行调）：
+  - `--execute_waypoint_scene_steps`（每个关节轨迹点后仿真步数，默认 1）
+  - `--execute_settle_scene_steps`（每帧结束附加仿真步数，默认 4）
+  - `--urdfik_joint_interp_waypoints`（joint_interp 轨迹插值点数，默认 2）
+- 适用入口：
+  - `render_hand_retarget_piper_dual_npz_urdfik_main.py`
+  - `render_hand_retarget_r1_npz_urdfik.py`
+- 日志新增打印：`[execute-steps] ...`，便于核对实际执行配置。
+- 同步更新：`/home/zaijia001/ssd/COMMAND_LIBRARY.zh.md`（D6 增加执行步数验证命令）。
+
+## 2026-04-29 17:10:00 +08
+
+- 更新命令工具：`run_piper_gripper_standard_pose_guess.sh`
+  - 默认加入 `TARGET_DY=0.1 TARGET_DZ=0.1`（前上偏移）
+  - 产物改为仅图片（zed/third PNG）+ `index.csv` + `world_targets_and_status.npz`
+  - 增加 `left_status/right_status` 输出，方便定位是否 IK 未执行到位
+- 命令库同步：`/home/zaijia001/ssd/COMMAND_LIBRARY.zh.md` D6
+  - 明确“只保留 zed+third 图片”
+  - 明确“Fail 常见由 IK 可达性引起，不等于朝向定义错误”
+
+## 2026-04-29 16:30:00 +08
+
+- 新增命令入口：
+  - `bash /home/zaijia001/ssd/RoboTwin/code_painting/run_piper_gripper_standard_pose_guess.sh ...`
+- 用途：
+  - 生成 Piper 夹爪“标准朝向猜测板”图片到单目录 `.../board/`
+  - 同时输出 `index.csv`，便于逐图人工反馈与语义校准
+- 相关代码：
+  - `code_painting/run_piper_gripper_standard_pose_guess.sh`
+  - `code_painting/run_piper_gripper_orientation_guess_board.sh`
+- 同步更新命令库：`/home/zaijia001/ssd/COMMAND_LIBRARY.zh.md`（新增 D6）
+
+## 2026-04-29 16:00:00 +08
+
+- 更新 `/home/zaijia001/ssd/COMMAND_LIBRARY.zh.md` 的 HaMeR 指令：
+  - GPU 命令从 `hamer-r1` 切换为 `hamer-r1-gpu`
+  - GPU 命令增加 `unset LD_LIBRARY_PATH`（与原版 README 约定保持一致）
+- 新增快速检测统计命令：
+  - 直接读取 `hand_detections_*.npz` 的 `left_hand_detected/right_hand_detected` 计数
+- 新增 debug 基准命令：
+  - `CUDA_VISIBLE_DEVICES=2 + hamer-r1-gpu + video_id=0 + --no_visualize`
+
 ## 2026-04-27 17:35:00 +08
 
 - `run_multi_object_pose_r1_npz_batch.sh` 所调用的 batch 入口现已支持：
@@ -742,3 +786,235 @@
   - `--execution_object_visual_scale_override NAME=S|SX,SY,SZ`
   - `--execution_object_collision_scale_override NAME=S|SX,SY,SZ`
   - 用途：分别控制 execution object 的 visual mesh 与 collision shape 缩放
+- 2026-05-07
+  - 新增 retarget 后旋转 board 视频命令：
+    - `code_painting/run_piper_retarget_postrot_board_video.sh`
+  - 关键环境变量：
+    - `CASE_MODE=standard|axis90|grid`
+    - `ORIENTATION_REMAP_LABEL`
+    - `TARGET_DX/TARGET_DY/TARGET_DZ`
+    - `ARMS`
+    - `MAX_FRAMES`
+  - 输出：
+    - `board/board_zed.mp4`
+    - `board/board_third.mp4`
+    - `board/board_zed_frame0000.png`
+    - `board/board_third_frame0000.png`
+    - `index.csv`
+
+- 2026-05-07
+  - 扩展局部轴扫图命令：
+    - `VIDEO_MODE=1`：生成 `board_all_zed.mp4` 与 `board_success_zed.mp4`
+    - `CANDIDATE_MODE=semantic`：生成 `forward_from_*` / `open_from_*` 语义候选
+    - `FRAME_END` / `MAX_FRAMES` / `FRAME_STRIDE`：控制多帧范围
+  - 代表命令：
+    - `GPU=3 FRAME_IDX=0 FRAME_END=-1 MAX_FRAMES=32 ARM=left EXECUTE=1 CANDIDATE_MODE=remap VIDEO_MODE=1 FPS=5 SAVE_WRIST_VIEWS=0 bash code_painting/run_piper_local_axis_sweep_board.sh <input_npz> <output_dir>`
+
+- 2026-05-07
+  - 新增局部轴扫图命令：
+    - `bash code_painting/run_piper_local_axis_sweep_board.sh <input_npz> <output_dir>`
+  - 相关代码：
+    - `code_painting/build_piper_local_axis_sweep_board.py`
+    - `code_painting/run_piper_local_axis_sweep_board.sh`
+  - 重要参数：
+    - `FRAME_IDX`
+    - `ARM`
+    - `EXECUTE`
+    - `SAVE_WRIST_VIEWS`
+  - 使用说明：
+    - 默认固定当前 `PiperPika` 标定 head cam 位姿
+    - 默认先做纯扫图，不执行 IK
+    - 如果要检查“是不是执行不到位”，把 `EXECUTE=1` 打开
+
+- 2026-05-11
+  - 新增最终 HaMeR 轴 replay 批处理命令：
+    - `code_painting/run_piper_hamer_axes_replay_batch.sh <input_npz_or_dir> <output_root>`
+  - 关键环境变量：
+    - `GPU`
+    - `FPS`
+    - `MAX_FRAMES`
+    - `ARMS=both|left|right`
+    - `ID_FILTER=0,2,5-8`
+    - `KEEP_ONLY_ZED_THIRD=1`
+  - 固定 replay 规则：
+    - `--require_stored_gripper_pose 1`
+    - `--pose_source gripper`
+    - `--orientation_remap_label identity`
+    - `--stored_orientation_post_rot_xyz_deg 0 0 0`
+  - 输出：
+    - 每个 ID 输出到 `<output_root>/id_<id>`
+    - `frames/` 默认只保留 zed/third RGB PNG
+  - 文档调整：
+    - `/home/zaijia001/ssd/COMMAND_LIBRARY.zh.md` D 段只保留最终 replay 指令
+    - 详细 debug 指令迁移到 `/home/zaijia001/ssd/PIPER_GRIPPER_ORIENTATION_DEBUG.zh.md`
+
+- 2026-05-11
+  - 新增“HaMeR 手 + FoundationPose 物体同场 replay”命令：
+    - `code_painting/run_piper_hamer_axes_with_objects_replay_batch.sh <hand_npz_or_dir> <foundation_obj_vis_root> <output_root>`
+  - 关键环境变量：
+    - `GPU`
+    - `FPS`
+    - `MAX_FRAMES`
+    - `ARMS=both|left|right`
+    - `ID_FILTER=0,2,5-8`
+    - `KEEP_ONLY_ZED_THIRD=0|1`
+    - `OBJECT_MISSING_FRAME_POLICY=hide|hold_last`
+  - 新增底层 replay 参数：
+    - `--object_replay_input_dir`
+    - `--object_missing_frame_policy`
+    - `--objects`
+    - `--object NAME=/path/to/mesh.obj`
+  - 用法位置：
+    - `/home/zaijia001/ssd/COMMAND_LIBRARY.zh.md` 的 E 段
+  - 验证：
+    - 1 帧 smoke test 通过，输出 `/tmp/piper_hamer_axes_with_objects_smoke/id_0/zed_replay.mp4` 与 `third_replay.mp4`
+
+- 2026-05-11
+  - 新增 gripper/wrist-retreat 到物体的世界轴向距离图命令：
+    - `code_painting/plot_piper_gripper_wrist_object_axis_distances.py`
+  - 关键参数：
+    - `--hand_npz`
+    - `--object_dir`
+    - `--output_png`
+    - `--target_world_offset_xyz`
+    - `--left_object`
+    - `--right_object`
+  - 输出：
+    - PNG 曲线图
+    - 同名 CSV 数值表
+  - 用法位置：
+    - `/home/zaijia001/ssd/PIPER_GRIPPER_ORIENTATION_DEBUG.zh.md` 的 D-debug-9
+
+- 2026-05-18
+  - 更新 Piper replay 命令到 0515/new_table 标定：
+    - `/home/zaijia001/ssd/COMMAND_LIBRARY.zh.md` 的 C/D/E 段
+  - 新增标定说明段：
+    - `COMMAND_LIBRARY.zh.md` 的 C0
+  - 当前默认配置：
+    - `--robot_config /home/zaijia001/ssd/RoboTwin/robot_config_PiperPika_agx_dual_table_0515.json`
+    - `--head_camera_local_pos 0.11210396690038413 -0.39189397826604927 0.4753892624100325`
+    - `--head_camera_local_quat_wxyz -0.16972170030359832 0.6934883729683636 -0.6816465914025073 0.16008230830760367`
+  - 同步更新 wrapper 默认值：
+    - `code_painting/run_piper_hamer_axes_replay_batch.sh`
+    - `code_painting/run_piper_hamer_axes_with_objects_replay_batch.sh`
+
+- 2026-05-18
+  - 修正 `/home/zaijia001/ssd/COMMAND_LIBRARY.zh.md` 的 Piper 标定命令说明：
+    - C0 标定源从“三文件”补齐为“四文件”，新增 `left_wrist_new_table_eye_in_hand.json`
+    - C0 记录左右 wrist `gripper_T_camera` 的 pos/quat，避免后续启用 wrist camera 时只接右腕
+    - C0 增加当前 base/head camera 摆放估算
+    - F 段距离曲线命令恢复为单行可复制命令
+  - 关键路径：
+    - `head_d435_new_table_0515_head_from_wrist.json`
+    - `left_base_T_right_base_new_table.json`
+    - `left_wrist_new_table_eye_in_hand.json`
+    - `right_wrist_new_table_eye_in_hand.json`
+
+- 2026-05-18
+  - 新增 `place_bread_basket` 的 HaMeR/Piper 调试命令：
+    - 位置：`/home/zaijia001/ssd/COMMAND_LIBRARY.zh.md` 的 D0
+  - 新增命令类型：
+    - HaMeR GPU 检测：`detect_hands_realr1.py --data_dir .../place_bread_basket/harmer_input --output_dir .../place_bread_basket/harmer_output`
+    - HaMeR 自带夹爪可视化查看：`hand_vis_gripper_*.mp4`
+    - Piper replay 检查：`run_piper_hamer_axes_replay_batch.sh .../place_bread_basket/harmer_output .../output_place_bread_basket_piper_hamer_axes`
+  - 重要参数：
+    - `GPU_ID=2`
+    - `GPU=2`
+    - `ARMS=both`
+    - `KEEP_ONLY_ZED_THIRD=1`
+    - `ID_FILTER=0`
+
+- 2026-05-18
+  - 新增 Piper 标定 bundle 命令：
+    - 位置：`/home/zaijia001/ssd/COMMAND_LIBRARY.zh.md` 的 C0 和 D0
+  - 新增工具：
+    - `code_painting/build_piper_calibration_bundle.py`
+    - `code_painting/visualize_piper_calibration_bundle.py`
+  - 新增 replay 参数/环境变量：
+    - `--piper_calibration_bundle`
+    - `CALIBRATION_BUNDLE=/home/zaijia001/ssd/RoboTwin/calibration_bundle_piper_new_table_0515.json`
+  - 新增可视化命令：
+    - 输出 `/home/zaijia001/ssd/RoboTwin/code_painting/output_piper_calibration_bundle_0515/axes_compare_old_head.png`
+    - 使用 viewer 打开 `place_bread_basket` id0 的相机/场景检查
+
+- 2026-05-18
+  - 新增 third 视角内可见的 head camera marker 命令：
+    - `DEBUG_VISUALIZE_CAMERAS=1`
+    - `DEBUG_CAMERA_AXIS_LENGTH=0.22`
+  - 新增三版本对比命令：
+    - `output_place_bread_basket_camera_compare/old_manual`
+    - `output_place_bread_basket_camera_compare/new_table_pre0515`
+    - `output_place_bread_basket_camera_compare/new_table_0515`
+  - 用法：
+    - 查看各目录下 `id_0/frames/third_0000.png`
+    - marker 颜色：白色机身，红/绿/蓝为局部 `+x/+y/+z`，黄色为相机 `-Z` 光轴
+
+- 2026-05-18
+  - 新增 viewer 排查命令：
+    - `code_painting/probe_sapien_viewer.py`
+  - 更新 viewer 命令：
+    - 运行前打印 `DISPLAY/WAYLAND_DISPLAY/XDG_SESSION_TYPE`
+    - hand replay 内部打印 `[viewer] ...`
+    - 加入 `--debug_visualize_cameras 1`，确保 third 图里也能看到 head camera marker
+
+- 2026-05-18
+  - 修正 viewer 调试命令：
+    - 移除 `CUDA_VISIBLE_DEVICES=2`
+    - 日志增加 `CUDA_VISIBLE_DEVICES`
+    - 增加 `CUDA_VISIBLE_DEVICES=2` 的最小 viewer probe 反例命令
+  - 原因：
+    - SAPIEN viewer 需要 display GPU 可见；设置 `CUDA_VISIBLE_DEVICES=2` 可能隐藏 VNC/X display 对应 GPU，导致 `Renderer does not support display`
+
+- 2026-05-18
+  - 修正 0515 Piper head camera 命令参数：
+    - 旧散写 quaternion：raw/optical handeye quaternion
+    - 新散写 quaternion：`0.8524694864910365 -0.0011011947849308937 0.5226654778798345 0.010740586780925399`
+    - 新 quaternion 是 `raw_optical @ legacy_r1.T` 后的 render/SAPIEN 相机位姿，和 `--camera_cv_axis_mode legacy_r1` 配套使用
+  - 更新位置：
+    - `/home/zaijia001/ssd/COMMAND_LIBRARY.zh.md` 的 C0/C1/C2/C3/D1/E2
+    - `code_painting/run_piper_hamer_axes_replay_batch.sh`
+    - `code_painting/run_piper_hamer_axes_with_objects_replay_batch.sh`
+    - `code_painting/plot_piper_gripper_wrist_object_axis_distances.py`
+  - bundle 命令保持不变，但 `build_piper_calibration_bundle.py` 现在会自动把 raw head 转成 replay 所需 render/SAPIEN head；已重新生成 0515 和 pre-0515 bundle。
+
+- 2026-05-18
+  - 将 `/home/zaijia001/ssd/COMMAND_LIBRARY.zh.md` 的 D 段 replay 命令改成 bundle 优先：
+    - place_bread_basket 的 id0/id1/批处理命令显式加入 `CALIBRATION_BUNDLE=/home/zaijia001/ssd/RoboTwin/calibration_bundle_piper_new_table_0515.json`
+    - D1 单条底层 replay 命令改用 `--piper_calibration_bundle`
+    - D2 最终批处理、id 过滤、右手检查命令显式加入 `CALIBRATION_BUNDLE`
+  - 原因：
+    - wrapper 默认值当前已是正确 0515 render/SAPIEN head 参数，但 bundle 形式更稳，后续换标定时优先重生成/替换 bundle，不需要人工同步散写 `robot_config/head_pos/head_quat`。
+
+- 2026-05-19
+  - 更新 `/home/zaijia001/ssd/COMMAND_LIBRARY.zh.md` 的 D 段 debug 命令：
+    - 新增 HaMeR 只跑指定视频 ID 的命令：`--video_ids $(seq 0 10)`
+    - 新增 Piper replay 只跑 id0-id10 的命令：`ID_FILTER=0-10`
+    - 新增 `D4. HaMeR 可视化视频 + Piper retarget replay 横向拼接对比`
+  - 新增 ffmpeg 拼接命令：
+    - 单个 id：`hand_vis_gripper_<id>.mp4` + `zed_replay.mp4`
+    - 单个 id：`hand_vis_gripper_<id>.mp4` + `zed_replay.mp4` + `third_replay.mp4`
+    - 批量 id0-id10：逐个生成 `compare_hamer_gripper_piper_zed_third_<id>.mp4`
+  - 验证：
+    - 对 id0 运行三联拼接命令成功，生成 `output_place_bread_basket_piper_hamer_axes/id_0/compare_hamer_gripper_piper_zed_third_0.mp4`
+
+- 2026-05-19
+  - 修正 D4 视频拼接的时间对齐问题：
+    - HaMeR `hand_vis_gripper` 通常是 30fps，Piper replay 是 5fps，直接 `hstack` 会导致左侧 HaMeR 播放过快
+    - 新增对齐版命令：用 `ffprobe` 自动计算 `zed_replay_duration / hamer_duration`，再对 HaMeR 输入应用 `setpts=R*PTS,fps=5`
+    - 新增单 id 对齐版输出：`compare_aligned_hamer_gripper_piper_zed_third_<id>.mp4`
+    - 新增批量 id0-id10 对齐版拼接命令
+  - 验证：
+    - 对 id0 生成成功：`output_place_bread_basket_piper_hamer_axes/id_0/compare_aligned_hamer_gripper_piper_zed_third_0.mp4`
+    - id0 自动计算的拉伸比例约 `R=6.0`，对应 HaMeR 30fps 到 Piper 5fps
+
+- 2026-05-19
+  - 新增 replay 局部蓝轴后退命令格式：
+    - `/home/zaijia001/ssd/RoboTwin/COMMAND_LIBRARY.zh.md` 的 D2 增加 `TARGET_LOCAL_FORWARD_RETREAT_M=0.05`
+    - 底层参数为 `--target_local_forward_retreat_m 0.05`
+  - 参数含义：
+    - 正数沿夹爪自身局部 `+Z` 蓝色前进/接近轴的反方向后退
+    - 与 `--target_world_offset_xyz` 不同，它不是固定世界坐标偏移，而是跟随每帧 eepose 朝向
+  - 相关入口：
+    - `code_painting/render_hand_retarget_r1_npz.py`
+    - `code_painting/run_piper_hamer_axes_replay_batch.sh`
+    - `code_painting/run_piper_hamer_axes_with_objects_replay_batch.sh`
