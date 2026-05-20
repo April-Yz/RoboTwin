@@ -1600,3 +1600,14 @@
     - `py_compile` passed for `render_object_pose_r1_npz.py`, `replay_r1_h5.py`, `minimal_gripper_collision_probe.py`, and `render_multi_object_pose_r1_npz.py`
     - `bash -n` passed for `run_multi_object_pose_r1_npz_batch.sh`
     - A pick_diverse_bottles id0 smoke test with `--max_frames 1 --skip_existing 0` passed and generated `/tmp/pick_diverse_bottles_foundation_replay_smoke/foundation_input_0/head_cam_replay.mp4` and `multi_object_world_poses.npz`
+
+- 2026-05-20
+  - Updated the E2 single-video replay commands in `COMMAND_LIBRARY.zh.md`:
+    - Added hand + FoundationPose object replay commands for pick_diverse_bottles, place_bread_basket, and stack_cups
+    - All three commands use `--piper_calibration_bundle calibration_bundle_piper_new_table_0515.json`
+    - All three commands include `--target_local_forward_retreat_m 0.05` to retreat 5 cm opposite the gripper-local blue `+Z` approach axis
+    - E2 now documents the viewer toggle: append `--enable_viewer 1 --viewer_wait_at_end 1 --viewer_frame_delay 0.02`
+  - Validation:
+    - Ran a pick_diverse_bottles id0 smoke test with `--max_frames 1` successfully
+    - The log confirmed `[target-local-retreat] along_local_plus_z_blue_m=0.0500`
+    - The log confirmed FoundationPose objects `['left_bottle', 'right_bottle']` were loaded

@@ -1601,3 +1601,14 @@
     - `py_compile` 通过：`render_object_pose_r1_npz.py`、`replay_r1_h5.py`、`minimal_gripper_collision_probe.py`、`render_multi_object_pose_r1_npz.py`
     - `bash -n` 通过：`run_multi_object_pose_r1_npz_batch.sh`
     - 对 pick_diverse_bottles id0 跑 `--max_frames 1 --skip_existing 0` smoke test 成功，生成 `/tmp/pick_diverse_bottles_foundation_replay_smoke/foundation_input_0/head_cam_replay.mp4` 和 `multi_object_world_poses.npz`
+
+- 2026-05-20
+  - 更新 `COMMAND_LIBRARY.zh.md` 的 E2 单条 replay 命令：
+    - 新增 pick_diverse_bottles、place_bread_basket、stack_cups 三个任务的人手 + FoundationPose 物体同场 replay 指令
+    - 三个命令都使用 `--piper_calibration_bundle calibration_bundle_piper_new_table_0515.json`
+    - 三个命令都加入 `--target_local_forward_retreat_m 0.05`，用于沿夹爪局部蓝色 `+Z` 前进轴反方向后退 5cm
+    - 在 E2 中注明 viewer 开启方式：追加 `--enable_viewer 1 --viewer_wait_at_end 1 --viewer_frame_delay 0.02`
+  - 验证：
+    - 对 pick_diverse_bottles id0 运行 `--max_frames 1` smoke test 成功
+    - 日志确认 `[target-local-retreat] along_local_plus_z_blue_m=0.0500`
+    - 日志确认加载 FoundationPose 物体 `['left_bottle', 'right_bottle']`

@@ -1029,3 +1029,14 @@
     - `code_painting/render_object_pose_r1_npz.py`
   - 验证：
     - `CUDA_VISIBLE_DEVICES=2 ... --ids 0 --max_frames 1 --skip_existing 0 ...` smoke test 通过，不再出现 renderer 构造参数缺失错误
+
+- 2026-05-20
+  - 补充 E2 手 + 指定 FoundationPose video dir 的三任务单条命令：
+    - pick_diverse_bottles：`hand_detections_0.npz` + `foundation_input_0`，对象 `right_bottle/left_bottle`
+    - place_bread_basket：`hand_detections_0.npz` + `foundation_input_0`，对象 `basket/bread`
+    - stack_cups：`hand_detections_0.npz` + `foundation_input_0`，对象 `right_dark_red_cup/left_light_pink_cup`
+  - 关键参数：
+    - `--target_local_forward_retreat_m 0.05`：沿夹爪局部蓝色 `+Z` 前进轴反方向后退 5cm
+    - viewer 开启方式：追加 `--enable_viewer 1 --viewer_wait_at_end 1 --viewer_frame_delay 0.02`
+  - 验证：
+    - pick_diverse_bottles id0 的 `--max_frames 1` smoke test 通过
