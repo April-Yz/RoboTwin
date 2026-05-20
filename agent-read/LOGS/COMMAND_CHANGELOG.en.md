@@ -1042,3 +1042,14 @@
     - Viewer toggle: append `--enable_viewer 1 --viewer_wait_at_end 1 --viewer_frame_delay 0.02`
   - Validation:
     - The pick_diverse_bottles id0 `--max_frames 1` smoke test passed
+
+- 2026-05-20
+  - Changed the E2.1/E2.2/E2.3 hand + object replay commands to id0-id10 batch-loop format:
+    - `pick_diverse_bottles`
+    - `place_bread_basket`
+    - `stack_cups`
+  - Command format:
+    - `source ... && for ID in $(seq 0 10); do CUDA_VISIBLE_DEVICES=2 conda run ...; done`
+    - `--input_npz`, `--output_dir`, and `--object_replay_input_dir` all expand `${ID}`
+  - Viewer usage note:
+    - The batch commands keep the viewer off by default; to use the viewer, narrow the loop to a single ID and then append the viewer flags

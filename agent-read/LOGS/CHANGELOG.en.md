@@ -1611,3 +1611,15 @@
     - Ran a pick_diverse_bottles id0 smoke test with `--max_frames 1` successfully
     - The log confirmed `[target-local-retreat] along_local_plus_z_blue_m=0.0500`
     - The log confirmed FoundationPose objects `['left_bottle', 'right_bottle']` were loaded
+
+- 2026-05-20
+  - Changed the E2.1/E2.2/E2.3 H2O replay commands in `COMMAND_LIBRARY.zh.md` from single id0 runs to batch id0-id10 runs:
+    - Use `for ID in $(seq 0 10)`
+    - Inputs now use `hand_detections_${ID}.npz`
+    - FoundationPose object directories now use `foundation_input_${ID}`
+    - Output directories now use `id${ID}_z005`
+  - Updated the viewer note:
+    - To enable the viewer, first narrow `seq 0 10` to a single ID such as `seq 0 0`
+    - Then append `--enable_viewer 1 --viewer_wait_at_end 1 --viewer_frame_delay 0.02`
+  - Validation:
+    - Ran `bash -n` syntax checks for the three batch loop commands; did not run all 33 replays

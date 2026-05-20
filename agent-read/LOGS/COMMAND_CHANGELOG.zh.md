@@ -1040,3 +1040,14 @@
     - viewer 开启方式：追加 `--enable_viewer 1 --viewer_wait_at_end 1 --viewer_frame_delay 0.02`
   - 验证：
     - pick_diverse_bottles id0 的 `--max_frames 1` smoke test 通过
+
+- 2026-05-20
+  - 修改 E2.1/E2.2/E2.3 三个手 + 物体 replay 命令为 id0-id10 批处理格式：
+    - `pick_diverse_bottles`
+    - `place_bread_basket`
+    - `stack_cups`
+  - 命令格式：
+    - `source ... && for ID in $(seq 0 10); do CUDA_VISIBLE_DEVICES=2 conda run ...; done`
+    - `--input_npz`、`--output_dir`、`--object_replay_input_dir` 均使用 `${ID}` 展开
+  - viewer 使用说明：
+    - 批量命令默认不开 viewer；如果需要 viewer，先把循环改成单 ID，再追加 viewer 参数

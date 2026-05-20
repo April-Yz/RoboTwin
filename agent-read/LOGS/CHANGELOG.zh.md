@@ -1612,3 +1612,15 @@
     - 对 pick_diverse_bottles id0 运行 `--max_frames 1` smoke test 成功
     - 日志确认 `[target-local-retreat] along_local_plus_z_blue_m=0.0500`
     - 日志确认加载 FoundationPose 物体 `['left_bottle', 'right_bottle']`
+
+- 2026-05-20
+  - 将 `COMMAND_LIBRARY.zh.md` 的 E2.1/E2.2/E2.3 三个 H2O replay 命令从单个 id0 改为批量 id0-id10：
+    - 使用 `for ID in $(seq 0 10)` 循环
+    - 输入改为 `hand_detections_${ID}.npz`
+    - FoundationPose 物体目录改为 `foundation_input_${ID}`
+    - 输出目录改为 `id${ID}_z005`
+  - viewer 说明同步更新：
+    - 若要开 viewer，建议先把 `seq 0 10` 改为单个 ID，例如 `seq 0 0`
+    - 再追加 `--enable_viewer 1 --viewer_wait_at_end 1 --viewer_frame_delay 0.02`
+  - 验证：
+    - 对三个批量 loop 命令做 `bash -n` 语法检查，通过；未实际运行 33 个 replay
