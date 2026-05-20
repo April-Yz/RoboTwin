@@ -1623,3 +1623,15 @@
     - Then append `--enable_viewer 1 --viewer_wait_at_end 1 --viewer_frame_delay 0.02`
   - Validation:
     - Ran `bash -n` syntax checks for the three batch loop commands; did not run all 33 replays
+
+- 2026-05-20
+  - Added section G at the end of `COMMAND_LIBRARY.zh.md`:
+    - Added H2O id0-id10 commands for plotting world-axis distances from gripper/wrist-retreat points to FoundationPose object centers
+    - Covered pick_diverse_bottles, place_bread_basket, and stack_cups
+    - Each ID writes a PNG plus matching CSV under `code_painting/human_object_replay/h2o/.../id${ID}_z005/`
+  - Added interpretation notes:
+    - Stable same-direction `dz` offsets across tasks/IDs point more toward the head/depth/camera-to-world or replay calibration chain
+    - Object-specific or frame-local jumps point more toward FoundationPose pose/depth/mesh estimation
+  - Validation:
+    - `bash -n` passed for all three id0-id10 loop commands
+    - A pick_diverse_bottles id0 `--max_frames 2` smoke test passed and generated `/tmp/pick_diverse_bottles_axis_distance_id0_smoke.png` and `.csv`

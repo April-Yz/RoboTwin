@@ -1051,3 +1051,14 @@
     - `--input_npz`、`--output_dir`、`--object_replay_input_dir` 均使用 `${ID}` 展开
   - viewer 使用说明：
     - 批量命令默认不开 viewer；如果需要 viewer，先把循环改成单 ID，再追加 viewer 参数
+
+- 2026-05-20
+  - 新增 G 部分距离曲线命令：
+    - `plot_piper_gripper_wrist_object_axis_distances.py`
+    - 三任务 id0-id10 批量生成 gripper/wrist-retreat 到物体中心的世界轴向距离 PNG/CSV
+  - 关键参数：
+    - `--left_object` / `--right_object` 显式指定左右手对应物体目录
+    - `--max_frames 300`
+    - 输出目录跟随 H2O replay 的 `id${ID}_z005`
+  - 目的：
+    - 用 `dx/dy/dz` 曲线判断物体与人手 z 轴偏低更像检测问题还是 replay/标定链路问题

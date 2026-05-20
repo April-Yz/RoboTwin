@@ -442,3 +442,34 @@ nvidia-smi
 
 # 输出 id0 的 gripper/wrist-retreat 到物体的世界轴向距离曲线
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && CUDA_VISIBLE_DEVICES=3 conda run -n RoboTwin_bw python /home/zaijia001/ssd/RoboTwin/code_painting/plot_piper_gripper_wrist_object_axis_distances.py --hand_npz /home/zaijia001/ssd/data/piper/hand/pnp_star_pear_hamer_output_v2/hand_detections_0.npz --object_dir /home/zaijia001/ssd/data/piper/hand/pnp_star_pear_foundation_vis/obj_vis/pnp_star_pear_foundation_input_0 --output_png /home/zaijia001/ssd/RoboTwin/code_painting/output_piper_replay_hamer_axes_with_objects_all/id_0/gripper_wrist_object_axis_distance_id0.png --max_frames 300
+
+## G. H2O 人手/夹爪点到 FoundationPose 物体的世界轴向距离曲线
+
+> 用途：判断“物体 replay 和人手 replay 在 z 轴上整体偏低”到底更像 FoundationPose 检测/深度偏差，还是 RoboTwin replay 坐标转换偏差。图中每个任务每个 id 输出一张 PNG 和同名 CSV；曲线是 `手点 - 物体中心` 的世界坐标轴向差值，蓝线 `dz` 是高度差。
+>
+> 读图规则：如果多个任务/多个 id 的 `gripper_dz` 和 `wrist_dz` 同时出现稳定同向偏移，优先怀疑 head/depth/camera-to-world 或 replay 标定；如果只在某个物体或某些帧跳变，优先怀疑 FoundationPose 物体 pose/depth/mesh 估计；如果 z 偏差和 x/y 偏差一起随帧漂移，更像检测跟踪或相机位姿链路问题。
+
+### G1. pick_diverse_bottles：id0-id10 距离曲线
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && for ID in $(seq 0 10); do CUDA_VISIBLE_DEVICES=3 conda run -n RoboTwin_bw python /home/zaijia001/ssd/RoboTwin/code_painting/plot_piper_gripper_wrist_object_axis_distances.py --hand_npz /home/zaijia001/ssd/data/piper/hand/pick_diverse_bottles/harmer_output/hand_detections_${ID}.npz --object_dir /home/zaijia001/ssd/data/piper/hand/pick_diverse_bottles/foundation_vis/obs_vis/foundation_input_${ID} --left_object left_bottle --right_object right_bottle --output_png /home/zaijia001/ssd/RoboTwin/code_painting/human_object_replay/h2o/pick_diverse_bottles/id${ID}_z005/gripper_wrist_object_axis_distance_id${ID}.png --max_frames 300; done
+```
+
+### G2. place_bread_basket：id0-id10 距离曲线
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && for ID in $(seq 0 10); do CUDA_VISIBLE_DEVICES=3 conda run -n RoboTwin_bw python /home/zaijia001/ssd/RoboTwin/code_painting/plot_piper_gripper_wrist_object_axis_distances.py --hand_npz /home/zaijia001/ssd/data/piper/hand/place_bread_basket/harmer_output/hand_detections_${ID}.npz --object_dir /home/zaijia001/ssd/data/piper/hand/place_bread_basket/foundation_vis/obs_vis/foundation_input_${ID} --left_object basket --right_object bread --output_png /home/zaijia001/ssd/RoboTwin/code_painting/human_object_replay/h2o/place_bread_basket/id${ID}_z005/gripper_wrist_object_axis_distance_id${ID}.png --max_frames 300; done
+```
+
+### G3. stack_cups：id0-id10 距离曲线
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && for ID in $(seq 0 10); do CUDA_VISIBLE_DEVICES=3 conda run -n RoboTwin_bw python /home/zaijia001/ssd/RoboTwin/code_painting/plot_piper_gripper_wrist_object_axis_distances.py --hand_npz /home/zaijia001/ssd/data/piper/hand/stack_cups/harmer_output/hand_detections_${ID}.npz --object_dir /home/zaijia001/ssd/data/piper/hand/stack_cups/foundation_vis/obs_vis/foundation_input_${ID} --left_object left_light_pink_cup --right_object right_dark_red_cup --output_png /home/zaijia001/ssd/RoboTwin/code_painting/human_object_replay/h2o/stack_cups/id${ID}_z005/gripper_wrist_object_axis_distance_id${ID}.png --max_frames 300; done
+```
+
+### G4. 快速查看输出
+
+```bash
+find /home/zaijia001/ssd/RoboTwin/code_painting/human_object_replay/h2o -path '*/gripper_wrist_object_axis_distance_id*.png' | sort
+find /home/zaijia001/ssd/RoboTwin/code_painting/human_object_replay/h2o -path '*/gripper_wrist_object_axis_distance_id*.csv' | sort
+```

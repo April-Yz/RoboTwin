@@ -1053,3 +1053,14 @@
     - `--input_npz`, `--output_dir`, and `--object_replay_input_dir` all expand `${ID}`
   - Viewer usage note:
     - The batch commands keep the viewer off by default; to use the viewer, narrow the loop to a single ID and then append the viewer flags
+
+- 2026-05-20
+  - Added section G distance-curve commands:
+    - `plot_piper_gripper_wrist_object_axis_distances.py`
+    - Batch commands for all three tasks and id0-id10 to generate world-axis distance PNG/CSV files from gripper/wrist-retreat points to object centers
+  - Key parameters:
+    - `--left_object` / `--right_object` explicitly map hands to FoundationPose object folders
+    - `--max_frames 300`
+    - Outputs follow the H2O replay `id${ID}_z005` directories
+  - Purpose:
+    - Use `dx/dy/dz` curves to distinguish object/hand z-offset symptoms caused by detection from symptoms caused by the replay/calibration chain

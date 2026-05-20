@@ -1624,3 +1624,15 @@
     - 再追加 `--enable_viewer 1 --viewer_wait_at_end 1 --viewer_frame_delay 0.02`
   - 验证：
     - 对三个批量 loop 命令做 `bash -n` 语法检查，通过；未实际运行 33 个 replay
+
+- 2026-05-20
+  - 在 `COMMAND_LIBRARY.zh.md` 末尾新增 G 部分：
+    - 添加 H2O 三任务 id0-id10 的 gripper/wrist-retreat 到 FoundationPose 物体中心的世界轴向距离曲线命令
+    - 三个任务分别为 pick_diverse_bottles、place_bread_basket、stack_cups
+    - 输出每个 id 的 PNG 与同名 CSV 到 `code_painting/human_object_replay/h2o/.../id${ID}_z005/`
+  - 文档补充读图规则：
+    - 若 `dz` 多任务/多 id 稳定同向偏移，优先怀疑 head/depth/camera-to-world 或 replay 标定链路
+    - 若只在某个物体或某些帧跳变，优先怀疑 FoundationPose pose/depth/mesh 估计
+  - 验证：
+    - 三条 id0-id10 loop 命令 `bash -n` 通过
+    - pick_diverse_bottles id0 运行 `--max_frames 2` smoke test 成功，生成 `/tmp/pick_diverse_bottles_axis_distance_id0_smoke.png` 和 `.csv`
