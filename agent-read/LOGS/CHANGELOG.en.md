@@ -1589,3 +1589,14 @@
     - `py_compile` passed for `render_hand_retarget_r1_npz.py`, `build_piper_local_axis_sweep_board.py`, and `plot_piper_gripper_wrist_object_axis_distances.py`
     - `bash -n` passed for both Piper HaMeR batch wrappers
     - `TARGET_LOCAL_FORWARD_RETREAT_M=0.05 MAX_FRAMES=1 ID_FILTER=0` smoke test passed and printed `[target-local-retreat] along_local_plus_z_blue_m=0.0500`
+
+- 2026-05-20
+  - Fixed a renderer-constructor compatibility issue in FoundationPose multi-object replay:
+    - After `HandRetargetR1Renderer.__init__` gained camera-debug and local-blue-axis retreat arguments, `render_object_pose_r1_npz.py` still used the old constructor argument list, causing `run_multi_object_pose_r1_npz_batch.sh` to fail with `missing 4 required positional arguments`
+    - Added default values in the `ReplayRenderer(...)` constructor calls in `render_object_pose_r1_npz.py`, `replay_r1_h5.py`, and `minimal_gripper_collision_probe.py`
+  - Updated the command library:
+    - Added a note around line 182 in C1 of `/home/zaijia001/ssd/RoboTwin/COMMAND_LIBRARY.zh.md` to mark the pick_diverse_bottles command as a Piper 0515 head/base calibrated FoundationPose two-object replay command
+  - Validation:
+    - `py_compile` passed for `render_object_pose_r1_npz.py`, `replay_r1_h5.py`, `minimal_gripper_collision_probe.py`, and `render_multi_object_pose_r1_npz.py`
+    - `bash -n` passed for `run_multi_object_pose_r1_npz_batch.sh`
+    - A pick_diverse_bottles id0 smoke test with `--max_frames 1 --skip_existing 0` passed and generated `/tmp/pick_diverse_bottles_foundation_replay_smoke/foundation_input_0/head_cam_replay.mp4` and `multi_object_world_poses.npz`

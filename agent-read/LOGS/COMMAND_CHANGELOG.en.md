@@ -1020,3 +1020,14 @@
     - `code_painting/render_hand_retarget_r1_npz.py`
     - `code_painting/run_piper_hamer_axes_replay_batch.sh`
     - `code_painting/run_piper_hamer_axes_with_objects_replay_batch.sh`
+
+- 2026-05-20
+  - Fixed the compatibility issue behind the C1 FoundationPose two-object replay command:
+    - Added a note near line 182 of `/home/zaijia001/ssd/RoboTwin/COMMAND_LIBRARY.zh.md` for the pick_diverse_bottles command
+    - The command still uses explicit 0515 calibration arguments via `--robot_config`, `--head_camera_local_pos`, and `--head_camera_local_quat_wxyz`
+  - Related entrypoints:
+    - `code_painting/run_multi_object_pose_r1_npz_batch.sh`
+    - `code_painting/render_multi_object_pose_r1_npz.py`
+    - `code_painting/render_object_pose_r1_npz.py`
+  - Validation:
+    - `CUDA_VISIBLE_DEVICES=2 ... --ids 0 --max_frames 1 --skip_existing 0 ...` smoke test passed without the renderer-constructor missing-argument error

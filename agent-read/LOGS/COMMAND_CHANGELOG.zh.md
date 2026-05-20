@@ -1018,3 +1018,14 @@
     - `code_painting/render_hand_retarget_r1_npz.py`
     - `code_painting/run_piper_hamer_axes_replay_batch.sh`
     - `code_painting/run_piper_hamer_axes_with_objects_replay_batch.sh`
+
+- 2026-05-20
+  - 修正 C1 FoundationPose 双物体 replay 命令相关兼容问题：
+    - `/home/zaijia001/ssd/RoboTwin/COMMAND_LIBRARY.zh.md` 第 182 行附近新增 pick_diverse_bottles 命令说明
+    - 命令仍使用显式 `--robot_config`、`--head_camera_local_pos`、`--head_camera_local_quat_wxyz` 的 0515 标定参数
+  - 相关入口：
+    - `code_painting/run_multi_object_pose_r1_npz_batch.sh`
+    - `code_painting/render_multi_object_pose_r1_npz.py`
+    - `code_painting/render_object_pose_r1_npz.py`
+  - 验证：
+    - `CUDA_VISIBLE_DEVICES=2 ... --ids 0 --max_frames 1 --skip_existing 0 ...` smoke test 通过，不再出现 renderer 构造参数缺失错误

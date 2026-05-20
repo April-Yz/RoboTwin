@@ -1590,3 +1590,14 @@
     - `py_compile` 通过：`render_hand_retarget_r1_npz.py`、`build_piper_local_axis_sweep_board.py`、`plot_piper_gripper_wrist_object_axis_distances.py`
     - `bash -n` 通过：两个 Piper HaMeR batch wrapper
     - `TARGET_LOCAL_FORWARD_RETREAT_M=0.05 MAX_FRAMES=1 ID_FILTER=0` smoke test 通过，日志打印 `[target-local-retreat] along_local_plus_z_blue_m=0.0500`
+
+- 2026-05-20
+  - 修复 FoundationPose 多物体 replay 的 renderer 构造兼容问题：
+    - `HandRetargetR1Renderer.__init__` 新增 camera debug 与局部蓝轴后退参数后，`render_object_pose_r1_npz.py` 仍使用旧构造参数，导致 `run_multi_object_pose_r1_npz_batch.sh` 报 `missing 4 required positional arguments`
+    - 在 `render_object_pose_r1_npz.py`、`replay_r1_h5.py`、`minimal_gripper_collision_probe.py` 的 `ReplayRenderer(...)` 构造调用中补齐默认参数
+  - 更新命令库：
+    - `/home/zaijia001/ssd/RoboTwin/COMMAND_LIBRARY.zh.md` C1 中 pick_diverse_bottles 第 182 行附近增加说明，明确这是 Piper 0515 head/base 标定的 FoundationPose 双物体 replay 命令
+  - 验证：
+    - `py_compile` 通过：`render_object_pose_r1_npz.py`、`replay_r1_h5.py`、`minimal_gripper_collision_probe.py`、`render_multi_object_pose_r1_npz.py`
+    - `bash -n` 通过：`run_multi_object_pose_r1_npz_batch.sh`
+    - 对 pick_diverse_bottles id0 跑 `--max_frames 1 --skip_existing 0` smoke test 成功，生成 `/tmp/pick_diverse_bottles_foundation_replay_smoke/foundation_input_0/head_cam_replay.mp4` 和 `multi_object_world_poses.npz`
