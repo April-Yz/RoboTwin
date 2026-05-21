@@ -1635,3 +1635,17 @@
   - Validation:
     - `bash -n` passed for all three id0-id10 loop commands
     - A pick_diverse_bottles id0 `--max_frames 2` smoke test passed and generated `/tmp/pick_diverse_bottles_axis_distance_id0_smoke.png` and `.csv`
+
+- 2026-05-21
+  - Updated `plot_piper_gripper_wrist_object_axis_distances.py`:
+    - Added `--plot_clip_abs_m`, defaulting to `0.5`
+    - PNG plotting now clips values beyond `±plot_clip_abs_m` to the plot boundary so the sub-0.5m trend remains readable
+    - CSV output still keeps raw unclipped values, and plot titles report clipping and clipped-value counts
+    - Missing FoundationPose object `poses.npz` files no longer abort the whole plot; the script prints a warning and writes NaNs for that side
+  - Data observations:
+    - There are now 33 H2O task/id CSVs; place_bread_basket id5/id6 are missing `bread/poses.npz`, but the script can still generate the left-side basket curves
+    - Treating `|value|>0.5m` as large outliers, the normal-frame overall dz medians are about gripper `+0.150m` and wrist `+0.169m`
+  - Validation:
+    - `py_compile` passed
+    - A pick_diverse_bottles id0 `--max_frames 2` clipped smoke test passed
+    - place_bread_basket id5/id6 generated PNG/CSV files despite missing bread tracks

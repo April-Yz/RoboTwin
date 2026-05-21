@@ -1064,3 +1064,11 @@
     - Outputs follow the H2O replay `id${ID}_z005` directories
   - Purpose:
     - Use `dx/dy/dz` curves to distinguish object/hand z-offset symptoms caused by detection from symptoms caused by the replay/calibration chain
+
+- 2026-05-21
+  - Updated the section G distance-plot visualization rule:
+    - `plot_piper_gripper_wrist_object_axis_distances.py` now defaults to `--plot_clip_abs_m 0.5`
+    - PNG plots compress large outliers beyond `±0.5m`, while CSV files keep raw values
+    - Append `--plot_clip_abs_m 0` to see the full uncompressed plot scale
+  - Compatibility:
+    - Missing FoundationPose object tracks now produce NaN curves instead of aborting the batch

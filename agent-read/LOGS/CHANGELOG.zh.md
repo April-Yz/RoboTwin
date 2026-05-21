@@ -1636,3 +1636,17 @@
   - 验证：
     - 三条 id0-id10 loop 命令 `bash -n` 通过
     - pick_diverse_bottles id0 运行 `--max_frames 2` smoke test 成功，生成 `/tmp/pick_diverse_bottles_axis_distance_id0_smoke.png` 和 `.csv`
+
+- 2026-05-21
+  - 更新距离曲线脚本 `plot_piper_gripper_wrist_object_axis_distances.py`：
+    - 新增 `--plot_clip_abs_m`，默认 `0.5`
+    - PNG 绘图时将超过 `±plot_clip_abs_m` 的值压到边界显示，便于观察 0.5m 以内趋势
+    - CSV 仍保留未裁剪原始值，图标题会标注 clipping 与被裁剪数量
+    - 某个 FoundationPose 物体目录缺失 `poses.npz` 时不再中断，改为打印 warning 并将该侧曲线写为 NaN
+  - 数据观察：
+    - H2O 三任务 id0-id10 已有 33 个 CSV；place_bread_basket id5/id6 缺 `bread/poses.npz`，脚本已允许缺失并生成左侧 basket 曲线
+    - 统计时将 `|value|>0.5m` 作为大异常；正常帧整体 dz 中位数约 gripper `+0.150m`、wrist `+0.169m`
+  - 验证：
+    - `py_compile` 通过
+    - pick_diverse_bottles id0 `--max_frames 2` clipped smoke test 通过
+    - place_bread_basket id5/id6 在缺 bread track 的情况下生成 PNG/CSV

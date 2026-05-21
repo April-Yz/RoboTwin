@@ -447,6 +447,8 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && CUDA_VISIBLE_DEV
 
 > 用途：判断“物体 replay 和人手 replay 在 z 轴上整体偏低”到底更像 FoundationPose 检测/深度偏差，还是 RoboTwin replay 坐标转换偏差。图中每个任务每个 id 输出一张 PNG 和同名 CSV；曲线是 `手点 - 物体中心` 的世界坐标轴向差值，蓝线 `dz` 是高度差。
 >
+> 可视化规则：脚本默认 `--plot_clip_abs_m 0.5`，即 PNG 中超过 `±0.5m` 的异常值会被压到边界显示，便于观察 0.5m 以内的主要趋势；CSV 仍保留原始未裁剪数值。若要关闭压缩显示，追加 `--plot_clip_abs_m 0`。
+>
 > 读图规则：如果多个任务/多个 id 的 `gripper_dz` 和 `wrist_dz` 同时出现稳定同向偏移，优先怀疑 head/depth/camera-to-world 或 replay 标定；如果只在某个物体或某些帧跳变，优先怀疑 FoundationPose 物体 pose/depth/mesh 估计；如果 z 偏差和 x/y 偏差一起随帧漂移，更像检测跟踪或相机位姿链路问题。
 
 ### G1. pick_diverse_bottles：id0-id10 距离曲线

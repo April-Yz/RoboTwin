@@ -48,6 +48,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--left_object", type=str, default="pear")
     parser.add_argument("--right_object", type=str, default="star_fruit")
     parser.add_argument("--absolute", type=int, default=0, help="If 1, plot absolute axis distances instead of signed deltas.")
+    parser.add_argument(
+        "--plot_clip_abs_m",
+        type=float,
+        default=0.5,
+        help="Clip plotted values to +/- this many meters while keeping CSV values raw. Use <=0 to disable plot clipping.",
+    )
     return parser.parse_args()
 
 
@@ -117,8 +123,12 @@ def frame_indices(length: int, args: argparse.Namespace) -> List[int]:
     return indices
 
 
-def load_object_track(object_dir: Path, object_name: str) -> Tuple[np.ndarray, Dict[int, int]]:
-    poses, source_frames = load_pose_sequence(object_dir / object_name / "poses.npz")
+def load_object_track(object_dir: Path, object_name: str) -> Tuple[Optional[np.ndarray], Dict[int, int]]:
+    npz_path = object_dir / object_name / "poses.npz"
+    if not npz_path.is_file():
+        print(f"[warn] missing object pose track: {npz_path}")
+        return None, {}
+    poses, source_frames = load_pose_sequence(npz_path)
     return poses, {int(frame_idx): idx for idx, frame_idx in enumerate(source_frames.tolist())}
 
 
@@ -132,12 +142,23 @@ def target_world_pos(renderer, trajectory, side: str, frame_idx: int, pose_sourc
     return pose_world[:3].copy()
 
 
-def object_world_pos(renderer, poses: np.ndarray, frame_to_idx: Dict[int, int], frame_idx: int) -> Optional[np.ndarray]:
+def object_world_pos(renderer, poses: Optional[np.ndarray], frame_to_idx: Dict[int, int], frame_idx: int) -> Optional[np.ndarray]:
+    if poses is None:
+        return None
     npz_idx = frame_to_idx.get(int(frame_idx))
     if npz_idx is None:
         return None
     pose_world = camera_pose_matrix_to_world_pose(renderer, np.asarray(poses[npz_idx], dtype=np.float64).reshape(4, 4))
     return pose_world[:3].copy()
+
+
+def values_for_plot(values: List[float], clip_abs_m: float) -> Tuple[np.ndarray, int]:
+    arr = np.asarray(values, dtype=np.float64)
+    if clip_abs_m <= 0.0:
+        return arr, 0
+    finite = np.isfinite(arr)
+    clipped_count = int(np.count_nonzero(finite & (np.abs(arr) > clip_abs_m)))
+    return np.clip(arr, -clip_abs_m, clip_abs_m), clipped_count
 
 
 def main() -> None:
@@ -205,18 +226,31 @@ def main() -> None:
     fig, axes = plt.subplots(2, 1, figsize=(15, 9), sharex=True)
     colors = {"x": "#d62728", "y": "#2ca02c", "z": "#1f77b4"}
     x_values = np.asarray(indices, dtype=np.int32)
+    clip_abs_m = float(args.plot_clip_abs_m)
     for ax, side in zip(axes, ("left", "right")):
         object_name = tracks[side][0]
+        clipped_total = 0
         for axis in ("x", "y", "z"):
-            ax.plot(x_values, series[side][f"gripper_d{axis}"], color=colors[axis], linestyle="-", label=f"gripper d{axis}")
-            ax.plot(x_values, series[side][f"wrist_d{axis}"], color=colors[axis], linestyle="--", label=f"wrist-retreat d{axis}")
+            gripper_values, gripper_clipped = values_for_plot(series[side][f"gripper_d{axis}"], clip_abs_m)
+            wrist_values, wrist_clipped = values_for_plot(series[side][f"wrist_d{axis}"], clip_abs_m)
+            clipped_total += gripper_clipped + wrist_clipped
+            ax.plot(x_values, gripper_values, color=colors[axis], linestyle="-", label=f"gripper d{axis}")
+            ax.plot(x_values, wrist_values, color=colors[axis], linestyle="--", label=f"wrist-retreat d{axis}")
         ax.axhline(0.0, color="black", linewidth=0.8, alpha=0.35)
+        if clip_abs_m > 0.0:
+            ax.axhline(clip_abs_m, color="black", linewidth=0.7, alpha=0.25, linestyle=":")
+            ax.axhline(-clip_abs_m, color="black", linewidth=0.7, alpha=0.25, linestyle=":")
+            ax.set_ylim(-clip_abs_m * 1.08, clip_abs_m * 1.08)
         ax.grid(True, alpha=0.25)
         ax.set_ylabel("axis distance (m)")
-        ax.set_title(f"{side} hand vs {object_name}: {'absolute' if bool(args.absolute) else 'signed'} world-axis distance")
+        clip_note = "" if clip_abs_m <= 0.0 else f", plot clipped to +/-{clip_abs_m:.2f}m ({clipped_total} values)"
+        ax.set_title(f"{side} hand vs {object_name}: {'absolute' if bool(args.absolute) else 'signed'} world-axis distance{clip_note}")
         ax.legend(loc="upper right", ncol=3, fontsize=9)
     axes[-1].set_xlabel("frame index")
-    fig.suptitle("HaMeR gripper / wrist-retreat point to FoundationPose object distance by world axis", fontsize=14)
+    title = "HaMeR gripper / wrist-retreat point to FoundationPose object distance by world axis"
+    if clip_abs_m > 0.0:
+        title += " (CSV raw, plot clipped)"
+    fig.suptitle(title, fontsize=14)
     fig.tight_layout(rect=[0, 0.02, 1, 0.96])
     fig.savefig(args.output_png, dpi=160)
     print(f"[done] png={args.output_png}")

@@ -1062,3 +1062,11 @@
     - 输出目录跟随 H2O replay 的 `id${ID}_z005`
   - 目的：
     - 用 `dx/dy/dz` 曲线判断物体与人手 z 轴偏低更像检测问题还是 replay/标定链路问题
+
+- 2026-05-21
+  - 更新 G 部分距离曲线可视化规则：
+    - `plot_piper_gripper_wrist_object_axis_distances.py` 默认 `--plot_clip_abs_m 0.5`
+    - PNG 会压缩显示超过 `±0.5m` 的大异常值，CSV 保留原始值
+    - 如果需要查看完整比例，命令追加 `--plot_clip_abs_m 0`
+  - 兼容性：
+    - FoundationPose 某个物体 track 缺失时输出 NaN 曲线而不中断批处理
