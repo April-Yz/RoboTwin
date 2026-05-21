@@ -510,9 +510,21 @@ find /home/zaijia001/ssd/RoboTwin/code_painting/human_object_replay/h2o -path '*
 输出：
 
 ```bash
-# 每个 id 输出一个横向拼接视频和同名 CSV
+# 每个 id 输出一个横向拼接视频、同名 CSV、同 stem 的距离曲线 PNG
 # 视频：HaMeR hand_vis_gripper + 每个物体 mesh_overlay，并叠加手指/中点/物体中心
 # CSV：相机坐标系下 hand_midpoint - object_center 的 dx/dy/dz，单位 m
+# PNG：和 G 部分类似的距离曲线；默认 --plot_clip_abs_m 0.5，只压缩 PNG 显示，CSV 保留原始值
+```
+
+常用参数：
+
+```bash
+# 默认会输出：*_hamer_foundation_points_distance.png
+# 如需关闭曲线压缩显示，在任意 H3/H4/H5 命令末尾追加：
+--plot_clip_abs_m 0
+
+# 如需指定曲线图路径，追加：
+--output_plot /path/to/custom_distance.png
 ```
 
 ### H3. pick_diverse_bottles：id0-id10 原始点位对比
@@ -540,4 +552,5 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && for ID in $(seq 
 ```bash
 find /home/zaijia001/ssd/RoboTwin/code_painting/human_object_replay/h2o_compare_points -name '*_hamer_foundation_points.mp4' | sort
 find /home/zaijia001/ssd/RoboTwin/code_painting/human_object_replay/h2o_compare_points -name '*_hamer_foundation_points.csv' | sort
+find /home/zaijia001/ssd/RoboTwin/code_painting/human_object_replay/h2o_compare_points -name '*_hamer_foundation_points_distance.png' | sort
 ```

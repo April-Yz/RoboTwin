@@ -1085,3 +1085,10 @@
     - place_bread_basket：`basket/bread`
     - stack_cups：`left_light_pink_cup/right_dark_red_cup`
   - 使用说明：该对比不经过 Piper replay，只检查原始检测/物体 pose 层面的点位偏差。
+
+- 2026-05-21
+  - 修改 `COMMAND_LIBRARY.zh.md` H2 指令说明：
+    - `make_hamer_foundation_point_compare_video.py` 现在默认同时输出 `*_distance.png`
+    - 距离曲线与 G 部分一致，按帧画左右手对应物体的相机坐标系 `dx/dy/dz`
+    - 新增参数说明：`--plot_clip_abs_m 0` 关闭曲线压缩显示；`--output_plot` 指定 PNG 路径
+  - H6 增加查看 `*_hamer_foundation_points_distance.png` 的命令。

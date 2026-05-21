@@ -1087,3 +1087,10 @@
     - place_bread_basket: `basket/bread`
     - stack_cups: `left_light_pink_cup/right_dark_red_cup`
   - Usage note: this comparison bypasses Piper replay and checks raw detection/object-pose point offsets directly.
+
+- 2026-05-21
+  - Updated the H2 command notes in `COMMAND_LIBRARY.zh.md`:
+    - `make_hamer_foundation_point_compare_video.py` now also emits `*_distance.png` by default
+    - The distance plot mirrors section G and shows per-frame camera-frame `dx/dy/dz` for each hand/object pair
+    - Documented `--plot_clip_abs_m 0` to disable plot clipping and `--output_plot` to override the PNG path
+  - H6 now includes a finder command for `*_hamer_foundation_points_distance.png`.

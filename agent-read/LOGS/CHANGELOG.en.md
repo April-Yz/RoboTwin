@@ -1667,3 +1667,16 @@
   - Validation:
     - `py_compile` passed
     - place_bread_basket id0 `--max_frames 5` smoke test succeeded and produced `/tmp/hamer_foundation_point_compare_place_bread_basket_id0.mp4` plus `.csv`
+
+- 2026-05-21
+  - Extended `make_hamer_foundation_point_compare_video.py`:
+    - Added default distance-curve PNG output named `*_distance.png`
+    - The plot shows camera-frame `dx/dy/dz` from the HaMeR thumb/index midpoint to the FoundationPose object center
+    - Added `--output_plot` to override the plot path
+    - Added `--plot_clip_abs_m`, defaulting to `0.5`, matching section G behavior by clipping only the PNG display while preserving raw CSV values
+  - Updated `COMMAND_LIBRARY.zh.md` H2/H6:
+    - H2 now documents the video, CSV, and distance-curve PNG outputs
+    - H6 now includes a finder command for `*_hamer_foundation_points_distance.png`
+  - Validation:
+    - `py_compile` passed
+    - place_bread_basket id0 `--max_frames 5` smoke test succeeded and produced a video, CSV, and distance-curve PNG

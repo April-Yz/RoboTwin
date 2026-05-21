@@ -9,9 +9,13 @@ from pathlib import Path
 from typing import Dict, Optional, Sequence, Tuple
 
 import cv2
+import matplotlib
 import numpy as np
 
 from render_object_pose_r1_npz import load_pose_sequence
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt  # noqa: E402
 
 
 THUMB_TIP_IDX = 4
@@ -37,11 +41,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--right_object", type=str, required=True)
     parser.add_argument("--output_video", type=Path, required=True)
     parser.add_argument("--output_csv", type=Path, default=None)
+    parser.add_argument("--output_plot", type=Path, default=None)
     parser.add_argument("--max_frames", type=int, default=-1)
     parser.add_argument("--fps", type=float, default=0.0, help="Output FPS; <=0 uses hand video FPS.")
     parser.add_argument("--panel_width", type=int, default=640)
     parser.add_argument("--panel_height", type=int, default=480)
     parser.add_argument("--point_radius", type=int, default=7)
+    parser.add_argument("--plot_clip_abs_m", type=float, default=0.5, help="Clip plot display to +/- this value; <=0 disables clipping.")
     return parser.parse_args()
 
 
@@ -139,12 +145,55 @@ def side_hand_midpoint(hand_data: Dict[str, np.ndarray], side: str, frame_idx: i
     return midpoint_3d, thumb, index
 
 
+def plot_distance_curves(rows: Sequence[Dict[str, object]], side_to_object: Dict[str, str], output_plot: Path, clip_abs_m: float) -> None:
+    if not rows:
+        print(f"[warn] no rows to plot: {output_plot}")
+        return
+    output_plot.parent.mkdir(parents=True, exist_ok=True)
+    frames = np.asarray([int(row["frame"]) for row in rows], dtype=np.int64)
+    fig, axes = plt.subplots(2, 1, figsize=(16, 9), sharex=True)
+    if not isinstance(axes, np.ndarray):
+        axes = np.asarray([axes])
+    colors = {"x": "#d62728", "y": "#2ca02c", "z": "#1f77b4"}
+    clipped_count = 0
+    for ax, side in zip(axes, ("left", "right")):
+        obj = side_to_object[side]
+        for axis in ("x", "y", "z"):
+            key = f"{side}_{obj}_hand_minus_object_d{axis}_m"
+            values = []
+            for row in rows:
+                value = row.get(key, "")
+                values.append(float(value) if value not in ("", None) else np.nan)
+            arr = np.asarray(values, dtype=np.float64)
+            plot_arr = arr.copy()
+            if clip_abs_m and clip_abs_m > 0:
+                finite = np.isfinite(plot_arr)
+                clipped_count += int(np.count_nonzero(finite & (np.abs(plot_arr) > clip_abs_m)))
+                plot_arr[finite] = np.clip(plot_arr[finite], -clip_abs_m, clip_abs_m)
+            ax.plot(frames, plot_arr, label=f"d{axis}", color=colors[axis], linewidth=2.0)
+        ax.axhline(0.0, color="0.45", linewidth=1.0)
+        ax.grid(True, alpha=0.25)
+        ax.set_ylabel("camera-axis distance (m)")
+        ax.set_title(f"{side} hand midpoint vs {obj}: hand - object in camera frame")
+        ax.legend(loc="upper right")
+    axes[-1].set_xlabel("frame index")
+    title = "HaMeR thumb/index midpoint to FoundationPose object center distance by camera axis"
+    if clip_abs_m and clip_abs_m > 0:
+        title += f" (plot clipped to +/-{clip_abs_m:.2f}m, clipped_values={clipped_count})"
+    fig.suptitle(title, fontsize=14)
+    fig.tight_layout(rect=(0, 0, 1, 0.95))
+    fig.savefig(str(output_plot), dpi=150)
+    plt.close(fig)
+
+
 def main() -> None:
     args = parse_args()
     args.output_video.parent.mkdir(parents=True, exist_ok=True)
     if args.output_csv is None:
         args.output_csv = args.output_video.with_suffix(".csv")
     args.output_csv.parent.mkdir(parents=True, exist_ok=True)
+    if args.output_plot is None:
+        args.output_plot = args.output_video.with_name(f"{args.output_video.stem}_distance.png")
 
     camera = load_camera_params(args.hand_npz)
     hand_data = load_hand_data(args.hand_npz)
@@ -184,6 +233,7 @@ def main() -> None:
         for axis in ("x", "y", "z"):
             headers.append(f"{side}_{obj}_hand_minus_object_d{axis}_m")
 
+    rows = []
     with args.output_csv.open("w", newline="", encoding="utf-8") as f:
         csv_writer = csv.DictWriter(f, fieldnames=headers)
         csv_writer.writeheader()
@@ -223,6 +273,7 @@ def main() -> None:
                 panels.append(frame)
 
             csv_writer.writerow(row)
+            rows.append(row)
             writer.write(np.hstack(panels))
 
     writer.release()
@@ -230,8 +281,10 @@ def main() -> None:
     for cap in obj_caps.values():
         if cap is not None:
             cap.release()
+    plot_distance_curves(rows, side_to_object, args.output_plot, args.plot_clip_abs_m)
     print(f"[done] video={args.output_video}")
     print(f"[done] csv={args.output_csv}")
+    print(f"[done] plot={args.output_plot}")
 
 
 if __name__ == "__main__":

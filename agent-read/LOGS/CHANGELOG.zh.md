@@ -1668,3 +1668,16 @@
   - 验证：
     - `py_compile` 通过
     - place_bread_basket id0 `--max_frames 5` smoke test 成功，生成 `/tmp/hamer_foundation_point_compare_place_bread_basket_id0.mp4` 和 `.csv`
+
+- 2026-05-21
+  - 扩展 `make_hamer_foundation_point_compare_video.py`：
+    - 新增默认距离曲线 PNG 输出，文件名为 `*_distance.png`
+    - 曲线显示 HaMeR thumb/index midpoint 到 FoundationPose object center 的相机坐标轴向 `dx/dy/dz`
+    - 新增 `--output_plot` 可指定曲线输出路径
+    - 新增 `--plot_clip_abs_m`，默认 `0.5`，与 G 部分一致只压缩 PNG 显示，不改 CSV 原始值
+  - 更新 `COMMAND_LIBRARY.zh.md` H2/H6：
+    - H2 说明视频、CSV、距离曲线 PNG 三种输出
+    - H6 增加查找 `*_hamer_foundation_points_distance.png` 的命令
+  - 验证：
+    - `py_compile` 通过
+    - place_bread_basket id0 `--max_frames 5` smoke test 成功，生成视频、CSV 和距离曲线 PNG
