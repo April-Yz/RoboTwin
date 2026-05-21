@@ -1120,3 +1120,11 @@
   - 验证：
     - 从 E0 起抽取 28 个 bash 代码块，`bash -n /tmp/command_library_new_blocks.sh` 通过。
     - 确认 `run_human_robot_inpaint_repaint.py`、`render_anygrasp_ranked_preview.py`、`run_plan_anygrasp_keyframes_piper_batch.sh` 存在。
+
+- 2026-05-21
+  - 修正 `COMMAND_LIBRARY.zh.md` I1/I2 SAM repaint 指令：
+    - I1 现在只要求 `harmer_input/rgb_<id>.mp4` 存在，并使用一个已存在的 dummy robot video 满足 `run_human_robot_inpaint_repaint.py --robot_video` 必填参数。
+    - 说明 I1 的 `human_hand_bg.mp4` 不依赖 dummy robot 是否对应同一个 task/id。
+    - I2 仍严格要求每个 task/id 的 E0 pure `zed_replay.mp4` 存在，并分别打印缺失的 BG 或 pure robot 路径。
+  - 原因：用户运行 I1 时大量 `[skip] missing HUMAN or ROBOT`，实际 `HUMAN` 存在，缺的是尚未生成完整的 `h2_pure/<task>/id<ID>_z005/zed_replay.mp4`。
+  - 验证：抽取 I 段 4 个 bash 代码块，`bash -n /tmp/command_library_I_blocks.sh` 通过。

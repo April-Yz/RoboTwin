@@ -1122,3 +1122,11 @@
   - Validation:
     - Extracted 28 bash code blocks from E0 onward and `bash -n /tmp/command_library_new_blocks.sh` passed.
     - Confirmed `run_human_robot_inpaint_repaint.py`, `render_anygrasp_ranked_preview.py`, and `run_plan_anygrasp_keyframes_piper_batch.sh` exist.
+
+- 2026-05-21
+  - Fixed the `COMMAND_LIBRARY.zh.md` I1/I2 SAM repaint commands:
+    - I1 now only requires `harmer_input/rgb_<id>.mp4` and uses an existing dummy robot video to satisfy the required `run_human_robot_inpaint_repaint.py --robot_video` argument.
+    - Documented that I1 `human_hand_bg.mp4` does not depend on whether the dummy robot video matches the same task/id.
+    - I2 still requires the per-task/id E0 pure `zed_replay.mp4` and now reports missing BG vs missing pure robot paths separately.
+  - Reason: the user's I1 run printed many `[skip] missing HUMAN or ROBOT` lines; `HUMAN` existed, while most `h2_pure/<task>/id<ID>_z005/zed_replay.mp4` files had not been generated yet.
+  - Validation: extracted 4 bash code blocks from section I and `bash -n /tmp/command_library_I_blocks.sh` passed.

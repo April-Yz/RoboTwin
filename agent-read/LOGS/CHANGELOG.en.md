@@ -1710,3 +1710,8 @@
   - Validation:
     - Extracted the new command blocks and `bash -n` passed.
     - Confirmed the repaint and AnyGrasp entry scripts exist.
+
+- 2026-05-21
+  - Fixed the section-I SAM repaint command docs so Stage-1 hand removal no longer skips everything just because the full E0 pure robot replay set is incomplete.
+  - I1 now uses a dummy robot video; I2 still uses E0 pure robot videos and reports more specific missing paths.
+  - Validation: section-I bash blocks passed `bash -n`.

@@ -1711,3 +1711,8 @@
   - 验证：
     - 新增命令区块抽取后 `bash -n` 通过。
     - 检查到 repaint/AnyGrasp 入口脚本存在。
+
+- 2026-05-21
+  - 修正 I 段 SAM repaint 文档命令，避免 Stage-1 人手抠除因为 E0 pure robot 视频未全部生成而全量跳过。
+  - I1 改为使用 dummy robot video；I2 保持使用 E0 pure robot，并输出更具体的缺失路径。
+  - 验证：I 段 bash 代码块 `bash -n` 通过。
