@@ -1649,3 +1649,21 @@
     - `py_compile` passed
     - A pick_diverse_bottles id0 `--max_frames 2` clipped smoke test passed
     - place_bread_basket id5/id6 generated PNG/CSV files despite missing bread tracks
+
+- 2026-05-21
+  - Added a raw HaMeR hand point vs FoundationPose object point comparison tool:
+    - `code_painting/make_hamer_foundation_point_compare_video.py`
+    - Inputs HaMeR `hand_detections_<id>.npz`, `hand_vis_gripper_<id>.mp4`, and FoundationPose object directories
+    - Outputs a horizontal comparison video with a HaMeR hand-point panel plus each object's `mesh_overlay.mp4` panel
+    - Overlays thumb tip, index tip, thumb/index midpoint, and projected object center
+    - Writes a paired CSV with camera-frame `hand_midpoint - object_center` `dx/dy/dz`
+  - Updated the H section in `COMMAND_LIBRARY.zh.md`:
+    - Recorded the H2O three-task id0-id10 replay CSV statistics from section G
+    - Added id0-id10 raw point comparison commands for pick_diverse_bottles, place_bread_basket, and stack_cups
+  - Data notes:
+    - In inlier frames, overall `abs dz median` is about `15.1cm` for gripper and `17.0cm` for wrist-retreat
+    - Signed dz median is about `+15.0cm` for gripper and `+16.9cm` for wrist-retreat
+    - pick/place contain a small number of meter-scale z outliers; stack_cups has no `>0.5m` outliers
+  - Validation:
+    - `py_compile` passed
+    - place_bread_basket id0 `--max_frames 5` smoke test succeeded and produced `/tmp/hamer_foundation_point_compare_place_bread_basket_id0.mp4` plus `.csv`

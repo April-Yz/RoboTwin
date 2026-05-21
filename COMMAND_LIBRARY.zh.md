@@ -475,3 +475,69 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && for ID in $(seq 
 find /home/zaijia001/ssd/RoboTwin/code_painting/human_object_replay/h2o -path '*/gripper_wrist_object_axis_distance_id*.png' | sort
 find /home/zaijia001/ssd/RoboTwin/code_painting/human_object_replay/h2o -path '*/gripper_wrist_object_axis_distance_id*.csv' | sort
 ```
+
+## H. HaMeR 原始手点 + FoundationPose 原始物体点对比
+
+> 用途：直接在原始检测可视化层面检查“人手拇指/食指中点”和 FoundationPose 物体中心是否已经存在系统性偏差。H 部分不经过 Piper IK/replay，只对齐 HaMeR `hand_vis_gripper_${ID}.mp4` 与 FoundationPose 每个物体的 `mesh_overlay.mp4`，因此更适合判断偏差来自检测本身还是后续 RoboTwin replay/标定链路。
+>
+> 可视化点：左侧面板标出 thumb tip、index tip、thumb/index midpoint；物体面板标出 FoundationPose `poses.npz` 的物体中心投影。CSV 记录相机坐标系下 `hand_midpoint - object_center` 的 `dx/dy/dz`。
+
+### H1. G 部分 33 个 replay CSV 的统计摘要
+
+统计口径：三任务 id0-id10，总计 33 个 CSV；正常帧统计只使用 `|value| <= 0.5m` 的轴向差值，超过 0.5m 记为 outlier，原始 CSV 不裁剪。
+
+| 任务 | 点 | abs dx median | abs dy median | abs dz median | signed dx median | signed dy median | signed dz median | 主要 outlier |
+|---|---|---:|---:|---:|---:|---:|---:|---|
+| pick_diverse_bottles | gripper | 1.8cm | 10.2cm | 14.6cm | -0.1cm | +10.0cm | +14.5cm | z outlier 4.33%，raw min -10.04m |
+| pick_diverse_bottles | wrist-retreat | 6.6cm | 5.6cm | 16.5cm | -0.3cm | +2.3cm | +16.3cm | z outlier 4.49%，raw min -9.96m |
+| place_bread_basket | gripper | 16.5cm | 4.1cm | 18.8cm | -7.4cm | +2.5cm | +18.1cm | z outlier 2.19%，raw min -3.88m |
+| place_bread_basket | wrist-retreat | 23.0cm | 8.2cm | 18.6cm | -12.4cm | -3.9cm | +18.1cm | z outlier 2.19%，raw min -3.91m |
+| stack_cups | gripper | 1.9cm | 9.2cm | 14.7cm | +0.2cm | +9.2cm | +14.7cm | 无 `>0.5m` outlier |
+| stack_cups | wrist-retreat | 9.0cm | 3.1cm | 16.8cm | +3.8cm | +1.5cm | +16.8cm | 无 `>0.5m` outlier |
+| ALL | gripper | 2.9cm | 8.5cm | 15.1cm | -0.3cm | +8.2cm | +15.0cm | z outlier 1.73%，raw min -10.04m |
+| ALL | wrist-retreat | 9.5cm | 4.3cm | 17.0cm | -3.8cm | +0.9cm | +16.9cm | z outlier 1.77%，raw min -9.96m |
+
+读数结论：正常帧里 `dz` 的中位数整体在 `+15cm` 到 `+17cm`，说明手点相对 FoundationPose 物体中心在世界 z 轴上有稳定正偏差；这不是单帧执行不到位能解释的问题。pick/place 的少量米级异常更像 FoundationPose 物体 pose track 或缺帧/跳帧问题，stack_cups 没有这种大 outlier。
+
+### H2. 原始 HaMeR + FoundationPose 点位对比脚本
+
+入口脚本：
+
+```bash
+/home/zaijia001/ssd/RoboTwin/code_painting/make_hamer_foundation_point_compare_video.py
+```
+
+输出：
+
+```bash
+# 每个 id 输出一个横向拼接视频和同名 CSV
+# 视频：HaMeR hand_vis_gripper + 每个物体 mesh_overlay，并叠加手指/中点/物体中心
+# CSV：相机坐标系下 hand_midpoint - object_center 的 dx/dy/dz，单位 m
+```
+
+### H3. pick_diverse_bottles：id0-id10 原始点位对比
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && for ID in $(seq 0 10); do CUDA_VISIBLE_DEVICES=2 conda run -n RoboTwin_bw python /home/zaijia001/ssd/RoboTwin/code_painting/make_hamer_foundation_point_compare_video.py --hand_npz /home/zaijia001/ssd/data/piper/hand/pick_diverse_bottles/harmer_output/hand_detections_${ID}.npz --hand_video /home/zaijia001/ssd/data/piper/hand/pick_diverse_bottles/harmer_output/hand_vis_gripper_${ID}.mp4 --object left_bottle=/home/zaijia001/ssd/data/piper/hand/pick_diverse_bottles/foundation_vis/obs_vis/foundation_input_${ID}/left_bottle --object right_bottle=/home/zaijia001/ssd/data/piper/hand/pick_diverse_bottles/foundation_vis/obs_vis/foundation_input_${ID}/right_bottle --left_object left_bottle --right_object right_bottle --output_video /home/zaijia001/ssd/RoboTwin/code_painting/human_object_replay/h2o_compare_points/pick_diverse_bottles/id${ID}_hamer_foundation_points.mp4 --max_frames 300; done
+```
+
+### H4. place_bread_basket：id0-id10 原始点位对比
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && for ID in $(seq 0 10); do CUDA_VISIBLE_DEVICES=2 conda run -n RoboTwin_bw python /home/zaijia001/ssd/RoboTwin/code_painting/make_hamer_foundation_point_compare_video.py --hand_npz /home/zaijia001/ssd/data/piper/hand/place_bread_basket/harmer_output/hand_detections_${ID}.npz --hand_video /home/zaijia001/ssd/data/piper/hand/place_bread_basket/harmer_output/hand_vis_gripper_${ID}.mp4 --object basket=/home/zaijia001/ssd/data/piper/hand/place_bread_basket/foundation_vis/obs_vis/foundation_input_${ID}/basket --object bread=/home/zaijia001/ssd/data/piper/hand/place_bread_basket/foundation_vis/obs_vis/foundation_input_${ID}/bread --left_object basket --right_object bread --output_video /home/zaijia001/ssd/RoboTwin/code_painting/human_object_replay/h2o_compare_points/place_bread_basket/id${ID}_hamer_foundation_points.mp4 --max_frames 300; done
+```
+
+说明：如果某个 id 的 `bread/poses.npz` 或物体视频缺失，脚本会输出 warning，并在对应面板/CSV 中保留空值，不会中断整个批处理。
+
+### H5. stack_cups：id0-id10 原始点位对比
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && for ID in $(seq 0 10); do CUDA_VISIBLE_DEVICES=2 conda run -n RoboTwin_bw python /home/zaijia001/ssd/RoboTwin/code_painting/make_hamer_foundation_point_compare_video.py --hand_npz /home/zaijia001/ssd/data/piper/hand/stack_cups/harmer_output/hand_detections_${ID}.npz --hand_video /home/zaijia001/ssd/data/piper/hand/stack_cups/harmer_output/hand_vis_gripper_${ID}.mp4 --object left_light_pink_cup=/home/zaijia001/ssd/data/piper/hand/stack_cups/foundation_vis/obs_vis/foundation_input_${ID}/left_light_pink_cup --object right_dark_red_cup=/home/zaijia001/ssd/data/piper/hand/stack_cups/foundation_vis/obs_vis/foundation_input_${ID}/right_dark_red_cup --left_object left_light_pink_cup --right_object right_dark_red_cup --output_video /home/zaijia001/ssd/RoboTwin/code_painting/human_object_replay/h2o_compare_points/stack_cups/id${ID}_hamer_foundation_points.mp4 --max_frames 300; done
+```
+
+### H6. 查看 H 部分输出
+
+```bash
+find /home/zaijia001/ssd/RoboTwin/code_painting/human_object_replay/h2o_compare_points -name '*_hamer_foundation_points.mp4' | sort
+find /home/zaijia001/ssd/RoboTwin/code_painting/human_object_replay/h2o_compare_points -name '*_hamer_foundation_points.csv' | sort
+```

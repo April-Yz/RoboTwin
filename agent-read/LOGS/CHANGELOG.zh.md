@@ -1650,3 +1650,21 @@
     - `py_compile` 通过
     - pick_diverse_bottles id0 `--max_frames 2` clipped smoke test 通过
     - place_bread_basket id5/id6 在缺 bread track 的情况下生成 PNG/CSV
+
+- 2026-05-21
+  - 新增 HaMeR 原始手点与 FoundationPose 原始物体点的对比工具：
+    - `code_painting/make_hamer_foundation_point_compare_video.py`
+    - 输入 HaMeR `hand_detections_<id>.npz`、`hand_vis_gripper_<id>.mp4` 和 FoundationPose object dir
+    - 输出横向拼接视频：HaMeR 手点面板 + 每个物体 `mesh_overlay.mp4` 面板
+    - 视频叠加 thumb tip、index tip、thumb/index midpoint 与物体中心投影
+    - 同名 CSV 记录相机坐标系下 `hand_midpoint - object_center` 的 `dx/dy/dz`
+  - 更新 `COMMAND_LIBRARY.zh.md` H 部分：
+    - 记录 H2O 三任务 id0-id10 的 G 部分 replay CSV 统计摘要
+    - 新增 pick_diverse_bottles、place_bread_basket、stack_cups 三任务 id0-id10 原始点位对比命令
+  - 数据观察：
+    - 正常帧整体 `abs dz median` 约 gripper `15.1cm`、wrist-retreat `17.0cm`
+    - signed dz median 约 gripper `+15.0cm`、wrist-retreat `+16.9cm`
+    - pick/place 存在少量米级 z outlier，stack_cups 无 `>0.5m` outlier
+  - 验证：
+    - `py_compile` 通过
+    - place_bread_basket id0 `--max_frames 5` smoke test 成功，生成 `/tmp/hamer_foundation_point_compare_place_bread_basket_id0.mp4` 和 `.csv`

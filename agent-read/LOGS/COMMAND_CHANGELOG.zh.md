@@ -1070,3 +1070,18 @@
     - 如果需要查看完整比例，命令追加 `--plot_clip_abs_m 0`
   - 兼容性：
     - FoundationPose 某个物体 track 缺失时输出 NaN 曲线而不中断批处理
+
+- 2026-05-21
+  - 新增 `COMMAND_LIBRARY.zh.md` H 部分：HaMeR 原始手点 + FoundationPose 原始物体点对比。
+  - 新命令入口：`code_painting/make_hamer_foundation_point_compare_video.py`。
+  - 关键参数：
+    - `--hand_npz`：HaMeR `hand_detections_<id>.npz`
+    - `--hand_video`：HaMeR `hand_vis_gripper_<id>.mp4`
+    - `--object NAME=/path/to/foundation_input_<id>/<object>`：可重复传入多个物体目录
+    - `--left_object` / `--right_object`：左右手 CSV 差值对应的物体名
+    - `--output_video`：输出拼接视频，同名 `.csv` 自动生成
+  - 已记录三任务 id0-id10 批处理命令：
+    - pick_diverse_bottles：`left_bottle/right_bottle`
+    - place_bread_basket：`basket/bread`
+    - stack_cups：`left_light_pink_cup/right_dark_red_cup`
+  - 使用说明：该对比不经过 Piper replay，只检查原始检测/物体 pose 层面的点位偏差。
