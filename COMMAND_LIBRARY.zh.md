@@ -398,6 +398,20 @@ GPU=2 FPS=5 MAX_FRAMES=300 ARMS=both KEEP_ONLY_ZED_THIRD=0 ID_FILTER=0,2,5-8 bas
 # 单个 id0：直接指定 hand_detections_0.npz 和对应 FoundationPose video-level 目录；如果物体某帧缺失，默认 hide
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && CUDA_VISIBLE_DEVICES=2 conda run -n RoboTwin_bw python /home/zaijia001/ssd/RoboTwin/code_painting/render_hand_retarget_piper_dual_npz_urdfik_main.py --input_npz /home/zaijia001/ssd/data/piper/hand/pnp_star_pear_hamer_output_v2/hand_detections_0.npz --output_dir /home/zaijia001/ssd/RoboTwin/code_painting/output_piper_replay_hamer_axes_with_objects_id0 --fps 5 --max_frames 300 --arms both --robot_config /home/zaijia001/ssd/RoboTwin/robot_config_PiperPika_agx_dual_table_0515.json --camera_cv_axis_mode legacy_r1 --head_camera_local_pos 0.11210396690038413 -0.39189397826604927 0.4753892624100325 --head_camera_local_quat_wxyz 0.8524694864910365 -0.0011011947849308937 0.5226654778798345 0.010740586780925399 --require_stored_gripper_pose 1 --pose_source gripper --orientation_remap_label identity --stored_orientation_post_rot_xyz_deg 0 0 0 --target_world_offset_xyz 0 0.1 0.1 --execute_waypoint_scene_steps 5 --execute_settle_scene_steps 20 --urdfik_joint_interp_waypoints 10 --debug_mode 0 --debug_post_execute 1 --debug_frame_limit -1 --save_png_frames 1 --object_replay_input_dir /home/zaijia001/ssd/data/piper/hand/pnp_star_pear_foundation_vis/obj_vis/pnp_star_pear_foundation_input_0 --object pear=/home/zaijia001/ssd/data/R1/hand/obj_mesh/pear/pear.obj --object star_fruit=/home/zaijia001/ssd/data/R1/hand/obj_mesh/star/star.obj --object_missing_frame_policy hide --lighting_mode front_no_shadow
 
+#### E0. 三个 H2O 任务：pure Piper replay（只保留 zed/third RGB，无文字/坐标轴）
+
+用途：为后续 SAM repaint 准备干净机器人视频。输出每个 id 只保留 `zed_replay.mp4` 和 `third_replay.mp4`；`--clean_output 1 --overlay_text_enable 0` 关闭左上角文字，`--debug_visualize_targets 0 --debug_visualize_cameras 0` 关闭目标/相机坐标轴可视化，最后用 ffmpeg 转成 VS Code 更稳定支持的 `h264/yuv420p/faststart`。
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && GPU=3; FPS=5; MAX_FRAMES=300; RETREAT=0.05; for TASK in pick_diverse_bottles place_bread_basket stack_cups; do for ID in $(seq 0 10); do IN=/home/zaijia001/ssd/data/piper/hand/${TASK}/harmer_output/hand_detections_${ID}.npz; OUT=/home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure/${TASK}/id${ID}_z005; [[ -f "$IN" ]] || { echo "[skip] missing $IN"; continue; }; CUDA_VISIBLE_DEVICES=${GPU} conda run -n RoboTwin_bw python /home/zaijia001/ssd/RoboTwin/code_painting/render_hand_retarget_piper_dual_npz_urdfik_main.py --input_npz "$IN" --output_dir "$OUT" --fps ${FPS} --max_frames ${MAX_FRAMES} --arms both --piper_calibration_bundle /home/zaijia001/ssd/RoboTwin/calibration_bundle_piper_new_table_0515.json --camera_cv_axis_mode legacy_r1 --require_stored_gripper_pose 1 --pose_source gripper --orientation_remap_label identity --stored_orientation_post_rot_xyz_deg 0 0 0 --target_local_forward_retreat_m ${RETREAT} --target_world_offset_xyz 0 0.1 0.1 --execute_waypoint_scene_steps 5 --execute_settle_scene_steps 20 --urdfik_joint_interp_waypoints 10 --debug_mode 0 --debug_post_execute 0 --debug_frame_limit -1 --debug_visualize_targets 0 --debug_visualize_cameras 0 --clean_output 1 --overlay_text_enable 0 --save_png_frames 0 --lighting_mode front_no_shadow; rm -f "$OUT"/zed_depth.mp4 "$OUT"/left_wrist_replay.mp4 "$OUT"/right_wrist_replay.mp4 "$OUT"/smooth_*.mp4; rm -rf "$OUT"/frames; for V in zed_replay third_replay; do [[ -f "$OUT/${V}.mp4" ]] || continue; ffmpeg -y -i "$OUT/${V}.mp4" -an -c:v libx264 -pix_fmt yuv420p -movflags +faststart "$OUT/${V}.tmp.mp4" && mv "$OUT/${V}.tmp.mp4" "$OUT/${V}.mp4"; done; done; done
+```
+
+查看输出：
+
+```bash
+find /home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure -maxdepth 3 -type f \( -name 'zed_replay.mp4' -o -name 'third_replay.mp4' \) | sort
+```
+
 #### E2.0 三个 H2O 任务：只 replay 人手，不加载 FoundationPose 物体
 
 > 用途：排除 FoundationPose 物体加载/渲染对画面的影响，只检查 HaMeR gripper pose 到 Piper 双臂 replay 的结果。下面三条命令仍使用 0515 Piper calibration bundle、identity gripper 朝向、沿夹爪蓝色 +Z 反方向后退 5cm。`--save_png_frames 0` 表示只保存 replay mp4/npz 等主输出，不保存 `frames/` 下的逐帧 PNG。
@@ -584,4 +598,84 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && for ID in $(seq 
 find /home/zaijia001/ssd/RoboTwin/code_painting/human_object_replay/h2o_compare_points -name '*_hamer_foundation_points.mp4' | sort
 find /home/zaijia001/ssd/RoboTwin/code_painting/human_object_replay/h2o_compare_points -name '*_hamer_foundation_points.csv' | sort
 find /home/zaijia001/ssd/RoboTwin/code_painting/human_object_replay/h2o_compare_points -name '*_hamer_foundation_points_distance.png' | sort
+```
+
+## I. SAM repaint：H2O 人手抠除 + pure Piper 机械臂贴回
+
+说明：本节模仿 `/home/zaijia001/usage.sh` 的两阶段流程。I1 先对原始人手视频做 Stage-1 抠除并缓存 `human_hand_bg.mp4`；I2 使用 E0 的 pure `zed_replay.mp4` 作为 robot video，把机械臂贴回同一个背景。默认处理三个任务 `id0-id10`。
+
+### I1. 三个任务：只做人手抠除背景缓存
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate inpainting-sam2-r1 && cd /home/zaijia001/ssd/inpainting_sam2_robot && GPU=0; FPS=5; for TASK in pick_diverse_bottles place_bread_basket stack_cups; do for ID in $(seq 0 10); do HUMAN=/home/zaijia001/ssd/data/piper/hand/${TASK}/harmer_input/rgb_${ID}.mp4; ROBOT=/home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure/${TASK}/id${ID}_z005/zed_replay.mp4; OUT=/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2/stage1/${TASK}/id_${ID}; [[ -f "$HUMAN" && -f "$ROBOT" ]] || { echo "[skip] task=${TASK} id=${ID} missing HUMAN or ROBOT"; continue; }; CUDA_VISIBLE_DEVICES=${GPU} python run_human_robot_inpaint_repaint.py --human_video "$HUMAN" --robot_video "$ROBOT" --output_dir "$OUT" --coords_type key_in --point_coords 10 80 --point_labels 1 --human_dilate_kernel_size 100 --robot_dilate_kernel_size 0 --robot_text_prompt "left robot arm, right robot arm, forearm, wrist, gripper, end effector." --robot_box_threshold 0.20 --robot_text_threshold 0.20 --robot_max_mask_area_ratio 1.0 --robot_erode_kernel_size 3 --robot_composite_erode_kernel_size 1 --robot_blend_alpha_sigma 1.0 --robot_exclude_bottom_ratio 0.14 --mask_idx 2 --fps ${FPS} --device cuda --human_save_debug_artifacts 0 --robot_save_removed_video 0 --robot_save_mask_artifacts 0 --robot_save_debug_videos 0 --robot_save_composite_video 0; done; done
+```
+
+输出检查：
+
+```bash
+find /home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2/stage1 -path '*/human_hand_bg.mp4' | sort
+```
+
+### I2. 三个任务：把 E0 pure replay 贴回 I1 背景
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate inpainting-sam2-r1 && cd /home/zaijia001/ssd/inpainting_sam2_robot && GPU=0; FPS=5; for TASK in pick_diverse_bottles place_bread_basket stack_cups; do for ID in $(seq 0 10); do BG=/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2/stage1/${TASK}/id_${ID}/human_hand_bg.mp4; ROBOT=/home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure/${TASK}/id${ID}_z005/zed_replay.mp4; OUT=/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2/e0_robot/${TASK}/id_${ID}; [[ -f "$BG" && -f "$ROBOT" ]] || { echo "[skip] task=${TASK} id=${ID} missing BG or ROBOT"; continue; }; CUDA_VISIBLE_DEVICES=${GPU} python run_human_robot_inpaint_repaint.py --stage1_bg_video "$BG" --robot_video "$ROBOT" --output_dir "$OUT" --coords_type key_in --point_coords 10 80 --point_labels 1 --human_dilate_kernel_size 100 --robot_dilate_kernel_size 0 --robot_text_prompt "left robot arm, right robot arm, forearm, wrist, gripper, end effector." --robot_box_threshold 0.20 --robot_text_threshold 0.20 --robot_max_mask_area_ratio 1.0 --robot_erode_kernel_size 3 --robot_composite_erode_kernel_size 1 --robot_blend_alpha_sigma 1.0 --robot_exclude_bottom_ratio 0.14 --mask_idx 2 --fps ${FPS} --device cuda --reuse_stage1; done; done
+```
+
+输出检查：
+
+```bash
+find /home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2/e0_robot -type f \( -name '*target_with_original*.mp4' -o -name '*repaint*.mp4' -o -name '*.mp4' \) | sort | head -n 80
+```
+
+## J. AnyGrasp 候选筛选：找离人手朝向/目标物最近的候选
+
+说明：三个任务的 AnyGrasp 结果位于 `/home/zaijia001/ssd/data/piper/hand/<TASK>/<TASK>_output/foundation_input_<ID>`。J0 先检查 id0-id10 需要的 AnyGrasp、Foundation replay、HaMeR NPZ 是否齐全；J1 生成 ranked preview 和 `summary.json`，其中 `orientation_rank` 更偏向“和人手局部轴接近”，`fused_rank` 同时考虑 AnyGrasp score 和人手朝向。
+
+### J0. 三个任务：筛选可用 id0-id10 数据
+
+```bash
+for TASK in pick_diverse_bottles place_bread_basket stack_cups; do REPORT=/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview/${TASK}_availability_id0_10.txt; mkdir -p "$(dirname "$REPORT")"; : > "$REPORT"; for ID in $(seq 0 10); do A=/home/zaijia001/ssd/data/piper/hand/${TASK}/${TASK}_output/foundation_input_${ID}; R=/home/zaijia001/ssd/data/piper/hand/${TASK}/foundation_replay/foundation_input_${ID}/head_anygrasp_frames; H=/home/zaijia001/ssd/data/piper/hand/${TASK}/harmer_output/hand_detections_${ID}.npz; if [[ -d "$A/grasps" && -d "$R" && -f "$H" ]]; then echo "OK id=${ID} anygrasp=$A replay=$R hand=$H" | tee -a "$REPORT"; else echo "MISS id=${ID} anygrasp=$([[ -d "$A/grasps" ]] && echo 1 || echo 0) replay=$([[ -d "$R" ]] && echo 1 || echo 0) hand=$([[ -f "$H" ]] && echo 1 || echo 0)" | tee -a "$REPORT"; fi; done; done
+```
+
+### J1. 三个任务：生成和人手最接近的候选 preview/summary
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && for TASK in pick_diverse_bottles place_bread_basket stack_cups; do case "$TASK" in pick_diverse_bottles) LEFT_OBJ=left_bottle; RIGHT_OBJ=right_bottle ;; place_bread_basket) LEFT_OBJ=basket; RIGHT_OBJ=bread ;; stack_cups) LEFT_OBJ=left_light_pink_cup; RIGHT_OBJ=right_dark_red_cup ;; esac; for ID in $(seq 0 10); do A=/home/zaijia001/ssd/data/piper/hand/${TASK}/${TASK}_output/foundation_input_${ID}; R=/home/zaijia001/ssd/data/piper/hand/${TASK}/foundation_replay/foundation_input_${ID}; H=/home/zaijia001/ssd/data/piper/hand/${TASK}/harmer_output/hand_detections_${ID}.npz; O=/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview/${TASK}/foundation_input_${ID}; [[ -d "$A/grasps" && -d "$R/head_anygrasp_frames" && -f "$H" ]] || { echo "[skip] task=${TASK} id=${ID} missing input"; continue; }; CUDA_VISIBLE_DEVICES=2 conda run -n RoboTwin_bw python /home/zaijia001/ssd/RoboTwin/code_painting/render_anygrasp_ranked_preview.py --anygrasp_dir "$A" --replay_dir "$R" --hand_npz "$H" --base_image_dir "$R/head_anygrasp_frames" --base_image_mode raw --output_dir "$O" --frames 1 22 -10 --left_target_object "$LEFT_OBJ" --right_target_object "$RIGHT_OBJ" --anygrasp_score_weight 0.25 --orientation_score_weight 0.75 --max_rotation_distance_deg 90 --candidate_target_local_x_offset_m -0.05 --draw_object_overlay 1 --draw_hand_reference 1 --debug_dump_object_distances 1 --top_k 20 --camera_cv_axis_mode legacy_r1; done; done
+```
+
+输出检查：
+
+```bash
+find /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview -name summary.json | sort
+find /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview -name '*orientation_rank.png' | sort | head -n 30
+```
+
+## K. AnyGrasp replay + SAM repaint：使用 J 的候选贴回人手背景
+
+说明：K1 使用 J1 的 `summary.json` 选择候选，跑 Piper AnyGrasp 规划/执行预览；K2 把规划出的 `head_cam_plan.mp4` 贴回 I1 的人手抠除背景。若想看交互 viewer，在 K1 命令末尾把 `--enable_viewer 0 --viewer_wait_at_end 0` 改成 `--enable_viewer 1 --viewer_wait_at_end 1 --viewer_frame_delay 0.02`。
+
+### K1. 三个任务：AnyGrasp 候选规划与 replay
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && for TASK in pick_diverse_bottles place_bread_basket stack_cups; do case "$TASK" in pick_diverse_bottles) LEFT_OBJ=left_bottle; RIGHT_OBJ=right_bottle; MESH_ARGS=(--object_mesh_override left_bottle=/home/zaijia001/ssd/data/R1/hand/obj_mesh/cola/cola.obj --object_mesh_override right_bottle=/home/zaijia001/ssd/data/R1/hand/obj_mesh/bottle/bottle.obj) ;; place_bread_basket) LEFT_OBJ=basket; RIGHT_OBJ=bread; MESH_ARGS=(--object_mesh_override basket=/home/zaijia001/ssd/data/R1/hand/obj_mesh/basket/basket.obj --object_mesh_override bread=/home/zaijia001/ssd/data/R1/hand/obj_mesh/bread_y/bread_y.obj) ;; stack_cups) LEFT_OBJ=left_light_pink_cup; RIGHT_OBJ=right_dark_red_cup; MESH_ARGS=(--object_mesh_override left_light_pink_cup=/home/zaijia001/ssd/data/R1/hand/obj_mesh/light_pink_cup/light_pink_cup.obj --object_mesh_override right_dark_red_cup=/home/zaijia001/ssd/data/R1/hand/obj_mesh/dark_red_cup/dark_red_cup.obj) ;; esac; CUDA_VISIBLE_DEVICES=2 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_batch.sh /home/zaijia001/ssd/data/piper/hand/${TASK}/${TASK}_output /home/zaijia001/ssd/data/piper/hand/${TASK}/foundation_replay /home/zaijia001/ssd/data/piper/hand/${TASK}/harmer_output /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_plan/${TASK} --ids $(seq 0 10) --reuse_preview_summary_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview/${TASK} --reuse_preview_frame_mode annotated_json_keyframes --reuse_preview_candidate_group orientation --reuse_preview_top_rank 1 --arm auto --execute_both_arms 1 --planner_backend urdfik --urdfik_trajectory_mode cartesian_interp_ik --urdfik_cartesian_interp_steps 20 --urdfik_cartesian_interp_auto_step_m 0.05 --candidate_selection_mode planner --left_target_object "$LEFT_OBJ" --right_target_object "$RIGHT_OBJ" --candidate_target_local_x_offset_m -0.05 --approach_offset_m 0.20 --reach_error_pose_source tcp --replan_until_reached 1 --replan_until_reached_max_attempts 3 --save_debug_preview 1 --save_debug_execution_preview 1 --reach_pos_tol_m 0.03 --reach_rot_tol_deg 20 --pure_scene_output 1 --overlay_text 0 --debug_visualize_targets 0 --debug_visualize_ik_waypoints 0 --third_person_view 0 --head_only 1 --lighting_mode front_no_shadow --robot_config /home/zaijia001/ssd/RoboTwin/robot_config_PiperPika_agx_dual_table_0515.json --camera_cv_axis_mode legacy_r1 --head_camera_local_pos 0.11210396690038413 -0.39189397826604927 0.4753892624100325 --head_camera_local_quat_wxyz 0.8524694864910365 -0.0011011947849308937 0.5226654778798345 0.010740586780925399 --enable_viewer 0 --viewer_wait_at_end 0 "${MESH_ARGS[@]}"; done
+```
+
+输出检查：
+
+```bash
+find /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_plan -name head_cam_plan.mp4 | sort
+find /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_plan -name plan_summary.json | sort
+```
+
+### K2. 三个任务：把 AnyGrasp replay 贴回 I1 背景
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate inpainting-sam2-r1 && cd /home/zaijia001/ssd/inpainting_sam2_robot && GPU=0; FPS=5; for TASK in pick_diverse_bottles place_bread_basket stack_cups; do for ID in $(seq 0 10); do BG=/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2/stage1/${TASK}/id_${ID}/human_hand_bg.mp4; ROBOT=/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_plan/${TASK}/foundation_input_${ID}/head_cam_plan.mp4; OUT=/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2/anygrasp/${TASK}/id_${ID}; [[ -f "$BG" && -f "$ROBOT" ]] || { echo "[skip] task=${TASK} id=${ID} missing BG or ROBOT"; continue; }; CUDA_VISIBLE_DEVICES=${GPU} python run_human_robot_inpaint_repaint.py --stage1_bg_video "$BG" --robot_video "$ROBOT" --output_dir "$OUT" --coords_type key_in --point_coords 10 80 --point_labels 1 --human_dilate_kernel_size 100 --robot_dilate_kernel_size 0 --robot_text_prompt "left robot arm, right robot arm, forearm, wrist, gripper, end effector." --robot_box_threshold 0.20 --robot_text_threshold 0.20 --robot_max_mask_area_ratio 1.0 --robot_erode_kernel_size 3 --robot_composite_erode_kernel_size 1 --robot_blend_alpha_sigma 1.0 --robot_exclude_bottom_ratio 0.14 --mask_idx 2 --fps ${FPS} --device cuda --reuse_stage1; done; done
+```
+
+输出检查：
+
+```bash
+find /home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2/anygrasp -type f \( -name '*target_with_original*.mp4' -o -name '*repaint*.mp4' -o -name '*.mp4' \) | sort | head -n 80
 ```

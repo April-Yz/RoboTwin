@@ -1702,3 +1702,12 @@
   - 说明：原始 replay mp4 可能使用 VS Code/Chromium 不支持的 codec 或 pixel format；对比视频能预览是因为 ffmpeg hstack 命令重编码成了 H.264/yuv420p
   - 验证：
     - E2.0 三条 loop 命令和单条 ffmpeg 转码命令 `bash -n` 通过
+
+- 2026-05-21
+  - 扩展 `COMMAND_LIBRARY.zh.md` 的 Piper H2O 调试/生成流程：
+    - 增加 E0 pure replay，用干净 zed/third RGB 视频作为后续 repaint 的机器人源。
+    - 增加 I/J/K，串起 SAM 人手抠除、pure replay 贴回、AnyGrasp 候选筛选、AnyGrasp keyframe replay 和 repaint。
+  - 该轮只修改文档命令和 agent-read 日志，没有运行长耗时渲染/重绘任务。
+  - 验证：
+    - 新增命令区块抽取后 `bash -n` 通过。
+    - 检查到 repaint/AnyGrasp 入口脚本存在。

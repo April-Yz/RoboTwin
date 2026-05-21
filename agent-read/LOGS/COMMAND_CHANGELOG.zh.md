@@ -1105,3 +1105,18 @@
     - `--save_png_frames 0` 用于避免生成 `frames/` 逐帧 PNG
     - 新增单视频转码命令，把 replay mp4 转成 VS Code 更兼容的 H.264/yuv420p
   - 验证：相关命令 `bash -n` 通过。
+
+- 2026-05-21
+  - 更新 `COMMAND_LIBRARY.zh.md`：
+    - 新增 E0：三任务 H2O pure Piper replay，批量处理 `id0-id10`，只保留 `zed_replay.mp4` / `third_replay.mp4`，关闭 overlay text、target/camera axis 可视化，并转码为 VS Code 更兼容的 H.264/yuv420p。
+    - 新增 I：按 `/home/zaijia001/usage.sh` 的两阶段 SAM repaint 流程，先生成人手抠除背景 `human_hand_bg.mp4`，再把 E0 pure robot replay 贴回背景。
+    - 新增 J：对三个任务的 AnyGrasp 输出做 id0-id10 可用性筛选，并用 `render_anygrasp_ranked_preview.py` 生成和 HaMeR 人手朝向/目标物更接近的候选 preview/summary。
+    - 新增 K：使用 J 的 `summary.json` 驱动 Piper AnyGrasp keyframe replay，并把 `head_cam_plan.mp4` 贴回 I1 背景。
+  - 关键路径：
+    - pure replay 输出：`code_painting/human_replay/h2_pure/<task>/id<ID>_z005`
+    - repaint 输出：`/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2`
+    - AnyGrasp preview：`code_painting/anygrasp_h2o_preview`
+    - AnyGrasp plan：`code_painting/anygrasp_h2o_plan`
+  - 验证：
+    - 从 E0 起抽取 28 个 bash 代码块，`bash -n /tmp/command_library_new_blocks.sh` 通过。
+    - 确认 `run_human_robot_inpaint_repaint.py`、`render_anygrasp_ranked_preview.py`、`run_plan_anygrasp_keyframes_piper_batch.sh` 存在。

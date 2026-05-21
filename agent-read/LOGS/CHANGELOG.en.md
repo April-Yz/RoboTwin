@@ -1701,3 +1701,12 @@
   - Note: raw replay mp4 files may use a codec or pixel format unsupported by VS Code/Chromium; the comparison videos are viewable because the ffmpeg hstack command re-encodes them as H.264/yuv420p
   - Validation:
     - `bash -n` passed for the three E2.0 loop commands and the single ffmpeg transcode command
+
+- 2026-05-21
+  - Expanded the Piper H2O debug/generation workflow in `COMMAND_LIBRARY.zh.md`:
+    - Added E0 pure replay to create clean zed/third RGB robot videos for later repainting.
+    - Added I/J/K to connect SAM hand removal, pure replay repainting, AnyGrasp candidate filtering, AnyGrasp keyframe replay, and repainting.
+  - This round only changed command documentation and agent-read logs; no long rendering or repainting jobs were run.
+  - Validation:
+    - Extracted the new command blocks and `bash -n` passed.
+    - Confirmed the repaint and AnyGrasp entry scripts exist.

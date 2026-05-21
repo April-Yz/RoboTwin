@@ -1107,3 +1107,18 @@
     - `--save_png_frames 0` avoids generating per-frame PNG files under `frames/`
     - Added a single-video transcode command to make replay mp4 files more compatible with VS Code by using H.264/yuv420p
   - Validation: related commands passed `bash -n`.
+
+- 2026-05-21
+  - Updated `COMMAND_LIBRARY.zh.md`:
+    - Added E0 for pure Piper replay on the three H2O tasks over `id0-id10`; it keeps only `zed_replay.mp4` / `third_replay.mp4`, disables overlay text and target/camera axis visualization, and transcodes to VS Code-friendly H.264/yuv420p.
+    - Added I for the `/home/zaijia001/usage.sh`-style two-stage SAM repaint flow: first cache hand-removed backgrounds as `human_hand_bg.mp4`, then repaint E0 pure robot replay videos onto those backgrounds.
+    - Added J to check id0-id10 AnyGrasp data availability for the three tasks and generate HaMeR-aligned ranked candidate previews/summaries with `render_anygrasp_ranked_preview.py`.
+    - Added K to run Piper AnyGrasp keyframe replay from J summaries and repaint `head_cam_plan.mp4` onto the I1 backgrounds.
+  - Key paths:
+    - Pure replay output: `code_painting/human_replay/h2_pure/<task>/id<ID>_z005`
+    - Repaint output: `/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2`
+    - AnyGrasp preview: `code_painting/anygrasp_h2o_preview`
+    - AnyGrasp plan: `code_painting/anygrasp_h2o_plan`
+  - Validation:
+    - Extracted 28 bash code blocks from E0 onward and `bash -n /tmp/command_library_new_blocks.sh` passed.
+    - Confirmed `run_human_robot_inpaint_repaint.py`, `render_anygrasp_ranked_preview.py`, and `run_plan_anygrasp_keyframes_piper_batch.sh` exist.
