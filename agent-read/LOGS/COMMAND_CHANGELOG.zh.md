@@ -1092,3 +1092,10 @@
     - 距离曲线与 G 部分一致，按帧画左右手对应物体的相机坐标系 `dx/dy/dz`
     - 新增参数说明：`--plot_clip_abs_m 0` 关闭曲线压缩显示；`--output_plot` 指定 PNG 路径
   - H6 增加查看 `*_hamer_foundation_points_distance.png` 的命令。
+
+- 2026-05-21
+  - 更新 `COMMAND_LIBRARY.zh.md` E/H 部分：
+    - 新增 E2.0：三任务纯人手 replay，去掉 `--object_replay_input_dir` 和 `--object` 参数
+    - E2.0 覆盖 pick_diverse_bottles、place_bread_basket、stack_cups 的 id0-id10 批处理
+    - H1 后新增当前 H 原始 CSV 统计摘要，用于和 G/H1 world replay 统计对比
+  - 验证：三条 E2.0 loop 命令 `bash -n` 通过。

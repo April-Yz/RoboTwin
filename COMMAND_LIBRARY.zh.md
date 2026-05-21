@@ -398,6 +398,21 @@ GPU=2 FPS=5 MAX_FRAMES=300 ARMS=both KEEP_ONLY_ZED_THIRD=0 ID_FILTER=0,2,5-8 bas
 # 单个 id0：直接指定 hand_detections_0.npz 和对应 FoundationPose video-level 目录；如果物体某帧缺失，默认 hide
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && CUDA_VISIBLE_DEVICES=2 conda run -n RoboTwin_bw python /home/zaijia001/ssd/RoboTwin/code_painting/render_hand_retarget_piper_dual_npz_urdfik_main.py --input_npz /home/zaijia001/ssd/data/piper/hand/pnp_star_pear_hamer_output_v2/hand_detections_0.npz --output_dir /home/zaijia001/ssd/RoboTwin/code_painting/output_piper_replay_hamer_axes_with_objects_id0 --fps 5 --max_frames 300 --arms both --robot_config /home/zaijia001/ssd/RoboTwin/robot_config_PiperPika_agx_dual_table_0515.json --camera_cv_axis_mode legacy_r1 --head_camera_local_pos 0.11210396690038413 -0.39189397826604927 0.4753892624100325 --head_camera_local_quat_wxyz 0.8524694864910365 -0.0011011947849308937 0.5226654778798345 0.010740586780925399 --require_stored_gripper_pose 1 --pose_source gripper --orientation_remap_label identity --stored_orientation_post_rot_xyz_deg 0 0 0 --target_world_offset_xyz 0 0.1 0.1 --execute_waypoint_scene_steps 5 --execute_settle_scene_steps 20 --urdfik_joint_interp_waypoints 10 --debug_mode 0 --debug_post_execute 1 --debug_frame_limit -1 --save_png_frames 1 --object_replay_input_dir /home/zaijia001/ssd/data/piper/hand/pnp_star_pear_foundation_vis/obj_vis/pnp_star_pear_foundation_input_0 --object pear=/home/zaijia001/ssd/data/R1/hand/obj_mesh/pear/pear.obj --object star_fruit=/home/zaijia001/ssd/data/R1/hand/obj_mesh/star/star.obj --object_missing_frame_policy hide --lighting_mode front_no_shadow
 
+#### E2.0 三个 H2O 任务：只 replay 人手，不加载 FoundationPose 物体
+
+> 用途：排除 FoundationPose 物体加载/渲染对画面的影响，只检查 HaMeR gripper pose 到 Piper 双臂 replay 的结果。下面三条命令仍使用 0515 Piper calibration bundle、identity gripper 朝向、沿夹爪蓝色 +Z 反方向后退 5cm。
+
+```bash
+# pick_diverse_bottles：只回放人手 id0-id10
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && for ID in $(seq 0 10); do CUDA_VISIBLE_DEVICES=2 conda run -n RoboTwin_bw python /home/zaijia001/ssd/RoboTwin/code_painting/render_hand_retarget_piper_dual_npz_urdfik_main.py --input_npz /home/zaijia001/ssd/data/piper/hand/pick_diverse_bottles/harmer_output/hand_detections_${ID}.npz --output_dir /home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2o/pick_diverse_bottles/id${ID}_z005 --fps 5 --max_frames 300 --arms both --piper_calibration_bundle /home/zaijia001/ssd/RoboTwin/calibration_bundle_piper_new_table_0515.json --camera_cv_axis_mode legacy_r1 --require_stored_gripper_pose 1 --pose_source gripper --orientation_remap_label identity --stored_orientation_post_rot_xyz_deg 0 0 0 --target_local_forward_retreat_m 0.05 --target_world_offset_xyz 0 0.1 0.1 --execute_waypoint_scene_steps 5 --execute_settle_scene_steps 20 --urdfik_joint_interp_waypoints 10 --debug_mode 0 --debug_post_execute 1 --debug_frame_limit -1 --save_png_frames 1 --lighting_mode front_no_shadow; done
+
+# place_bread_basket：只回放人手 id0-id10
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && for ID in $(seq 0 10); do CUDA_VISIBLE_DEVICES=2 conda run -n RoboTwin_bw python /home/zaijia001/ssd/RoboTwin/code_painting/render_hand_retarget_piper_dual_npz_urdfik_main.py --input_npz /home/zaijia001/ssd/data/piper/hand/place_bread_basket/harmer_output/hand_detections_${ID}.npz --output_dir /home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2o/place_bread_basket/id${ID}_z005 --fps 5 --max_frames 300 --arms both --piper_calibration_bundle /home/zaijia001/ssd/RoboTwin/calibration_bundle_piper_new_table_0515.json --camera_cv_axis_mode legacy_r1 --require_stored_gripper_pose 1 --pose_source gripper --orientation_remap_label identity --stored_orientation_post_rot_xyz_deg 0 0 0 --target_local_forward_retreat_m 0.05 --target_world_offset_xyz 0 0.1 0.1 --execute_waypoint_scene_steps 5 --execute_settle_scene_steps 20 --urdfik_joint_interp_waypoints 10 --debug_mode 0 --debug_post_execute 1 --debug_frame_limit -1 --save_png_frames 1 --lighting_mode front_no_shadow; done
+
+# stack_cups：只回放人手 id0-id10
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && for ID in $(seq 0 10); do CUDA_VISIBLE_DEVICES=2 conda run -n RoboTwin_bw python /home/zaijia001/ssd/RoboTwin/code_painting/render_hand_retarget_piper_dual_npz_urdfik_main.py --input_npz /home/zaijia001/ssd/data/piper/hand/stack_cups/harmer_output/hand_detections_${ID}.npz --output_dir /home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2o/stack_cups/id${ID}_z005 --fps 5 --max_frames 300 --arms both --piper_calibration_bundle /home/zaijia001/ssd/RoboTwin/calibration_bundle_piper_new_table_0515.json --camera_cv_axis_mode legacy_r1 --require_stored_gripper_pose 1 --pose_source gripper --orientation_remap_label identity --stored_orientation_post_rot_xyz_deg 0 0 0 --target_local_forward_retreat_m 0.05 --target_world_offset_xyz 0 0.1 0.1 --execute_waypoint_scene_steps 5 --execute_settle_scene_steps 20 --urdfik_joint_interp_waypoints 10 --debug_mode 0 --debug_post_execute 1 --debug_frame_limit -1 --save_png_frames 1 --lighting_mode front_no_shadow; done
+```
+
 #### E2.1 pick_diverse_bottles：手 + right_bottle/left_bottle
 
 ```bash
@@ -498,6 +513,16 @@ find /home/zaijia001/ssd/RoboTwin/code_painting/human_object_replay/h2o -path '*
 | ALL | wrist-retreat | 9.5cm | 4.3cm | 17.0cm | -3.8cm | +0.9cm | +16.9cm | z outlier 1.77%，raw min -9.96m |
 
 读数结论：正常帧里 `dz` 的中位数整体在 `+15cm` 到 `+17cm`，说明手点相对 FoundationPose 物体中心在世界 z 轴上有稳定正偏差；这不是单帧执行不到位能解释的问题。pick/place 的少量米级异常更像 FoundationPose 物体 pose track 或缺帧/跳帧问题，stack_cups 没有这种大 outlier。
+
+当前 H 部分原始检测 CSV 统计（已生成 `pick_diverse_bottles` id0-id10，共 11 个 CSV；相机坐标系 `hand_midpoint - object_center`，正常帧仍按 `|value|<=0.5m`）：
+
+| 任务 | 点 | abs dx median | abs dy median | abs dz median | signed dx median | signed dy median | signed dz median | 主要 outlier |
+|---|---|---:|---:|---:|---:|---:|---:|---|
+| pick_diverse_bottles | left hand vs left_bottle | 1.6cm | 4.0cm | 6.3cm | +0.5cm | -1.7cm | -6.2cm | z outlier 5.12%，raw max +9.63m |
+| pick_diverse_bottles | right hand vs right_bottle | 1.8cm | 2.6cm | 3.9cm | -0.9cm | -1.0cm | -3.2cm | z outlier 4.09%，raw max +3.35m |
+| pick_diverse_bottles | both | 1.7cm | 3.4cm | 5.1cm | -0.1cm | -1.2cm | -4.6cm | z outlier 4.60%，raw max +9.63m |
+
+H 原始 CSV 与 G replay/world CSV 的差异：H 是相机坐标系原始检测差值，且不包含 `--target_world_offset_xyz 0 0.1 0.1`、Piper 标定 camera-to-world 旋转、机器人 replay 目标偏移和 wrist-retreat 点；G 是 world 坐标系下的 gripper/wrist-retreat 到物体差值。因此 H 中 pick 的正常帧 `abs dz median` 约 `5.1cm`，明显小于 G 中 pick 的 gripper `14.6cm` / wrist `16.5cm`；G 的 z 偏差主要来自 replay/世界坐标转换和人为 target offset/retreat 定义，而不是 HaMeR 与 FoundationPose 原始相机坐标里已经有 15cm 级 z 偏差。
 
 ### H2. 原始 HaMeR + FoundationPose 点位对比脚本
 

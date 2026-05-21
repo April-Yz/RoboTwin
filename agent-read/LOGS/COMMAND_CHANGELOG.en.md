@@ -1094,3 +1094,10 @@
     - The distance plot mirrors section G and shows per-frame camera-frame `dx/dy/dz` for each hand/object pair
     - Documented `--plot_clip_abs_m 0` to disable plot clipping and `--output_plot` to override the PNG path
   - H6 now includes a finder command for `*_hamer_foundation_points_distance.png`.
+
+- 2026-05-21
+  - Updated the E/H sections in `COMMAND_LIBRARY.zh.md`:
+    - Added E2.0 for pure hand replay without `--object_replay_input_dir` or `--object` arguments
+    - E2.0 covers id0-id10 batches for pick_diverse_bottles, place_bread_basket, and stack_cups
+    - Added a current H raw CSV statistics summary after H1 for comparison against the G/H1 world replay statistics
+  - Validation: `bash -n` passed for all three E2.0 loop commands.

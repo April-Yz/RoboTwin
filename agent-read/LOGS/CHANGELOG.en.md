@@ -1680,3 +1680,15 @@
   - Validation:
     - `py_compile` passed
     - place_bread_basket id0 `--max_frames 5` smoke test succeeded and produced a video, CSV, and distance-curve PNG
+
+- 2026-05-21
+  - Analyzed the newly generated raw HaMeR/FoundationPose CSV files from section H:
+    - Found 11 CSVs for `pick_diverse_bottles` id0-id10
+    - The inlier overall `abs dz median` in camera-frame `hand_midpoint - object_center` is about `5.1cm`
+    - In comparison, the G/H1 world replay statistics for pick have gripper/wrist `abs dz median` about `14.6cm/16.5cm`
+    - Conclusion: the 15cm-level z offset is not mainly present in the raw detection points; it is more likely introduced by camera-to-world conversion, `target_world_offset_xyz`, retreat-point definition, and replay coordinate-chain effects
+  - Updated `COMMAND_LIBRARY.zh.md`:
+    - Added E2.0 before E2.1/E2.2/E2.3 for pure hand replay on the three H2O tasks without loading FoundationPose objects
+    - Added the current H raw CSV statistics and comparison against G/H1 world replay statistics after H1
+  - Validation:
+    - `bash -n` passed for the three E2.0 id0-id10 pure hand replay loop commands

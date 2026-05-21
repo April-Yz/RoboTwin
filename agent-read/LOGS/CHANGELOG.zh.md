@@ -1681,3 +1681,15 @@
   - 验证：
     - `py_compile` 通过
     - place_bread_basket id0 `--max_frames 5` smoke test 成功，生成视频、CSV 和距离曲线 PNG
+
+- 2026-05-21
+  - 统计 H 部分新生成的原始 HaMeR/FoundationPose CSV：
+    - 当前检测到 `pick_diverse_bottles` id0-id10，共 11 个 CSV
+    - 相机坐标系 `hand_midpoint - object_center` 的正常帧整体 `abs dz median` 约 `5.1cm`
+    - 对比 G/H1 的 world replay 统计，pick 的 gripper/wrist `abs dz median` 约 `14.6cm/16.5cm`
+    - 结论：15cm 级 z 偏差不主要来自原始检测点位，而更可能来自 camera-to-world、`target_world_offset_xyz`、retreat 点定义和 replay 坐标链路叠加
+  - 更新 `COMMAND_LIBRARY.zh.md`：
+    - 在 E2.1/E2.2/E2.3 前新增 E2.0，只 replay 三个 H2O 任务的人手，不加载 FoundationPose 物体
+    - 在 H1 后补充当前 H 原始 CSV 统计和与 G/H1 world replay 统计的差异说明
+  - 验证：
+    - E2.0 三条 id0-id10 pure hand replay loop 命令 `bash -n` 通过
