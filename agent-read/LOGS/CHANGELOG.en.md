@@ -1692,3 +1692,12 @@
     - Added the current H raw CSV statistics and comparison against G/H1 world replay statistics after H1
   - Validation:
     - `bash -n` passed for the three E2.0 id0-id10 pure hand replay loop commands
+
+- 2026-05-21
+  - Updated `COMMAND_LIBRARY.zh.md` E2.0:
+    - Changed the three pure hand replay commands from `--save_png_frames 1` to `--save_png_frames 0`
+    - Documented that `--save_png_frames 0` avoids saving per-frame PNG files under `frames/` and keeps only the main replay mp4/npz outputs
+    - Added a VS Code-compatible transcode command using `ffmpeg -c:v libx264 -pix_fmt yuv420p -movflags +faststart`
+  - Note: raw replay mp4 files may use a codec or pixel format unsupported by VS Code/Chromium; the comparison videos are viewable because the ffmpeg hstack command re-encodes them as H.264/yuv420p
+  - Validation:
+    - `bash -n` passed for the three E2.0 loop commands and the single ffmpeg transcode command

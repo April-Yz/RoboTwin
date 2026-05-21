@@ -1099,3 +1099,9 @@
     - E2.0 覆盖 pick_diverse_bottles、place_bread_basket、stack_cups 的 id0-id10 批处理
     - H1 后新增当前 H 原始 CSV 统计摘要，用于和 G/H1 world replay 统计对比
   - 验证：三条 E2.0 loop 命令 `bash -n` 通过。
+
+- 2026-05-21
+  - 更新 E2.0 纯人手 replay 命令：
+    - `--save_png_frames 0` 用于避免生成 `frames/` 逐帧 PNG
+    - 新增单视频转码命令，把 replay mp4 转成 VS Code 更兼容的 H.264/yuv420p
+  - 验证：相关命令 `bash -n` 通过。

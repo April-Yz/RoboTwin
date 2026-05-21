@@ -1101,3 +1101,9 @@
     - E2.0 covers id0-id10 batches for pick_diverse_bottles, place_bread_basket, and stack_cups
     - Added a current H raw CSV statistics summary after H1 for comparison against the G/H1 world replay statistics
   - Validation: `bash -n` passed for all three E2.0 loop commands.
+
+- 2026-05-21
+  - Updated E2.0 pure hand replay commands:
+    - `--save_png_frames 0` avoids generating per-frame PNG files under `frames/`
+    - Added a single-video transcode command to make replay mp4 files more compatible with VS Code by using H.264/yuv420p
+  - Validation: related commands passed `bash -n`.

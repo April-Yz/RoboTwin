@@ -1693,3 +1693,12 @@
     - 在 H1 后补充当前 H 原始 CSV 统计和与 G/H1 world replay 统计的差异说明
   - 验证：
     - E2.0 三条 id0-id10 pure hand replay loop 命令 `bash -n` 通过
+
+- 2026-05-21
+  - 更新 `COMMAND_LIBRARY.zh.md` E2.0：
+    - 三个纯人手 replay 命令从 `--save_png_frames 1` 改为 `--save_png_frames 0`
+    - 说明 `--save_png_frames 0` 不再保存 `frames/` 下逐帧 PNG，只保存 replay mp4/npz 等主输出
+    - 增加 VS Code 预览兼容转码命令：`ffmpeg -c:v libx264 -pix_fmt yuv420p -movflags +faststart`
+  - 说明：原始 replay mp4 可能使用 VS Code/Chromium 不支持的 codec 或 pixel format；对比视频能预览是因为 ffmpeg hstack 命令重编码成了 H.264/yuv420p
+  - 验证：
+    - E2.0 三条 loop 命令和单条 ffmpeg 转码命令 `bash -n` 通过
