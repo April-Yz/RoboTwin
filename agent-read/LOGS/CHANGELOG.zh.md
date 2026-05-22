@@ -1,5 +1,18 @@
 # CHANGELOG.zh
 
+## 2026-05-22（H2O 人工关键帧标注与废弃视频标记）
+
+- 新增 `code_painting/annotate_hand_keyframes.py`：
+  - 从旧 `d_pour_blue` 交互标注逻辑迁移为 repo 内通用工具。
+  - 支持 `Space` 标注关键帧、`d` 标记/恢复废弃视频、`n/p/q` 保存导航。
+  - 输出 `hand_keyframes_all.json`，并可把 `hand_vis_gripper_<id>.mp4` 归一化为下游读取的 `hand_vis_<id>.mp4`。
+- 更新 `code_painting/run_render_anygrasp_ranked_preview_keyframes_batch.sh`：
+  - 读取标注 JSON 后跳过 `reject/discard/bad` 或关键帧少于 2 个的 id。
+- 更新 `COMMAND_LIBRARY.zh.md` K0，明确 `ffplay/mpv` 只是查看器，正式标注依赖交互脚本。
+- 验证：
+  - `python code_painting/annotate_hand_keyframes.py --help`
+  - `bash -n code_painting/run_render_anygrasp_ranked_preview_keyframes_batch.sh`
+
 ## 2026-04-29（Piper 朝向猜测：仅图片 + 前上偏移修复）
 
 - 调整 `code_painting/run_piper_gripper_standard_pose_guess.sh`：

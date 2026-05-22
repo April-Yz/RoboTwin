@@ -659,77 +659,73 @@ find /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview -name '*ori
 
 ### K0. 人工筛选关键帧与废弃 bad id
 
-用途：K1 使用 `--reuse_preview_frame_mode annotated_json_keyframes` 时，需要 preview summary 里带人工关键帧信息。先人工看 HaMeR gripper 视频，记录每个 id 的两个关键帧；再用这些关键帧重跑 AnyGrasp preview。通常第一个关键帧选“手刚接近/准备抓取”，第二个关键帧选“动作目标/搬运目标”。
+用途：K1 使用 `--reuse_preview_frame_mode annotated_json_keyframes` 时，需要 preview summary 里带人工关键帧信息。旧的 `ffplay/mpv` 命令只是临时看视频，不会自动写标注；正式流程改为使用交互式标注脚本逐个打开 `hand_vis_gripper_*.mp4`，把结果写成 `hand_keyframes_all.json`。通常第一个关键帧选“手刚接近/准备抓取”，第二个关键帧选“动作目标/搬运目标”。
 
-#### K0.1 人工看视频并记录关键帧
+#### K0.1 交互标注关键帧与废弃视频
+
+脚本入口：
+
+- `/home/zaijia001/ssd/RoboTwin/code_painting/annotate_hand_keyframes.py`
+
+按键逻辑：
+
+- `Space`：把当前帧加入/移除关键帧
+- `Left/Right`：逐帧前后移动
+- `s`：播放/暂停
+- `d`：把当前视频标记为 `reject`，再次按 `d` 恢复为 `in_progress`
+- `n`：保存当前视频并进入下一个；如果没有被 reject，会写成 `status=done`
+- `p`：保存当前视频并回上一个
+- `q` / `Esc`：保存退出
+
+三个任务批量人工标注入口如下；每次只打开一个任务，建议先改 `TASK=...` 单独跑：
 
 ```bash
-# 单个视频 review：推荐用 mpv；空格暂停，`.` 下一帧，`,` 上一帧，方向键快退/快进，`q` 退出。把你认可的两个帧号记录到下面 TSV。
-TASK=pick_diverse_bottles; ID=0; mpv --osd-level=3 --osd-fractions --pause /home/zaijia001/ssd/data/piper/hand/${TASK}/harmer_output/hand_vis_gripper_${ID}.mp4
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && TASK=pick_diverse_bottles; python /home/zaijia001/ssd/RoboTwin/code_painting/annotate_hand_keyframes.py --video-dir /home/zaijia001/ssd/data/piper/hand/${TASK}/harmer_output --pattern 'hand_vis_gripper_*.mp4' --output-json /home/zaijia001/ssd/RoboTwin/code_painting/h2o_manual_review/${TASK}/hand_keyframes_all.json --json-video-name-mode hand_vis --delay-ms 120
 
-# 如果 mpv 不可用，用 ffplay；空格暂停，左右方向键快退/快进，`s` 单帧步进，`q` 退出。
-TASK=pick_diverse_bottles; ID=0; ffplay -vf "drawtext=text='task=${TASK} id=${ID}':x=12:y=12:fontsize=24:fontcolor=lime:box=1:boxcolor=black@0.45" /home/zaijia001/ssd/data/piper/hand/${TASK}/harmer_output/hand_vis_gripper_${ID}.mp4
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && TASK=place_bread_basket; python /home/zaijia001/ssd/RoboTwin/code_painting/annotate_hand_keyframes.py --video-dir /home/zaijia001/ssd/data/piper/hand/${TASK}/harmer_output --pattern 'hand_vis_gripper_*.mp4' --output-json /home/zaijia001/ssd/RoboTwin/code_painting/h2o_manual_review/${TASK}/hand_keyframes_all.json --json-video-name-mode hand_vis --delay-ms 120
+
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && TASK=stack_cups; python /home/zaijia001/ssd/RoboTwin/code_painting/annotate_hand_keyframes.py --video-dir /home/zaijia001/ssd/data/piper/hand/${TASK}/harmer_output --pattern 'hand_vis_gripper_*.mp4' --output-json /home/zaijia001/ssd/RoboTwin/code_painting/h2o_manual_review/${TASK}/hand_keyframes_all.json --json-video-name-mode hand_vis --delay-ms 120
 ```
 
-#### K0.2 写入人工关键帧 JSON
+输出 JSON 结构和旧版保持兼容，核心字段是：
 
-把 `/tmp/h2o_manual_keyframes.tsv` 里的示例行改成你实际认可的 id/关键帧。格式是：`task id keyframe1 keyframe2 status notes`。`status=ok` 会进入后续 preview；`status=reject` 只记录，不用于 preview。
-
-```bash
-cat > /tmp/h2o_manual_keyframes.tsv <<'EOF'
-# task id keyframe1 keyframe2 status notes
-pick_diverse_bottles 0 1 22 ok demo
-place_bread_basket 0 1 22 ok demo
-stack_cups 0 1 22 ok demo
-EOF
-
-python3 - <<'PY'
-import json
-from pathlib import Path
-
-tsv = Path("/tmp/h2o_manual_keyframes.tsv")
-out_root = Path("/home/zaijia001/ssd/RoboTwin/code_painting/h2o_manual_review")
-by_task = {}
-rejects = {}
-for raw in tsv.read_text(encoding="utf-8").splitlines():
-    line = raw.strip()
-    if not line or line.startswith("#"):
-        continue
-    parts = line.split(maxsplit=5)
-    if len(parts) < 5:
-        raise ValueError(f"bad line: {raw}")
-    task, sid, k1, k2, status = parts[:5]
-    notes = parts[5] if len(parts) > 5 else ""
-    item = {
-        "keyframes": [int(k1), int(k2)],
-        "status": status,
-        "notes": notes,
+```json
+{
+  "videos": {
+    "hand_vis_0.mp4": {
+      "keyframes": [15, 31],
+      "status": "done"
+    },
+    "hand_vis_3.mp4": {
+      "keyframes": [],
+      "status": "reject",
+      "notes": "discarded_by_operator"
     }
-    if status == "ok":
-        by_task.setdefault(task, {"_meta": {"schema_version": 1}, "videos": {}})["videos"][f"hand_vis_{int(sid)}.mp4"] = item
-    else:
-        rejects.setdefault(task, {})[str(int(sid))] = item
-
-out_root.mkdir(parents=True, exist_ok=True)
-for task, data in by_task.items():
-    task_dir = out_root / task
-    task_dir.mkdir(parents=True, exist_ok=True)
-    (task_dir / "hand_keyframes_all.json").write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-(out_root / "rejected_ids.json").write_text(json.dumps({"tasks": rejects}, indent=2, ensure_ascii=False), encoding="utf-8")
-print(f"[wrote] {out_root}")
-PY
+  }
+}
 ```
 
-#### K0.3 用人工关键帧重跑 preview summary
+说明：`--json-video-name-mode hand_vis` 会把正在看的 `hand_vis_gripper_${ID}.mp4` 归一化保存成 `hand_vis_${ID}.mp4`。这是下游 `render_anygrasp_ranked_preview.py` 当前读取的 key 格式。
+
+#### K0.2 用人工关键帧重跑 preview summary
+
+下游逻辑：`render_anygrasp_ranked_preview.py --frame_selection_mode hand_keyframes_json` 会读取 `hand_keyframes_all.json`，把帧列表变成 `[0] + 标注关键帧`；其中 `0` 是上下文预览帧。planner 用 `--reuse_preview_frame_mode annotated_json_keyframes` 时，只取 `frame_selection.annotated_keyframes[:2]` 作为真正执行的两个关键帧。`run_render_anygrasp_ranked_preview_keyframes_batch.sh` 会自动跳过 `status=reject/discard/bad` 或少于两个关键帧的 id。
 
 ```bash
 # 整任务批处理：旧版 d_pour_blue 使用同一个 wrapper；这里 H2O 目录名前缀是 foundation_input，所以加 VIDEO_PREFIX=foundation_input。
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && for TASK in pick_diverse_bottles place_bread_basket stack_cups; do case "$TASK" in pick_diverse_bottles) LEFT_OBJ=left_bottle; RIGHT_OBJ=right_bottle ;; place_bread_basket) LEFT_OBJ=basket; RIGHT_OBJ=bread ;; stack_cups) LEFT_OBJ=left_light_pink_cup; RIGHT_OBJ=right_dark_red_cup ;; esac; ANN=/home/zaijia001/ssd/RoboTwin/code_painting/h2o_manual_review/${TASK}/hand_keyframes_all.json; [[ -f "$ANN" ]] || { echo "[skip] missing annotation $ANN"; continue; }; VIDEO_PREFIX=foundation_input CUDA_VISIBLE_DEVICES=2 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_render_anygrasp_ranked_preview_keyframes_batch.sh /home/zaijia001/ssd/data/piper/hand/${TASK}/${TASK}_output /home/zaijia001/ssd/data/piper/hand/${TASK}/foundation_replay /home/zaijia001/ssd/data/piper/hand/${TASK}/harmer_output /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview/${TASK} --hand_keyframes_json "$ANN" --left_target_object "$LEFT_OBJ" --right_target_object "$RIGHT_OBJ" --anygrasp_score_weight 0.25 --orientation_score_weight 0.75 --max_rotation_distance_deg 90 --candidate_target_local_x_offset_m -0.05 --draw_object_overlay 1 --draw_hand_reference 1 --debug_dump_object_distances 1 --top_k 20 --camera_cv_axis_mode legacy_r1; done
 ```
 
-#### K0.4 移动废弃人手数据并同步记录 JSON
+查看 preview 输出：
 
-默认 `APPLY=0` 只打印计划，不移动文件；确认无误后把 `APPLY=1`。这里只移动人手相关输入/输出，不动 FoundationPose/AnyGrasp/robot replay 结果，避免误删物体侧数据。
+```bash
+find /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview -name summary.json | sort | head -n 30
+find /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview -name '*orientation_rank.png' | sort | head -n 30
+```
+
+#### K0.3 可选：物理移动废弃人手数据
+
+标注脚本里的 `status=reject` 已足够让 K0.2/K1 跳过坏 id。只有在你确认要把坏视频从原始目录移走时，才使用下面命令。默认 `APPLY=0` 只打印计划，不移动文件；确认无误后把 `APPLY=1`。这里只移动人手相关输入/输出，不动 FoundationPose/AnyGrasp/robot replay 结果，避免误删物体侧数据。
 
 ```bash
 cat > /tmp/h2o_reject_ids.tsv <<'EOF'

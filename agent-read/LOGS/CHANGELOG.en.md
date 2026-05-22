@@ -1,5 +1,18 @@
 # CHANGELOG.en
 
+## 2026-05-22 (H2O manual keyframe annotation and discarded-video marking)
+
+- Added `code_painting/annotate_hand_keyframes.py`:
+  - migrated the old `d_pour_blue` interactive annotation workflow into a repo-local reusable tool.
+  - supports `Space` for keyframes, `d` for discard/restore, and `n/p/q` for save/navigation.
+  - writes `hand_keyframes_all.json` and can normalize `hand_vis_gripper_<id>.mp4` to downstream `hand_vis_<id>.mp4` keys.
+- Updated `code_painting/run_render_anygrasp_ranked_preview_keyframes_batch.sh`:
+  - skips ids marked `reject/discard/bad` or ids with fewer than two annotated keyframes.
+- Updated `COMMAND_LIBRARY.zh.md` K0 to clarify that `ffplay/mpv` is only a viewer and the formal annotation path uses the interactive script.
+- Validation:
+  - `python code_painting/annotate_hand_keyframes.py --help`
+  - `bash -n code_painting/run_render_anygrasp_ranked_preview_keyframes_batch.sh`
+
 ## 2026-04-29 (Piper orientation guess: images-only + forward/up offset fix)
 
 - Updated `code_painting/run_piper_gripper_standard_pose_guess.sh`:

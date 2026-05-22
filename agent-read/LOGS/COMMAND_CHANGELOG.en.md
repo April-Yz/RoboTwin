@@ -1,3 +1,15 @@
+## 2026-05-22 15:05:00 +08
+
+- Added an H2O AnyGrasp manual keyframe annotation entrypoint:
+  - `code_painting/annotate_hand_keyframes.py`
+  - annotates `hand_vis_gripper_*.mp4` videos interactively and normalizes JSON keys to `hand_vis_<id>.mp4`
+  - supports pressing `d` to mark `status=reject` for discarded bad videos/detections
+- Updated preview batch:
+  - `code_painting/run_render_anygrasp_ranked_preview_keyframes_batch.sh`
+  - skips ids with `status=reject/discard/bad` or fewer than two annotated keyframes
+- Updated command library:
+  - `COMMAND_LIBRARY.zh.md` K0 now documents the interactive annotator workflow and keeps the optional physical move command for discarded data.
+
 ## 2026-05-06 11:40:00 +08
 
 - Added explicit URDFIK execution-step CLI controls:

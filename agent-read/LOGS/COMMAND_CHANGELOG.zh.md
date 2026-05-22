@@ -1,3 +1,15 @@
+## 2026-05-22 15:05:00 +08
+
+- 新增 H2O AnyGrasp 人工关键帧标注入口：
+  - `code_painting/annotate_hand_keyframes.py`
+  - 支持逐视频标注 `hand_vis_gripper_*.mp4` 的关键帧，并把 JSON key 归一化为 `hand_vis_<id>.mp4`
+  - 支持按 `d` 标记 `status=reject`，用于废弃坏视频/坏检测
+- 更新 preview batch：
+  - `code_painting/run_render_anygrasp_ranked_preview_keyframes_batch.sh`
+  - 自动跳过 `status=reject/discard/bad` 或少于两个关键帧的 id
+- 更新命令库：
+  - `COMMAND_LIBRARY.zh.md` K0 改为交互式标注脚本流程，保留可选物理移动废弃数据命令。
+
 ## 2026-05-06 11:40:00 +08
 
 - 为 URDFIK replay 新增显式执行步数参数（可直接从命令行调）：

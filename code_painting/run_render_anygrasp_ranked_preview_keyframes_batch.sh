@@ -53,6 +53,27 @@ collect_ids_from_root() {
   done | sort -n
 }
 
+annotation_check() {
+  local json_path="$1"
+  local id="$2"
+  python - "${json_path}" "${id}" <<'PY'
+import json
+import sys
+
+json_path, sid = sys.argv[1], int(sys.argv[2])
+with open(json_path, "r", encoding="utf-8") as f:
+    data = json.load(f)
+videos = data.get("videos", data)
+info = videos.get(f"hand_vis_{sid}.mp4")
+if not isinstance(info, dict):
+    print("missing 0")
+    raise SystemExit(0)
+status = str(info.get("status", "done")).lower()
+keyframes = [int(v) for v in info.get("keyframes", [])]
+print(f"{status} {len(keyframes)}")
+PY
+}
+
 if ((${#ids[@]} == 0)); then
   mapfile -t ids < <(collect_ids_from_root "${anygrasp_root}")
 fi
@@ -83,6 +104,20 @@ for id in "${ids[@]}"; do
   hand_npz="${hand_dir}/hand_detections_${id}.npz"
   base_image_dir="${replay_dir}/head_anygrasp_frames"
   output_dir="${output_root}/${video_name}"
+  read -r annotation_status annotation_keyframe_count < <(annotation_check "${hand_keyframes_json}" "${id}")
+
+  if [[ "${annotation_status}" == "missing" ]]; then
+    echo "[run-anygrasp-preview-keyframes-batch] skip id=${id} missing annotation key hand_vis_${id}.mp4 in ${hand_keyframes_json}" >&2
+    continue
+  fi
+  if [[ "${annotation_status}" == "reject" || "${annotation_status}" == "discard" || "${annotation_status}" == "bad" ]]; then
+    echo "[run-anygrasp-preview-keyframes-batch] skip id=${id} annotation_status=${annotation_status}" >&2
+    continue
+  fi
+  if ((annotation_keyframe_count < 2)); then
+    echo "[run-anygrasp-preview-keyframes-batch] skip id=${id} annotation has ${annotation_keyframe_count} keyframes; need at least 2" >&2
+    continue
+  fi
 
   if [[ ! -d "${anygrasp_dir}" ]]; then
     echo "[run-anygrasp-preview-keyframes-batch] skip id=${id} missing anygrasp_dir=${anygrasp_dir}" >&2
