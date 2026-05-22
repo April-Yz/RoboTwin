@@ -1144,3 +1144,11 @@
     - K0.3：用 `--frame_selection_mode hand_keyframes_json` 按人工关键帧重跑 AnyGrasp preview summary，供 K1 的 `annotated_json_keyframes` 使用。
     - K0.4：新增 bad id 废弃命令，默认 `APPLY=0` dry-run，`APPLY=1` 时移动人手相关文件到 `_rejected_human_ids/` 并写入 `rejected_ids.json`。
   - 验证：抽取 K0 的 4 个 bash 代码块，`bash -n /tmp/command_library_K0_blocks.sh` 通过。
+
+- 2026-05-22
+  - 修正 H2O AnyGrasp 人工关键帧批处理命令：
+    - `run_render_anygrasp_ranked_preview_keyframes_batch.sh` 新增 `VIDEO_PREFIX` 环境变量，默认仍为旧版 `d_pour_blue`，H2O 使用 `VIDEO_PREFIX=foundation_input`。
+    - K0.3 改为调用 keyframe preview batch wrapper，对整个 task 批量生成 `summary.json`，不再手写单 id loop。
+    - K1 去掉 `--ids $(seq 0 10)`，按 task 根目录批处理全部可用 `foundation_input_<id>`。
+  - 旧版链路确认：先用人工关键帧 JSON 生成 preview summary，再由 planner 通过 `--reuse_preview_frame_mode annotated_json_keyframes` 消费 summary。
+  - 验证：wrapper `bash -n` 通过；K0.3/K1 两个命令块 `bash -n` 通过。

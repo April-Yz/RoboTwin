@@ -1730,3 +1730,12 @@
     - 增加按人工关键帧重跑 AnyGrasp preview summary 的命令。
     - 增加 bad id dry-run/移动命令，并同步记录 `_rejected_human_ids/rejected_ids.json`。
   - 验证：K0 bash 代码块 `bash -n` 通过。
+
+- 2026-05-22
+  - 参数化 `run_render_anygrasp_ranked_preview_keyframes_batch.sh` 的视频目录前缀：
+    - 默认保持 `d_pour_blue`，兼容旧 AnyGrasp 流程。
+    - 新增 `VIDEO_PREFIX=foundation_input` 支持 H2O task 的 `foundation_input_<id>` 目录。
+  - 更新 `COMMAND_LIBRARY.zh.md` K0.3/K1：
+    - K0.3 使用 batch wrapper 按整 task 生成人工关键帧 preview summary。
+    - K1 改为处理整 task，不再限制 `id0-id10`。
+  - 验证：wrapper 和 K0.3/K1 文档命令均 `bash -n` 通过。

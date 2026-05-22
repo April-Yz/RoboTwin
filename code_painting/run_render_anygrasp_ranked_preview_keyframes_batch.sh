@@ -17,6 +17,7 @@ output_root=${4:-"/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_direct_pre
 shift 4 || true
 
 hand_keyframes_json="${hand_dir}/hand_keyframes_all.json"
+video_prefix="${VIDEO_PREFIX:-d_pour_blue}"
 ids=()
 forward_args=()
 while (($# > 0)); do
@@ -46,9 +47,9 @@ done
 collect_ids_from_root() {
   local root="$1"
   local path=""
-  for path in "${root}"/d_pour_blue_*; do
+  for path in "${root}/${video_prefix}"_*; do
     [[ -d "${path}" ]] || continue
-    basename "${path}" | sed -E 's/^d_pour_blue_([0-9]+)$/\1/'
+    basename "${path}" | sed -E "s/^${video_prefix}_([0-9]+)$/\\1/"
   done | sort -n
 }
 
@@ -60,6 +61,7 @@ echo "[run-anygrasp-preview-keyframes-batch] anygrasp_root=${anygrasp_root}"
 echo "[run-anygrasp-preview-keyframes-batch] replay_root=${replay_root}"
 echo "[run-anygrasp-preview-keyframes-batch] hand_dir=${hand_dir}"
 echo "[run-anygrasp-preview-keyframes-batch] hand_keyframes_json=${hand_keyframes_json}"
+echo "[run-anygrasp-preview-keyframes-batch] video_prefix=${video_prefix}"
 echo "[run-anygrasp-preview-keyframes-batch] output_root=${output_root}"
 echo "[run-anygrasp-preview-keyframes-batch] ids=${ids[*]:-}"
 
@@ -75,7 +77,7 @@ fi
 mkdir -p "${output_root}"
 
 for id in "${ids[@]}"; do
-  video_name="d_pour_blue_${id}"
+  video_name="${video_prefix}_${id}"
   anygrasp_dir="${anygrasp_root}/${video_name}"
   replay_dir="${replay_root}/${video_name}"
   hand_npz="${hand_dir}/hand_detections_${id}.npz"

@@ -1146,3 +1146,11 @@
     - K0.3: rerun AnyGrasp preview summaries with `--frame_selection_mode hand_keyframes_json`, producing metadata consumed by K1 `annotated_json_keyframes`.
     - K0.4: add a bad-id rejection command; it defaults to `APPLY=0` dry-run and moves human-side files into `_rejected_human_ids/` plus records `rejected_ids.json` when `APPLY=1`.
   - Validation: extracted the four K0 bash blocks and `bash -n /tmp/command_library_K0_blocks.sh` passed.
+
+- 2026-05-22
+  - Fixed the H2O AnyGrasp manual-keyframe batch commands:
+    - `run_render_anygrasp_ranked_preview_keyframes_batch.sh` now supports a `VIDEO_PREFIX` environment variable; the default remains the legacy `d_pour_blue`, while H2O uses `VIDEO_PREFIX=foundation_input`.
+    - K0.3 now calls the keyframe preview batch wrapper for whole-task summary generation instead of a handwritten per-id loop.
+    - K1 no longer passes `--ids $(seq 0 10)`, so it processes all available `foundation_input_<id>` directories under each task root.
+  - Confirmed the old flow: manual keyframe JSON first generates preview summaries, and the planner later consumes them with `--reuse_preview_frame_mode annotated_json_keyframes`.
+  - Validation: the wrapper passed `bash -n`; the K0.3/K1 command blocks passed `bash -n`.

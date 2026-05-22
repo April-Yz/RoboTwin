@@ -1729,3 +1729,12 @@
     - Added a command to rerun AnyGrasp preview summaries using the manual keyframes.
     - Added a bad-id dry-run/move command that records `_rejected_human_ids/rejected_ids.json`.
   - Validation: the K0 bash command blocks passed `bash -n`.
+
+- 2026-05-22
+  - Parameterized the video-directory prefix in `run_render_anygrasp_ranked_preview_keyframes_batch.sh`:
+    - The default remains `d_pour_blue` for compatibility with the old AnyGrasp flow.
+    - `VIDEO_PREFIX=foundation_input` now supports H2O task directories named `foundation_input_<id>`.
+  - Updated K0.3/K1 in `COMMAND_LIBRARY.zh.md`:
+    - K0.3 uses the batch wrapper to generate manual-keyframe preview summaries for whole tasks.
+    - K1 now processes whole tasks instead of only `id0-id10`.
+  - Validation: the wrapper and the K0.3/K1 documented command blocks passed `bash -n`.
