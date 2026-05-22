@@ -1716,3 +1716,9 @@
   - 修正 I 段 SAM repaint 文档命令，避免 Stage-1 人手抠除因为 E0 pure robot 视频未全部生成而全量跳过。
   - I1 改为使用 dummy robot video；I2 保持使用 E0 pure robot，并输出更具体的缺失路径。
   - 验证：I 段 bash 代码块 `bash -n` 通过。
+
+- 2026-05-22
+  - 修正 `COMMAND_LIBRARY.zh.md` I2/K2 的 Stage-1 背景输入路径。
+  - 背景文件实际在 `stage1_human_inpaint/removed_w_mask_*.mp4`，因此命令加入 fallback，兼容不存在顶层 `human_hand_bg.mp4` 的情况。
+  - 同步更新 I1 输出检查命令。
+  - 验证：I/K2 repaint 命令块 `bash -n` 通过；抽样三任务 id0/id1/id10 均能找到现有 Stage-1 背景文件。

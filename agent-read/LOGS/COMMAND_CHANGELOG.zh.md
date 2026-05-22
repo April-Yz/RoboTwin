@@ -1128,3 +1128,11 @@
     - I2 仍严格要求每个 task/id 的 E0 pure `zed_replay.mp4` 存在，并分别打印缺失的 BG 或 pure robot 路径。
   - 原因：用户运行 I1 时大量 `[skip] missing HUMAN or ROBOT`，实际 `HUMAN` 存在，缺的是尚未生成完整的 `h2_pure/<task>/id<ID>_z005/zed_replay.mp4`。
   - 验证：抽取 I 段 4 个 bash 代码块，`bash -n /tmp/command_library_I_blocks.sh` 通过。
+
+- 2026-05-22
+  - 修正 `COMMAND_LIBRARY.zh.md` I2/K2 repaint 背景路径：
+    - Stage-1 背景实际位于 `stage1_human_inpaint/removed_w_mask_*.mp4`，不是每次都会生成顶层 `human_hand_bg.mp4`。
+    - I2/K2 现在先尝试顶层 `human_hand_bg.mp4`，不存在时自动 fallback 到 `stage1_human_inpaint/removed_w_mask_*.mp4`。
+    - 缺失提示改为指向 `${BG_ROOT}/stage1_human_inpaint`，便于定位 I1 输出。
+  - 同步修正 I1 输出检查命令，直接查找 `stage1_human_inpaint/removed_w_mask_*.mp4`。
+  - 验证：I/K2 repaint 代码块 `bash -n` 通过；三任务抽样 id0/id1/id10 的 BG fallback 均解析到现有 `removed_w_mask_rgb_<ID>.mp4`。

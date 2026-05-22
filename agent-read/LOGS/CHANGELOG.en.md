@@ -1715,3 +1715,9 @@
   - Fixed the section-I SAM repaint command docs so Stage-1 hand removal no longer skips everything just because the full E0 pure robot replay set is incomplete.
   - I1 now uses a dummy robot video; I2 still uses E0 pure robot videos and reports more specific missing paths.
   - Validation: section-I bash blocks passed `bash -n`.
+
+- 2026-05-22
+  - Fixed the Stage-1 background input paths for I2/K2 in `COMMAND_LIBRARY.zh.md`.
+  - The background file is actually under `stage1_human_inpaint/removed_w_mask_*.mp4`, so the commands now fall back to that path when the top-level `human_hand_bg.mp4` alias is absent.
+  - Updated the I1 output check command accordingly.
+  - Validation: the I/K2 repaint command blocks passed `bash -n`; sampled id0/id1/id10 across all three tasks and each resolved to an existing Stage-1 background file.

@@ -1130,3 +1130,11 @@
     - I2 still requires the per-task/id E0 pure `zed_replay.mp4` and now reports missing BG vs missing pure robot paths separately.
   - Reason: the user's I1 run printed many `[skip] missing HUMAN or ROBOT` lines; `HUMAN` existed, while most `h2_pure/<task>/id<ID>_z005/zed_replay.mp4` files had not been generated yet.
   - Validation: extracted 4 bash code blocks from section I and `bash -n /tmp/command_library_I_blocks.sh` passed.
+
+- 2026-05-22
+  - Fixed the I2/K2 repaint background paths in `COMMAND_LIBRARY.zh.md`:
+    - The Stage-1 background actually lives under `stage1_human_inpaint/removed_w_mask_*.mp4`; a top-level `human_hand_bg.mp4` is not always produced.
+    - I2/K2 now try the top-level `human_hand_bg.mp4` first, then fall back to `stage1_human_inpaint/removed_w_mask_*.mp4`.
+    - Missing-file messages now point at `${BG_ROOT}/stage1_human_inpaint` to make I1 output checks easier.
+  - Updated the I1 output check command to search for `stage1_human_inpaint/removed_w_mask_*.mp4` directly.
+  - Validation: the I/K2 repaint command blocks passed `bash -n`; sampled id0/id1/id10 for all three tasks and the BG fallback resolved to existing `removed_w_mask_rgb_<ID>.mp4` files.
