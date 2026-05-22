@@ -1,3 +1,10 @@
+## 2026-05-22 15:45:00 +08
+
+- Updated `COMMAND_LIBRARY.zh.md` K1:
+  - the planning command no longer scans every AnyGrasp directory under the task root.
+  - it now derives usable ids from `anygrasp_h2o_preview/<TASK>/foundation_input_<ID>/summary.json` and passes them through `--ids`.
+  - added `--skip_existing 1 --continue_on_error 1` for safe partial-task resume and to avoid repeated `missing_preview_summary` reports for ids that have not gone through K0.2.
+
 ## 2026-05-22 15:25:00 +08
 
 - Updated the H2O manual keyframe annotator:

@@ -1,5 +1,14 @@
 # CHANGELOG.en
 
+## 2026-05-22 (K1 planning command now runs only ids with preview summaries)
+
+- Updated `COMMAND_LIBRARY.zh.md` K1:
+  - automatically collects runnable ids from the K0.2 preview summary directory.
+  - passes explicit `--ids` into the planner batch to avoid scanning unannotated ids without preview summaries.
+  - keeps `--skip_existing 1` for resume behavior, so ids with existing `plan_summary.json` are skipped.
+- Validation:
+  - checked that the shell snippet can derive ids from existing `pick_diverse_bottles` preview summaries.
+
 ## 2026-05-22 (H2O annotator supports separate left/right hand keyframes)
 
 - Updated `code_painting/annotate_hand_keyframes.py`:

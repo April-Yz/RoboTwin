@@ -1,3 +1,10 @@
+## 2026-05-22 15:45:00 +08
+
+- 更新 `COMMAND_LIBRARY.zh.md` K1：
+  - 规划命令不再直接扫描任务下所有 AnyGrasp 目录。
+  - 改为从 `anygrasp_h2o_preview/<TASK>/foundation_input_<ID>/summary.json` 反推可用 id，再传入 `--ids`。
+  - 增加 `--skip_existing 1 --continue_on_error 1`，支持部分任务安全续跑，避免未生成 K0.2 preview 的 id 反复报 `missing_preview_summary`。
+
 ## 2026-05-22 15:25:00 +08
 
 - 更新 H2O 人工关键帧标注工具：

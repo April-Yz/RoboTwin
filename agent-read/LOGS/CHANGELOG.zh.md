@@ -1,5 +1,14 @@
 # CHANGELOG.zh
 
+## 2026-05-22（K1 规划命令改为只跑已有 preview 的 id）
+
+- 更新 `COMMAND_LIBRARY.zh.md` K1：
+  - 从 K0.2 preview summary 目录自动收集可运行 id。
+  - 给 planner batch 显式传 `--ids`，避免未标注/未生成 preview 的 id 被扫描后报错。
+  - 保留 `--skip_existing 1` 用于续跑，已有 `plan_summary.json` 的 id 会跳过。
+- 验证：
+  - 通过 shell 片段检查 `pick_diverse_bottles` preview summary 能正确反推出 id 列表。
+
 ## 2026-05-22（H2O 标注器支持左右手分开关键帧）
 
 - 更新 `code_painting/annotate_hand_keyframes.py`：
