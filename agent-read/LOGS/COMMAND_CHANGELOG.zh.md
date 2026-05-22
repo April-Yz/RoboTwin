@@ -1,3 +1,9 @@
+## 2026-05-22 15:55:00 +08
+
+- 更新 `COMMAND_LIBRARY.zh.md` K1：
+  - 将 `bash -lc '...'` 超长单行命令改为 heredoc 生成 `/tmp/run_h2o_k1_preview_resume.sh` 后执行。
+  - 避免 zsh 中误用中文弯引号 `‘ ’` 导致进入续行状态，也避免直接依赖 zsh 支持 bash 内置 `mapfile`。
+
 ## 2026-05-22 15:45:00 +08
 
 - 更新 `COMMAND_LIBRARY.zh.md` K1：

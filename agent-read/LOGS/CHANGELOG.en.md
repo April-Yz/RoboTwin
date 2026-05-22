@@ -1,5 +1,13 @@
 # CHANGELOG.en
 
+## 2026-05-22 (K1 resume command rewritten as a heredoc script)
+
+- Updated `COMMAND_LIBRARY.zh.md` K1:
+  - writes a bash script via `cat > /tmp/run_h2o_k1_preview_resume.sh <<'BASH' ... BASH` and then executes it.
+  - avoids zsh `cmdand for>` continuation prompts caused by pasting `bash -lc ‘...’` with curly quotes.
+- Validation:
+  - checked the K1 heredoc block structure.
+
 ## 2026-05-22 (K1 planning command now runs only ids with preview summaries)
 
 - Updated `COMMAND_LIBRARY.zh.md` K1:

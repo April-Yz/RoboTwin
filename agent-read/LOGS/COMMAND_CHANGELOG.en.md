@@ -1,3 +1,9 @@
+## 2026-05-22 15:55:00 +08
+
+- Updated `COMMAND_LIBRARY.zh.md` K1:
+  - replaced the long `bash -lc '...'` one-liner with a heredoc that writes `/tmp/run_h2o_k1_preview_resume.sh` and then runs it.
+  - avoids zsh continuation prompts caused by curly quotes `‘ ’`, and avoids relying on zsh support for bash's `mapfile` builtin.
+
 ## 2026-05-22 15:45:00 +08
 
 - Updated `COMMAND_LIBRARY.zh.md` K1:

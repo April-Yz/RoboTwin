@@ -1,5 +1,13 @@
 # CHANGELOG.zh
 
+## 2026-05-22（K1 续跑命令改为 heredoc 脚本）
+
+- 更新 `COMMAND_LIBRARY.zh.md` K1：
+  - 使用 `cat > /tmp/run_h2o_k1_preview_resume.sh <<'BASH' ... BASH` 生成 bash 脚本再执行。
+  - 避免用户在 zsh 里粘贴 `bash -lc ‘...’` 时因中文弯引号进入 `cmdand for>` 续行状态。
+- 验证：
+  - 检查 K1 heredoc 片段结构。
+
 ## 2026-05-22（K1 规划命令改为只跑已有 preview 的 id）
 
 - 更新 `COMMAND_LIBRARY.zh.md` K1：
