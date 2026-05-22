@@ -1,3 +1,15 @@
+## 2026-05-22 16:20:00 +08
+
+- 修复 K1 Piper AnyGrasp planner 参数兼容性：
+  - `plan_anygrasp_keyframes_r1.py` 新增并透传 `--debug_visualize_cameras`、`--debug_camera_axis_length`、`--debug_camera_axis_thickness`、`--target_local_forward_retreat_m`。
+  - `plan_anygrasp_keyframes_r1_batch.py` 同步新增参数并传给单条 planner。
+  - `COMMAND_LIBRARY.zh.md` K1 heredoc 命令显式加入默认值：
+    - `--debug_visualize_cameras 0`
+    - `--debug_camera_axis_length 0.16`
+    - `--debug_camera_axis_thickness 0.006`
+    - `--target_local_forward_retreat_m 0.0`
+- 原因：Piper planner 最终继承 `HandRetargetR1Renderer`，该 renderer 已新增上述构造参数；AnyGrasp planner 路径未同步导致初始化 TypeError。
+
 ## 2026-05-22 15:55:00 +08
 
 - 更新 `COMMAND_LIBRARY.zh.md` K1：

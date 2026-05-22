@@ -1,5 +1,17 @@
 # CHANGELOG.en
 
+## 2026-05-22 (Fix missing renderer args in K1 Piper AnyGrasp planner)
+
+- Fixed `plan_anygrasp_keyframes_r1.py` and the batch wrapper:
+  - added CLI defaults for the `HandRetargetR1Renderer` arguments `debug_visualize_cameras`, `debug_camera_axis_length`, `debug_camera_axis_thickness`, and `target_local_forward_retreat_m`.
+  - forwards the same four arguments through the batch command builder so Piper K1 no longer fails during renderer initialization with missing required arguments.
+- Updated `COMMAND_LIBRARY.zh.md` K1:
+  - the heredoc batch command now explicitly passes these four defaults, making camera visualization and local-forward retreat easy to adjust later.
+- Validation:
+  - `conda run -n RoboTwin_bw python -m py_compile code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_anygrasp_keyframes_r1_batch.py code_painting/plan_anygrasp_keyframes_piper.py code_painting/plan_anygrasp_keyframes_piper_batch.py`
+  - `conda run -n RoboTwin_bw python code_painting/plan_anygrasp_keyframes_piper.py --help`
+  - `conda run -n RoboTwin_bw python code_painting/plan_anygrasp_keyframes_piper_batch.py --help`
+
 ## 2026-05-22 (K1 resume command rewritten as a heredoc script)
 
 - Updated `COMMAND_LIBRARY.zh.md` K1:

@@ -268,6 +268,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--pure_scene_output", type=int, default=0, help="If 1, keep head/third output videos clean: no overlay text, no candidate grippers, and no target-axis visualization. Also skip debug_selection_preview.mp4, keep head/left_wrist/right_wrist plan videos, and auto-save pose_debug.jsonl.")
     parser.add_argument("--debug_visualize_targets", type=int, default=1, help="If 1, show target axis actors. Original internal name: debug_visualize_targets.")
     parser.add_argument("--debug_visualize_ik_waypoints", type=int, default=0, help="If 1, visualize intermediate URDF IK Cartesian waypoints as point+forward-axis markers in viewer/debug output.")
+    parser.add_argument("--debug_visualize_cameras", type=int, default=0, help="If 1, draw calibrated camera axes/frustums in rendered debug outputs.")
+    parser.add_argument("--debug_camera_axis_length", type=float, default=0.16)
+    parser.add_argument("--debug_camera_axis_thickness", type=float, default=0.006)
+    parser.add_argument("--target_local_forward_retreat_m", type=float, default=0.0, help="Retreat replay target opposite the hand/gripper local forward axis before planning; 0 keeps legacy AnyGrasp planner behavior.")
     parser.add_argument("--save_rank_preview_images", type=int, default=1)
     parser.add_argument("--rank_preview_top_n", type=int, default=3, help="Save per-keyframe rank preview PNGs for left/right rank 1..N.")
     parser.add_argument("--debug_target_axis_length", type=float, default=0.08)
@@ -642,9 +646,13 @@ def build_renderer(args: argparse.Namespace) -> ReplayRenderer:
         debug_visualize_targets=bool(args.debug_visualize_targets),
         debug_target_axis_length=args.debug_target_axis_length,
         debug_target_axis_thickness=args.debug_target_axis_thickness,
+        debug_visualize_cameras=bool(args.debug_visualize_cameras),
+        debug_camera_axis_length=args.debug_camera_axis_length,
+        debug_camera_axis_thickness=args.debug_camera_axis_thickness,
         orientation_remap_label="identity",
         orientation_remap_matrix=np.eye(3, dtype=np.float64),
         stored_orientation_post_rot_xyz_deg=[0.0, 0.0, 0.0],
+        target_local_forward_retreat_m=args.target_local_forward_retreat_m,
         target_world_offset_xyz=[0.0, 0.0, 0.0],
         left_target_world_offset_xyz=[0.0, 0.0, 0.0],
         right_target_world_offset_xyz=[0.0, 0.0, 0.0],

@@ -1,3 +1,15 @@
+## 2026-05-22 16:20:00 +08
+
+- Fixed K1 Piper AnyGrasp planner argument compatibility:
+  - `plan_anygrasp_keyframes_r1.py` now defines and forwards `--debug_visualize_cameras`, `--debug_camera_axis_length`, `--debug_camera_axis_thickness`, and `--target_local_forward_retreat_m`.
+  - `plan_anygrasp_keyframes_r1_batch.py` now accepts the same arguments and forwards them to the single-video planner.
+  - `COMMAND_LIBRARY.zh.md` K1 heredoc command explicitly includes the default values:
+    - `--debug_visualize_cameras 0`
+    - `--debug_camera_axis_length 0.16`
+    - `--debug_camera_axis_thickness 0.006`
+    - `--target_local_forward_retreat_m 0.0`
+- Cause: the Piper planner ultimately inherits `HandRetargetR1Renderer`, whose constructor gained these arguments; the AnyGrasp planner path had not been synchronized and failed during initialization.
+
 ## 2026-05-22 15:55:00 +08
 
 - Updated `COMMAND_LIBRARY.zh.md` K1:

@@ -1,5 +1,17 @@
 # CHANGELOG.zh
 
+## 2026-05-22（修复 K1 Piper AnyGrasp planner renderer 缺参）
+
+- 修复 `plan_anygrasp_keyframes_r1.py` / batch wrapper：
+  - 为 planner CLI 补齐 `HandRetargetR1Renderer` 新增的 `debug_visualize_cameras`、`debug_camera_axis_length`、`debug_camera_axis_thickness`、`target_local_forward_retreat_m` 默认参数。
+  - 在 batch 命令生成时同步透传这 4 个参数，避免 Piper K1 规划进入 renderer 初始化时报 `missing required positional arguments`。
+- 更新 `COMMAND_LIBRARY.zh.md` K1：
+  - 在 heredoc 批处理命令中显式写出上述 4 个默认参数，便于后续按需打开相机可视化或设置局部前进轴 retreat。
+- 验证：
+  - `conda run -n RoboTwin_bw python -m py_compile code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_anygrasp_keyframes_r1_batch.py code_painting/plan_anygrasp_keyframes_piper.py code_painting/plan_anygrasp_keyframes_piper_batch.py`
+  - `conda run -n RoboTwin_bw python code_painting/plan_anygrasp_keyframes_piper.py --help`
+  - `conda run -n RoboTwin_bw python code_painting/plan_anygrasp_keyframes_piper_batch.py --help`
+
 ## 2026-05-22（K1 续跑命令改为 heredoc 脚本）
 
 - 更新 `COMMAND_LIBRARY.zh.md` K1：

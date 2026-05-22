@@ -860,6 +860,10 @@ for TASK in pick_diverse_bottles place_bread_basket stack_cups; do
     --overlay_text 0 \
     --debug_visualize_targets 0 \
     --debug_visualize_ik_waypoints 0 \
+    --debug_visualize_cameras 0 \
+    --debug_camera_axis_length 0.16 \
+    --debug_camera_axis_thickness 0.006 \
+    --target_local_forward_retreat_m 0.0 \
     --third_person_view 0 \
     --head_only 1 \
     --lighting_mode front_no_shadow \
