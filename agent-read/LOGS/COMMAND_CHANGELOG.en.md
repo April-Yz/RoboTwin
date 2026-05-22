@@ -1,3 +1,13 @@
+## 2026-05-22 15:25:00 +08
+
+- Updated the H2O manual keyframe annotator:
+  - `Space` still annotates global keyframes into `keyframes`
+  - `l`/`L` annotates left-hand keyframes into `left_keyframes`
+  - `r` annotates right-hand keyframes into `right_keyframes`
+  - the old replay shortcut moved from `r` to `R` to avoid conflict
+- Updated command library:
+  - `COMMAND_LIBRARY.zh.md` K0 now documents separate left/right hand keyframe fields.
+
 ## 2026-05-22 15:05:00 +08
 
 - Added an H2O AnyGrasp manual keyframe annotation entrypoint:

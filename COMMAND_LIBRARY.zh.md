@@ -669,10 +669,13 @@ find /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview -name '*ori
 
 按键逻辑：
 
-- `Space`：把当前帧加入/移除关键帧
+- `Space`：把当前帧加入/移除整体关键帧，写入 `keyframes`
+- `l` / `L`：把当前帧加入/移除左手关键帧，写入 `left_keyframes`
+- `r`：把当前帧加入/移除右手关键帧，写入 `right_keyframes`
 - `Left/Right`：逐帧前后移动
 - `s`：播放/暂停
 - `d`：把当前视频标记为 `reject`，再次按 `d` 恢复为 `in_progress`
+- `R`：从当前视频第 0 帧重新播放
 - `n`：保存当前视频并进入下一个；如果没有被 reject，会写成 `status=done`
 - `p`：保存当前视频并回上一个
 - `q` / `Esc`：保存退出
@@ -694,6 +697,8 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate R
   "videos": {
     "hand_vis_0.mp4": {
       "keyframes": [15, 31],
+      "left_keyframes": [15],
+      "right_keyframes": [31],
       "status": "done"
     },
     "hand_vis_3.mp4": {

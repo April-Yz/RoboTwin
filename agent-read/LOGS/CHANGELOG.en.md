@@ -1,5 +1,15 @@
 # CHANGELOG.en
 
+## 2026-05-22 (H2O annotator supports separate left/right hand keyframes)
+
+- Updated `code_painting/annotate_hand_keyframes.py`:
+  - preserved the old `keyframes` field for the existing AnyGrasp preview/planner flow.
+  - added `left_keyframes` and `right_keyframes`, annotated with `l`/`L` and `r` respectively.
+  - moved the old replay shortcut from `r` to uppercase `R`.
+- Updated `COMMAND_LIBRARY.zh.md` K0 instructions.
+- Validation:
+  - `conda run -n RoboTwin_bw python code_painting/annotate_hand_keyframes.py --help`
+
 ## 2026-05-22 (H2O manual keyframe annotation and discarded-video marking)
 
 - Added `code_painting/annotate_hand_keyframes.py`:

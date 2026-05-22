@@ -22,14 +22,14 @@ except ImportError as exc:
 
 
 WINDOW_NAME = "Hand Keyframe Annotator"
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 ARROW_LEFT = {81, 2424832, 65361}
 ARROW_RIGHT = {83, 2555904, 65363}
 DISCARD_STATUSES = {"reject", "discard", "bad"}
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Annotate two hand keyframes per video and optionally discard bad ids.")
+    parser = argparse.ArgumentParser(description="Annotate global/left/right hand keyframes per video and optionally discard bad ids.")
     parser.add_argument("--video-dir", type=Path, required=True, help="Directory containing hand_vis*.mp4 videos.")
     parser.add_argument("--output-json", type=Path, default=None, help="Merged hand_keyframes_all.json path.")
     parser.add_argument("--pattern", default="hand_vis_gripper_*.mp4", help="Video glob pattern.")
@@ -82,6 +82,8 @@ def load_annotations(path: Path) -> Dict[str, object]:
         normalized["videos"][name] = {
             "video_path": str(info.get("video_path", "")),
             "keyframes": sorted({int(v) for v in info.get("keyframes", [])}),
+            "left_keyframes": sorted({int(v) for v in info.get("left_keyframes", [])}),
+            "right_keyframes": sorted({int(v) for v in info.get("right_keyframes", [])}),
             "total_frames": int(info.get("total_frames", 0)),
             "fps": float(info.get("fps", 0.0)),
             "updated_at": str(info.get("updated_at", "")),
@@ -133,7 +135,28 @@ def read_frame(cap: "cv2.VideoCapture", frame_idx: int):
     return frame if ok else None
 
 
-def draw_overlay(frame, video_name: str, json_name: str, index: int, count: int, frame_idx: int, total_frames: int, paused: bool, keyframes, status: str, delay_ms: int):
+def toggle_frame(frames, frame_idx: int) -> None:
+    if frame_idx in frames:
+        frames.remove(frame_idx)
+    else:
+        frames.add(frame_idx)
+
+
+def draw_overlay(
+    frame,
+    video_name: str,
+    json_name: str,
+    index: int,
+    count: int,
+    frame_idx: int,
+    total_frames: int,
+    paused: bool,
+    keyframes,
+    left_keyframes,
+    right_keyframes,
+    status: str,
+    delay_ms: int,
+):
     frame_canvas = frame.copy()
     h, w = frame_canvas.shape[:2]
     font = cv2.FONT_HERSHEY_SIMPLEX
@@ -141,8 +164,10 @@ def draw_overlay(frame, video_name: str, json_name: str, index: int, count: int,
     lines = [
         f"Video: {video_name} ({index + 1}/{count})  JSON key: {json_name}",
         f"Frame: {frame_idx}/{max(total_frames - 1, 0)}  Mode: {'PAUSE' if paused else f'PLAY {delay_ms}ms'}  Status: {status}",
-        "Keys: space toggle keyframe | d discard/restore | left/right step | s pause | r replay | n next | p prev | q quit",
-        f"Selected keyframes: {', '.join(map(str, keyframes)) if keyframes else 'None'}",
+        "Keys: space global | l left | r right | d discard/restore | arrows step | s pause | R replay | n next | p prev | q quit",
+        f"Global keyframes: {', '.join(map(str, keyframes)) if keyframes else 'None'}",
+        f"Left keyframes: {', '.join(map(str, left_keyframes)) if left_keyframes else 'None'}",
+        f"Right keyframes: {', '.join(map(str, right_keyframes)) if right_keyframes else 'None'}",
     ]
     line_h = 28
     info_h = 16 + 12 + line_h * len(lines)
@@ -154,18 +179,34 @@ def draw_overlay(frame, video_name: str, json_name: str, index: int, count: int,
         cv2.putText(info_canvas, line, (24, y), font, 0.7, (255, 255, 255), 2, cv2.LINE_AA)
         y += line_h
     if frame_idx in keyframes:
-        cv2.putText(frame_canvas, "KEYFRAME", (24, h - 32), font, 1.0, (0, 0, 255), 2, cv2.LINE_AA)
+        cv2.putText(frame_canvas, "GLOBAL", (24, h - 32), font, 1.0, (0, 0, 255), 2, cv2.LINE_AA)
+    if frame_idx in left_keyframes:
+        cv2.putText(frame_canvas, "LEFT", (220, h - 32), font, 1.0, (0, 255, 0), 2, cv2.LINE_AA)
+    if frame_idx in right_keyframes:
+        cv2.putText(frame_canvas, "RIGHT", (360, h - 32), font, 1.0, (255, 0, 0), 2, cv2.LINE_AA)
     if status in DISCARD_STATUSES:
         cv2.putText(frame_canvas, "DISCARDED", (24, h - 72), font, 1.2, (0, 0, 255), 3, cv2.LINE_AA)
     return cv2.vconcat([info_canvas, frame_canvas])
 
 
-def update_record(annotations: Dict[str, object], json_name: str, video_path: Path, keyframes, total_frames: int, fps: float, status: str) -> None:
+def update_record(
+    annotations: Dict[str, object],
+    json_name: str,
+    video_path: Path,
+    keyframes,
+    left_keyframes,
+    right_keyframes,
+    total_frames: int,
+    fps: float,
+    status: str,
+) -> None:
     videos = annotations.setdefault("videos", {})
     assert isinstance(videos, dict)
     videos[json_name] = {
         "video_path": str(video_path),
         "keyframes": sorted({int(v) for v in keyframes}),
+        "left_keyframes": sorted({int(v) for v in left_keyframes}),
+        "right_keyframes": sorted({int(v) for v in right_keyframes}),
         "total_frames": int(total_frames),
         "fps": float(fps),
         "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -183,6 +224,8 @@ def annotate_video(video_path: Path, json_name: str, index: int, count: int, ann
     fps = float(cap.get(cv2.CAP_PROP_FPS) or 0.0)
     existing = annotations.get("videos", {}).get(json_name, {})
     keyframes = set(int(v) for v in existing.get("keyframes", []))
+    left_keyframes = set(int(v) for v in existing.get("left_keyframes", []))
+    right_keyframes = set(int(v) for v in existing.get("right_keyframes", []))
     status = str(existing.get("status", "in_progress"))
     frame_idx = 0
     paused = False
@@ -195,7 +238,24 @@ def annotate_video(video_path: Path, json_name: str, index: int, count: int, ann
             frame = read_frame(cap, frame_idx)
             if frame is None:
                 break
-        cv2.imshow(WINDOW_NAME, draw_overlay(frame, video_path.name, json_name, index, count, frame_idx, total_frames, paused, sorted(keyframes), status, delay_ms))
+        cv2.imshow(
+            WINDOW_NAME,
+            draw_overlay(
+                frame,
+                video_path.name,
+                json_name,
+                index,
+                count,
+                frame_idx,
+                total_frames,
+                paused,
+                sorted(keyframes),
+                sorted(left_keyframes),
+                sorted(right_keyframes),
+                status,
+                delay_ms,
+            ),
+        )
         key = cv2.waitKeyEx(0 if paused else delay_ms)
 
         if key == -1:
@@ -206,41 +266,52 @@ def annotate_video(video_path: Path, json_name: str, index: int, count: int, ann
                     paused = True
             continue
         if key in (ord("q"), 27):
-            update_record(annotations, json_name, video_path, keyframes, total_frames, fps, status)
+            update_record(annotations, json_name, video_path, keyframes, left_keyframes, right_keyframes, total_frames, fps, status)
             save_annotations(output_json, annotations, json_name, video_dir, count)
             cap.release()
             return "quit"
         if key == ord(" "):
-            if frame_idx in keyframes:
-                keyframes.remove(frame_idx)
-            else:
-                keyframes.add(frame_idx)
+            toggle_frame(keyframes, frame_idx)
             if status in DISCARD_STATUSES:
                 status = "in_progress"
-            update_record(annotations, json_name, video_path, keyframes, total_frames, fps, status)
+            update_record(annotations, json_name, video_path, keyframes, left_keyframes, right_keyframes, total_frames, fps, status)
+            save_annotations(output_json, annotations, json_name, video_dir, count)
+            continue
+        if key in (ord("l"), ord("L")):
+            toggle_frame(left_keyframes, frame_idx)
+            if status in DISCARD_STATUSES:
+                status = "in_progress"
+            update_record(annotations, json_name, video_path, keyframes, left_keyframes, right_keyframes, total_frames, fps, status)
+            save_annotations(output_json, annotations, json_name, video_dir, count)
+            continue
+        if key == ord("r"):
+            toggle_frame(right_keyframes, frame_idx)
+            if status in DISCARD_STATUSES:
+                status = "in_progress"
+            update_record(annotations, json_name, video_path, keyframes, left_keyframes, right_keyframes, total_frames, fps, status)
             save_annotations(output_json, annotations, json_name, video_dir, count)
             continue
         if key in (ord("d"), ord("D")):
             status = "in_progress" if status in DISCARD_STATUSES else "reject"
-            update_record(annotations, json_name, video_path, keyframes, total_frames, fps, status)
+            update_record(annotations, json_name, video_path, keyframes, left_keyframes, right_keyframes, total_frames, fps, status)
             save_annotations(output_json, annotations, json_name, video_dir, count)
             continue
         if key in (ord("n"), ord("N")):
             if status not in DISCARD_STATUSES:
                 status = "done"
-            update_record(annotations, json_name, video_path, keyframes, total_frames, fps, status)
+            update_record(annotations, json_name, video_path, keyframes, left_keyframes, right_keyframes, total_frames, fps, status)
             save_annotations(output_json, annotations, json_name, video_dir, count)
             cap.release()
             return "next"
         if key in (ord("p"), ord("P")):
-            update_record(annotations, json_name, video_path, keyframes, total_frames, fps, status)
+            update_record(annotations, json_name, video_path, keyframes, left_keyframes, right_keyframes, total_frames, fps, status)
             save_annotations(output_json, annotations, json_name, video_dir, count)
             cap.release()
             return "prev"
         if key in (ord("s"), ord("S")):
             paused = not paused
             continue
-        if key in (ord("r"), ord("R")):
+        if key == ord("R"):
             frame_idx = 0
             paused = False
             continue
@@ -253,7 +324,7 @@ def annotate_video(video_path: Path, json_name: str, index: int, count: int, ann
             frame_idx = clamp_frame(frame_idx + 1, total_frames)
             continue
 
-    update_record(annotations, json_name, video_path, keyframes, total_frames, fps, status)
+    update_record(annotations, json_name, video_path, keyframes, left_keyframes, right_keyframes, total_frames, fps, status)
     save_annotations(output_json, annotations, json_name, video_dir, count)
     cap.release()
     return "next"

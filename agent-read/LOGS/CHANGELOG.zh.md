@@ -1,5 +1,15 @@
 # CHANGELOG.zh
 
+## 2026-05-22（H2O 标注器支持左右手分开关键帧）
+
+- 更新 `code_painting/annotate_hand_keyframes.py`：
+  - 保留旧 `keyframes` 字段用于现有 AnyGrasp preview/planner。
+  - 新增 `left_keyframes` 与 `right_keyframes`，分别由 `l`/`L` 和 `r` 标注。
+  - 原 `r` 重新播放功能改为大写 `R`。
+- 更新 `COMMAND_LIBRARY.zh.md` K0 说明。
+- 验证：
+  - `conda run -n RoboTwin_bw python code_painting/annotate_hand_keyframes.py --help`
+
 ## 2026-05-22（H2O 人工关键帧标注与废弃视频标记）
 
 - 新增 `code_painting/annotate_hand_keyframes.py`：
