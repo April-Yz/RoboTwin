@@ -657,6 +657,143 @@ find /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview -name '*ori
 
 说明：K1 使用 J1 的 `summary.json` 选择候选，跑 Piper AnyGrasp 规划/执行预览；K2 把规划出的 `head_cam_plan.mp4` 贴回 I1 的人手抠除背景。若想看交互 viewer，在 K1 命令末尾把 `--enable_viewer 0 --viewer_wait_at_end 0` 改成 `--enable_viewer 1 --viewer_wait_at_end 1 --viewer_frame_delay 0.02`。
 
+### K0. 人工筛选关键帧与废弃 bad id
+
+用途：K1 使用 `--reuse_preview_frame_mode annotated_json_keyframes` 时，需要 preview summary 里带人工关键帧信息。先人工看 HaMeR gripper 视频，记录每个 id 的两个关键帧；再用这些关键帧重跑 AnyGrasp preview。通常第一个关键帧选“手刚接近/准备抓取”，第二个关键帧选“动作目标/搬运目标”。
+
+#### K0.1 人工看视频并记录关键帧
+
+```bash
+# 单个视频 review：推荐用 mpv；空格暂停，`.` 下一帧，`,` 上一帧，方向键快退/快进，`q` 退出。把你认可的两个帧号记录到下面 TSV。
+TASK=pick_diverse_bottles; ID=0; mpv --osd-level=3 --osd-fractions --pause /home/zaijia001/ssd/data/piper/hand/${TASK}/harmer_output/hand_vis_gripper_${ID}.mp4
+
+# 如果 mpv 不可用，用 ffplay；空格暂停，左右方向键快退/快进，`s` 单帧步进，`q` 退出。
+TASK=pick_diverse_bottles; ID=0; ffplay -vf "drawtext=text='task=${TASK} id=${ID}':x=12:y=12:fontsize=24:fontcolor=lime:box=1:boxcolor=black@0.45" /home/zaijia001/ssd/data/piper/hand/${TASK}/harmer_output/hand_vis_gripper_${ID}.mp4
+```
+
+#### K0.2 写入人工关键帧 JSON
+
+把 `/tmp/h2o_manual_keyframes.tsv` 里的示例行改成你实际认可的 id/关键帧。格式是：`task id keyframe1 keyframe2 status notes`。`status=ok` 会进入后续 preview；`status=reject` 只记录，不用于 preview。
+
+```bash
+cat > /tmp/h2o_manual_keyframes.tsv <<'EOF'
+# task id keyframe1 keyframe2 status notes
+pick_diverse_bottles 0 1 22 ok demo
+place_bread_basket 0 1 22 ok demo
+stack_cups 0 1 22 ok demo
+EOF
+
+python3 - <<'PY'
+import json
+from pathlib import Path
+
+tsv = Path("/tmp/h2o_manual_keyframes.tsv")
+out_root = Path("/home/zaijia001/ssd/RoboTwin/code_painting/h2o_manual_review")
+by_task = {}
+rejects = {}
+for raw in tsv.read_text(encoding="utf-8").splitlines():
+    line = raw.strip()
+    if not line or line.startswith("#"):
+        continue
+    parts = line.split(maxsplit=5)
+    if len(parts) < 5:
+        raise ValueError(f"bad line: {raw}")
+    task, sid, k1, k2, status = parts[:5]
+    notes = parts[5] if len(parts) > 5 else ""
+    item = {
+        "keyframes": [int(k1), int(k2)],
+        "status": status,
+        "notes": notes,
+    }
+    if status == "ok":
+        by_task.setdefault(task, {"_meta": {"schema_version": 1}, "videos": {}})["videos"][f"hand_vis_{int(sid)}.mp4"] = item
+    else:
+        rejects.setdefault(task, {})[str(int(sid))] = item
+
+out_root.mkdir(parents=True, exist_ok=True)
+for task, data in by_task.items():
+    task_dir = out_root / task
+    task_dir.mkdir(parents=True, exist_ok=True)
+    (task_dir / "hand_keyframes_all.json").write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+(out_root / "rejected_ids.json").write_text(json.dumps({"tasks": rejects}, indent=2, ensure_ascii=False), encoding="utf-8")
+print(f"[wrote] {out_root}")
+PY
+```
+
+#### K0.3 用人工关键帧重跑 preview summary
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && for TASK in pick_diverse_bottles place_bread_basket stack_cups; do case "$TASK" in pick_diverse_bottles) LEFT_OBJ=left_bottle; RIGHT_OBJ=right_bottle ;; place_bread_basket) LEFT_OBJ=basket; RIGHT_OBJ=bread ;; stack_cups) LEFT_OBJ=left_light_pink_cup; RIGHT_OBJ=right_dark_red_cup ;; esac; ANN=/home/zaijia001/ssd/RoboTwin/code_painting/h2o_manual_review/${TASK}/hand_keyframes_all.json; [[ -f "$ANN" ]] || { echo "[skip] missing annotation $ANN"; continue; }; IDS=$(python3 - <<PY
+import json
+from pathlib import Path
+data=json.loads(Path("$ANN").read_text())
+print(" ".join(str(int(k.split("_")[-1].split(".")[0])) for k,v in data.get("videos",{}).items() if v.get("status","ok")=="ok"))
+PY
+); [[ -n "$IDS" ]] || { echo "[skip] ${TASK} has no ok ids"; continue; }; for ID in $IDS; do A=/home/zaijia001/ssd/data/piper/hand/${TASK}/${TASK}_output/foundation_input_${ID}; R=/home/zaijia001/ssd/data/piper/hand/${TASK}/foundation_replay/foundation_input_${ID}; H=/home/zaijia001/ssd/data/piper/hand/${TASK}/harmer_output/hand_detections_${ID}.npz; O=/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview/${TASK}/foundation_input_${ID}; [[ -d "$A/grasps" && -d "$R/head_anygrasp_frames" && -f "$H" ]] || { echo "[skip] task=${TASK} id=${ID} missing input"; continue; }; CUDA_VISIBLE_DEVICES=2 conda run -n RoboTwin_bw python /home/zaijia001/ssd/RoboTwin/code_painting/render_anygrasp_ranked_preview.py --anygrasp_dir "$A" --replay_dir "$R" --hand_npz "$H" --base_image_dir "$R/head_anygrasp_frames" --base_image_mode raw --output_dir "$O" --frame_selection_mode hand_keyframes_json --hand_keyframes_json "$ANN" --left_target_object "$LEFT_OBJ" --right_target_object "$RIGHT_OBJ" --anygrasp_score_weight 0.25 --orientation_score_weight 0.75 --max_rotation_distance_deg 90 --candidate_target_local_x_offset_m -0.05 --draw_object_overlay 1 --draw_hand_reference 1 --debug_dump_object_distances 1 --top_k 20 --camera_cv_axis_mode legacy_r1; done; done
+```
+
+#### K0.4 移动废弃人手数据并同步记录 JSON
+
+默认 `APPLY=0` 只打印计划，不移动文件；确认无误后把 `APPLY=1`。这里只移动人手相关输入/输出，不动 FoundationPose/AnyGrasp/robot replay 结果，避免误删物体侧数据。
+
+```bash
+cat > /tmp/h2o_reject_ids.tsv <<'EOF'
+# task id reason
+pick_diverse_bottles 3 bad_hand_detection
+place_bread_basket 5 bad_keyframes
+stack_cups 7 bad_hand_motion
+EOF
+
+APPLY=0 python3 - <<'PY'
+import json
+import os
+import shutil
+from datetime import datetime
+from pathlib import Path
+
+apply = os.environ.get("APPLY", "0") == "1"
+tsv = Path("/tmp/h2o_reject_ids.tsv")
+data_root = Path("/home/zaijia001/ssd/data/piper/hand")
+reject_root = data_root / "_rejected_human_ids"
+record = {"generated_at": datetime.now().isoformat(timespec="seconds"), "apply": apply, "items": []}
+
+patterns = [
+    ("harmer_input", "rgb_{id}.mp4"),
+    ("harmer_output", "hand_detections_{id}.npz"),
+    ("harmer_output", "hand_vis_{id}.mp4"),
+    ("harmer_output", "hand_vis_gripper_{id}.mp4"),
+]
+
+for raw in tsv.read_text(encoding="utf-8").splitlines():
+    line = raw.strip()
+    if not line or line.startswith("#"):
+        continue
+    task, sid, *rest = line.split(maxsplit=2)
+    reason = rest[0] if rest else ""
+    item = {"task": task, "id": int(sid), "reason": reason, "moved": []}
+    for subdir, pattern in patterns:
+        src = data_root / task / subdir / pattern.format(id=int(sid))
+        if not src.exists():
+            continue
+        dst = reject_root / task / subdir / src.name
+        item["moved"].append({"src": str(src), "dst": str(dst)})
+        print(("[move]" if apply else "[dry-run]"), src, "->", dst)
+        if apply:
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(src), str(dst))
+    record["items"].append(item)
+
+reject_root.mkdir(parents=True, exist_ok=True)
+json_path = reject_root / "rejected_ids.json"
+old = {"history": []}
+if json_path.exists():
+    old = json.loads(json_path.read_text(encoding="utf-8"))
+old.setdefault("history", []).append(record)
+json_path.write_text(json.dumps(old, indent=2, ensure_ascii=False), encoding="utf-8")
+print(f"[record] {json_path}")
+PY
+```
+
 ### K1. 三个任务：AnyGrasp 候选规划与 replay
 
 ```bash

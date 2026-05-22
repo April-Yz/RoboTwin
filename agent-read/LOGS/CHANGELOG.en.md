@@ -1721,3 +1721,11 @@
   - The background file is actually under `stage1_human_inpaint/removed_w_mask_*.mp4`, so the commands now fall back to that path when the top-level `human_hand_bg.mp4` alias is absent.
   - Updated the I1 output check command accordingly.
   - Validation: the I/K2 repaint command blocks passed `bash -n`; sampled id0/id1/id10 across all three tasks and each resolved to an existing Stage-1 background file.
+
+- 2026-05-22
+  - Updated the K section in `COMMAND_LIBRARY.zh.md`:
+    - Added a K0 manual keyframe review flow before K1.
+    - Added a command to generate `hand_keyframes_all.json` from a TSV file.
+    - Added a command to rerun AnyGrasp preview summaries using the manual keyframes.
+    - Added a bad-id dry-run/move command that records `_rejected_human_ids/rejected_ids.json`.
+  - Validation: the K0 bash command blocks passed `bash -n`.

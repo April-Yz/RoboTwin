@@ -1136,3 +1136,11 @@
     - 缺失提示改为指向 `${BG_ROOT}/stage1_human_inpaint`，便于定位 I1 输出。
   - 同步修正 I1 输出检查命令，直接查找 `stage1_human_inpaint/removed_w_mask_*.mp4`。
   - 验证：I/K2 repaint 代码块 `bash -n` 通过；三任务抽样 id0/id1/id10 的 BG fallback 均解析到现有 `removed_w_mask_rgb_<ID>.mp4`。
+
+- 2026-05-22
+  - 在 `COMMAND_LIBRARY.zh.md` K1 前新增 K0 人工筛选流程：
+    - K0.1：用 `mpv`/`ffplay` 人工查看 HaMeR gripper 视频并记录关键帧。
+    - K0.2：把 `/tmp/h2o_manual_keyframes.tsv` 转成每个 task 的 `h2o_manual_review/<task>/hand_keyframes_all.json`。
+    - K0.3：用 `--frame_selection_mode hand_keyframes_json` 按人工关键帧重跑 AnyGrasp preview summary，供 K1 的 `annotated_json_keyframes` 使用。
+    - K0.4：新增 bad id 废弃命令，默认 `APPLY=0` dry-run，`APPLY=1` 时移动人手相关文件到 `_rejected_human_ids/` 并写入 `rejected_ids.json`。
+  - 验证：抽取 K0 的 4 个 bash 代码块，`bash -n /tmp/command_library_K0_blocks.sh` 通过。

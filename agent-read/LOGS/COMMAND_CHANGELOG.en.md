@@ -1138,3 +1138,11 @@
     - Missing-file messages now point at `${BG_ROOT}/stage1_human_inpaint` to make I1 output checks easier.
   - Updated the I1 output check command to search for `stage1_human_inpaint/removed_w_mask_*.mp4` directly.
   - Validation: the I/K2 repaint command blocks passed `bash -n`; sampled id0/id1/id10 for all three tasks and the BG fallback resolved to existing `removed_w_mask_rgb_<ID>.mp4` files.
+
+- 2026-05-22
+  - Added a K0 manual review flow before K1 in `COMMAND_LIBRARY.zh.md`:
+    - K0.1: inspect HaMeR gripper videos with `mpv`/`ffplay` and record keyframes manually.
+    - K0.2: convert `/tmp/h2o_manual_keyframes.tsv` into per-task `h2o_manual_review/<task>/hand_keyframes_all.json` files.
+    - K0.3: rerun AnyGrasp preview summaries with `--frame_selection_mode hand_keyframes_json`, producing metadata consumed by K1 `annotated_json_keyframes`.
+    - K0.4: add a bad-id rejection command; it defaults to `APPLY=0` dry-run and moves human-side files into `_rejected_human_ids/` plus records `rejected_ids.json` when `APPLY=1`.
+  - Validation: extracted the four K0 bash blocks and `bash -n /tmp/command_library_K0_blocks.sh` passed.

@@ -1722,3 +1722,11 @@
   - 背景文件实际在 `stage1_human_inpaint/removed_w_mask_*.mp4`，因此命令加入 fallback，兼容不存在顶层 `human_hand_bg.mp4` 的情况。
   - 同步更新 I1 输出检查命令。
   - 验证：I/K2 repaint 命令块 `bash -n` 通过；抽样三任务 id0/id1/id10 均能找到现有 Stage-1 背景文件。
+
+- 2026-05-22
+  - 更新 `COMMAND_LIBRARY.zh.md` K 部分：
+    - 在 K1 前补充 K0 人工关键帧筛选流程。
+    - 增加基于 TSV 生成 `hand_keyframes_all.json` 的命令。
+    - 增加按人工关键帧重跑 AnyGrasp preview summary 的命令。
+    - 增加 bad id dry-run/移动命令，并同步记录 `_rejected_human_ids/rejected_ids.json`。
+  - 验证：K0 bash 代码块 `bash -n` 通过。
