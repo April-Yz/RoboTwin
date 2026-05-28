@@ -20,6 +20,7 @@ import tyro
 import json
 import os
 import fnmatch
+import random
 
 
 @dataclasses.dataclass(frozen=True)
@@ -37,6 +38,7 @@ DEFAULT_DATASET_CONFIG = DatasetConfig()
 def create_empty_dataset(
     repo_id: str,
     robot_type: str,
+    image_shape: tuple[int, int] = (480, 640),
     mode: Literal["video", "image"] = "video",
     *,
     has_velocity: bool = False,
@@ -104,7 +106,7 @@ def create_empty_dataset(
     for cam in cameras:
         features[f"observation.images.{cam}"] = {
             "dtype": mode,
-            "shape": (3, 480, 640),
+            "shape": (3, image_shape[0], image_shape[1]),
             "names": [
                 "channels",
                 "height",
@@ -167,6 +169,54 @@ def load_raw_images_per_camera(ep: h5py.File, cameras: list[str]) -> dict[str, n
     return imgs_per_cam
 
 
+def infer_image_shape(hdf5_files: list[Path]) -> tuple[int, int]:
+    with h5py.File(hdf5_files[0], "r") as ep:
+        if "/head_camera_image" in ep:
+            sample = ep["/head_camera_image"]
+            return int(sample.shape[1]), int(sample.shape[2])
+
+        if "/observation/head_camera/rgb" in ep:
+            data = ep["/observation/head_camera/rgb"][0]
+            import cv2
+
+            image = cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_COLOR)
+            return int(image.shape[0]), int(image.shape[1])
+
+    return 480, 640
+
+
+def load_episode_instructions(ep_path: Path, ep: h5py.File) -> list[str]:
+    if "seen" in ep or "unseen" in ep:
+        prompts = []
+        for key in ("seen", "unseen"):
+            if key not in ep:
+                continue
+            for value in ep[key][()]:
+                prompts.append(value.decode("utf-8") if isinstance(value, bytes) else str(value))
+        return [p for p in prompts if p]
+
+    instructions_dir = ep_path.parent.parent / "instructions"
+    instruction_path = instructions_dir / f"{ep_path.stem}.json"
+    if instruction_path.exists():
+        with open(instruction_path, "r") as f_instr:
+            instruction_dict = json.load(f_instr)
+        prompts = []
+        for key in ("seen", "unseen", "instructions"):
+            value = instruction_dict.get(key)
+            if isinstance(value, list):
+                prompts.extend(value)
+        return [p for p in prompts if p]
+
+    legacy_instruction_path = ep_path.parent / "instructions.json"
+    if legacy_instruction_path.exists():
+        with open(legacy_instruction_path, "r") as f_instr:
+            instruction_dict = json.load(f_instr)
+        prompts = instruction_dict.get("instructions", [])
+        return [p for p in prompts if p]
+
+    return []
+
+
 def load_raw_episode_data(
     ep_path: Path,
 ) -> tuple[
@@ -175,8 +225,27 @@ def load_raw_episode_data(
         torch.Tensor,
         torch.Tensor | None,
         torch.Tensor | None,
+        list[str],
 ]:
     with h5py.File(ep_path, "r") as ep:
+        prompts = load_episode_instructions(ep_path, ep)
+
+        if "/head_camera_image" in ep:
+            total_steps = ep["/action"].shape[0]
+            if total_steps < 2:
+                raise ValueError(f"Episode {ep_path} has fewer than 2 steps.")
+
+            state = torch.from_numpy(ep["/action"][: total_steps - 1].astype(np.float32))
+            action = torch.from_numpy(ep["/action"][1:total_steps].astype(np.float32))
+            velocity = None
+            effort = None
+            imgs_per_cam = {
+                "cam_high": ep["/head_camera_image"][: total_steps - 1],
+                "cam_left_wrist": ep["/left_wrist_image"][: total_steps - 1],
+                "cam_right_wrist": ep["/right_wrist_image"][: total_steps - 1],
+            }
+            return imgs_per_cam, state, action, velocity, effort, prompts
+
         state = torch.from_numpy(ep["/observations/qpos"][:])
         action = torch.from_numpy(ep["/action"][:])
 
@@ -197,7 +266,7 @@ def load_raw_episode_data(
             ],
         )
 
-    return imgs_per_cam, state, action, velocity, effort
+    return imgs_per_cam, state, action, velocity, effort, prompts
 
 
 def populate_dataset(
@@ -212,16 +281,9 @@ def populate_dataset(
     for ep_idx in tqdm.tqdm(episodes):
         ep_path = hdf5_files[ep_idx]
 
-        imgs_per_cam, state, action, velocity, effort = load_raw_episode_data(ep_path)
+        imgs_per_cam, state, action, velocity, effort, prompts = load_raw_episode_data(ep_path)
         num_frames = state.shape[0]
-        # add prompt
-        dir_path = os.path.dirname(ep_path)
-        json_Path = f"{dir_path}/instructions.json"
-
-        with open(json_Path, 'r') as f_instr:
-            instruction_dict = json.load(f_instr)
-            instructions = instruction_dict['instructions']
-            instruction = np.random.choice(instructions)
+        instruction = random.choice(prompts) if prompts else task
         for i in range(num_frames):
             frame = {
                 "observation.state": state[i],
@@ -267,9 +329,12 @@ def port_aloha(
             file_path = os.path.join(root, filename)
             hdf5_files.append(file_path)
 
+    hdf5_files = sorted(hdf5_files)
+    image_shape = infer_image_shape(hdf5_files)
     dataset = create_empty_dataset(
         repo_id,
         robot_type="mobile_aloha" if is_mobile else "aloha",
+        image_shape=image_shape,
         mode=mode,
         has_effort=has_effort(hdf5_files),
         has_velocity=has_velocity(hdf5_files),

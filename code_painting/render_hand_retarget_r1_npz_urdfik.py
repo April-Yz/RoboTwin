@@ -48,6 +48,8 @@ class HandRetargetR1URDFIKRenderer(ReplayRenderer):
         raw_cartesian_interp_steps = int(kwargs.pop("urdfik_cartesian_interp_steps", 8))
         self.urdfik_cartesian_interp_auto_step_m = max(float(kwargs.pop("urdfik_cartesian_interp_auto_step_m", 0.05)), 1e-4)
         self.urdfik_cartesian_interp_steps = -1 if raw_cartesian_interp_steps == -1 else max(raw_cartesian_interp_steps, 2)
+        self.urdfik_joint_interp_waypoints = max(int(kwargs.pop("urdfik_joint_interp_waypoints", 2)), 2)
+        self.urdfik_execute_partial_cartesian_plan = bool(kwargs.pop("urdfik_execute_partial_cartesian_plan", False))
         kwargs["attach_planner"] = False
         if kwargs.get("init_left_arm_joints") is None:
             kwargs["init_left_arm_joints"] = DEFAULT_INIT_LEFT_ARM_JOINTS.copy()
@@ -71,8 +73,12 @@ class HandRetargetR1URDFIKRenderer(ReplayRenderer):
         print(
             "[ik-trajectory] "
             f"mode={self.urdfik_trajectory_mode} "
+            f"joint_interp_waypoints={self.urdfik_joint_interp_waypoints} "
             f"cartesian_interp_steps={self.urdfik_cartesian_interp_steps} "
             f"auto_step_m={self.urdfik_cartesian_interp_auto_step_m:.4f} "
+            f"partial_cartesian={int(self.urdfik_execute_partial_cartesian_plan)} "
+            f"exec_waypoint_scene_steps={self.execute_waypoint_scene_steps} "
+            f"exec_settle_scene_steps={self.execute_settle_scene_steps} "
             f"ik_pos_thresh={self.left_ik_solver.default_position_threshold:.4f}m "
             f"ik_rot_thresh={self.left_ik_solver.default_rotation_threshold:.4f}rad"
         )
@@ -197,6 +203,56 @@ class HandRetargetR1URDFIKRenderer(ReplayRenderer):
             payload["waypoint_count"] = int(waypoint_count)
         return payload
 
+    def _build_partial_cartesian_plan(
+        self,
+        arm: str,
+        current_arm: np.ndarray,
+        target_pose_world: np.ndarray,
+        failed_ee_pos_base: np.ndarray,
+        failed_ee_quat_base: np.ndarray,
+        joint_waypoints: List[np.ndarray],
+        ee_waypoints_base: List[np.ndarray],
+        tcp_waypoints_world: List[np.ndarray],
+        reason: str,
+        waypoint_index: int,
+        waypoint_count: int,
+    ) -> Dict:
+        if len(joint_waypoints) < 2:
+            return self._build_fail_plan(
+                arm,
+                current_arm,
+                target_pose_world,
+                failed_ee_pos_base,
+                failed_ee_quat_base,
+                reason=reason,
+                waypoint_index=waypoint_index,
+                waypoint_count=waypoint_count,
+            )
+        position_traj = np.stack(joint_waypoints, axis=0)
+        velocity_traj = np.zeros_like(position_traj, dtype=np.float64)
+        solved_waypoint_count = len(joint_waypoints)
+        return {
+            "status": "Partial",
+            "solver": "urdfik",
+            "trajectory_mode": self.urdfik_trajectory_mode,
+            "arm": arm,
+            "current_joints": current_arm.copy(),
+            "target_joints": joint_waypoints[-1].copy(),
+            "position": position_traj,
+            "velocity": velocity_traj,
+            "target_pose_world": np.asarray(target_pose_world, dtype=np.float64).copy(),
+            "target_pose_ee_base": ee_waypoints_base[-1].copy() if ee_waypoints_base else np.concatenate([failed_ee_pos_base, failed_ee_quat_base]).astype(np.float64),
+            "failed_target_pose_ee_base": np.concatenate([failed_ee_pos_base, failed_ee_quat_base]).astype(np.float64),
+            "cartesian_waypoint_count": len(tcp_waypoints_world),
+            "tcp_waypoints_world": np.stack(tcp_waypoints_world, axis=0),
+            "solved_tcp_waypoints_world": np.stack(tcp_waypoints_world[:solved_waypoint_count], axis=0),
+            "ee_waypoints_base": np.stack(ee_waypoints_base, axis=0) if ee_waypoints_base else np.zeros((0, 7), dtype=np.float64),
+            "reason": str(reason),
+            "failed_waypoint_index": int(waypoint_index),
+            "waypoint_count": int(waypoint_count),
+            "solved_waypoint_count": int(solved_waypoint_count),
+        }
+
     def _solution_error_to_ee_target(
         self,
         arm: str,
@@ -277,7 +333,7 @@ class HandRetargetR1URDFIKRenderer(ReplayRenderer):
             )
 
         target_arm = solution[-6:].astype(np.float64)
-        position_traj = np.stack([current_arm, target_arm], axis=0)
+        position_traj = np.linspace(current_arm, target_arm, num=self.urdfik_joint_interp_waypoints, endpoint=True, dtype=np.float64)
         velocity_traj = np.zeros_like(position_traj, dtype=np.float64)
         return {
             "status": "Success",
@@ -343,6 +399,20 @@ class HandRetargetR1URDFIKRenderer(ReplayRenderer):
                 current_seed=current_seed,
             )
             if result is None:
+                if self.urdfik_execute_partial_cartesian_plan:
+                    return self._build_partial_cartesian_plan(
+                        arm,
+                        current_arm,
+                        target_pose_world,
+                        ee_pos_base,
+                        ee_quat_base,
+                        joint_waypoints,
+                        ee_waypoints_base[:-1],
+                        tcp_waypoints_world,
+                        reason="failed during cartesian waypoint IK",
+                        waypoint_index=waypoint_index,
+                        waypoint_count=len(tcp_waypoints_world),
+                    )
                 return self._build_fail_plan(
                     arm,
                     current_arm,
@@ -355,6 +425,20 @@ class HandRetargetR1URDFIKRenderer(ReplayRenderer):
                 )
             solution = result.solution.detach().cpu().numpy().reshape(-1)
             if solution.shape[0] < 10:
+                if self.urdfik_execute_partial_cartesian_plan:
+                    return self._build_partial_cartesian_plan(
+                        arm,
+                        current_arm,
+                        target_pose_world,
+                        ee_pos_base,
+                        ee_quat_base,
+                        joint_waypoints,
+                        ee_waypoints_base[:-1],
+                        tcp_waypoints_world,
+                        reason=f"expected >=10 joints from IK, got {solution.shape[0]}",
+                        waypoint_index=waypoint_index,
+                        waypoint_count=len(tcp_waypoints_world),
+                    )
                 return self._build_fail_plan(
                     arm,
                     current_arm,
@@ -439,9 +523,10 @@ class HandRetargetR1URDFIKRenderer(ReplayRenderer):
             if right_ok and right_idx < right_n and (not left_ok or right_idx / max(right_n, 1) <= left_idx / max(left_n, 1)):
                 self.robot.set_arm_joints(right_pos[right_idx], right_vel[right_idx], "right")
                 right_idx += 1
-            self.step_scene(steps=1)
+            self.step_scene(steps=self.execute_waypoint_scene_steps)
 
-        self.step_scene(steps=4)
+        if self.execute_settle_scene_steps > 0:
+            self.step_scene(steps=self.execute_settle_scene_steps)
         return left_status, right_status
 
 

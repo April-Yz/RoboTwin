@@ -28,6 +28,8 @@ There are **2 backends**, but **3 practical planning modes**:
 
 1. Backend A old mode: `--planner_backend urdfik --urdfik_trajectory_mode joint_interp`
 2. Backend A new mode: `--planner_backend urdfik --urdfik_trajectory_mode cartesian_interp_ik`
+   - world-position smoothing: linear interpolation
+   - world-orientation smoothing: quaternion `Slerp`
 3. Backend B: `--planner_backend curobo`
 
 ## 2. Computation modes
@@ -67,6 +69,11 @@ Important conclusion:
   5. builds a multi-point joint trajectory from those waypoint IK results
 
 So this is still **direct IK**, not full planning, but it is much closer to "follow this EE path".
+
+Important clarification:
+
+- In the current codebase, A2 already is the "coordinate smoothing + slerp" version.
+- So there is no need for a separate "mode 3" unless you want a different Cartesian smoothing policy from the current A2 behavior.
 
 ### Mode B: `planner_backend=curobo`
 
@@ -161,6 +168,38 @@ Main caveat:
 
 - because each waypoint still relies on local IK and there is still no collision-aware planner, the chain can fail at an intermediate waypoint even when the final pose alone is solvable
 
+### 5.2.1 How A2 smooths the world-coordinate path
+
+The relevant implementation is in:
+
+- `render_hand_retarget_r1_npz_urdfik.py:_interpolate_tcp_pose_world_series(...)`
+
+Actual behavior:
+
+1. it reads the current TCP world pose and the target TCP world pose
+2. world position is interpolated by linear blending:
+   - `interp_pos = (1 - ratio) * start_pos + ratio * target_pos`
+3. world orientation is interpolated with SciPy quaternion `Slerp`
+4. each interpolated world-space TCP waypoint is converted to an EE/base-frame target
+5. IK is solved waypoint by waypoint
+
+So the answer to "does A2 use slerp?" is:
+
+- **Yes.**
+
+The current A2 already uses:
+
+- world-coordinate smoothing for position
+- quaternion `Slerp` for orientation
+
+Therefore I did **not** add a separate mode 3 in code, because it would be functionally redundant with the current A2 behavior.
+
+If you later want a genuinely different mode 3, meaningful variants would be:
+
+- Cartesian interpolation + `Slerp` + arc-length resampling
+- Cartesian interpolation + `Slerp` + velocity-limited waypoint spacing
+- Cartesian interpolation in TCP space, but direct pose tracking instead of waypoint IK
+
 ### 5.3 Mode B: full cuRobo MotionGen planning
 
 Pipeline:
@@ -200,6 +239,29 @@ So the overall system is still:
 
 The new A2 mode only changes **how Backend A constructs the trajectory inside one planning attempt**.
 
+## 7.1 2026-03-25 note on `plan-solution` semantics
+
+The newer `plan-solution` debug fields need one important clarification:
+
+- `plan-request` compares `current -> target`
+- `plan-solution` additionally compares:
+  - `planned -> target`
+  - `current -> planned`
+
+Therefore:
+
+- `plan_vs_current_fwd_cm > 0`
+  - does not mean “the planned endpoint is ahead of the current pose”
+  - it means “the current pose is ahead of the planned endpoint”
+  - equivalently, the planned endpoint is behind the current pose
+
+This directly affects diagnosis:
+
+- in the late retry tail of `d_pour_blue_0`, the planned endpoint had already started moving backward
+- but the executed `attempt` still stayed forward-biased for a long time
+
+So the dominant late-stage issue became execution-side convergence to the final joint target, not only IK direction error.
+
 ## 8. Explicit commands
 
 ### 8.1 Backend A old mode
@@ -234,6 +296,11 @@ CUDA_VISIBLE_DEVICES=3 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_
   --urdfik_trajectory_mode cartesian_interp_ik \
   --urdfik_cartesian_interp_steps 8
 ```
+
+This mode already includes:
+
+- world-coordinate position smoothing
+- quaternion `Slerp` for orientation smoothing
 
 ### 8.3 Backend B
 

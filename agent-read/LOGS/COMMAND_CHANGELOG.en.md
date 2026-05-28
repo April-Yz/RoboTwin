@@ -1691,3 +1691,13 @@
   - `--debug_mode 1 --debug_post_execute 1`
   - `--save_world_targets 1`
   - `--enable_viewer 1 --viewer_wait_at_end 1`
+## 2026-05-29 (L15.17 Direct Replay / AnyGrasp Axis Convention Comparison)
+
+- Added L15.17 to `COMMAND_LIBRARY.zh.md`.
+- Added the convention note:
+  - Direct Piper hand replay: local `+Z` blue is approach/forward.
+  - AnyGrasp preview/planner: local `+X` red is the wireframe finger-depth direction.
+- Added comparison parameter:
+  - `--candidate_orientation_remap_label swap_red_blue`
+- Purpose:
+  - Test whether AnyGrasp local `+X` should be mapped onto direct replay local `+Z`, explaining or correcting the mismatch between viewer target axes and the actual robot gripper orientation.

@@ -251,7 +251,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--candidate_post_rot_xyz_deg", type=float, nargs=3, default=[0.0, 0.0, 0.0])
     parser.add_argument("--candidate_keep_camera_up", type=int, default=0, help="If 1, keep the gripper/camera top side facing upward overall while preserving the original grasp direction. The planner only resolves the redundant roll about the gripper forward axis.")
     parser.add_argument("--candidate_camera_top_axis", choices=["y", "z"], default="z", help="Which local gripper axis should be treated as the camera/top direction when --candidate_keep_camera_up=1.")
-    parser.add_argument("--candidate_target_local_x_offset_m", type=float, default=0.0, help="Additional translation applied to each AnyGrasp world target along the gripper local +X axis before planning/visualization. This is the target-compensation knob for wrist/endlink vs fingertip-TCP mismatch: use a negative value such as -0.12 to move the planner target backward along local +X when the raw candidate behaves like a wrist/endlink pose but planning should use a fingertip TCP target.")
+    parser.add_argument("--candidate_target_local_x_offset_m", type=float, default=0.0, help="Additional translation applied to each AnyGrasp world target along the AnyGrasp candidate local +X axis before planning/visualization. In the AnyGrasp wireframe this is the finger-depth axis, which is not the same convention as direct hand replay's local +Z approach axis.")
     parser.add_argument("--manual_candidate", type=str, nargs=3, action="append", default=[], metavar=("FRAME", "ARM", "CANDIDATE_IDX"), help="Optional manual candidate override, e.g. --manual_candidate 1 left 5. Partial overrides only reorder debug display; full two-frame overrides for one arm drive selection directly.")
     parser.add_argument("--object_mesh_override", action="append", default=[], help="Repeatable mesh override in the form NAME=/abs/path/to/mesh.obj, e.g. cup=/.../blue_cup.obj")
     parser.add_argument("--robot_config", type=Path, default=R1_CONFIG)
@@ -263,7 +263,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--robot_base_pose", type=float, nargs=7, default=None, metavar=("X", "Y", "Z", "QW", "QX", "QY", "QZ"))
     parser.add_argument("--open_gripper", type=float, default=1.0)
     parser.add_argument("--close_gripper", type=float, default=0.0)
-    parser.add_argument("--approach_offset_m", type=float, default=0.08, help="Pregrasp-only retreat distance. The grasp target itself is unchanged; instead the planner first creates a separate pregrasp pose by moving backward from the grasp pose along the gripper local +X axis (implemented as a retreat opposite to local +X in pose_with_offset_along_local_x).")
+    parser.add_argument("--approach_offset_m", type=float, default=0.08, help="Pregrasp-only retreat distance. The grasp target itself is unchanged; instead the planner first creates a separate pregrasp pose by moving backward from the AnyGrasp candidate pose along local +X. This differs from direct hand replay, where the approach retreat uses local +Z.")
     parser.add_argument("--settle_steps", type=int, default=4)
     parser.add_argument("--execute_interp_steps", type=int, default=24)
     parser.add_argument("--joint_command_scene_steps", type=int, default=2, help="Physics scene steps to advance after each commanded arm waypoint.")
@@ -3255,7 +3255,8 @@ def pose_error_breakdown(
     rot_err = float(base.quat_angle_deg_wxyz(current_pose_world_wxyz[3:], target_pose_world_wxyz[3:]))
     target_pose_world_matrix = pose_wxyz_to_matrix(target_pose_world_wxyz)
     current_pose_world_matrix = pose_wxyz_to_matrix(current_pose_world_wxyz)
-    # The planner and candidate conventions use local +X as the gripper forward axis.
+    # AnyGrasp candidate diagnostics use local +X as the wireframe finger-depth
+    # axis. Direct hand replay uses local +Z as its gripper approach axis.
     target_forward_world = base.orthonormalize_rotation(target_pose_world_matrix[:3, :3])[:, 0]
     current_forward_world = base.orthonormalize_rotation(current_pose_world_matrix[:3, :3])[:, 0]
     forward_axis_cos = float(np.clip(np.dot(target_forward_world, current_forward_world), -1.0, 1.0))

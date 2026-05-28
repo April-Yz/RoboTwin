@@ -16,8 +16,8 @@ FORCE_REPAD=0 \
 DILATE_KERNEL_SIZE=8 \
 ERODE_KERNEL_SIZE=14 \
 TEXT_PROMPT='robotic manipulator arm, forearm, wrist, gripper, end effector, cup, bottle.' \
-BOX_THRESHOLD=0.25 \
-TEXT_THRESHOLD=0.22 \
+BOX_THRESHOLD=0.18 \
+TEXT_THRESHOLD=0.18 \
 MAX_MASK_AREA_RATIO=0.60 \
 MAX_SELECTED_BOXES=0 \
 ARM_SPLIT_RATIO=0.5 \
@@ -39,7 +39,7 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
 conda activate inpainting-sam2-r1
 
 python /home/zaijia001/ssd/inpainting_sam2_robot/script/review_repaint_videos.py \
-  --task-root /home/zaijia001/ssd/inpainting_sam2_robot/results_repaint/d_pour_blue_v7 \
+   /home/zaijia001/ssd/inpainting_sam2_robot/results_repaint/d_pour_blue_v7 \
   --dir-template 'id_{id}_head_cam_arm_gripper_cup_bottle_pad_target' \
   --video-name target_with_original_head_cam_plan.mp4 \
   --json-path /home/zaijia001/ssd/inpainting_sam2_robot/results_repaint/d_pour_blue_v7/video_review.json
@@ -51,8 +51,8 @@ conda activate RoboTwin_bw
 
 python /home/zaijia001/ssd/RoboTwin/policy/pi0/scripts/process_repainted_planner_outputs.py \
   d_pour_blue \
-  'pour water' \
-  27 \
+  'pour' \
+  26 \
   --head-root /home/zaijia001/ssd/inpainting_sam2_robot/results_repaint/d_pour_blue_v7 \
   --head-dir-template 'id_{id}_head_cam_arm_gripper_cup_bottle_pad_target' \
   --head-video-name target_with_original_head_cam_plan.mp4 \
@@ -65,3 +65,4 @@ python /home/zaijia001/ssd/RoboTwin/policy/pi0/scripts/process_repainted_planner
   --review-mode strict \
   --ignore-ids \
   --output-dir /home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/d_pour_blue-27-planner-v7
+ rclone copy /home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/d_pour_blue-27-planner-v7 gdrive:R1/processed_data/human-pour-blue-any26-0406 -P --drive-chunk-size 64M --transfers 4 --dry-run

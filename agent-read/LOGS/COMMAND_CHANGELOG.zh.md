@@ -1689,3 +1689,13 @@
   - `--debug_mode 1 --debug_post_execute 1`
   - `--save_world_targets 1`
   - `--enable_viewer 1 --viewer_wait_at_end 1`
+## 2026-05-29（L15.17 Direct replay / AnyGrasp 轴约定对照）
+
+- `COMMAND_LIBRARY.zh.md` 新增 L15.17。
+- 新增说明：
+  - direct Piper hand replay：local `+Z` 蓝轴是 approach/forward。
+  - AnyGrasp preview/planner：local `+X` 红轴是 wireframe finger-depth。
+- 新增对照参数：
+  - `--candidate_orientation_remap_label swap_red_blue`
+- 用途：
+  - 测试是否需要把 AnyGrasp local `+X` 映射到 direct replay local `+Z`，以解释/修正 viewer 中 gripper 轴与真实机器人朝向不一致的问题。

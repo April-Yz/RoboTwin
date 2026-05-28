@@ -13,6 +13,14 @@
   - `agent-read/V1.16_pose_debug_smooth_replay.md`
   - `agent-read/V1.16_pose_debug_smooth_replay_ZH.md`
 - Updated `code_painting/README_anygrasp_keyframe_planner.md` so `pose_debug.jsonl` and the smooth replay workflow are now documented in the main planner README.
+- Expanded the smooth-replay docs with explicit full command examples for:
+  - `/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_realoffset_batch_pure-v5`
+- Also documented the exact replay semantics explicitly: the smoother reuses recorded joint / gripper / object states from `pose_debug.jsonl` and does not rerun planning or IK.
+- Added two more clarifications to the smooth-replay docs:
+  - `pose_debug.jsonl` is aligned with exported video frames because both are emitted from the same `record_frame(...)` call path
+  - but it is not aligned with every low-level physics substep, which explains why post-hoc smoothing can improve visual continuity without recovering motion details that were never recorded
+- Added reusable batch-loop command examples for the smooth replay path, including the current output root:
+  - `/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_single_close_only_viewer_visual07_collision03`
 - Validation:
   - `python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/replay_pose_debug_smooth.py`
   - `bash /home/zaijia001/ssd/RoboTwin/code_painting/run_replay_pose_debug_smooth.sh --plan_summary_json /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_realoffset_batch_pure-v3-base/d_pour_blue_35/plan_summary.json --output_path /tmp/smooth_replay_test.mp4 --interp_factor 2 --max_input_records 5 --overlay_text 0 --base_occluder_enable 1 --base_occluder_local_pos 0 0 0.4 --base_occluder_half_size 0.45 0.45 0.02 --base_occluder_color 1 1 1`

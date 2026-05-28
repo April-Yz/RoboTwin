@@ -2,6 +2,8 @@
 
 This document is a compact map of the baseline `policy/pi0` implementation: model structure, training path, and the exact input/output format used inside RoboTwin.
 
+For actual runs, treat `pi0_base_aloha_robotwin_lora` as the default baseline train config and [`finetune_pi0_baseline.sh`](/home/zaijia001/ssd/RoboTwin/policy/pi0/finetune_pi0_baseline.sh) / [`eval_pi0_baseline.sh`](/home/zaijia001/ssd/RoboTwin/policy/pi0/eval_pi0_baseline.sh) as the standard helper scripts.
+
 ## 1. Code layout
 
 - `scripts/train.py`
@@ -101,13 +103,35 @@ At inference time:
 4. The model iteratively denoises for `num_steps` Euler updates
 5. Output transforms unnormalize and map back to ALOHA action space
 
-## 7. Useful baseline commands
+## 7. Baseline runbook
+
+### 7.1 Environment and prerequisites
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin/policy/pi0
+uv sync
+```
+
+Before training on a real dataset, make sure normalization stats exist under:
+
+```text
+policy/pi0/assets/pi0_base_aloha_robotwin_lora/<repo_id>/
+```
+
+The training loader will fail if stats are missing. The stock stats script reads the repo id from the named config, so if you train with a different `DATA_REPO_ID` you also need a matching asset directory for that repo.
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin/policy/pi0
+uv run scripts/compute_norm_stats.py --config-name=pi0_base_aloha_robotwin_lora
+```
+
+### 7.2 Training
 
 Train a baseline config:
 
 ```bash
 cd /home/zaijia001/ssd/RoboTwin/policy/pi0
-uv run scripts/train.py pi0_base_aloha_robotwin_lora --exp-name=my_baseline --overwrite
+uv run scripts/train.py pi0_base_aloha_robotwin_lora --exp-name=my_baseline --batch-size=32 --overwrite
 ```
 
 Use the existing helper:
@@ -117,18 +141,23 @@ cd /home/zaijia001/ssd/RoboTwin/policy/pi0
 bash finetune.sh pi0_base_aloha_robotwin_lora my_baseline 0
 ```
 
+Current default for the helper scripts is global `batch_size=32`. If you need a different value, override it with `BATCH_SIZE=<n>`.
+
 Use the dedicated baseline helper with a concrete example:
 
 ```bash
 cd /home/zaijia001/ssd/RoboTwin/policy/pi0
 DATA_REPO_ID=aloha_beat_block_hammer_builder \
 EXP_NAME=pi0_baseline_b32 \
+BATCH_SIZE=32 \
 SAVE_INTERVAL=1000 \
 KEEP_PERIOD=5000 \
 bash /home/zaijia001/ssd/RoboTwin/policy/pi0/finetune_pi0_baseline.sh 0
 ```
 
-Run RoboTwin eval:
+### 7.3 RoboTwin evaluation
+
+Run RoboTwin eval directly:
 
 ```bash
 cd /home/zaijia001/ssd/RoboTwin/policy/pi0
@@ -144,6 +173,50 @@ TASK_NAME=beat_block_hammer \
 TASK_CONFIG=demo_clean \
 bash /home/zaijia001/ssd/RoboTwin/policy/pi0/eval_pi0_baseline.sh latest 0 0
 ```
+
+Evaluate a specific saved step:
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin/policy/pi0
+MODEL_NAME=pi0_baseline_b32 \
+TASK_NAME=beat_block_hammer \
+TASK_CONFIG=demo_clean \
+bash /home/zaijia001/ssd/RoboTwin/policy/pi0/eval_pi0_baseline.sh 1000 0 0
+```
+
+The helper resolves checkpoints from:
+
+```text
+policy/pi0/checkpoints/<TRAIN_CONFIG_NAME>/<MODEL_NAME>/<STEP>/
+```
+
+The dedicated baseline helper also defaults to global `batch_size=32` when `BATCH_SIZE` is not set.
+
+### 7.4 Quick tests and sanity checks
+
+Check that the baseline config loads and that distillation is disabled:
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin/policy/pi0
+uv run python - <<'PY'
+from openpi.training import config as cfg
+train_cfg = cfg.get_config("pi0_base_aloha_robotwin_lora")
+print(train_cfg.name, train_cfg.use_privileged_distill, train_cfg.data.repo_id)
+PY
+```
+
+Run lightweight unit tests for the core pi0 path:
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin/policy/pi0
+uv run pytest src/openpi/models/pi0_test.py src/openpi/models/model_test.py -q
+```
+
+If RoboTwin eval fails immediately, check these first:
+
+- checkpoint exists under `policy/pi0/checkpoints/pi0_base_aloha_robotwin_lora/<exp_name>/`
+- the selected step contains `params/` and `assets/<repo_id>/`
+- `MODEL_NAME`, `TRAIN_CONFIG_NAME`, `TASK_NAME`, and `TASK_CONFIG` all match the training run
 
 ## 8. What to read first
 

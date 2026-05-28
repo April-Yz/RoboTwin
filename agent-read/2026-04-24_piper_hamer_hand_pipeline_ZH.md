@@ -285,7 +285,25 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_hand_retarget_r1_npz_urdfik.
 
 ---
 
-## 9. 本次状态
+## 9. 朝向匹配说明（R1 与 HaMeR 的关系）
+
+- `run_hand_retarget_r1_npz_urdfik.sh` 默认传入：
+  - `--require_stored_gripper_pose 1`
+  - `--pose_source gripper`
+  - `--orientation_remap_label swap_red_blue_keep_green`
+- 这意味着：
+  1. **优先使用 HaMeR NPZ 里已存的** `*_gripper_position` / `*_gripper_rotation_matrix`；
+  2. 不会在 replay 端强制重算（除非你改成 `--require_stored_gripper_pose 0` 且缺字段）；
+  3. 会再套一层固定轴重映射 `swap_red_blue_keep_green`（并可能叠加 `--stored_orientation_post_rot_xyz_deg`）。
+- HaMeR 检测脚本里，左手还会额外做一次 `LOCAL_RZ_180`（写入 NPZ 前）。
+
+因此你看到的末端朝向不是“原始 HaMeR 朝向直接使用”，而是：
+
+`HaMeR存储朝向` -> `orientation_remap_label` -> `stored_orientation_post_rot_xyz_deg` -> `URDF末端定义(ee_link)`
+
+---
+
+## 10. 本次状态
 
 已完成：
 
@@ -296,3 +314,4 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_hand_retarget_r1_npz_urdfik.
   - `pnp_star_pear_hamer_input`
   - `pnp_star_pear_foundation_input`
 - 已在 `video_id=0` 上生成 HaMeR 检测结果和可视化视频（`hand_vis_0.mp4`, `hand_vis_gripper_0.mp4`）
+- 已验证 FoundationPose 物体 replay 的 Piper 标定 head cam 相对位置正确（C 阶段）。

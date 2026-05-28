@@ -115,6 +115,10 @@ class Observation(Generic[ArrayT]):
         for key in data["image"]:
             if data["image"][key].dtype == np.uint8:
                 data["image"][key] = data["image"][key].astype(np.float32) / 255.0 * 2.0 - 1.0
+        if "future_image" in data and data["future_image"] is not None:
+            for key in data["future_image"]:
+                if data["future_image"][key].dtype == np.uint8:
+                    data["future_image"][key] = data["future_image"][key].astype(np.float32) / 255.0 * 2.0 - 1.0
         return cls(
             images=data["image"],
             image_masks=data["image_mask"],

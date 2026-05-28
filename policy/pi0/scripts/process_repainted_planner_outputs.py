@@ -32,6 +32,7 @@ from scipy.spatial.transform import Rotation
 
 
 ID_FROM_DIGITS_RE = re.compile(r"(\d+)")
+DISCARD_STATUSES = {"reject", "discard", "bad"}
 
 
 def quaternion_to_euler(quat_wxyz: np.ndarray, order: str = "xyz") -> np.ndarray:
@@ -63,10 +64,14 @@ def images_encoding(imgs: list[np.ndarray]) -> tuple[list[bytes], int]:
 
 
 def parse_id_from_name(name: str) -> int | None:
-    matches = ID_FROM_DIGITS_RE.findall(name)
+    matches = ID_FROM_DIGITS_RE.findall(Path(name).stem)
     if not matches:
         return None
     return int(matches[-1])
+
+
+def format_template(value: str, episode_id: int) -> str:
+    return value.format(id=episode_id)
 
 
 def discover_ids(root: Path, template: str) -> list[int]:
@@ -120,15 +125,20 @@ def load_usable_ids_from_review_json(review_json: Path, review_mode: str = "stri
     if isinstance(payload, dict) and "videos" in payload and isinstance(payload["videos"], dict):
         usable_ids: list[int] = []
         for raw_id, item in payload["videos"].items():
-            try:
-                episode_id = int(raw_id)
-            except (TypeError, ValueError):
+            episode_id = parse_id_from_name(str(raw_id))
+            if episode_id is None:
                 continue
             if not isinstance(item, dict):
                 continue
             label = item.get("label")
             usable = item.get("usable")
             reviewed = item.get("reviewed")
+            status = str(item.get("status", "")).lower()
+            if status in DISCARD_STATUSES:
+                continue
+            if status:
+                usable_ids.append(episode_id)
+                continue
             is_yes = label == "y" or usable is True or (reviewed and str(label).lower() in {"usable", "yes", "y"})
             is_ambiguous = label == "m" or usable == "ambiguous" or str(label).lower() in {"m", "maybe", "ambiguous"}
             if is_yes or (allow_ambiguous and is_ambiguous):
@@ -297,9 +307,9 @@ def process_dataset(
             print(f"[skip] ignored episode id={episode_id}")
             continue
 
-        head_episode_dir = head_root / head_dir_template.format(id=episode_id)
-        planner_episode_dir = planner_root / planner_dir_template.format(id=episode_id)
-        head_video_path = head_episode_dir / head_video_name
+        head_episode_dir = head_root / format_template(head_dir_template, episode_id)
+        planner_episode_dir = planner_root / format_template(planner_dir_template, episode_id)
+        head_video_path = head_episode_dir / format_template(head_video_name, episode_id)
         left_wrist_path = planner_episode_dir / left_wrist_video_name
         right_wrist_path = planner_episode_dir / right_wrist_video_name
         pose_debug_path = planner_episode_dir / pose_debug_name

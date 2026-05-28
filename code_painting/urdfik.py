@@ -28,6 +28,11 @@ class URDFInverseKinematics:
         urdf_file: str | Path = DEFAULT_URDF,
         base_link: str = "base_link",
         ee_link: str = "left_gripper_link",
+        position_threshold: float = 0.001,
+        rotation_threshold: float = 0.02,
+        max_position_threshold: Optional[float] = None,
+        max_rotation_threshold: Optional[float] = None,
+        num_seeds: int = 1,
     ) -> None:
         self.urdf_file = str(Path(urdf_file).resolve())
         self.base_link = str(base_link)
@@ -35,14 +40,25 @@ class URDFInverseKinematics:
 
         self.tensor_args = TensorDeviceType()
         self.robot_cfg = RobotConfig.from_basic(self.urdf_file, self.base_link, self.ee_link, self.tensor_args)
-        self.default_rotation_threshold = 0.02
-        self.default_position_threshold = 0.001
+        self.default_rotation_threshold = float(rotation_threshold)
+        self.default_position_threshold = float(position_threshold)
+        self.max_position_threshold = (
+            max(float(self.default_position_threshold) * 2.0, 0.002)
+            if max_position_threshold is None
+            else max(float(max_position_threshold), float(self.default_position_threshold))
+        )
+        self.max_rotation_threshold = (
+            max(float(self.default_rotation_threshold) * 2.0, 0.04)
+            if max_rotation_threshold is None
+            else max(float(max_rotation_threshold), float(self.default_rotation_threshold))
+        )
+        self.num_seeds = max(int(num_seeds), 1)
         self.ik_config = IKSolverConfig.load_from_robot_config(
             self.robot_cfg,
             None,
             rotation_threshold=self.default_rotation_threshold,
             position_threshold=self.default_position_threshold,
-            num_seeds=1,
+            num_seeds=self.num_seeds,
             self_collision_check=False,
             self_collision_opt=False,
             tensor_args=self.tensor_args,
@@ -82,8 +98,8 @@ class URDFInverseKinematics:
         is_success = bool(result.success.cpu().numpy().all())
         original_pos_thresh = self.ik_solver.position_threshold
         original_rot_thresh = self.ik_solver.rotation_threshold
-        max_pos_thresh = max(float(original_pos_thresh) * 2.0, 0.002)
-        max_rot_thresh = max(float(original_rot_thresh) * 2.0, 0.04)
+        max_pos_thresh = max(float(self.max_position_threshold), float(original_pos_thresh))
+        max_rot_thresh = max(float(self.max_rotation_threshold), float(original_rot_thresh))
 
         while not is_success:
             self.ik_solver.position_threshold = min(float(self.ik_solver.position_threshold) * 2.0, max_pos_thresh)

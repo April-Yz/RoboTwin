@@ -2292,3 +2292,11 @@
   - 打开 `--debug_mode 1 --debug_post_execute 1`，用于查看目标 EE/TCP pose 与实际执行之间的误差。
   - 保存 `world_targets_and_status.npz`，便于后续读取 target pose/status。
 - 同步更新 `agent-read/COMMANDS/piper_anygrasp_keyframes.zh.md` / `.en.md` 和 command changelog。
+## 2026-05-29（补充 direct replay 与 AnyGrasp 轴约定差异）
+
+- 记录 direct replay 与 AnyGrasp planner 的 gripper frame 差异：
+  - direct Piper hand replay 的 stored gripper frame 使用 local `+Z` 蓝轴作为 approach/forward 轴。
+  - AnyGrasp preview wireframe 使用 `rotation_matrix[:, 0]`，即 local `+X` 红轴，作为掌根到指尖的 finger-depth 方向。
+- `plan_anygrasp_keyframes_r1.py` 的参数说明和诊断注释已改为明确区分 AnyGrasp local `+X` 与 direct replay local `+Z`。
+- `COMMAND_LIBRARY.zh.md` 新增 L15.17，提供 `stack_cups id0` 的 `--candidate_orientation_remap_label swap_red_blue` 单条对照命令，用于测试是否应把 AnyGrasp local `+X` 映射到 direct replay local `+Z`。
+- `.gitignore` 增加 `policy/openvla-oft/runs/`，避免 96G 运行输出进入 git；同时忽略 `*.bak` / `*.bak2` 备份文件。

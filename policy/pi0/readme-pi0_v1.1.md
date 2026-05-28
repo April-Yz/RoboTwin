@@ -1,6 +1,14 @@
-# pi0_v1.1 Privileged Distillation
+# pi0 OPSD v1 Notes
 
-This document records the `pi0_v1.1` changes added on top of the baseline pi0 training pipeline.
+This document records the current pi0 offline privileged self-distillation implementation.
+
+In the codebase the train config and helper scripts still use the older `pi0_v1.1` naming:
+
+- config: `pi0_v1_1_aloha_robotwin_lora_distill`
+- train helper: [`finetune_pi0_v1_1.sh`](/home/zaijia001/ssd/RoboTwin/policy/pi0/finetune_pi0_v1_1.sh)
+- eval helper: [`eval_pi0_v1_1.sh`](/home/zaijia001/ssd/RoboTwin/policy/pi0/eval_pi0_v1_1.sh)
+
+In this note, `opsd_v1` refers to that current implementation.
 
 ## 1. Goal
 
@@ -11,6 +19,34 @@ Replicate the OpenVLA-OFT teacher/student idea in a lighter pi0 setup:
 - student is trained with the original flow-matching loss plus an action-space distillation loss
 
 The inference-time policy stays baseline-compatible. Distillation exists only during training.
+
+## 1.1 Alignment with OpenVLA-OFT
+
+At the requirement level, `opsd_v1` matches the OpenVLA-OFT teacher/student direction:
+
+- offline teacher/student training
+- student sees only deployable current observations
+- teacher sees extra future images from the same trajectory
+- teacher provides action-level supervision only
+- inference stays baseline-compatible
+
+But the implementation is not structurally identical to OpenVLA-OFT.
+
+OpenVLA-OFT:
+
+- encodes future frames into one `future_token`
+- injects that token into the teacher branch as an extra conditioning token
+- exposes explicit `forward_student()` / `forward_teacher()` semantics
+
+Current pi0 `opsd_v1`:
+
+- encodes each future frame with the same image encoder
+- pools token sequences across the future horizon
+- substitutes the teacher-side image prefix tokens with pooled future image tokens instead of adding a separate token
+- uses `predict_velocity(..., use_future_images=...)` instead of a separate distillation wrapper class
+- uses `jax.lax.stop_gradient()` on the teacher output, which is equivalent for parameter updates but is not literally a PyTorch-style `torch.no_grad()` block
+
+So the current pi0 path is aligned with the earlier teacher/student requirements, but it is not the same OFT conditioning architecture one-to-one.
 
 ## 2. What changed
 
@@ -121,13 +157,28 @@ pi0_v1.1:
 - future image latent pooling for teacher
 - flow-matching + privileged distillation
 
-## 4. Recommended training commands
+## 4. Runbook
 
-### 4.1 Start pi0_v1.1 from scratch
+### 4.1 Environment and prerequisites
 
 ```bash
 cd /home/zaijia001/ssd/RoboTwin/policy/pi0
-uv run scripts/train.py pi0_v1_1_aloha_robotwin_lora_distill --exp-name=pi0_v1_1_run --overwrite
+uv sync
+```
+
+As with baseline training, make sure normalization stats exist under:
+
+```text
+policy/pi0/assets/pi0_v1_1_aloha_robotwin_lora_distill/<repo_id>/
+```
+
+If you override `DATA_REPO_ID`, the training pipeline and checkpoint loader both expect a matching asset subdirectory for that repo id.
+
+### 4.2 Start `opsd_v1` from scratch
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin/policy/pi0
+uv run scripts/train.py pi0_v1_1_aloha_robotwin_lora_distill --exp-name=pi0_v1_1_run --batch-size=32 --overwrite
 ```
 
 Or with the helper:
@@ -137,18 +188,21 @@ cd /home/zaijia001/ssd/RoboTwin/policy/pi0
 bash finetune.sh pi0_v1_1_aloha_robotwin_lora_distill pi0_v1_1_run 0
 ```
 
+Current default for the helper scripts is global `batch_size=32`. If you need a different value, override it with `BATCH_SIZE=<n>`.
+
 Dedicated helper with a concrete example:
 
 ```bash
 cd /home/zaijia001/ssd/RoboTwin/policy/pi0
 DATA_REPO_ID=aloha_beat_block_hammer_builder \
 EXP_NAME=pi0_v1_1_b32 \
+BATCH_SIZE=32 \
 SAVE_INTERVAL=1000 \
 KEEP_PERIOD=5000 \
 bash /home/zaijia001/ssd/RoboTwin/policy/pi0/finetune_pi0_v1_1.sh 0
 ```
 
-### 4.2 Override the data repo at launch time
+### 4.3 Override the data repo at launch time
 
 If you want to keep the named config but swap the dataset:
 
@@ -157,14 +211,16 @@ cd /home/zaijia001/ssd/RoboTwin/policy/pi0
 uv run scripts/train.py \
   pi0_v1_1_aloha_robotwin_lora_distill \
   --exp-name=pi0_v1_1_run \
+  --batch-size=32 \
   --data.repo-id=your_repo_id \
   --overwrite
 ```
 
-### 4.3 Match the OpenVLA-style default settings
+### 4.4 Match the current default settings
 
 These are the current defaults in `pi0_v1_1_aloha_robotwin_lora_distill`:
 
+- `batch_size=32`
 - `use_privileged_distill=True`
 - `future_horizon=4`
 - `future_mode=image_latent`
@@ -174,7 +230,9 @@ These are the current defaults in `pi0_v1_1_aloha_robotwin_lora_distill`:
 - `bc_weight=1.0`
 - `teacher_detach=True`
 
-### 4.4 Evaluate a saved v1.1 checkpoint
+### 4.5 RoboTwin evaluation
+
+`opsd_v1` uses the same inference path as baseline. Only the training graph differs.
 
 Evaluate the latest checkpoint:
 
@@ -195,6 +253,56 @@ TASK_NAME=beat_block_hammer \
 TASK_CONFIG=demo_clean \
 bash /home/zaijia001/ssd/RoboTwin/policy/pi0/eval_pi0_v1_1.sh 1000 0 0
 ```
+
+Run evaluation without the helper if you want the full underlying command:
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin/policy/pi0
+bash eval.sh beat_block_hammer demo_clean pi0_v1_1_aloha_robotwin_lora_distill pi0_v1_1_run 0 0 1000 50
+```
+
+Checkpoint layout is the same as baseline:
+
+```text
+policy/pi0/checkpoints/<TRAIN_CONFIG_NAME>/<MODEL_NAME>/<STEP>/
+```
+
+### 4.6 Quick tests and sanity checks
+
+Check that the config loads and that privileged distillation is enabled:
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin/policy/pi0
+uv run python - <<'PY'
+from openpi.training import config as cfg
+train_cfg = cfg.get_config("pi0_v1_1_aloha_robotwin_lora_distill")
+print(train_cfg.name)
+print("use_privileged_distill =", train_cfg.use_privileged_distill)
+print("future_horizon =", train_cfg.future_horizon)
+print("distill_loss_type =", train_cfg.distill_loss_type)
+PY
+```
+
+Run the shared unit tests for the pi0 model path:
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin/policy/pi0
+uv run pytest src/openpi/models/pi0_test.py src/openpi/models/model_test.py -q
+```
+
+After training starts, verify that these metrics appear in the log:
+
+- `bc_loss`
+- `distill_loss`
+- `student_teacher_l1`
+- `future_valid_ratio`
+
+If `distill_loss` is missing or always zero, you probably launched the baseline config by mistake or disabled `use_privileged_distill`.
+
+Before RoboTwin eval, check these paths:
+
+- `policy/pi0/checkpoints/pi0_v1_1_aloha_robotwin_lora_distill/<exp_name>/<step>/params/`
+- `policy/pi0/checkpoints/pi0_v1_1_aloha_robotwin_lora_distill/<exp_name>/<step>/assets/<repo_id>/`
 
 ## 5. Logged metrics
 

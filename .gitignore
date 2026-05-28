@@ -14,6 +14,7 @@ viewer_show.*
 eval_video/
 task_config/
 **/.DS_Store
+code_painting/*
 code_painting/anygrasp*
 code_painting/replay*
 !code_painting/replay_pose_debug_smooth.py
@@ -27,11 +28,14 @@ assets/*
 !assets/files
 
 policy/weights/*
+policy/openvla-oft/runs/
 
 envs/curobo/*
 
 .vscode
 /config.json
+*.bak
+*.bak2
 
 # /*.json*
 /*.txt

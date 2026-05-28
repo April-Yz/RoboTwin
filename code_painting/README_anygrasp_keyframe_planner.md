@@ -578,6 +578,25 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_replay_pose_debug_smooth.sh 
   --base_occluder_color 1.0 1.0 1.0
 ```
 
+针对你当前常用目录：
+
+- `/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_realoffset_batch_pure-v5`
+
+可以直接用：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_replay_pose_debug_smooth.sh \
+  --plan_summary_json /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_realoffset_batch_pure-v5/d_pour_blue_0/plan_summary.json \
+  --output_path /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_realoffset_batch_pure-v5/d_pour_blue_0/head_cam_plan_smooth.mp4 \
+  --interp_factor 4 \
+  --fps 20 \
+  --overlay_text 0 \
+  --base_occluder_enable 1 \
+  --base_occluder_local_pos 0.0 0.0 0.4 \
+  --base_occluder_half_size 0.45 0.45 0.02 \
+  --base_occluder_color 1.0 1.0 1.0
+```
+
 说明：
 
 - 它会自动从 `plan_summary.json` 找到：

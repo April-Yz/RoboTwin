@@ -4130,3 +4130,96 @@ for k in d.files:
     print(k, getattr(arr, 'shape', None), getattr(arr, 'dtype', None))
 PY
 ```
+
+### L15.17 Direct replay 与 AnyGrasp 的 gripper 轴约定差异
+
+当前确认的根因：
+
+- direct Piper hand replay 中，目标 gripper pose 来自 HaMeR/hand NPZ 的 stored gripper frame。该路径的 `--target_local_forward_retreat_m` 明确沿 `local +Z` 后退，日志会打印：
+
+```text
+[target-local-retreat] along_local_plus_z_blue_m=...
+```
+
+因此 direct replay viewer 里蓝色轴（local +Z）就是手工 gripper frame 的 approach/forward 轴。
+
+- AnyGrasp preview/planner 使用 AnyGrasp candidate 自己的 frame。`render_anygrasp_ranked_preview.py::draw_grasp_wireframe()` 中：
+
+```text
+x_axis = rotation_matrix[:, 0]
+y_axis = rotation_matrix[:, 1]
+left_tip/right_tip = left_base/right_base + x_axis * finger_len
+```
+
+所以 AnyGrasp 可视化里 local +X（红轴）是 wireframe 两根手指从掌根到指尖的 finger-depth 方向；local +Y 是开合宽度方向。它不是 direct replay 的 local +Z approach 约定。
+
+这解释了你看到的现象：direct replay 中蓝轴看起来对齐真实机器人前进轴；AnyGrasp 中如果按红轴看，会和 direct replay 的“蓝轴前进”不一致。这不是 viewer 颜色画错，而是两套 gripper frame 约定不同。
+
+当前 AnyGrasp planner 默认仍使用：
+
+```text
+--candidate_orientation_remap_label identity
+--candidate_target_local_x_offset_m -0.05
+--approach_offset_m 0.12
+```
+
+也就是说它把 AnyGrasp candidate 的 raw rotation 直接当执行 target。若要让 AnyGrasp candidate 的 local +X 对齐到 direct replay 的 local +Z approach 约定，需要做 candidate orientation remap。先用下面的对照命令单独跑 `stack_cups id0`：
+
+```bash
+CUDA_VISIBLE_DEVICES=2 conda run -n RoboTwin_bw python /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_piper.py \
+  --anygrasp_dir /home/zaijia001/ssd/data/piper/hand/stack_cups/stack_cups_output/foundation_input_0 \
+  --replay_dir /home/zaijia001/ssd/data/piper/hand/stack_cups/foundation_replay_d435/foundation_input_0 \
+  --hand_npz /home/zaijia001/ssd/data/piper/hand/stack_cups/harmer_output/hand_detections_0.npz \
+  --output_dir /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_axis_remap_debug/stack_cups/id0_swap_red_blue \
+  --reuse_preview_summary_json /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview_d435/stack_cups/foundation_input_0/summary.json \
+  --reuse_preview_frame_mode annotated_json_keyframes \
+  --reuse_preview_candidate_group orientation \
+  --reuse_preview_top_rank 1 \
+  --image_width 640 --image_height 480 --fovy_deg 42.499880046655484 \
+  --arm auto --execute_both_arms 1 --dual_stage_require_all_plans 0 \
+  --require_keyframe1_reached_before_close 1 --require_keyframe1_reached_before_action 1 \
+  --planner_backend urdfik \
+  --urdfik_trajectory_mode cartesian_interp_ik \
+  --urdfik_cartesian_interp_steps -1 \
+  --urdfik_cartesian_interp_auto_step_m 0.03 \
+  --execute_partial_cartesian_plan 1 \
+  --urdfik_max_position_threshold_m 0.02 \
+  --urdfik_max_rotation_threshold_rad 3.14 \
+  --piper_urdfik_apply_global_trans_to_ik 0 \
+  --candidate_selection_mode planner \
+  --candidate_orientation_remap_label swap_red_blue \
+  --left_target_object left_light_pink_cup \
+  --right_target_object right_dark_red_cup \
+  --candidate_target_local_x_offset_m -0.05 \
+  --approach_offset_m 0.12 \
+  --reach_error_pose_source ee \
+  --replan_until_reached 1 --replan_until_reached_max_attempts 1 \
+  --save_debug_preview 1 --save_pose_debug 1 \
+  --debug_visualize_targets 1 \
+  --debug_candidate_top_k 0 \
+  --debug_common_candidate_top_k 0 \
+  --debug_visualize_selected_keyframe_axes 0 \
+  --debug_visualize_ik_waypoints 0 \
+  --reach_pos_tol_m 0.03 --reach_rot_tol_deg 180 \
+  --enable_grasp_action_object_collision 0 \
+  --execute_interp_steps 24 --joint_command_scene_steps 10 \
+  --settle_steps 30 --joint_target_wait_steps 25 --joint_target_wait_tol_rad 0.01 \
+  --print_execution_pose_every 5 \
+  --hold_frames_after_stage 8 \
+  --pure_scene_output 0 --overlay_text 0 --head_only 0 --third_person_view 1 \
+  --vscode_compatible_video 1 \
+  --lighting_mode front_no_shadow \
+  --robot_config /home/zaijia001/ssd/RoboTwin/robot_config_PiperPika_agx_dual_table_0515.json \
+  --camera_cv_axis_mode legacy_r1 \
+  --head_camera_local_pos 0.11210396690038413 -0.39189397826604927 0.4753892624100325 \
+  --head_camera_local_quat_wxyz 0.8524694864910365 -0.0011011947849308937 0.5226654778798345 0.010740586780925399 \
+  --enable_viewer 0 --viewer_wait_at_end 0 --viewer_show_camera_frustums 0 \
+  --object_mesh_override left_light_pink_cup=/home/zaijia001/ssd/data/R1/hand/obj_mesh/light_pink_cup/light_pink_cup.obj \
+  --object_mesh_override right_dark_red_cup=/home/zaijia001/ssd/data/R1/hand/obj_mesh/dark_red_cup/dark_red_cup.obj
+```
+
+解释：
+
+- `swap_red_blue` 的作用是把 AnyGrasp 的 local +X 映射到执行 target 的 local +Z，作为 direct replay 轴约定的候选对齐方式。
+- 这条命令先无 viewer 跑，输出 `pose_debug.jsonl`、`debug_execution_metrics.jsonl` 和视频，避免 viewer 干扰。
+- 如果该 remap 后蓝轴与 direct replay 的蓝轴一致、执行误差下降，再把同样的 `--candidate_orientation_remap_label swap_red_blue` 加回六任务 wrapper。若方向相反，再测 `swap_red_blue_keep_green` 或显式的 `x_from_zp_y_from_yp_z_from_xm`。

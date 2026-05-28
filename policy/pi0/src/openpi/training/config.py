@@ -703,6 +703,47 @@ _CONFIGS = [
         bc_weight=1.0,
         teacher_detach=True,
     ),
+    # pi0_v1.2 by full fine-tuning with future-image privileged self-distillation
+    TrainConfig(
+        name="pi0_v1_2_aloha_robotwin_full_distill",
+        model=pi0.Pi0Config(),
+        data=LeRobotAlohaDataConfig(
+            repo_id="your_repo_id",
+            adapt_to_pi=False,
+            repack_transforms=_transforms.Group(inputs=[
+                _transforms.RepackTransform({
+                    "images": {
+                        "cam_high": "observation.images.cam_high",
+                        "cam_left_wrist": "observation.images.cam_left_wrist",
+                        "cam_right_wrist": "observation.images.cam_right_wrist",
+                    },
+                    "state": "observation.state",
+                    "actions": "action",
+                    "prompt": "prompt",
+                })
+            ]),
+            base_config=DataConfig(
+                local_files_only=True,
+                prompt_from_task=True,
+            ),
+        ),
+        freeze_filter=pi0.Pi0Config().get_freeze_filter(),
+        ema_decay=None,
+        batch_size=4,
+        weight_loader=weight_loaders.CheckpointWeightLoader("s3://openpi-assets/checkpoints/pi0_base/params"),
+        num_train_steps=30000,
+        save_interval=1000,
+        keep_period=5000,
+        fsdp_devices=4,
+        use_privileged_distill=True,
+        future_horizon=4,
+        future_mode="image_latent",
+        distill_target="action",
+        distill_loss_type="smooth_l1",
+        distill_weight=1.0,
+        bc_weight=1.0,
+        teacher_detach=True,
+    ),
     # pi0_fast_base by lora
     TrainConfig(
         name="pi0_fast_aloha_robotwin_lora",

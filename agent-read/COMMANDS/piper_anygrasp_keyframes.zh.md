@@ -419,3 +419,19 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_pipe
 ```bash
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && cd /home/zaijia001/ssd/RoboTwin && unset CUDA_VISIBLE_DEVICES && conda run -n RoboTwin_bw python /home/zaijia001/ssd/RoboTwin/code_painting/render_hand_retarget_piper_dual_npz_urdfik_main.py --input_npz /home/zaijia001/ssd/data/piper/hand/stack_cups/harmer_output/hand_detections_0.npz --output_dir /home/zaijia001/ssd/RoboTwin/code_painting/direct_replay_debug_piper_d435/stack_cups/id0_viewer_axes --image_width 640 --image_height 480 --fovy_deg 42.499880046655484 --fps 5 --frame_start 0 --frame_end 220 --max_frames 221 --arms both --piper_calibration_bundle /home/zaijia001/ssd/RoboTwin/calibration_bundle_piper_new_table_0515.json --camera_cv_axis_mode legacy_r1 --require_stored_gripper_pose 1 --pose_source gripper --orientation_remap_label identity --stored_orientation_post_rot_xyz_deg 0 0 0 --target_local_forward_retreat_m 0.05 --target_world_offset_xyz 0 0.1 0.1 --execute_waypoint_scene_steps 5 --execute_settle_scene_steps 20 --urdfik_joint_interp_waypoints 10 --debug_mode 1 --debug_post_execute 1 --debug_frame_limit -1 --debug_visualize_targets 1 --debug_target_axis_length 0.10 --debug_visualize_cameras 0 --save_world_targets 1 --clean_output 0 --overlay_text_enable 1 --save_png_frames 0 --lighting_mode front_no_shadow --enable_viewer 1 --viewer_frame_delay 0.02 --viewer_wait_at_end 1
 ```
+
+## L15.17 Direct Replay 与 AnyGrasp 轴约定差异
+
+direct Piper hand replay 和 AnyGrasp planner 当前不是同一个 gripper local frame：
+
+- direct replay 的 stored gripper frame 使用 `local +Z` 作为 approach/forward 轴。`--target_local_forward_retreat_m` 也是沿蓝轴后退，运行时会打印 `along_local_plus_z_blue_m`。
+- AnyGrasp preview 的 wireframe 使用 `rotation_matrix[:, 0]` 作为两根手指从掌根到指尖的 finger-depth 方向，即 local +X/红轴。
+- 所以 direct replay 中“蓝轴是前进轴”与 AnyGrasp 中“红轴像是 gripper wireframe 指尖方向”并不矛盾；这是两套局部坐标系约定不同。
+
+如果要测试把 AnyGrasp local +X 映射到 direct replay local +Z，可以在 planner 单条命令中加入：
+
+```bash
+--candidate_orientation_remap_label swap_red_blue
+```
+
+`COMMAND_LIBRARY.zh.md` L15.17 已补充 `stack_cups id0` 的完整无 viewer 对照命令。先无 viewer 生成 `pose_debug.jsonl` 和视频，确认蓝轴/执行误差是否更接近 direct replay；若方向相反，再测试 `swap_red_blue_keep_green` 或具体枚举标签。

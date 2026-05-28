@@ -57,7 +57,7 @@
         ]
       }
     ],
-    "gripper_bias": 0.0,
+    "gripper_bias": 0.12,
     "gripper_scale": [
       -0.01,
       0.045
@@ -191,7 +191,7 @@
         ]
       }
     ],
-    "gripper_bias": 0.0,
+    "gripper_bias": 0.12,
     "gripper_scale": [
       -0.01,
       0.045

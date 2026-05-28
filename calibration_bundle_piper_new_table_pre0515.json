@@ -1,0 +1,496 @@
+{
+  "schema": "piper_calibration_bundle.v1",
+  "name": "piper_new_table_0515",
+  "source_files": {
+    "head": "/home/zaijia001/ssd/data/piper/calibration/handeye/head_d435_new_table_head_from_wrist.json",
+    "base": "/home/zaijia001/ssd/data/piper/calibration/handeye/left_base_T_right_base_new_table.json",
+    "left_wrist": "/home/zaijia001/ssd/data/piper/calibration/handeye/left_wrist_new_table_eye_in_hand.json",
+    "right_wrist": "/home/zaijia001/ssd/data/piper/calibration/handeye/right_wrist_new_table_eye_in_hand.json",
+    "template_robot_config": "/home/zaijia001/ssd/RoboTwin/robot_config_PiperPika_agx_dual_table.json"
+  },
+  "robot_config": {
+    "left_robot_file": "./assets/embodiments/piper_pika_agx",
+    "right_robot_file": "./assets/embodiments/piper_pika_agx",
+    "dual_arm_embodied": false,
+    "embodiment_dis": 0.0,
+    "left_embodiment_config": {
+      "urdf_path": "piper_pika_agx.urdf",
+      "srdf_path": "piper.srdf",
+      "joint_stiffness": 1000,
+      "joint_damping": 200,
+      "gripper_stiffness": 1000,
+      "gripper_damping": 200,
+      "move_group": [
+        "link6",
+        "link6"
+      ],
+      "ee_joints": [
+        "joint6",
+        "joint6"
+      ],
+      "arm_joints_name": [
+        [
+          "joint1",
+          "joint2",
+          "joint3",
+          "joint4",
+          "joint5",
+          "joint6"
+        ],
+        [
+          "joint1",
+          "joint2",
+          "joint3",
+          "joint4",
+          "joint5",
+          "joint6"
+        ]
+      ],
+      "gripper_name": [
+        {
+          "base": "left_joint",
+          "mimic": [
+            [
+              "right_joint",
+              -1.0,
+              0.0
+            ]
+          ]
+        },
+        {
+          "base": "left_joint",
+          "mimic": [
+            [
+              "right_joint",
+              -1.0,
+              0.0
+            ]
+          ]
+        }
+      ],
+      "gripper_bias": 0.12,
+      "gripper_scale": [
+        0.0,
+        0.05
+      ],
+      "homestate": [
+        [
+          0.0,
+          0.8,
+          1.2,
+          0.0,
+          -0.4,
+          0.0
+        ],
+        [
+          0.0,
+          0.8,
+          1.2,
+          0.0,
+          -0.4,
+          0.0
+        ]
+      ],
+      "delta_matrix": [
+        [
+          1,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          1
+        ]
+      ],
+      "global_trans_matrix": [
+        [
+          1,
+          0,
+          0
+        ],
+        [
+          0,
+          -1,
+          0
+        ],
+        [
+          0,
+          0,
+          -1
+        ]
+      ],
+      "robot_pose": [
+        [
+          -0.3,
+          -0.25,
+          0.75,
+          0.70710678,
+          0.0,
+          0.0,
+          0.70710678
+        ],
+        [
+          0.5562084617626928,
+          -0.271842218720072,
+          0.7698417802711055,
+          0.7069488215893724,
+          -0.0011520778826584626,
+          0.02211893190752489,
+          0.7069178093818405
+        ]
+      ],
+      "planner": "curobo",
+      "dual_arm": false,
+      "rotate_lim": [
+        0,
+        1
+      ],
+      "grasp_perfect_direction": [
+        "front_right",
+        "front_left"
+      ]
+    },
+    "right_embodiment_config": {
+      "urdf_path": "piper_pika_agx.urdf",
+      "srdf_path": "piper.srdf",
+      "joint_stiffness": 1000,
+      "joint_damping": 200,
+      "gripper_stiffness": 1000,
+      "gripper_damping": 200,
+      "move_group": [
+        "link6",
+        "link6"
+      ],
+      "ee_joints": [
+        "joint6",
+        "joint6"
+      ],
+      "arm_joints_name": [
+        [
+          "joint1",
+          "joint2",
+          "joint3",
+          "joint4",
+          "joint5",
+          "joint6"
+        ],
+        [
+          "joint1",
+          "joint2",
+          "joint3",
+          "joint4",
+          "joint5",
+          "joint6"
+        ]
+      ],
+      "gripper_name": [
+        {
+          "base": "left_joint",
+          "mimic": [
+            [
+              "right_joint",
+              -1.0,
+              0.0
+            ]
+          ]
+        },
+        {
+          "base": "left_joint",
+          "mimic": [
+            [
+              "right_joint",
+              -1.0,
+              0.0
+            ]
+          ]
+        }
+      ],
+      "gripper_bias": 0.12,
+      "gripper_scale": [
+        0.0,
+        0.05
+      ],
+      "homestate": [
+        [
+          0.0,
+          0.8,
+          1.2,
+          0.0,
+          -0.4,
+          0.0
+        ],
+        [
+          0.0,
+          0.8,
+          1.2,
+          0.0,
+          -0.4,
+          0.0
+        ]
+      ],
+      "delta_matrix": [
+        [
+          1,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          1
+        ]
+      ],
+      "global_trans_matrix": [
+        [
+          1,
+          0,
+          0
+        ],
+        [
+          0,
+          -1,
+          0
+        ],
+        [
+          0,
+          0,
+          -1
+        ]
+      ],
+      "robot_pose": [
+        [
+          -0.3,
+          -0.25,
+          0.75,
+          0.70710678,
+          0.0,
+          0.0,
+          0.70710678
+        ],
+        [
+          0.5562084617626928,
+          -0.271842218720072,
+          0.7698417802711055,
+          0.7069488215893724,
+          -0.0011520778826584626,
+          0.02211893190752489,
+          0.7069178093818405
+        ]
+      ],
+      "planner": "curobo",
+      "dual_arm": false,
+      "rotate_lim": [
+        0,
+        1
+      ],
+      "grasp_perfect_direction": [
+        "front_right",
+        "front_left"
+      ]
+    }
+  },
+  "left_base_world_pose": [
+    -0.3,
+    -0.25,
+    0.75,
+    0.70710678,
+    0.0,
+    0.0,
+    0.70710678
+  ],
+  "right_base_world_pose": [
+    0.5562084617626928,
+    -0.271842218720072,
+    0.7698417802711055,
+    0.7069488215893724,
+    -0.0011520778826584626,
+    0.02211893190752489,
+    0.7069178093818405
+  ],
+  "head_camera": {
+    "axis_conversion": "render_camera = raw_optical @ legacy_r1.T",
+    "raw_left_base_T_head_camera": {
+      "translation": [
+        0.1127068448407749,
+        -0.4311782871274784,
+        0.47718876971577984
+      ],
+      "quat_wxyz": [
+        -0.1561308512406826,
+        0.6956171360845059,
+        -0.6892823498209615,
+        0.12895657990867987
+      ],
+      "matrix": [
+        [
+          0.016520085447100152,
+          -0.9186850270836527,
+          0.39464529363610645,
+          0.1127068448407749
+        ],
+        [
+          -0.9992214294605698,
+          -0.0010259990323071566,
+          0.03943960234030042,
+          -0.4311782871274784
+        ],
+        [
+          -0.0358276664547921,
+          -0.3949895800376181,
+          -0.9179867155782322,
+          0.47718876971577984
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    },
+    "left_base_T_head_camera": {
+      "translation": [
+        0.1127068448407749,
+        -0.4311782871274784,
+        0.47718876971577984
+      ],
+      "quat_wxyz": [
+        0.8349934585274149,
+        0.010419742534229186,
+        0.5499060273780525,
+        0.0167545287977736
+      ],
+      "matrix": [
+        [
+          0.39464529363610645,
+          -0.016520085447100152,
+          0.9186850270836527,
+          0.1127068448407749
+        ],
+        [
+          0.03943960234030042,
+          0.9992214294605698,
+          0.0010259990323071566,
+          -0.4311782871274784
+        ],
+        [
+          -0.9179867155782322,
+          0.0358276664547921,
+          0.3949895800376181,
+          0.47718876971577984
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    },
+    "world_pose": [
+      0.13117828605866816,
+      -0.13729315698453792,
+      1.22718876971578,
+      0.5785822979053196,
+      -0.381474409013271,
+      0.3962101528850145,
+      0.6022767757181154
+    ]
+  },
+  "wrist_cameras": {
+    "left_gripper_T_camera": {
+      "translation": [
+        -0.1493144547324326,
+        0.020709178309353107,
+        0.04361262758934953
+      ],
+      "quat_wxyz": [
+        -0.4327524246505378,
+        0.557101905823548,
+        -0.43171951730171426,
+        0.562121929715988
+      ],
+      "matrix": [
+        [
+          -0.00472561097370261,
+          0.005495724327651552,
+          0.9999737324625282,
+          -0.1493144547324326
+        ],
+        [
+          -0.9675427878076804,
+          -0.2526871946797109,
+          -0.003183615278236962,
+          0.020709178309353107
+        ],
+        [
+          0.25266306093742147,
+          -0.9675324173685409,
+          0.006511449817091064,
+          0.04361262758934953
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    },
+    "right_gripper_T_camera": {
+      "translation": [
+        -0.13501234680848043,
+        -0.027382233580855064,
+        0.0394202891823076
+      ],
+      "quat_wxyz": [
+        0.6579499408322479,
+        -0.2646744381656339,
+        0.6467791787566072,
+        -0.2805815586731893
+      ],
+      "matrix": [
+        [
+          0.005901365718904872,
+          0.02684540834601945,
+          0.9996221775918075,
+          -0.13501234680848043
+        ],
+        [
+          -0.7115890713645597,
+          0.7024428614284595,
+          -0.014663558324013837,
+          -0.027382233580855064
+        ],
+        [
+          -0.7025711119859508,
+          -0.7112336820475629,
+          0.023248271417269706,
+          0.0394202891823076
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    }
+  },
+  "derived_summary": {
+    "base_distance_m": 0.856716819466607,
+    "head_distance_from_left_base_m": 0.65293695620164,
+    "head_distance_from_right_base_m": 0.6386864403030753
+  }
+}

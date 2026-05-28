@@ -41,6 +41,7 @@ WORLD_TARGETS_NAME = "world_targets_and_status.npz"
 LEFT_WRIST_VIDEO_NAME = "left_wrist_replay.mp4"
 RIGHT_WRIST_VIDEO_NAME = "right_wrist_replay.mp4"
 ID_FROM_DIGITS_RE = re.compile(r"(\d+)")
+DISCARD_STATUSES = {"reject", "discard", "bad"}
 
 
 def quaternion_to_euler(quat_wxyz: np.ndarray, order: str = "xyz") -> np.ndarray:
@@ -72,10 +73,14 @@ def images_encoding(imgs: list[np.ndarray]) -> tuple[list[bytes], int]:
 
 
 def parse_id_from_name(name: str) -> int | None:
-    matches = ID_FROM_DIGITS_RE.findall(name)
+    matches = ID_FROM_DIGITS_RE.findall(Path(name).stem)
     if not matches:
         return None
     return int(matches[-1])
+
+
+def format_template(value: str, episode_id: int) -> str:
+    return value.format(id=episode_id)
 
 
 def discover_ids(root: Path, template: str) -> list[int]:
@@ -142,6 +147,34 @@ def forward_fill_segments(values: np.ndarray, valid_mask: np.ndarray, label: str
     return filled
 
 
+def build_arm_state(
+    world_targets: np.ndarray,
+    gripper_value: np.ndarray,
+    status: np.ndarray,
+    label: str,
+) -> np.ndarray:
+    world_targets = np.asarray(world_targets, dtype=np.float64)
+    gripper_value = np.asarray(gripper_value, dtype=np.float64).reshape(-1, 1)
+    status = np.asarray(status).astype(str)
+    quat_norm = np.linalg.norm(world_targets[:, 3:7], axis=1)
+    valid_mask = (
+        (status == "Success")
+        & np.isfinite(world_targets).all(axis=1)
+        & np.isfinite(gripper_value[:, 0])
+        & (quat_norm > 1e-8)
+    )
+    if not valid_mask.any():
+        status_counts = {item: int((status == item).sum()) for item in sorted(set(status.tolist()))}
+        zero_quat_count = int((quat_norm <= 1e-8).sum())
+        raise ValueError(f"{label}: no valid Success frames found; statuses={status_counts}, zero_quat_count={zero_quat_count}")
+
+    state = np.zeros((world_targets.shape[0], 7), dtype=np.float64)
+    state[valid_mask, :3] = world_targets[valid_mask, :3]
+    state[valid_mask, 3:6] = quaternion_to_euler(world_targets[valid_mask, 3:7])
+    state[valid_mask, 6:7] = gripper_value[valid_mask]
+    return forward_fill_segments(state, valid_mask, label)
+
+
 def build_pose_sequence(world_targets_path: Path) -> np.ndarray:
     data = np.load(world_targets_path, allow_pickle=True)
 
@@ -152,28 +185,8 @@ def build_pose_sequence(world_targets_path: Path) -> np.ndarray:
     left_status = np.asarray(data["left_plan_status"]).astype(str)
     right_status = np.asarray(data["right_plan_status"]).astype(str)
 
-    left_state = np.concatenate(
-        [
-            left_world[:, :3],
-            quaternion_to_euler(left_world[:, 3:7]),
-            left_gripper,
-        ],
-        axis=1,
-    )
-    right_state = np.concatenate(
-        [
-            right_world[:, :3],
-            quaternion_to_euler(right_world[:, 3:7]),
-            right_gripper,
-        ],
-        axis=1,
-    )
-
-    left_valid = (left_status == "Success") & np.isfinite(left_world).all(axis=1) & np.isfinite(left_gripper[:, 0])
-    right_valid = (right_status == "Success") & np.isfinite(right_world).all(axis=1) & np.isfinite(right_gripper[:, 0])
-
-    left_filled = forward_fill_segments(left_state, left_valid, "left arm")
-    right_filled = forward_fill_segments(right_state, right_valid, "right arm")
+    left_filled = build_arm_state(left_world, left_gripper, left_status, "left arm")
+    right_filled = build_arm_state(right_world, right_gripper, right_status, "right arm")
     return np.concatenate([left_filled, right_filled], axis=1).astype(np.float32)
 
 
@@ -249,15 +262,20 @@ def load_usable_ids_from_review_json(review_json: Path, review_mode: str = "stri
     if isinstance(payload, dict) and "videos" in payload and isinstance(payload["videos"], dict):
         usable_ids: list[int] = []
         for raw_id, item in payload["videos"].items():
-            try:
-                episode_id = int(raw_id)
-            except (TypeError, ValueError):
+            episode_id = parse_id_from_name(str(raw_id))
+            if episode_id is None:
                 continue
             if not isinstance(item, dict):
                 continue
             label = item.get("label")
             usable = item.get("usable")
             reviewed = item.get("reviewed")
+            status = str(item.get("status", "")).lower()
+            if status in DISCARD_STATUSES:
+                continue
+            if status:
+                usable_ids.append(episode_id)
+                continue
             is_yes = label == "y" or usable is True or (reviewed and str(label).lower() in {"usable", "yes", "y"})
             is_ambiguous = label == "m" or usable == "ambiguous" or str(label).lower() in {"m", "maybe", "ambiguous"}
             if is_yes or (allow_ambiguous and is_ambiguous):
@@ -322,10 +340,10 @@ def process_dataset(
             print(f"[skip] ignored episode id={episode_id}")
             continue
 
-        head_episode_dir = head_root / head_dir_template.format(id=episode_id)
-        retarget_episode_dir = retarget_root / retarget_dir_template.format(id=episode_id)
+        head_episode_dir = head_root / format_template(head_dir_template, episode_id)
+        retarget_episode_dir = retarget_root / format_template(retarget_dir_template, episode_id)
         world_targets_path = retarget_episode_dir / world_targets_name
-        head_video_path = head_episode_dir / head_video_name
+        head_video_path = head_episode_dir / format_template(head_video_name, episode_id)
         left_wrist_path = retarget_episode_dir / left_wrist_video_name
         right_wrist_path = retarget_episode_dir / right_wrist_video_name
 

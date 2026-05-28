@@ -229,6 +229,7 @@ bash finetune_beat_block_hammer_v1_tmux.sh 1
 
 ```bash
 bash finetune_beat_block_hammer_v1.sh 0
+BATCH_SIZE=4 bash finetune_beat_block_hammer_v1.sh 1
 ```
 
 如果你想显式看到脚本内部实际执行的训练参数，对应命令如下：
@@ -534,3 +535,89 @@ tmux new -s openvla_beat_block_hammer_bs4
 cd /home/zaijia001/ssd/RoboTwin/policy/openvla-oft
 BATCH_SIZE=4 bash finetune_beat_block_hammer_v1.sh 1
 ```
+
+
+# 训练 V1.1
+```
+  unset LD_LIBRARY_PATH
+  source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
+  conda activate RoboTwin_openvla
+  cd /home/zaijia001/ssd/RoboTwin/policy/openvla-oft
+
+  export CUDA_VISIBLE_DEVICES=1
+
+  python vla-scripts/finetune.py \
+    --vla_path openvla/openvla-7b \
+    --data_root_dir /home/zaijia001/ssd/RoboTwin/data/beat_block_hammer/tfds \
+    --dataset_name aloha_beat_block_hammer_builder \
+    --run_root_dir /home/zaijia001/ssd/RoboTwin/policy/openvla-oft/runs/beat_block_hammer_v1 \
+    --use_l1_regression True \
+    --use_diffusion False \
+    --use_film True \
+    --num_images_in_input 3 \
+    --use_proprio True \
+    --use_privileged_distill True \
+    --future_horizon 4 \
+    --future_mode image_latent \
+    --distill_target action \
+    --distill_loss_type mse \
+    --distill_weight 1.0 \
+    --bc_weight 1.0 \
+    --teacher_detach True \
+    --batch_size 4 \
+    --grad_accumulation_steps 4 \
+    --learning_rate 1e-4 \
+    --num_steps_before_decay 50000 \
+    --max_steps 100000 \
+    --use_val_set True \
+    --val_freq 1000 \
+    --save_freq 5000 \
+    --image_aug True \
+    --lora_rank 32 \
+    --wandb_entity yangzaijia \
+    --wandb_project openvla-oft \
+    --run_id_note beat_block_hammer_v1_bs4_ga4_lr1e4_dw1
+
+```
+
+# eval 1.1
+```
+
+  unset LD_LIBRARY_PATH
+  source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
+  conda activate RoboTwin_openvla
+  cd /home/zaijia001/ssd/RoboTwin/policy/openvla-oft
+
+  export SAPIEN_RT_DENOISER=none
+  bash eval_beat_block_hammer_v1.sh \
+    /home/zaijia001/ssd/RoboTwin/policy/openvla-oft/runs/beat_block_hammer_v1/<你的run目录>--10000_chkpt
+  bash eval_beat_block_hammer_v1.sh \
+    /home/zaijia001/ssd/RoboTwin/policy/openvla-oft/runs/beat_block_hammer_v1/openvla-7b+aloha_beat_block_hammer_builder+b2+lr-0.0005+lora-r32+dropout-0.0--image_aug--pd-k4-dw0.5--beat_block_hammer_v1_gpu3--10000_chkpt
+
+  bash eval_beat_block_hammer_v1.sh \
+    /home/zaijia001/ssd/RoboTwin/policy/openvla-oft/runs/beat_block_hammer_v1/<你的run目录>--10000_chkpt
+
+  bash eval_beat_block_hammer_v1.sh \
+    /home/zaijia001/ssd/RoboTwin/policy/openvla-oft/runs/beat_block_hammer_v1/openvla-7b+aloha_beat_block_hammer_builder+b16+lr-0.0001+lora-r32+dropout-0.0--image_aug--pd-k4-dw1.0--beat_block_hammer_v1_bs4_ga4_lr1e4_dw1--5000_chkpt
+```
+
+  现在推荐你这样跑：
+
+
+  cd /home/zaijia001/ssd/RoboTwin/policy/openvla-oft
+  BATCH_SIZE=3 \
+  GRAD_ACCUMULATION_STEPS=4 \
+  DISTILL_WEIGHT=1.0 \
+  BC_WEIGHT=1.0 \
+  LEARNING_RATE=1e-4 \
+  SAVE_FREQ=1000 \
+  bash finetune_beat_block_hammer_v1.sh 1
+
+  评估如果 checkpoint 还没 merge，直接：
+
+  unset LD_LIBRARY_PATH
+  source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
+  conda activate RoboTwin_openvla
+  cd /home/zaijia001/ssd/RoboTwin/policy/openvla-oft
+  export SAPIEN_RT_DENOISER=none
+  CUDA_VISIBLE_DEVICES=1 bash eval_beat_block_hammer_v1.sh /home/zaijia001/ssd/RoboTwin/policy/openvla-oft/runs/beat_block_hammer_v1/openvla-7b+aloha_beat_block_hammer_builder+b16+lr-0.0001+lora-r32+dropout-0.0--image_aug--pd-k4-dw1.0--beat_block_hammer_v1_bs4_ga4_lr1e4_dw1--5000_chkpt

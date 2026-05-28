@@ -166,6 +166,10 @@ def has_effort(hdf5_files: list[Path]) -> bool:
 def load_raw_images_per_camera(ep: h5py.File, cameras: list[str]) -> dict[str, np.ndarray]:
     imgs_per_cam = {}
     for camera in cameras:
+        if f"/observations/images/{camera}" not in ep:
+            print(f"Warning: Camera {camera} not found in HDF5 file, skipping...")
+            continue
+
         uncompressed = ep[f"/observations/images/{camera}"].ndim == 4
 
         if uncompressed:
@@ -178,8 +182,8 @@ def load_raw_images_per_camera(ep: h5py.File, cameras: list[str]) -> dict[str, n
             imgs_array = []
             for data in ep[f"/observations/images/{camera}"]:
                 data = np.frombuffer(data, np.uint8)
-                # img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)  # 解码为彩色图像
-                imgs_array.append(cv2.imdecode(data, cv2.IMREAD_COLOR))
+                img = cv2.imdecode(data, cv2.IMREAD_COLOR)
+                imgs_array.append(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
             imgs_array = np.array(imgs_array)
 
         imgs_per_cam[camera] = imgs_array
@@ -230,10 +234,24 @@ def populate_dataset(
     if episodes is None:
         episodes = range(len(hdf5_files))
 
+    expected_cameras = set()
+    for feature_name in dataset.features:
+        if feature_name.startswith("observation.images."):
+            expected_cameras.add(feature_name.replace("observation.images.", ""))
+
+    skipped_episodes = []
+
     for ep_idx in tqdm.tqdm(episodes):
         ep_path = hdf5_files[ep_idx]
 
         imgs_per_cam, state, action, velocity, effort = load_raw_episode_data(ep_path, use_wrist=use_wrist)
+        available_cameras = set(imgs_per_cam.keys())
+        missing_cameras = expected_cameras - available_cameras
+        if missing_cameras:
+            print(f"\nWarning: Episode {ep_idx} ({ep_path}) is missing cameras: {missing_cameras}. Skipping this episode.")
+            skipped_episodes.append(ep_idx)
+            continue
+
         num_frames = state.shape[0]
         # add prompt
         dir_path = os.path.dirname(ep_path)
@@ -259,6 +277,10 @@ def populate_dataset(
                 frame["observation.effort"] = effort[i]
             dataset.add_frame(frame)
         dataset.save_episode()
+
+    if skipped_episodes:
+        print(f"\nTotal episodes skipped: {len(skipped_episodes)} out of {len(list(episodes))}")
+        print(f"Skipped episode indices: {skipped_episodes}")
 
     return dataset
 
@@ -288,6 +310,9 @@ def port_aloha(
         for filename in fnmatch.filter(files, '*.hdf5'):
             file_path = os.path.join(root, filename)
             hdf5_files.append(file_path)
+    hdf5_files = sorted(hdf5_files)
+    if not hdf5_files:
+        raise FileNotFoundError(f"No .hdf5 files found under {raw_dir}")
 
     dataset = create_empty_dataset(
         repo_id,

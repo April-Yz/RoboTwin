@@ -2294,3 +2294,11 @@
   - Enables `--debug_mode 1 --debug_post_execute 1` to inspect target EE/TCP pose versus actual execution error.
   - Saves `world_targets_and_status.npz` for later target pose/status inspection.
 - Updated `agent-read/COMMANDS/piper_anygrasp_keyframes.zh.md` / `.en.md` and the command changelog.
+## 2026-05-29 (Documented Direct Replay Versus AnyGrasp Axis Convention)
+
+- Documented the gripper-frame difference between direct replay and the AnyGrasp planner:
+  - Direct Piper hand replay's stored gripper frame uses local `+Z` blue as the approach/forward axis.
+  - The AnyGrasp preview wireframe uses `rotation_matrix[:, 0]`, local `+X` red, as the finger-depth direction from palm/back bar to fingertips.
+- Updated `plan_anygrasp_keyframes_r1.py` parameter help and diagnostic comments to explicitly distinguish AnyGrasp local `+X` from direct replay local `+Z`.
+- Added L15.17 to `COMMAND_LIBRARY.zh.md` with a single-run `stack_cups id0` `--candidate_orientation_remap_label swap_red_blue` comparison command, testing whether AnyGrasp local `+X` should be mapped to direct replay local `+Z`.
+- Added `policy/openvla-oft/runs/` to `.gitignore` to keep 96G of run outputs out of git; also ignored `*.bak` / `*.bak2` backup files.

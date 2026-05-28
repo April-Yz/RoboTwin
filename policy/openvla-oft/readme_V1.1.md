@@ -237,9 +237,12 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
 conda activate RoboTwin_openvla
 cd /home/zaijia001/ssd/RoboTwin/policy/openvla-oft
 
-CUDA_VISIBLE_DEVICES=0 bash /home/zaijia001/ssd/RoboTwin/policy/openvla-oft/eval_beat_block_hammer_baseline.sh \
+CUDA_VISIBLE_DEVICES=2 bash /home/zaijia001/ssd/RoboTwin/policy/openvla-oft/eval_beat_block_hammer_baseline.sh \
   /home/zaijia001/ssd/RoboTwin/policy/openvla-oft/runs/beat_block_hammer_baseline/openvla-7b+aloha_beat_block_hammer_builder+b16+lr-0.0001+lora-r32+dropout-0.0--image_aug--beat_block_hammer_baseline_bs4_ga4_lr1e4--1000_chkpt \
-  0 0
+  0 2
+CUDA_VISIBLE_DEVICES=3 bash /home/zaijia001/ssd/RoboTwin/policy/openvla-oft/eval_beat_block_hammer_baseline.sh \
+  /home/zaijia001/ssd/RoboTwin/policy/openvla-oft/runs/beat_block_hammer_baseline/openvla-7b+aloha_beat_block_hammer_builder+b16+lr-0.0001+lora-r32+dropout-0.0--image_aug--beat_block_hammer_baseline_bs4_ga4_lr1e4--5000_chkpt \
+  0 3
 ```
 
 如果你想和你之前那组 `4x4` 蒸馏配置完全保持一致，只把 distill 关掉，这个脚本默认就已经是那种设定。
@@ -366,9 +369,9 @@ cd /home/zaijia001/ssd/RoboTwin/policy/openvla-oft
 
 LOG_EVAL_ATTENTION=True \
 EVAL_ATTENTION_FPS=10 \
-CUDA_VISIBLE_DEVICES=1 bash /home/zaijia001/ssd/RoboTwin/policy/openvla-oft/eval_beat_block_hammer_v1.sh \
+CUDA_VISIBLE_DEVICES=2 bash /home/zaijia001/ssd/RoboTwin/policy/openvla-oft/eval_beat_block_hammer_v1.sh \
   /home/zaijia001/ssd/RoboTwin/policy/openvla-oft/runs/beat_block_hammer_v1/openvla-7b+aloha_beat_block_hammer_builder+b16+lr-0.0001+lora-r32+dropout-0.0--image_aug--pd-k4-dw1.0--beat_block_hammer_v1_bs4_ga4_lr1e4_dw1--5000_chkpt \
-  0 1
+  0 2
 ```
 
 这会在同一个 episode 目录下额外保存：

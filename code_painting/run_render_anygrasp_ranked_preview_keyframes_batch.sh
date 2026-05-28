@@ -70,7 +70,25 @@ if not isinstance(info, dict):
     raise SystemExit(0)
 status = str(info.get("status", "done")).lower()
 keyframes = [int(v) for v in info.get("keyframes", [])]
-print(f"{status} {len(keyframes)}")
+def dedup(values):
+    out = []
+    seen = set()
+    for value in values:
+        ivalue = int(value)
+        if ivalue in seen:
+            continue
+        seen.add(ivalue)
+        out.append(ivalue)
+    return out
+def effective_count(arm):
+    arm_keyframes = [int(v) for v in info.get(f"{arm}_keyframes", [])]
+    if len(arm_keyframes) >= 2:
+        return 2
+    return min(len(dedup(arm_keyframes + keyframes)), 2)
+usable_count = min(effective_count("left"), effective_count("right"))
+if usable_count < 2 and len(keyframes) >= 2:
+    usable_count = 2
+print(f"{status} {usable_count}")
 PY
 }
 
