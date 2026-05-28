@@ -2302,3 +2302,30 @@
 - Updated `plan_anygrasp_keyframes_r1.py` parameter help and diagnostic comments to explicitly distinguish AnyGrasp local `+X` from direct replay local `+Z`.
 - Added L15.17 to `COMMAND_LIBRARY.zh.md` with a single-run `stack_cups id0` `--candidate_orientation_remap_label swap_red_blue` comparison command, testing whether AnyGrasp local `+X` should be mapped to direct replay local `+Z`.
 - Added `policy/openvla-oft/runs/` to `.gitignore` to keep 96G of run outputs out of git; also ignored `*.bak` / `*.bak2` backup files.
+
+## 2026-05-29 (Replay-Axis AnyGrasp Keyframe Runner)
+
+- Added planner parameters:
+  - `--candidate_target_local_z_offset_m`: applies AnyGrasp target compensation along target local `+Z`.
+  - `--approach_axis local_x|local_z`: chooses whether pregrasp retreat uses local `+X` or local `+Z`.
+- Kept old defaults unchanged:
+  - `--candidate_target_local_x_offset_m` retains its existing meaning.
+  - `--approach_axis` defaults to `local_x`, preserving the old AnyGrasp planner behavior.
+- Added D435 six-task wrapper passthrough parameters:
+  - `--candidate_orientation_remap_label`
+  - `--candidate_target_local_x_offset_m`
+  - `--candidate_target_local_z_offset_m`
+  - `--approach_axis`
+  - `--approach_offset_m`
+- Added the separate entrypoint `code_painting/run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh`:
+  - Forces `swap_red_blue`.
+  - Disables local-X compensation and enables `--candidate_target_local_z_offset_m -0.05`.
+  - Forces `--approach_axis local_z`.
+- Documentation:
+  - `COMMAND_LIBRARY.zh.md` now has L15.18 explaining the direct-replay local +Z blue-axis convention versus the AnyGrasp local +X red-axis convention, plus six-task viewer/no-viewer commands.
+  - `agent-read/COMMANDS/piper_anygrasp_keyframes.zh.md` / `.en.md` now include L15.18.
+- Validation:
+  - `python3 -m py_compile code_painting/plan_anygrasp_keyframes_r1.py` passed.
+  - `bash -n code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh` passed.
+  - `bash -n code_painting/run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh` passed.
+  - A no-viewer `run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh --tasks stack_cups --ids 0 --debug_stop_after_keyframe1 ...` smoke run completed under `/tmp/stack_cups_id0_replay_axes_check/stack_cups/foundation_input_0`; `plan_summary.json` records `candidate_target_local_z_offset_m=-0.05` and `approach_axis=local_z`, and VSCode-compatible `head_cam_plan.mp4` / `third_cam_plan.mp4` were generated. In this debug run, both arms reached keyframe-1 grasp.

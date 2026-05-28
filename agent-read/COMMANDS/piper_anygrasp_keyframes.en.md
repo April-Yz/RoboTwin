@@ -435,3 +435,38 @@ To test mapping AnyGrasp local +X onto the direct-replay local +Z convention, ad
 ```
 
 `COMMAND_LIBRARY.zh.md` L15.17 includes a full no-viewer `stack_cups id0` comparison command. Generate `pose_debug.jsonl` and videos first, then check whether the blue axis and execution error become closer to direct replay. If the direction is flipped, test `swap_red_blue_keep_green` or an explicit enumerated label.
+
+## L15.18 Replay-Axis AnyGrasp Keyframe Planner
+
+This section adds a separate entrypoint without replacing the older AnyGrasp commands:
+
+```text
+code_painting/run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh
+```
+
+Why this exists: direct Piper hand replay uses the stored gripper frame where `local +Z` blue is the approach/forward axis. The raw AnyGrasp candidate wireframe uses `local +X` red as the palm-to-fingertip finger-depth axis. Therefore the old planner's `identity + local-X offset/pregrasp` path is not equivalent to the direct-replay blue-axis convention.
+
+The new wrapper always enables:
+
+```text
+--candidate_orientation_remap_label swap_red_blue
+--candidate_target_local_x_offset_m 0.0
+--candidate_target_local_z_offset_m -0.05
+--approach_axis local_z
+--approach_offset_m 0.12
+```
+
+Meaning: remap the original AnyGrasp local +X onto the execution target local +Z, then apply both the 5 cm target compensation and the pregrasp retreat along local +Z. The old six-task wrapper still defaults to the local-X behavior.
+
+The six-task no-viewer and viewer commands for the first five summaries are recorded in `COMMAND_LIBRARY.zh.md` L15.18. Common single-task id0-10 viewer debug command:
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh --gpu 2 --tasks stack_cups --id_start 0 --id_end 10 --continue_on_error --viewer --visualize_targets --disable_execution_collisions --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --viewer_wait_at_end 0 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/stack_cups_id0_10_viewer
+```
+
+Validation record:
+
+- `python3 -m py_compile code_painting/plan_anygrasp_keyframes_r1.py` passed.
+- `bash -n code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh` passed.
+- `bash -n code_painting/run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh` passed.
+- A no-viewer `stack_cups id0 --debug_stop_after_keyframe1` smoke run completed and generated `head_cam_plan.mp4` / `third_cam_plan.mp4`; `plan_summary.json` records `candidate_target_local_z_offset_m=-0.05` and `approach_axis=local_z`, with both arms reaching keyframe-1 grasp.

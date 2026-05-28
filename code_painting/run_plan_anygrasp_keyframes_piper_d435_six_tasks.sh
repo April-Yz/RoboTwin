@@ -30,6 +30,11 @@ EXECUTE_PARTIAL_CARTESIAN_PLAN=0
 IK_MAX_POSITION_THRESHOLD_M=0.02
 IK_MAX_ROTATION_THRESHOLD_RAD=0.12
 PIPER_APPLY_GLOBAL_TRANS_TO_IK=0
+CANDIDATE_ORIENTATION_REMAP_LABEL=identity
+CANDIDATE_TARGET_LOCAL_X_OFFSET_M=-0.05
+CANDIDATE_TARGET_LOCAL_Z_OFFSET_M=0.0
+APPROACH_AXIS=local_x
+APPROACH_OFFSET_M=0.12
 ENABLE_EXECUTION_COLLISIONS=1
 DEBUG_CANDIDATE_TOP_K=5
 DEBUG_COMMON_CANDIDATE_TOP_K=0
@@ -169,6 +174,26 @@ while (($# > 0)); do
       PIPER_APPLY_GLOBAL_TRANS_TO_IK="$2"
       shift 2
       ;;
+    --candidate_orientation_remap_label)
+      CANDIDATE_ORIENTATION_REMAP_LABEL="$2"
+      shift 2
+      ;;
+    --candidate_target_local_x_offset_m)
+      CANDIDATE_TARGET_LOCAL_X_OFFSET_M="$2"
+      shift 2
+      ;;
+    --candidate_target_local_z_offset_m)
+      CANDIDATE_TARGET_LOCAL_Z_OFFSET_M="$2"
+      shift 2
+      ;;
+    --approach_axis)
+      APPROACH_AXIS="$2"
+      shift 2
+      ;;
+    --approach_offset_m)
+      APPROACH_OFFSET_M="$2"
+      shift 2
+      ;;
     --ids)
       shift
       IDS_FILTER=()
@@ -298,7 +323,7 @@ for TASK in "${TASKS[@]}"; do
     done
     IDS=("${FILTERED_IDS[@]}")
   fi
-  echo "===== run D435 planner task=${TASK} summaries=${#IDS[@]} max_per_task=${MAX_PER_TASK} dry_run=${DRY_RUN} viewer=${VIEWER} debug_stop_after_keyframe1=${DEBUG_STOP_AFTER_KEYFRAME1} trajectory_mode=${TRAJECTORY_MODE} dual_require_all=${DUAL_STAGE_REQUIRE_ALL_PLANS} reach_pose=${REACH_ERROR_POSE_SOURCE} visualize_targets=${VISUALIZE_TARGETS} target_axes_only=${TARGET_AXES_ONLY} collisions=${ENABLE_EXECUTION_COLLISIONS} pure_scene=${PURE_SCENE_OUTPUT} partial_cartesian=${EXECUTE_PARTIAL_CARTESIAN_PLAN} ik_max_pos=${IK_MAX_POSITION_THRESHOLD_M} ik_max_rot=${IK_MAX_ROTATION_THRESHOLD_RAD} piper_global_trans_ik=${PIPER_APPLY_GLOBAL_TRANS_TO_IK} exec_steps=${EXECUTE_INTERP_STEPS} scene_steps=${JOINT_COMMAND_SCENE_STEPS} ====="
+  echo "===== run D435 planner task=${TASK} summaries=${#IDS[@]} max_per_task=${MAX_PER_TASK} dry_run=${DRY_RUN} viewer=${VIEWER} debug_stop_after_keyframe1=${DEBUG_STOP_AFTER_KEYFRAME1} trajectory_mode=${TRAJECTORY_MODE} dual_require_all=${DUAL_STAGE_REQUIRE_ALL_PLANS} reach_pose=${REACH_ERROR_POSE_SOURCE} visualize_targets=${VISUALIZE_TARGETS} target_axes_only=${TARGET_AXES_ONLY} collisions=${ENABLE_EXECUTION_COLLISIONS} pure_scene=${PURE_SCENE_OUTPUT} partial_cartesian=${EXECUTE_PARTIAL_CARTESIAN_PLAN} ik_max_pos=${IK_MAX_POSITION_THRESHOLD_M} ik_max_rot=${IK_MAX_ROTATION_THRESHOLD_RAD} piper_global_trans_ik=${PIPER_APPLY_GLOBAL_TRANS_TO_IK} remap=${CANDIDATE_ORIENTATION_REMAP_LABEL} local_x_offset=${CANDIDATE_TARGET_LOCAL_X_OFFSET_M} local_z_offset=${CANDIDATE_TARGET_LOCAL_Z_OFFSET_M} approach_axis=${APPROACH_AXIS} approach_offset=${APPROACH_OFFSET_M} exec_steps=${EXECUTE_INTERP_STEPS} scene_steps=${JOINT_COMMAND_SCENE_STEPS} ====="
   for ID in "${IDS[@]}"; do
     ANY=${ANY_ROOT}/foundation_input_${ID}
     REPLAY=/home/zaijia001/ssd/data/piper/hand/${TASK}/foundation_replay_d435/foundation_input_${ID}
@@ -352,10 +377,13 @@ for TASK in "${TASKS[@]}"; do
       --urdfik_max_rotation_threshold_rad ${IK_MAX_ROTATION_THRESHOLD_RAD} \
       --piper_urdfik_apply_global_trans_to_ik ${PIPER_APPLY_GLOBAL_TRANS_TO_IK} \
       --candidate_selection_mode planner \
+      --candidate_orientation_remap_label ${CANDIDATE_ORIENTATION_REMAP_LABEL} \
       --left_target_object "$LEFT_OBJ" \
       --right_target_object "$RIGHT_OBJ" \
-      --candidate_target_local_x_offset_m -0.05 \
-      --approach_offset_m 0.12 \
+      --candidate_target_local_x_offset_m ${CANDIDATE_TARGET_LOCAL_X_OFFSET_M} \
+      --candidate_target_local_z_offset_m ${CANDIDATE_TARGET_LOCAL_Z_OFFSET_M} \
+      --approach_axis ${APPROACH_AXIS} \
+      --approach_offset_m ${APPROACH_OFFSET_M} \
       --reach_error_pose_source ${REACH_ERROR_POSE_SOURCE} \
       --replan_until_reached 1 \
       --replan_until_reached_max_attempts ${REPLAN_ATTEMPTS} \

@@ -435,3 +435,38 @@ direct Piper hand replay 和 AnyGrasp planner 当前不是同一个 gripper loca
 ```
 
 `COMMAND_LIBRARY.zh.md` L15.17 已补充 `stack_cups id0` 的完整无 viewer 对照命令。先无 viewer 生成 `pose_debug.jsonl` 和视频，确认蓝轴/执行误差是否更接近 direct replay；若方向相反，再测试 `swap_red_blue_keep_green` 或具体枚举标签。
+
+## L15.18 Replay-Axis AnyGrasp Keyframe Planner
+
+本节新增独立入口，不替换旧 AnyGrasp 命令：
+
+```text
+code_painting/run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh
+```
+
+新增原因：direct Piper hand replay 的 stored gripper frame 使用 `local +Z` 蓝轴作为 approach/forward；AnyGrasp raw candidate 的 wireframe 使用 `local +X` 红轴作为掌根到指尖的 finger-depth。因此旧 planner 的 `identity + local-X offset/pregrasp` 不等价于 direct replay 的蓝轴逻辑。
+
+新 wrapper 固定启用：
+
+```text
+--candidate_orientation_remap_label swap_red_blue
+--candidate_target_local_x_offset_m 0.0
+--candidate_target_local_z_offset_m -0.05
+--approach_axis local_z
+--approach_offset_m 0.12
+```
+
+含义：先把 AnyGrasp 原始 local +X 映射成执行 target 的 local +Z，再把 5cm target compensation 和 pregrasp retreat 都沿 local +Z 执行。旧六任务 wrapper 默认仍保留 local-X 逻辑。
+
+六任务前 5 个 no-viewer 命令与 viewer 命令已写入 `COMMAND_LIBRARY.zh.md` L15.18。常用单任务 id0-10 viewer 调试：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh --gpu 2 --tasks stack_cups --id_start 0 --id_end 10 --continue_on_error --viewer --visualize_targets --disable_execution_collisions --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --viewer_wait_at_end 0 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/stack_cups_id0_10_viewer
+```
+
+验证记录：
+
+- `python3 -m py_compile code_painting/plan_anygrasp_keyframes_r1.py` 通过。
+- `bash -n code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh` 通过。
+- `bash -n code_painting/run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh` 通过。
+- 无 viewer 实测 `stack_cups id0 --debug_stop_after_keyframe1` 可运行并生成 `head_cam_plan.mp4` / `third_cam_plan.mp4`；`plan_summary.json` 中记录 `candidate_target_local_z_offset_m=-0.05`、`approach_axis=local_z`，keyframe1 grasp 左右手均 reached。

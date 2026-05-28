@@ -1699,3 +1699,22 @@
   - `--candidate_orientation_remap_label swap_red_blue`
 - 用途：
   - 测试是否需要把 AnyGrasp local `+X` 映射到 direct replay local `+Z`，以解释/修正 viewer 中 gripper 轴与真实机器人朝向不一致的问题。
+
+## 2026-05-29（L15.18 Replay-axis AnyGrasp 六任务命令）
+
+- `COMMAND_LIBRARY.zh.md` 新增 L15.18。
+- 新增入口：
+  - `code_painting/run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh`
+- 新增/透传参数：
+  - `--candidate_orientation_remap_label`
+  - `--candidate_target_local_x_offset_m`
+  - `--candidate_target_local_z_offset_m`
+  - `--approach_axis`
+  - `--approach_offset_m`
+- replay-axis wrapper 固定：
+  - `--candidate_orientation_remap_label swap_red_blue`
+  - `--candidate_target_local_x_offset_m 0.0`
+  - `--candidate_target_local_z_offset_m -0.05`
+  - `--approach_axis local_z`
+  - `--approach_offset_m 0.12`
+- L15.18 已写入六任务前 5 个 no-viewer 命令、viewer 命令，以及 `stack_cups id0-10` 小范围 viewer 调试命令。

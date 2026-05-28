@@ -4223,3 +4223,60 @@ CUDA_VISIBLE_DEVICES=2 conda run -n RoboTwin_bw python /home/zaijia001/ssd/RoboT
 - `swap_red_blue` 的作用是把 AnyGrasp 的 local +X 映射到执行 target 的 local +Z，作为 direct replay 轴约定的候选对齐方式。
 - 这条命令先无 viewer 跑，输出 `pose_debug.jsonl`、`debug_execution_metrics.jsonl` 和视频，避免 viewer 干扰。
 - 如果该 remap 后蓝轴与 direct replay 的蓝轴一致、执行误差下降，再把同样的 `--candidate_orientation_remap_label swap_red_blue` 加回六任务 wrapper。若方向相反，再测 `swap_red_blue_keep_green` 或显式的 `x_from_zp_y_from_yp_z_from_xm`。
+
+### L15.18 AnyGrasp replay-axis 关键帧执行逻辑（新增，不替换旧命令）
+
+用途：保留前面 L15.x 的旧 AnyGrasp local-X 执行命令不变，新增一套“按 direct replay 轴约定”的 AnyGrasp 关键帧执行入口。这个入口专门用于排查和对齐你在 direct replay viewer 里看到的蓝轴前进逻辑。
+
+为什么需要新增一套逻辑：
+
+- direct Piper hand replay 的 stored gripper pose 使用 replay 约定：`local +Z`（viewer 蓝轴）是 approach/forward 轴。`render_hand_retarget_*` 路径中的 `--target_local_forward_retreat_m` 就是沿 local +Z 做后退。
+- AnyGrasp raw candidate 使用 AnyGrasp 自己的 candidate frame：在 `render_anygrasp_ranked_preview.py::draw_grasp_wireframe()` 中，`rotation_matrix[:, 0]` 是两根手指从掌根到指尖的 finger-depth 方向，`rotation_matrix[:, 1]` 是开合宽度方向。
+- 因此旧 planner 的 `identity + --candidate_target_local_x_offset_m -0.05 + --approach_axis local_x` 是“AnyGrasp local-X 逻辑”，不等价于 direct replay 的“蓝轴 local +Z 逻辑”。
+- 新 wrapper 使用 `swap_red_blue`，把 AnyGrasp 原始 local +X 映射成执行 target 的 local +Z，然后 target offset 和 pregrasp retreat 都沿 local +Z 做。这样 viewer 中蓝轴的语义与 direct replay 保持一致。
+
+新增代码入口：
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh
+```
+
+它等价于在旧六任务 wrapper 前固定追加：
+
+```text
+--candidate_orientation_remap_label swap_red_blue
+--candidate_target_local_x_offset_m 0.0
+--candidate_target_local_z_offset_m -0.05
+--approach_axis local_z
+--approach_offset_m 0.12
+```
+
+注意：`--candidate_target_local_z_offset_m -0.05` 是沿 remap 后 target local +Z 的 5cm TCP/夹爪补偿；`--approach_axis local_z` 让 pregrasp 后退也沿 replay 蓝轴逻辑执行。旧脚本默认仍是 local-X，不会被这个新增入口改掉。
+
+六任务分别跑前 5 个，无 viewer，保存目标轴视频和 pose/debug 输出：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --tasks pick_diverse_bottles --target_axes_only --disable_execution_collisions --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/no-viewer
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --tasks place_bread_basket --target_axes_only --disable_execution_collisions --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/no-viewer
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --tasks stack_cups --target_axes_only --disable_execution_collisions --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/no-viewer
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --tasks handover_bottle --target_axes_only --disable_execution_collisions --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/no-viewer
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --tasks pnp_bread --target_axes_only --disable_execution_collisions --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/no-viewer
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --tasks pnp_tray --target_axes_only --disable_execution_collisions --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/no-viewer
+```
+
+六任务分别跑前 5 个，viewer 版本：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --viewer --tasks pick_diverse_bottles --visualize_targets --disable_execution_collisions --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --viewer_wait_at_end 0 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --viewer --tasks place_bread_basket --visualize_targets --disable_execution_collisions --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --viewer_wait_at_end 0 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --viewer --tasks stack_cups --visualize_targets --disable_execution_collisions --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --viewer_wait_at_end 0 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --viewer --tasks handover_bottle --visualize_targets --disable_execution_collisions --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --viewer_wait_at_end 0 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --viewer --tasks pnp_bread --visualize_targets --disable_execution_collisions --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --viewer_wait_at_end 0 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --viewer --tasks pnp_tray --visualize_targets --disable_execution_collisions --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --viewer_wait_at_end 0 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer
+```
+
+小范围调试某个任务 id0-10：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh --gpu 2 --tasks stack_cups --id_start 0 --id_end 10 --continue_on_error --viewer --visualize_targets --disable_execution_collisions --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --viewer_wait_at_end 0 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/stack_cups_id0_10_viewer
+```

@@ -2300,3 +2300,30 @@
 - `plan_anygrasp_keyframes_r1.py` 的参数说明和诊断注释已改为明确区分 AnyGrasp local `+X` 与 direct replay local `+Z`。
 - `COMMAND_LIBRARY.zh.md` 新增 L15.17，提供 `stack_cups id0` 的 `--candidate_orientation_remap_label swap_red_blue` 单条对照命令，用于测试是否应把 AnyGrasp local `+X` 映射到 direct replay local `+Z`。
 - `.gitignore` 增加 `policy/openvla-oft/runs/`，避免 96G 运行输出进入 git；同时忽略 `*.bak` / `*.bak2` 备份文件。
+
+## 2026-05-29（新增 replay-axis AnyGrasp 关键帧执行入口）
+
+- 新增 planner 参数：
+  - `--candidate_target_local_z_offset_m`：沿 target local `+Z` 对 AnyGrasp target 做补偿。
+  - `--approach_axis local_x|local_z`：控制 pregrasp retreat 使用 local `+X` 还是 local `+Z`。
+- 旧默认不变：
+  - `--candidate_target_local_x_offset_m` 默认语义仍保留。
+  - `--approach_axis` 默认 `local_x`，保持旧 AnyGrasp planner 行为。
+- 六任务 D435 wrapper 新增透传参数：
+  - `--candidate_orientation_remap_label`
+  - `--candidate_target_local_x_offset_m`
+  - `--candidate_target_local_z_offset_m`
+  - `--approach_axis`
+  - `--approach_offset_m`
+- 新增独立入口 `code_painting/run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh`：
+  - 固定 `swap_red_blue`。
+  - 固定关闭 local-X compensation，启用 `--candidate_target_local_z_offset_m -0.05`。
+  - 固定 `--approach_axis local_z`。
+- 文档同步：
+  - `COMMAND_LIBRARY.zh.md` 新增 L15.18，说明 direct replay local +Z 蓝轴与 AnyGrasp local +X 红轴的差异，以及六任务 viewer/no-viewer 命令。
+  - `agent-read/COMMANDS/piper_anygrasp_keyframes.zh.md` / `.en.md` 同步 L15.18。
+- 验证：
+  - `python3 -m py_compile code_painting/plan_anygrasp_keyframes_r1.py` 通过。
+  - `bash -n code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh` 通过。
+  - `bash -n code_painting/run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh` 通过。
+  - `run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh --tasks stack_cups --ids 0 --debug_stop_after_keyframe1 ...` 无 viewer 实测通过，输出到 `/tmp/stack_cups_id0_replay_axes_check/stack_cups/foundation_input_0`；`plan_summary.json` 记录 `candidate_target_local_z_offset_m=-0.05`、`approach_axis=local_z`，并生成 VSCode 兼容 `head_cam_plan.mp4` / `third_cam_plan.mp4`。该调试 run 中 keyframe1 grasp 左右手均 reached。

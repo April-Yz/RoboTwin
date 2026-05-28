@@ -251,7 +251,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--candidate_post_rot_xyz_deg", type=float, nargs=3, default=[0.0, 0.0, 0.0])
     parser.add_argument("--candidate_keep_camera_up", type=int, default=0, help="If 1, keep the gripper/camera top side facing upward overall while preserving the original grasp direction. The planner only resolves the redundant roll about the gripper forward axis.")
     parser.add_argument("--candidate_camera_top_axis", choices=["y", "z"], default="z", help="Which local gripper axis should be treated as the camera/top direction when --candidate_keep_camera_up=1.")
-    parser.add_argument("--candidate_target_local_x_offset_m", type=float, default=0.0, help="Additional translation applied to each AnyGrasp world target along the AnyGrasp candidate local +X axis before planning/visualization. In the AnyGrasp wireframe this is the finger-depth axis, which is not the same convention as direct hand replay's local +Z approach axis.")
+    parser.add_argument("--candidate_target_local_x_offset_m", type=float, default=0.0, help="Additional translation applied to each AnyGrasp world target along target local +X before planning/visualization. In the default identity AnyGrasp frame this is the AnyGrasp finger-depth axis, which is not the same convention as direct hand replay's local +Z approach axis.")
+    parser.add_argument("--candidate_target_local_z_offset_m", type=float, default=0.0, help="Additional translation applied to each AnyGrasp world target along target local +Z before planning/visualization. Use this with --candidate_orientation_remap_label swap_red_blue to reproduce the direct replay convention where blue local +Z is the approach/forward axis.")
     parser.add_argument("--manual_candidate", type=str, nargs=3, action="append", default=[], metavar=("FRAME", "ARM", "CANDIDATE_IDX"), help="Optional manual candidate override, e.g. --manual_candidate 1 left 5. Partial overrides only reorder debug display; full two-frame overrides for one arm drive selection directly.")
     parser.add_argument("--object_mesh_override", action="append", default=[], help="Repeatable mesh override in the form NAME=/abs/path/to/mesh.obj, e.g. cup=/.../blue_cup.obj")
     parser.add_argument("--robot_config", type=Path, default=R1_CONFIG)
@@ -263,7 +264,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--robot_base_pose", type=float, nargs=7, default=None, metavar=("X", "Y", "Z", "QW", "QX", "QY", "QZ"))
     parser.add_argument("--open_gripper", type=float, default=1.0)
     parser.add_argument("--close_gripper", type=float, default=0.0)
-    parser.add_argument("--approach_offset_m", type=float, default=0.08, help="Pregrasp-only retreat distance. The grasp target itself is unchanged; instead the planner first creates a separate pregrasp pose by moving backward from the AnyGrasp candidate pose along local +X. This differs from direct hand replay, where the approach retreat uses local +Z.")
+    parser.add_argument("--approach_offset_m", type=float, default=0.08, help="Pregrasp-only retreat distance. The grasp target itself is unchanged; instead the planner first creates a separate pregrasp pose by moving backward from the target pose along --approach_axis.")
+    parser.add_argument("--approach_axis", choices=["local_x", "local_z"], default="local_x", help="Target local axis used for pregrasp retreat. Default local_x preserves the legacy AnyGrasp planner behavior. local_z matches the direct hand replay convention after remapping AnyGrasp +X to replay +Z.")
     parser.add_argument("--settle_steps", type=int, default=4)
     parser.add_argument("--execute_interp_steps", type=int, default=24)
     parser.add_argument("--joint_command_scene_steps", type=int, default=2, help="Physics scene steps to advance after each commanded arm waypoint.")
@@ -1125,16 +1127,23 @@ def rotation_distance_deg(rot_a: np.ndarray, rot_b: np.ndarray) -> float:
     return float(np.rad2deg(delta.magnitude()))
 
 
-def shift_pose_along_local_x(pose_world_wxyz: np.ndarray, delta_m: float) -> np.ndarray:
+def shift_pose_along_local_axis(pose_world_wxyz: np.ndarray, delta_m: float, axis_index: int) -> np.ndarray:
     # Candidate-target compensation before planning.
     # This modifies the AnyGrasp target itself and is used to compensate for
-    # fingertip-TCP vs wrist/endlink convention mismatch. For example, a value
-    # of -0.12 moves the planner target backward along the gripper local +X axis.
+    # fingertip-TCP vs wrist/endlink convention mismatch.
     pose_world_wxyz = np.asarray(pose_world_wxyz, dtype=np.float64).reshape(7)
     pose_world_matrix = pose_wxyz_to_matrix(pose_world_wxyz)
-    pose_world_matrix[:3, 3] += pose_world_matrix[:3, 0] * float(delta_m)
+    pose_world_matrix[:3, 3] += pose_world_matrix[:3, int(axis_index)] * float(delta_m)
     quat = base.quat_xyzw_to_wxyz(R.from_matrix(base.orthonormalize_rotation(pose_world_matrix[:3, :3])).as_quat())
     return np.concatenate([pose_world_matrix[:3, 3], quat]).astype(np.float64)
+
+
+def shift_pose_along_local_x(pose_world_wxyz: np.ndarray, delta_m: float) -> np.ndarray:
+    return shift_pose_along_local_axis(pose_world_wxyz, delta_m, 0)
+
+
+def shift_pose_along_local_z(pose_world_wxyz: np.ndarray, delta_m: float) -> np.ndarray:
+    return shift_pose_along_local_axis(pose_world_wxyz, delta_m, 2)
 
 
 def candidate_to_world_pose(
@@ -1152,6 +1161,8 @@ def candidate_to_world_pose(
     pose_world_wxyz = raw_pose_world_wxyz.copy()
     if abs(float(args.candidate_target_local_x_offset_m)) > 1e-12:
         pose_world_wxyz = shift_pose_along_local_x(pose_world_wxyz, float(args.candidate_target_local_x_offset_m))
+    if abs(float(args.candidate_target_local_z_offset_m)) > 1e-12:
+        pose_world_wxyz = shift_pose_along_local_z(pose_world_wxyz, float(args.candidate_target_local_z_offset_m))
     pose_world_matrix = pose_wxyz_to_matrix(pose_world_wxyz)
     original_rotation_world = raw_pose_world_matrix[:3, :3].copy()
     roll_debug = {
@@ -1211,6 +1222,8 @@ def build_candidate_pose_variant(
     pose_world_wxyz = np.asarray(candidate.raw_pose_world_wxyz, dtype=np.float64).reshape(7).copy()
     if abs(float(args.candidate_target_local_x_offset_m)) > 1e-12:
         pose_world_wxyz = shift_pose_along_local_x(pose_world_wxyz, float(args.candidate_target_local_x_offset_m))
+    if abs(float(args.candidate_target_local_z_offset_m)) > 1e-12:
+        pose_world_wxyz = shift_pose_along_local_z(pose_world_wxyz, float(args.candidate_target_local_z_offset_m))
     pose_world_matrix = pose_wxyz_to_matrix(pose_world_wxyz)
     rot = base.orthonormalize_rotation(pose_world_matrix[:3, :3])
     if bool(flip_roll_180):
@@ -2816,14 +2829,22 @@ def record_frame(
 
 
 def pose_with_offset_along_local_x(pose_world_wxyz: np.ndarray, offset_m: float) -> np.ndarray:
+    return pose_with_offset_along_local_axis(pose_world_wxyz, offset_m, "local_x")
+
+
+def pose_with_offset_along_local_z(pose_world_wxyz: np.ndarray, offset_m: float) -> np.ndarray:
+    return pose_with_offset_along_local_axis(pose_world_wxyz, offset_m, "local_z")
+
+
+def pose_with_offset_along_local_axis(pose_world_wxyz: np.ndarray, offset_m: float, axis: str) -> np.ndarray:
     # Pregrasp generation only.
     # This does NOT change the actual grasp target. It creates a separate
     # pregrasp pose by retreating backward from the grasp pose along the gripper
-    # local forward axis. In the current convention, retreat is implemented as
-    # subtracting local +X by `offset_m`.
+    # local forward axis.
     pose_world_wxyz = np.asarray(pose_world_wxyz, dtype=np.float64).reshape(7)
     pose_world_matrix = pose_wxyz_to_matrix(pose_world_wxyz)
-    pose_world_matrix[:3, 3] -= pose_world_matrix[:3, 0] * float(offset_m)
+    axis_index = 2 if axis == "local_z" else 0
+    pose_world_matrix[:3, 3] -= pose_world_matrix[:3, axis_index] * float(offset_m)
     rot = pose_world_matrix[:3, :3]
     quat = base.quat_xyzw_to_wxyz(R.from_matrix(rot).as_quat())
     return np.concatenate([pose_world_matrix[:3, 3], quat]).astype(np.float64)
@@ -4548,6 +4569,8 @@ def export_source_preview_compare(
         "reuse_preview_candidate_group": str(args.reuse_preview_candidate_group),
         "reuse_preview_top_rank": int(args.reuse_preview_top_rank),
         "candidate_target_local_x_offset_m": float(args.candidate_target_local_x_offset_m),
+        "candidate_target_local_z_offset_m": float(args.candidate_target_local_z_offset_m),
+        "approach_axis": str(args.approach_axis),
         "frames": {},
     }
 
@@ -4606,6 +4629,7 @@ def export_source_preview_compare(
                     "planner_raw_pose_world_wxyz": np.asarray(selected.candidate.raw_pose_world_wxyz, dtype=np.float64).reshape(7).tolist(),
                     "planner_target_pose_world_wxyz": np.asarray(selected.candidate.pose_world_wxyz, dtype=np.float64).reshape(7).tolist(),
                     "local_x_offset_applied_m": float(args.candidate_target_local_x_offset_m),
+                    "local_z_offset_applied_m": float(args.candidate_target_local_z_offset_m),
                     "nearest_object": str(selected.candidate.nearest_object),
                     "rotation_distance_deg": float(selected.candidate.rotation_distance_deg),
                 }
@@ -5161,7 +5185,7 @@ def main() -> None:
             )
 
             pregrasp_targets = {
-                arm_name: pose_with_offset_along_local_x(seq[0].candidate.pose_world_wxyz, args.approach_offset_m)
+                arm_name: pose_with_offset_along_local_axis(seq[0].candidate.pose_world_wxyz, args.approach_offset_m, args.approach_axis)
                 for arm_name, seq in exec_selected_by_arm.items()
             }
             grasp_targets = {arm_name: seq[0].candidate.pose_world_wxyz for arm_name, seq in exec_selected_by_arm.items()}
@@ -5539,7 +5563,7 @@ def main() -> None:
                 )
 
                 grasp_pose = exec_selected_keyframes[0].candidate.pose_world_wxyz
-                pregrasp_pose = pose_with_offset_along_local_x(grasp_pose, args.approach_offset_m)
+                pregrasp_pose = pose_with_offset_along_local_axis(grasp_pose, args.approach_offset_m, args.approach_axis)
                 action_pose = exec_selected_keyframes[1].candidate.pose_world_wxyz
                 action_object_replay = None
                 if bool(args.replay_objects_during_action):
@@ -5887,6 +5911,8 @@ def main() -> None:
         "candidate_keep_camera_up": int(args.candidate_keep_camera_up),
         "candidate_camera_top_axis": str(args.candidate_camera_top_axis),
         "candidate_target_local_x_offset_m": float(args.candidate_target_local_x_offset_m),
+        "candidate_target_local_z_offset_m": float(args.candidate_target_local_z_offset_m),
+        "approach_axis": str(args.approach_axis),
         "enable_grasp_action_object_collision": int(args.enable_grasp_action_object_collision),
         "grasp_action_object_collision_start_stage": str(args.grasp_action_object_collision_start_stage),
         "disable_table": int(args.disable_table),
