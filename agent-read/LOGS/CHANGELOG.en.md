@@ -1,5 +1,244 @@
 # CHANGELOG.en
 
+## 2026-05-28 (Cartesian Partial Prefix Execution)
+
+- Added a Cartesian waypoint partial-prefix execution diagnostic:
+  - `plan_anygrasp_keyframes_r1.py` now supports `--execute_partial_cartesian_plan`.
+  - The Piper/R1 URDFIK renderers can return `status=Partial` plus the solved waypoint prefix when `cartesian_interp_ik` fails at an intermediate waypoint.
+  - Execution now runs plans that are `Success` or executable `Partial`; `Partial` is not counted as reached.
+  - The six-task wrapper forwards `--execute_partial_cartesian_plan`.
+  - `COMMAND_LIBRARY.zh.md` now includes L15.11 viewer/no-viewer debug commands and a note on position-priority vs orientation-priority IK.
+- Validation:
+  - Related Python files passed `py_compile`.
+  - The wrapper passed `bash -n`.
+  - L15.11 bash blocks passed `bash -n`.
+
+## 2026-05-28 (D435 Preview No-Offset Main And Planner-Selected Image)
+
+- Updated the D435 AnyGrasp preview convention per user request:
+  - L15.9 now regenerates the main `anygrasp_h2o_preview_d435` previews with no offset: `--candidate_target_local_x_offset_m 0.0`.
+  - L15.10 now writes the offset -5cm comparison output to `anygrasp_h2o_preview_d435_offset_minus_5cm_compare`.
+  - `render_anygrasp_ranked_preview.py` now writes `frame_XXXXXX_left_right_planner_selected_orientation_rank1.png`, showing only the downstream planner's default `orientation rank1` selection.
+  - Documentation now explains orientation vs fused ranking and the colors: candidate left is blue-ish, candidate right is orange-ish; human reference left is green and right is purple.
+- Validation:
+  - `python3 -m py_compile code_painting/render_anygrasp_ranked_preview.py` passed.
+  - The L15.9/L15.10 bash blocks passed `bash -n`.
+
+## 2026-05-28 (Raw/No-Offset D435 AnyGrasp Comparison)
+
+- Appended L15.10 to the end of `COMMAND_LIBRARY.zh.md`:
+  - Uses `--candidate_target_local_x_offset_m 0.0` to generate an independent comparison directory: `anygrasp_h2o_preview_d435_no_offset_compare`.
+  - Adds a summary comparison script to inspect the difference between the raw/original candidate and the offset visual/planner target.
+- Validation:
+  - The L15.10 bash blocks passed `bash -n`.
+
+## 2026-05-28 (Copy-Safe D435 AnyGrasp Commands)
+
+- Appended L15.9 to the end of `COMMAND_LIBRARY.zh.md`:
+  - Step 1 uses `bash <<'BASH'` to regenerate six-task D435 previews/summaries without zsh line-wrap argument loss.
+  - Step 2 provides the no-viewer D435 planner/replay command.
+  - Step 3 provides the viewer + `--visualize_targets` gripper-target visualization replay command.
+- Validation:
+  - The L15.9 bash blocks passed `bash -n`.
+
+## 2026-05-28 (D435 AnyGrasp Preview/Planner Mapping Fix)
+
+- Fixed an AnyGrasp D435 preview vs planner target visualization mismatch:
+  - `render_anygrasp_ranked_preview.py` now draws grasp wireframes with the remapped/post-rotated/local-X-offset `visual_translation_cam/visual_rotation_matrix`.
+  - The summary still keeps the raw `translation_cam/rotation_matrix` and now also writes `visual_translation_cam/visual_rotation_matrix`, separating the raw AnyGrasp candidate from the actual planner target.
+  - Confirmed that `pick_diverse_bottles id0 frame 38` uses D435 rank1 left candidate `16` and right candidate `11`; the default wide-FOV preview uses different candidate ids and should not be mixed with D435 planner runs.
+- Validation:
+  - `python3 -m py_compile code_painting/render_anygrasp_ranked_preview.py code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_anygrasp_keyframes_piper.py` passed.
+  - A single-id D435 preview was regenerated under `code_painting/anygrasp_h2o_preview_d435_offsetfix_debug/pick_diverse_bottles/foundation_input_0`, and the summary exposes raw/visual/world coordinates.
+
+## 2026-05-28 (D435 AnyGrasp Supports Per-Arm Keyframes)
+
+- Additional diagnosis:
+  - The `tmux anygrasp-view-18` viewer batch was repeatedly interrupted with `Ctrl-C`; existing outputs show that in strict sync mode, `pick_diverse_bottles id0` has a left-arm plan `Fail` while the right arm can have `Success`, but `dual_require_all=1` skips the whole stage, so debug metrics show zero TCP displacement.
+  - Found that the script had been changed to `--execute_interp_steps 2400 --joint_command_scene_steps 1000 --settle_steps 300 --joint_target_wait_steps 250`, which makes the viewer appear stuck at a waypoint. Restored the default R1/V7-style cadence: 24/10/30/25.
+  - Verified that execution does change pose with `--allow_partial_dual_stage --print_pose_every 5`: for `pick_diverse_bottles id0`, the right TCP moved from about `(0.561,-0.044,0.931)` to `(0.187,0.224,1.018)`, and stdout prints `[exec-pose]`.
+  - The viewer behavior where waypoints appear but the arm does not move before the gripper closes was caused by the old guard only blocking keyframe-2 action via `--require_keyframe1_reached_before_action`; it did not block `close_gripper`. When pregrasp/grasp planning failed, the stage was skipped but close still ran.
+  - Reproduced `stack_cups id0` with `--debug_stop_after_keyframe1`; it already fails at the first keyframe, ruling out close/action/keyframe-2 as the cause.
+  - The failure is caused by intermediate `cartesian_interp_ik` waypoint IK failures, not by too-small `settle_steps` or `joint_target_wait_steps`: pregrasp fails at left waypoint 13/23 and right waypoint 28/48; grasp fails at left waypoint 16/28 and right waypoint 25/45.
+  - Because `--dual_stage_require_all_plans 1` is enabled, any arm plan marked `Fail` skips the whole synchronized dual-arm stage, so the output video appears to execute almost no waypoints.
+- Code updates:
+  - Added `--debug_stop_after_keyframe1` to `plan_anygrasp_keyframes_r1.py`; it executes only init -> pregrasp -> grasp, without closing the gripper or entering keyframe 2.
+  - Added `--require_keyframe1_reached_before_close` to `plan_anygrasp_keyframes_r1.py`; when enabled, the gripper does not close unless the first-keyframe grasp reached.
+  - Added `--print_execution_pose_every` to `plan_anygrasp_keyframes_r1.py`; execution can now print TCP/EE world positions every N trajectory steps.
+  - Added `[plan-fail]` logging in dual stages to print the failure reason and failed Cartesian waypoint.
+  - `run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh` now passes `--require_keyframe1_reached_before_close 1` by default and supports `--viewer`, `--output_root`, `--debug_stop_after_keyframe1`, `--trajectory_mode`, `--cartesian_auto_step_m`, `--joint_interp_waypoints`, `--replan_attempts`, `--allow_partial_dual_stage`, and `--print_pose_every`.
+- Documentation updates:
+  - Added L15.6 to `COMMAND_LIBRARY.zh.md` with six-task five-episode no-viewer, viewer, and first-keyframe debug commands.
+  - Synchronized L15.6 in `agent-read/COMMANDS/piper_anygrasp_keyframes.*.md`.
+- Validation:
+  - `python3 -m py_compile code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_anygrasp_keyframes_piper.py`
+  - `bash -n code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh`
+  - `bash code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --dry_run --max_per_task 1 --tasks stack_cups`
+  - `bash code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --dry_run --max_per_task 1 --tasks stack_cups --viewer --output_root /tmp/viewer_out`
+  - `bash code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --dry_run --max_per_task 1 --tasks stack_cups --debug_stop_after_keyframe1`
+  - `bash code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --gpu 2 --max_per_task 1 --continue_on_error --tasks stack_cups --debug_stop_after_keyframe1`
+  - `bash code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --gpu 2 --max_per_task 1 --continue_on_error --tasks stack_cups --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_close_guard_check` verified that first-keyframe failure now prints `stopping before close_gripper` and no longer closes the gripper.
+  - `bash code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --gpu 2 --max_per_task 1 --continue_on_error --tasks pick_diverse_bottles --trajectory_mode joint_interp --joint_interp_waypoints 40 --allow_partial_dual_stage --print_pose_every 5 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_posemove_debug` verified that stdout pose changes with waypoint execution.
+
+- Root cause:
+  - The user pasted the old L15.4 long command directly into zsh, triggering `zsh: command not found: mapfile`; `mapfile` is a bash builtin, leaving `IDS` empty and causing a bogus `foundation_input_` lookup.
+  - J0.1 scans `seq 0 120`, which exceeds the real episode count for several tasks, so many `MISS` lines are expected.
+  - `place_bread_basket/stack_cups/handover_bottle/pnp_bread` had the required base inputs, but the old `run_render_anygrasp_ranked_preview_keyframes_batch.sh` only checked global `keyframes` and ignored the manually annotated `left_keyframes/right_keyframes`, so D435 preview summaries were skipped.
+  - `stack_cups id0` uses per-arm D435 summary keyframes: right `[51, 106]`, left `[139, 195]`. The old planner rank preview only rendered the global first two frames `[51, 106]`, so it only showed right-arm candidates and could be misread as a candidate offset issue.
+  - Planner `rank_previews` are SAPIEN-rendered 3D grippers, while the J1.1 preview is a projection on the raw D435 image. `approach_offset_m=0.12` does not affect rank previews; the rank preview target only includes the `candidate_target_local_x_offset_m=-0.05` 5 cm TCP compensation.
+- Code updates:
+  - `render_anygrasp_ranked_preview.py` now computes effective keyframes: when global `keyframes` has fewer than two frames, each arm is filled from `left_keyframes/right_keyframes` plus global `keyframes`.
+  - Preview summaries now include `frame_selection.annotated_keyframes_by_arm`, `effective_keyframes`, and `effective_keyframes_by_arm`.
+  - `run_render_anygrasp_ranked_preview_keyframes_batch.sh` now checks left/right effective keyframes.
+  - `plan_anygrasp_keyframes_r1.py` now prefers arm-specific `effective_keyframes_by_arm` when reusing a preview summary.
+  - Fixed the `resolved_map` scope bug in `load_reused_preview_summary()`, avoiding a `NameError` when the D435 planner reuses a preview summary.
+  - In dual mode, `selected_keyframes` is now the union of left/right execution sequences, and rank previews are exported for all frames that are actually used for execution.
+  - Added `code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh` as a zsh-safe six-task D435 planner entrypoint.
+  - Added `--continue_on_error` to the six-task script.
+  - Added L15.5 to `COMMAND_LIBRARY.zh.md`: a single `stack_cups id0` viewer debug command.
+  - Copied the J1.1 D435 source preview images into `anygrasp_plan_keyframes_piper_d435_v1/stack_cups/foundation_input_0/preview_compare_d435/` for side-by-side inspection.
+- Validation:
+  - `python3 -m py_compile code_painting/render_anygrasp_ranked_preview.py code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_anygrasp_keyframes_piper.py`
+  - `bash -n code_painting/run_render_anygrasp_ranked_preview_keyframes_batch.sh`
+  - `bash -n code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh`
+  - `bash code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --dry_run --max_per_task 1`
+  - `bash code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --gpu 2 --max_per_task 1 --tasks pick_diverse_bottles` generated id0 `plan_summary.json` and head/third videos successfully; execution-level left-arm IK still failed, and dual-sync gating skipped the stage as expected.
+  - Rerunning `stack_cups id0` now generates four planner `rank_previews`: right 51/106 and left 139/195.
+  - The L15.5 viewer command block passed `bash -n`.
+  - The viewer probe failed in the current shell because `DISPLAY=` is empty and SAPIEN reports `Renderer does not support display`; L15.5 now documents that the viewer must be run from a graphical terminal or a correctly forwarded X11/Wayland session.
+  - The L15.4 six-task D435 planner command block in `COMMAND_LIBRARY.zh.md` passed `bash -n`.
+  - A single `place_bread_basket id0` D435 preview was generated successfully under `/tmp/d435_preview_place_id0_check/foundation_input_0`; its summary records left `[34, 64]` and right `[103, 119]`.
+
+## 2026-05-28 (D435 AnyGrasp Candidate and Planner Path Binding)
+
+- Documentation updates:
+  - Added J1.2 and L15.3 to `COMMAND_LIBRARY.zh.md`.
+  - Synchronized the D435 planner path requirements in `agent-read/COMMANDS/piper_anygrasp_keyframes.en.md`.
+- Purpose:
+  - Make the D435 AnyGrasp candidate-selection step and downstream planner use `foundation_replay_d435` together with `anygrasp_h2o_preview_d435`.
+  - Prevent downstream D435 replay runs from accidentally reusing the default wide-FOV `anygrasp_h2o_preview` `summary.json`.
+- Validation:
+  - The new command blocks passed `bash -n`.
+
+## 2026-05-28 (Piper AnyGrasp Final Viewer/No-Viewer Command Split)
+
+- Updated `COMMAND_LIBRARY.zh.md`:
+  - Reworded L15.1 to explain that `dual_stage_require_all_plans` and `require_keyframe1_reached_before_action` explicitly match the old V7 behavioral intent: no single-arm stage execution in dual mode, and only proceed to keyframe 2 after keyframe 1 reaches.
+  - Added L15.2 with separate no-viewer batch and viewer single-id debug commands.
+  - The viewer command does not set `CUDA_VISIBLE_DEVICES=2`; it runs `unset CUDA_VISIBLE_DEVICES` so SAPIEN viewer can see the display GPU.
+  - Added a minimal `probe_sapien_viewer.py` probe command to L15.2.
+- Validation:
+  - Extracted the L15.2 bash blocks and passed `bash -n /tmp/l15_2_blocks.sh`.
+
+## 2026-05-27 (LeRobot Robot/AnyGrasp 25-Episode Subset Commands)
+
+- Updated command documentation:
+  - Added L5.1 with six-task "original human head + pure replay action/wrist" processed HDF5 commands.
+  - Added L5.2 documenting the human-head + D435 action/wrist command for the new three tasks when only `h2_pure_d435` outputs exist.
+  - Added I1.1/I3.5/L8.1 documenting the new-three-task comparison path from Stage-1 background generation through D435 visible-reinit robot repaint to processed HDF5.
+  - Added L0 as an overview of the human / robot replay / AnyGrasp replay data pipelines and their run order.
+  - Added L10.5 to convert L5.2 `human_head_pure_d435_action` outputs to LeRobot.
+  - Added L11.1 to `COMMAND_LIBRARY.zh.md` without changing the existing L11 commands.
+  - L11.1 covers six robot datasets: three default-wide `pure_repaint` datasets and three `anygrasp_repaint` datasets.
+  - Added explicit zip/rclone dry-run commands for `robot_replay_3task_25ep.zip` and `robot_anygrasp_3task_25ep.zip`.
+  - Added L11.2 covering the six H2O tasks used by the FoundationPose sections: `pick_diverse_bottles`, `place_bread_basket`, `stack_cups`, `handover_bottle`, `pnp_bread`, and `pnp_tray`.
+  - Added L11.3 explaining that the current LeRobot conversion reads prompts from processed episode `instructions.json` files, not from `convert_aloha_data_to_lerobot_R1.py --task`.
+  - Added L6.1/L9.1/L10.4 to make the six-task pipeline explicit: create processed HDF5 first, convert to LeRobot cache second, then use L11/L11.2 to create `_25ep` subsets.
+  - Extended L10.4 with six-task human_head_pure_action LeRobot conversion and aligned all six-task prompts to the user-provided descriptions.
+- Synchronized:
+  - `agent-read/COMMANDS/pi0_h2o_training_data.zh.md`
+  - `agent-read/COMMANDS/pi0_h2o_training_data.en.md`
+- Validation:
+  - Extracted the new L11.1 bash blocks and verified them with `bash -n /tmp/l11_1_blocks.sh`.
+  - Extracted the new L11.2/L11.3 bash blocks and verified them with `bash -n /tmp/l11_2_l11_3_blocks.sh`.
+  - Extracted the new L6.1/L9.1/L10.4 bash blocks and verified them with `bash -n /tmp/l6_1_l9_1_l10_4_blocks.sh`.
+  - Extracted the updated L5.1/L10.4 bash blocks and verified them with `bash -n /tmp/l5_1_l10_4_blocks.sh`.
+  - Extracted the new L5.2 bash blocks and verified them with `bash -n /tmp/l5_2_blocks.sh`.
+  - Extracted the new I1.1/I3.5/L8.1 bash blocks and verified them with `bash -n /tmp/i1_1_i3_5_l8_1_blocks.sh`.
+  - Extracted the new L10.5 bash blocks and verified them with `bash -n /tmp/l10_5_blocks.sh`.
+
+## 2026-05-27 (Piper AnyGrasp Requires Keyframe 1 Before Action)
+
+- Inspected the current `tmux anygrasp` output:
+  - Several ids still have `reached=0` in pregrasp/grasp and then proceed to action, which appears as "starting keyframe 2 before keyframe 1 is reached."
+  - The new `dual_stage_require_all_plans=1` behavior is active: dual-arm stages print `[dual-plan] skip stage execution...` when either arm fails to plan.
+- Updated code:
+  - Added `--require_keyframe1_reached_before_action` to `plan_anygrasp_keyframes_r1.py`.
+  - When this flag is 1 and first-keyframe grasp is not reached, the second-keyframe action is recorded as `Skipped` and its action trajectory is not executed.
+  - `plan_summary.json` now records `require_keyframe1_reached_before_action`, `execute_interp_steps`, `settle_steps`, `reach_pos_tol_m`, `reach_rot_tol_deg`, and key collision/table parameters for easier comparison against V7 runs.
+- Updated command documentation:
+  - Added L15.1 viewer command to `COMMAND_LIBRARY.zh.md`, matching the old V7 execution cadence: `execute_interp_steps=24`, `joint_command_scene_steps=10`, `settle_steps=30`, `joint_target_wait_steps=25`.
+  - L15.1 enables `--require_keyframe1_reached_before_action 1` by default.
+- Validation:
+  - `python3 -m py_compile code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_anygrasp_keyframes_piper.py`
+  - `conda run -n RoboTwin_bw python code_painting/plan_anygrasp_keyframes_piper.py --help | rg "require_keyframe1_reached_before_action|dual_stage_require_all_plans"`
+
+## 2026-05-27 (Piper AnyGrasp Batch Command Uses Annotated Keyframes and Dual-Stage Plan Gating)
+
+- Fixed the Piper AnyGrasp dual-sync execution behavior:
+  - `plan_anygrasp_keyframes_r1.py` now has `--dual_stage_require_all_plans`, defaulting to `1`.
+  - In a dual-arm stage, if either left or right arm fails to plan, neither arm executes the stage, preventing one arm from moving alone.
+  - `plan_summary.json` records `dual_stage_require_all_plans`.
+- Updated command documentation:
+  - Marked the old L13 command in `COMMAND_LIBRARY.zh.md` as historical and noted that `--keyframes 38 78` is not suitable for batch use.
+  - Added L15: the id0-id10 batch command no longer passes `--keyframes`; `--reuse_preview_frame_mode annotated_json_keyframes` reads each id's manually annotated keyframes.
+  - Documented that `settle_steps/joint_target_wait_steps` only wait for existing joint targets to settle and cannot fix IK failure or unreachable target poses.
+- Validation:
+  - `python3 -m py_compile code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_anygrasp_keyframes_piper.py`
+  - `conda run -n RoboTwin_bw python code_painting/plan_anygrasp_keyframes_piper.py --help | rg "dual_stage_require_all_plans|reuse_preview_frame_mode"`
+
+## 2026-05-27 (FoundationPose Replay D435 Intrinsics Commands)
+
+- Updated `COMMAND_LIBRARY.zh.md`:
+  - Added C1.2 after C1 for six H2O tasks: `pick_diverse_bottles`, `place_bread_basket`, `stack_cups`, `handover_bottle`, `pnp_bread`, and `pnp_tray`.
+  - C1.2 reuses the 0515 Piper head D435 extrinsics and `legacy_r1`, but explicitly adds `--image_width 640 --image_height 480 --fovy_deg 42.499880046655484` to match the D435 RGB intrinsics used by the E2.4 robot pure replay commands.
+  - Outputs are written to `foundation_replay_d435` to avoid overwriting the default C1 replay outputs.
+- Added command documentation: `agent-read/COMMANDS/piper_foundation_replay.{zh,en}.md`.
+- Validation: confirmed that `run_multi_object_pose_r1_npz_batch.sh` forwards `--image_width`, `--image_height`, and `--fovy_deg` through `render_multi_object_pose_r1_npz_batch.py`.
+
+## 2026-05-26 (Piper AnyGrasp IK Thresholds and VS Code Video Compatibility)
+
+- Updated the Piper AnyGrasp planning path:
+  - `urdfik.py` now accepts caller-provided IK initial thresholds, maximum relaxed thresholds, and seed count.
+  - `render_hand_retarget_piper_dual_npz_urdfik.py` forwards those threshold settings to both Piper URDFIK solvers.
+  - `plan_anygrasp_keyframes_r1.py` adds `--urdfik_max_position_threshold_m`, `--urdfik_max_rotation_threshold_rad`, `--urdfik_num_seeds`, and related summary fields in `plan_summary.json`.
+  - `plan_anygrasp_keyframes_r1.py` adds `--vscode_compatible_video 1`, which transcodes head/third outputs to H.264 yuv420p faststart when `ffmpeg` is available so VS Code can preview them directly.
+  - Fixed `plan-solution` diagnostics under the Piper dual renderer so planned-pose evaluation respects per-arm bases instead of the old R1 single-base FK path.
+- Updated command documentation:
+  - Added an id0-id10 AnyGrasp batch command to `COMMAND_LIBRARY.zh.md` L14.
+  - Updated `agent-read/COMMANDS/piper_anygrasp_keyframes.{zh,en}.md` with the current Piper AnyGrasp logic, recommended parameters, and the frame 38/78 failure interpretation.
+- Validation:
+  - `python3 -m py_compile code_painting/urdfik.py code_painting/render_hand_retarget_piper_dual_npz_urdfik.py code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_anygrasp_keyframes_piper.py`
+  - `conda run -n RoboTwin_bw python code_painting/plan_anygrasp_keyframes_piper.py --help | rg "urdfik_max_position|urdfik_max_rotation|urdfik_num_seeds|vscode_compatible|urdfik_cartesian_interp_auto_step"`
+
+## 2026-05-25 (H2O pi0 Training Data Conversion Commands)
+
+- Follow-up fix:
+  - `process_repainted_headcam_with_wrist.py` now converts quaternions to Euler angles only for `Success` frames with nonzero quaternions, avoiding `ValueError: Found zero norm quaternions in quat` from failed frames.
+  - `process_repainted_headcam_with_wrist.py` and `process_repainted_planner_outputs.py` now accept `hand_keyframes_all.json` through `--review-json` and skip episodes with `status=reject/discard/bad`.
+  - `--head-video-name` supports `{id}`, so `--head-dir-template '.' --head-video-name 'rgb_{id}.mp4'` can represent "original human head + pure replay action/wrist".
+  - Updated `COMMAND_LIBRARY.zh.md` L1/L2/L3 so all three conversions use the manual-review filter.
+  - Validation: both conversion scripts pass `py_compile`; `hand_keyframes_all.json` correctly resolves 102 ids for `pick_diverse_bottles`; pure repaint id0 and original-human-head id0 both converted successfully to temporary HDF5 outputs under `/tmp`.
+- Follow-up addition:
+  - Added `policy/pi0/scripts/visualize_processed_hdf5_episode.py`, which combines `cam_high`, `cam_left_wrist`, and `cam_right_wrist` from one pi0 `processed_data` episode into a review mp4.
+  - Added `COMMAND_LIBRARY.zh.md` L5/L6/L7 for three-task conversion commands, episode-count checks, HDF5 structure checks, and review mp4 visualization.
+  - Validation: the new visualization script passes `py_compile`; `processed_data/d_pour_blue-48/episode_0` produced `/tmp/pi0_review_probe.mp4` successfully.
+- Continued addition:
+  - Added `COMMAND_LIBRARY.zh.md` L8/L9 for separate three-task conversion commands covering D435 visible-reinit mode and AnyGrasp planner mode.
+  - Validation: representative L8/L9 commands pass `bash -n`.
+- Continued addition:
+  - Aligned `convert_aloha_data_to_lerobot_R1.py` for H2O processed HDF5 conversion: compressed images are converted to RGB after decoding, episodes with missing cameras are skipped, HDF5 files are sorted, and empty raw directories raise an error.
+  - Added `COMMAND_LIBRARY.zh.md` L10 with LeRobot conversion commands for 3 usable modes x 3 tasks.
+  - Validation: `convert_aloha_data_to_lerobot_R1.py` passes `py_compile`; representative L10 commands pass `bash -n`.
+- Added section L to `COMMAND_LIBRARY.zh.md`, separating three input types:
+  - Original human data and existing `policy/pi0/processed_data`
+  - Non-AnyGrasp pure replay data
+  - AnyGrasp planner replay data
+- Documented that pure replay conversion depends on `world_targets_and_status.npz`, `left_wrist_replay.mp4`, and `right_wrist_replay.mp4`.
+- Documented that AnyGrasp planner conversion depends on `pose_debug.jsonl`, `left_wrist_cam_plan.mp4`, and `right_wrist_cam_plan.mp4`.
+- Recorded the current check result: planner wrist videos are not present under `anygrasp_h2o_plan`, so L3 training conversion needs those wrist inputs to be generated first.
+- Added paired command docs: `agent-read/COMMANDS/pi0_h2o_training_data.{zh,en}.md`.
+
 ## 2026-05-22 (Fix missing renderer args in K1 Piper AnyGrasp planner)
 
 - Fixed `plan_anygrasp_keyframes_r1.py` and the batch wrapper:
@@ -1688,6 +1927,16 @@
     - `bash -n` passed for all three id0-id10 loop commands
     - A pick_diverse_bottles id0 `--max_frames 2` smoke test passed and generated `/tmp/pick_diverse_bottles_axis_distance_id0_smoke.png` and `.csv`
 
+- 2026-05-26
+  - Added a LeRobot cache episode-subset script:
+    - Added `policy/pi0/scripts/subset_lerobot_episodes.py` to copy selected episodes from an existing `/home/zaijia001/.cache/huggingface/lerobot/local/<dataset>` cache.
+    - Supports `--episodes '0-24'` and `--episodes '0,1-5,7'`; the parsed ids are deduplicated and sorted by old episode id.
+    - Writes to a new `--output-repo-id` and rewrites `episode_index`, `frame_index`, global `index`, `meta/info.json`, `meta/episodes.jsonl`, and `meta/episodes_stats.jsonl` so the subset is numbered continuously as `0..N-1`.
+    - Updated `COMMAND_LIBRARY.zh.md` L11 and `agent-read/COMMANDS/pi0_h2o_training_data.*.md` with the 25-episode subset command and output checks.
+  - Validation:
+    - `uv run python -m py_compile scripts/subset_lerobot_episodes.py` passed.
+    - Tested a temporary subset from `local/h2o_pick_diverse_bottles_human_head_pure_action` using `0,1-2,7`; verified `total_episodes=4`, reindexed episodes `0..3`, and present parquet plus three-camera videos, then removed the temporary repo.
+
 - 2026-05-21
   - Updated `plot_piper_gripper_wrist_object_axis_distances.py`:
     - Added `--plot_clip_abs_m`, defaulting to `0.5`
@@ -1790,3 +2039,258 @@
     - K0.3 uses the batch wrapper to generate manual-keyframe preview summaries for whole tasks.
     - K1 now processes whole tasks instead of only `id0-id10`.
   - Validation: the wrapper and the K0.3/K1 documented command blocks passed `bash -n`.
+
+- 2026-05-22
+  - Added a normal D435 head-view record to `COMMAND_LIBRARY.zh.md`:
+    - Recorded the headD435 source, RGB/depth topics, `fx/fy/cx/cy`, and `640x480` resolution from `pick_diverse_bottles/origin/episode35/head_d435_rgbd_meta.json` and `harmer_input/params_35.json`.
+    - Recorded the real-intrinsics equivalent `fovy_deg=42.499880046655484` and noted that the default replay uses `640x360 + fovy_deg=90`, which makes the rendered view wider and the Piper projection smaller.
+    - Added E2.4 D435 pure Piper replay commands and I3 D435 inpainting/repainting commands, using `h2_pure_d435`, `results_repaint_piper_h2_d435`, and `d435` in output filenames.
+  - Validation: extracted the D435 replay/repaint documentation commands and checked them with `bash -n`.
+  - Further clarified the D435 FOV source:
+    - Stated that `42.499880046655484°` comes from the recorded RGB camera_info intrinsics `fy=617.160888671875, height=480`, not from image dimensions alone; `640x480` alone cannot determine FOV.
+    - Added the distinction between the official D435 depth FOV `85.2 x 58` and the nominal color camera FOV `H:69 / V:42 / D:77`; this replay aligns `/camera/color/image_raw`, so `fovy_deg=42.499880046655484` remains the command value.
+  - Added the I3 D435 repaint anomaly diagnosis:
+    - Confirmed that I3 `BG` still points to the I1 `removed_w_mask_rgb_<id>.mp4`; the background path itself was not the direct mistake.
+    - Documented the Stage-2 compositing semantics: source pixels are copied from `robot_video` to the target background only inside the robot mask.
+    - Compared old/D435 id0 `w_mask/w_box/final` outputs and confirmed that the D435 GroundingDINO/SAM2 mask covers large simulated-background regions, so the final output copies the robot replay background as well.
+    - Recorded that both the original human video and D435 replay are `640x480`; the old replay is `640x360`, but Stage-2 resizes it to the target background size.
+
+- 2026-05-23
+  - Further updated the I3 D435 repaint diagnosis in `COMMAND_LIBRARY.zh.md`:
+    - Added the user-confirmed root cause: with the narrower D435 FOV, some videos do not show the robot in frame 0 or the first few frames, so Stage-2 first-frame detection can select the white simulated background or table as the robot mask and propagate that wrong target.
+    - Documented mitigation guidance: make the Stage-2 initialization frame contain a clearly visible robot first; thresholds alone cannot fix a completely robot-free first frame.
+    - Recommended starting D435 tuning with more conservative `--robot_box_threshold 0.30~0.40`, `--robot_text_threshold 0.25~0.35`, `--robot_max_mask_area_ratio 0.20~0.35`, and a more explicit robot prompt.
+    - Added a SAM3 Stage-2 robot repaint command that directly reuses the I1 background, with a note that the current SAM3 script also initializes from frame 0.
+  - Validation:
+    - The new I3.2/I3.3 bash commands passed `bash -n`.
+
+## 2026-05-28 (Piper AnyGrasp Gripper Axis Fix And IK Position-First Diagnostic)
+
+- Findings:
+  - The D435 preview gripper wireframe uses the AnyGrasp visible gripper frame, with `local +X = rotation_matrix[:, 0]`.
+  - Piper reports the visible gripper pose as `R_report = R_link6 @ global_trans_matrix @ delta_matrix`.
+  - The current Piper config uses `global_trans_matrix=diag(1,-1,-1)` and `delta_matrix=I`.
+  - A hard-coded inverse `global_trans_matrix` was considered, but the correct direct Piper hand replay behavior shows that it must not be enabled by default.
+- Code updates:
+  - `render_hand_retarget_piper_dual_npz_urdfik.py` now defaults to the original direct Piper hand replay URDFIK convention and exposes `urdfik_apply_global_trans_to_ik` only as a diagnostic comparison switch.
+  - `plan_anygrasp_keyframes_r1.py` keeps Piper dual `reach_error_pose_source=ee` in the visible gripper-frame convention instead of converting the target into raw link6 space.
+  - `cartesian_interp_ik` partial mode now tries a shorter sub-waypoint between the current pose and the first failed waypoint when waypoint 1 fails.
+  - `run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh` now accepts `--ik_max_position_threshold_m` and `--ik_max_rotation_threshold_rad` for direct position-first diagnostics.
+  - `run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --viewer` now defaults to `--viewer_wait_at_end 0`, so batch viewer runs automatically proceed to the next id. Use `--viewer_wait_at_end 1` only when an end-of-id pause is desired.
+  - The wrapper now supports `--id_start`, `--id_end`, `--ids`, and `--piper_apply_global_trans_to_ik`.
+- Validation:
+  - `python3 -m py_compile code_painting/plan_anygrasp_keyframes_r1.py code_painting/render_hand_retarget_piper_dual_npz_urdfik.py code_painting/render_hand_retarget_r1_npz_urdfik.py`
+  - `bash -n code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh`
+  - `bash code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --dry_run --max_per_task 1 --tasks pick_diverse_bottles --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --visualize_targets --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --output_root /tmp/axis_fix_pos_first_dryrun`
+  - With the default `--ik_max_rotation_threshold_rad 0.12`, the smoke test still failed at Cartesian waypoint 1, showing that static behavior was not caused by step/settle settings.
+  - With `--ik_max_rotation_threshold_rad 3.14`, `pick_diverse_bottles id0` printed continuous `[exec-pose]` lines, confirming that waypoint execution works and the main blocker is the orientation constraint in complete-pose IK.
+  - `bash code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --dry_run --max_per_task 1 --tasks pick_diverse_bottles --viewer --viewer_wait_at_end 1 --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --visualize_targets --ik_max_rotation_threshold_rad 3.14 --output_root /tmp/viewer_wait_dryrun`
+  - `bash code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --dry_run --tasks pick_diverse_bottles --id_start 0 --id_end 10 --viewer --visualize_targets --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --piper_apply_global_trans_to_ik 0 --output_root /tmp/id_filter_dryrun`
+
+- 2026-05-25
+  - Further updated I3 in `COMMAND_LIBRARY.zh.md`:
+    - Added the I3.4 "visible-frame SAM reinitialization mode" design note; this is documentation only and does not modify the current code.
+    - Compared the current SAM2/SAM3 Stage-2 fixed frame-0 initialization against the proposed mode: the new mode would detect the robot frame by frame, initialize SAM only after a valid robot is found, emit empty masks while the robot is absent, and reinitialize when it reappears.
+    - Documented the suggested state machine, mask-validity checks, proposed future interface, and separate output root `results_repaint_piper_h2_d435_sam3_visible_reinit` for later A/B comparison against the current SAM outputs.
+  - Validation:
+    - The proposed I3.4 future command passed `bash -n`.
+
+- 2026-05-26
+  - Fixed the Piper AnyGrasp two-keyframe planning entrypoint:
+    - `code_painting/plan_anygrasp_keyframes_piper.py` no longer uses the old R1-style single-base Piper wrapper.
+    - The entrypoint now reuses `PiperDualReplayRenderer` and `HandRetargetPiperDualURDFIKRenderer`, matching the direct Piper hand-coordinate replay path.
+    - Left and right arms keep their independent base poses from `robot_config_PiperPika_agx_dual_table_0515.json`, and IK converts world targets to base coordinates per arm.
+  - Updated documentation:
+    - Added `COMMAND_LIBRARY.zh.md` section L14 with a Piper AnyGrasp dual-base Cartesian-waypoint debug command.
+    - Added `agent-read/COMMANDS/piper_anygrasp_keyframes.zh.md` / `.en.md`.
+  - Validation:
+    - `python3 -m py_compile code_painting/plan_anygrasp_keyframes_piper.py` passed.
+
+- 2026-05-28
+  - Added D435 AnyGrasp candidate-selection commands:
+    - Added `COMMAND_LIBRARY.zh.md` section J0.1 to check six-task AnyGrasp, `foundation_replay_d435`, and HaMeR NPZ availability.
+    - Added J1.1 to generate six-task D435 candidate preview/summary outputs from manual keyframes in `hand_keyframes_all.json`.
+    - D435 summaries are written to `code_painting/anygrasp_h2o_preview_d435/<TASK>/foundation_input_<ID>/summary.json`, keeping them separate from the default-wide `anygrasp_h2o_preview`.
+    - The command supports a `place_bread_basket` fallback to `place_bread_basket_output_old_cam`.
+    - Updated `agent-read/COMMANDS/pi0_h2o_training_data.zh.md` / `.en.md` accordingly.
+  - Validation:
+    - Checked six-task `foundation_replay_d435` inputs and several AnyGrasp roots.
+    - The new J0.1/J1.1 command blocks passed `bash -n`.
+
+- 2026-05-28
+  - Updated the L11.2.4 D435 robot replay `_25ep` subset logic:
+    - It no longer blindly selects LeRobot episodes `0-24`.
+    - It now reads `processed_data/h2o_<TASK>_pure_d435_visible_reinit-120/episode_*/instructions.json/source_episode_id` and aligns filtering by original id.
+    - It excludes original bad ids `0,7,12,29` for `handover_bottle` and `0,1,2,3,4,5,6,22,70` for `pnp_bread`, then fills 25 episodes.
+    - Updated `agent-read/COMMANDS/pi0_h2o_training_data.zh.md` / `.en.md` accordingly.
+  - Validation:
+    - Checked the `source_episode_id` field in the D435 processed data.
+    - The updated L11.2.4 command block passed `bash -n`.
+
+- 2026-05-28
+  - Added an explanation of where D435 finals come from and which SAM2 fallback batch entrypoint to use:
+    - `d435_final` is `results_repaint_piper_h2_d435_sam3_visible_reinit/e0_robot/<TASK>/id_<ID>_d435/final_repainted.mp4`.
+    - It is generated by I3.5 through `batch_visible_reinit_d435_repaint.py`, not by L8.2.
+    - This machine does not have `Grounded_SAM_3`, so the I3.5 batch path currently logs `[backend] SAM=sam2, DINO=dino2`.
+    - The batch path prints `loading DINO once` and `loading SAM image predictor once`, so it loads checkpoints once and then loops over task/id jobs.
+    - Added a SAM2/DINO2 fallback batch command in `COMMAND_LIBRARY.zh.md` I3.5 for first filling each new task to at least 25 final videos.
+  - Validation:
+    - Checked the checkpoint-loading and `final_repainted.mp4` copy logic in `batch_visible_reinit_d435_repaint.py` and `remove_anything_video_sam3_robot_visible_reinit.py`.
+    - The new command block passed `bash -n`.
+
+- 2026-05-28
+  - Investigated why the new-three-task D435 robot replay processed-HDF5 counts in `pro5-17` are low:
+    - `pro5-17` is/was running the L8.2 conversion stage; it only reads existing `final_repainted.mp4` files and does not create missing D435 repaint outputs.
+    - The new three tasks have enough `h2_pure_d435` retarget outputs: `handover_bottle=51`, `pnp_bread=81`, `pnp_tray=51`.
+    - The missing parts are Stage-1 BGs and I3.5 D435 repaint finals; current final counts are approximately `handover_bottle=12`, `pnp_bread=2`, `pnp_tray=14`.
+    - Added `COMMAND_LIBRARY.zh.md` section I1.1.1 with a command that only fills missing Stage-1 BGs.
+    - Added an I3.5 0..80 resume command using `--overwrite 0` to fill missing D435 repaint finals before rerunning L8.2.
+    - Updated `agent-read/COMMANDS/pi0_h2o_training_data.zh.md` / `.en.md` accordingly.
+  - Validation:
+    - Checked `tmux capture-pane -pt pro5-17` and confirmed the skip log is from L8.2 missing `final_repainted.mp4`.
+    - The new command blocks were checked with `bash -n`.
+
+- 2026-05-28
+  - Fixed and rechecked the Piper D435 AnyGrasp keyframe execution reach issue:
+    - `target_pose_for_error(..., ee)` in `plan_anygrasp_keyframes_r1.py` now uses `world_pose_to_base_pose_for_arm/base_pose_to_world_pose_for_arm` for Piper dual arms, avoiding conversion of right-arm targets through the left-arm base.
+    - `planned_eval_pose_from_plan()` no longer treats `target_pose_world` as the planned pose; it evaluates target joints through FK and the robot gripper/endlink static transform.
+    - In partial diagnostic execution, an arm whose plan failed is held at its current joints while the other arm executes, preventing physics drift.
+    - `run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh` now accepts `--reach_error_pose_source` and defaults it to `ee`. The old `tcp` check leaves a fixed approximately 12 cm TCP/EE offset.
+  - `pick_diverse_bottles id0` recheck:
+    - Under the old `tcp` check, the right-arm grasp showed about `0.125m` error; with `ee` plus the per-arm base fix, the right-arm grasp position error is about `0.0057m`.
+    - The episode still fails overall because the left-arm first-keyframe IK/target fails; strict dual synchronization blocks the stage.
+  - Documentation:
+    - Added L15.7 to `COMMAND_LIBRARY.zh.md` for the current keyframe execution logic, EE reached-check rationale, and separate six-task commands.
+    - Updated `agent-read/COMMANDS/piper_anygrasp_keyframes.zh.md` / `.en.md`.
+  - Validation:
+    - `python3 -m py_compile code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_anygrasp_keyframes_piper.py` passed.
+    - `bash -n code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh` passed.
+    - The six-task wrapper dry-run covered one summary for each task.
+    - Reran `pick_diverse_bottles id0` with partial/joint_interp/pose printing and confirmed right-arm EE reach while the failed left arm is held.
+
+- 2026-05-28
+  - Added Piper D435 AnyGrasp preview comparison export and viewer target visualization:
+    - The planner now copies the reused summary's original D435 preview images and same-path legacy preview images into `<OUT>/source_preview_compare/`.
+    - Added `selected_candidate_mapping.json`, recording each frame/arm selected `candidate_idx`, rank, source translation, planner raw pose, planner target pose, and `candidate_target_local_x_offset_m`.
+    - The six-task wrapper now supports `--visualize_targets`; viewer debugging disables `pure_scene_output` and shows target axes / active candidate grippers.
+  - Validation:
+    - `pick_diverse_bottles id0` produced `/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v2/2-pdb/pick_diverse_bottles/foundation_input_0/source_preview_compare/` with frame 38/78 D435 and legacy `orientation/fused` images plus the mapping JSON.
+    - `plan_summary.json` records 13 `source_preview_compare` entries.
+    - `py_compile` and wrapper `bash -n` passed.
+
+- 2026-05-28
+  - Clarified and completed the six-task D435 robot replay data-processing chain:
+    - `COMMAND_LIBRARY.zh.md` now states in L6.1 that the command only applies to the default-wide `h2_pure` path; the new three tasks lack both `h2_pure` and default-wide repaint heads, so L6.1 skips all of them.
+    - Added L8.2: six-task D435 visible-reinit robot repaint head + `h2_pure_d435` action/wrist to processed HDF5.
+    - Added L10.6: six-task `h2o_<TASK>_pure_d435_visible_reinit-120` to LeRobot cache.
+    - Added L11.2.4: six-task D435 robot replay `_25ep` subset, packaging, and upload-check commands.
+    - Updated `agent-read/COMMANDS/pi0_h2o_training_data.zh.md` / `.en.md` with the D435 workflow.
+  - Current path check:
+    - The old three tasks have both default-wide `h2_pure` and D435 `h2_pure_d435`.
+    - The new three tasks only have D435 `h2_pure_d435`; they do not have default-wide `h2_pure`.
+    - The new three tasks currently only have partial D435 visible-reinit repaint outputs, so I1.1/I3.5 must be completed before L8.2/L10.6/L11.2.4.
+  - Validation:
+    - The new L8.2/L10.6/L11.2.4 command blocks were checked with `bash -n`.
+
+- 2026-05-28
+  - Updated the H2O pi0 data-processing command docs:
+    - Added `COMMAND_LIBRARY.zh.md` section L11.1.3 for the post-L5.2 -> L10.5 new-three-task human head + D435 action/wrist `_25ep` subset step.
+    - Clarified that post-L10.5 subsetting must not use `local/h2o_<TASK>_pure_repaint`; that repo belongs to L6/L6.1 robot replay data.
+    - L11.1.3 reads `instructions.json/source_episode_id` from the processed data, excludes original bad ids `0,7,12,29` for `handover_bottle` and `0,1,2,3,4,5,6,22,70` for `pnp_bread`, then fills the first 25 usable episodes.
+    - Updated `agent-read/COMMANDS/pi0_h2o_training_data.zh.md` / `.en.md` accordingly.
+  - Validation:
+    - The check in this round confirmed that naive `0-24` includes original ids `7,12` for `handover_bottle` and original id `22` for `pnp_bread`.
+    - The documented command blocks passed `bash -n` syntax checks.
+
+- 2026-05-26
+  - Added a Piper hand raw `origin/` review script:
+    - `code_painting/review_piper_hand_origin.py`
+    - It reads `/home/zaijia001/ssd/data/piper/hand/<TASK>/origin/episode*/camera/color/headD435/*.png` directly, so bad data can be filtered before AnyGrasp / foundation preprocessing.
+    - Pressing `b` / `d` moves the current episode directory to the sibling `bad/` directory and records the decision in `<TASK>/origin_bad_review.json`.
+  - Moved all `/home/zaijia001/ssd/data/piper/hand/handover_bottle/origin/episode*` directories to `/home/zaijia001/ssd/data/piper/hand/handover_bottle/bad/` as requested. After the move, `origin/` has 0 episode directories and `bad/` has 51.
+  - Updated docs:
+    - Added `COMMAND_LIBRARY.zh.md` section L13.
+    - Added `agent-read/COMMANDS/piper_hand_origin_review.zh.md` / `.en.md`.
+  - Validation:
+    - `python code_painting/review_piper_hand_origin.py --help` passed in the `RoboTwin_openvla` environment.
+    - The default system `python3` lacks `cv2`, so the documented commands explicitly activate `RoboTwin_openvla`.
+
+- 2026-05-25
+  - Implemented the I3.4 visible-frame SAM reinitialization mode:
+    - Added `/home/zaijia001/ssd/inpainting_sam3_robot/remove_anything_video_sam3_robot_visible_reinit.py` without changing the existing SAM2/SAM3 script interfaces.
+    - Added `/home/zaijia001/ssd/inpainting_sam3_robot/batch_visible_reinit_d435_repaint.py`; the batch path loads DINO/SAM checkpoints once and then processes task/id jobs in a loop.
+    - Single-video logic: inactive state detects robot frame by frame; a valid candidate initializes SAM; tracking state prompts SAM on the current frame with an expanded bbox from the previous valid frame; invalid/lost masks become empty masks and the script waits for a later valid robot detection to reinitialize.
+    - Updated `COMMAND_LIBRARY.zh.md` I3.4 from a design note to implemented-mode documentation, including single-video, batch, and dry-run commands.
+  - Validation:
+    - `python3 -m py_compile` passed for both new scripts.
+    - Both new scripts run `--help` in the `inpainting-sam3-dino3` environment.
+    - A batch dry-run for `pick_diverse_bottles id0` resolved the I1 background and D435 robot replay inputs correctly.
+    - The I3.4 single-video, batch, and dry-run documentation commands passed `bash -n`.
+
+- 2026-05-25
+  - Fixed a GroundingDINO loading compatibility issue in the I3.4 new script under the `inpainting-sam3-dino3` environment:
+    - The user hit `AttributeError: 'BertModel' object has no attribute 'get_head_mask'`.
+    - Cause: the old GroundingDINO `BertModelWarper` under `Grounded_SAM_2` expects the older transformers `BertModel.get_head_mask` helper, but the current environment's transformers version no longer exposes it.
+    - Added a local compatibility patch in `remove_anything_video_sam3_robot_visible_reinit.py`: the new script dynamically adds `get_head_mask` to `transformers.BertModel` at runtime, without editing third-party sources or changing the original SAM2/SAM3 script interfaces.
+  - Updated `COMMAND_LIBRARY.zh.md`:
+    - Renamed I3.3 to clearly indicate it is the current SAM3-project first-frame initialization path, and noted that the real backend is determined by the `[backend] SAM=...` startup log.
+    - Renamed I3.4 to "new logic: visible-frame reinitialization SAM2/SAM3 mode".
+    - Explicitly documented the difference among the original SAM2 command, the current SAM3-project command, and the new visible-reinit command.
+  - Validation:
+    - In the current environment, `BertModel.get_head_mask` is `False` before the patch and `True` after the patch.
+    - `VisibleReinitRobotSegmenter` completes DINO/SAM model loading in the `inpainting-sam3-dino3` environment and prints `[ok] model loaded`.
+    - Both new scripts pass `py_compile`.
+
+- 2026-05-25
+  - Further fixed the old GroundingDINO / new transformers compatibility issue in the `inpainting-sam3-dino3` environment:
+    - The user then hit `TypeError: to() received an invalid combination of arguments - got (dtype=torch.device, )`.
+    - Cause: the old `BertModelWarper` calls `get_extended_attention_mask(attention_mask, input_shape, device)` using the old transformers API, while the current transformers 5.3.0 expects `dtype` as the third argument.
+    - Added a unified `patch_transformers_bert_for_groundingdino()` helper in `/home/zaijia001/ssd/inpainting_sam3_robot/remove_anything_video_sam3_robot.py`, patching both `get_head_mask` and `get_extended_attention_mask`.
+    - Updated `/home/zaijia001/ssd/inpainting_sam3_robot/remove_anything_video_sam3_robot_visible_reinit.py` to reuse that unified compatibility helper.
+  - Updated `COMMAND_LIBRARY.zh.md`:
+    - Added I3.0 as a comparison section listing the original fixed-first-frame SAM2 command, the SAM3-project fixed-first-frame command, and the new visible-frame reinitialization command with their entrypoints, backend behavior, initialization logic, and output roots.
+    - Added I3.0.1 original SAM2 single-id command, I3.0.2 SAM3-project single-id command, a true-SAM3 backend template, I3.0.3 new visible-reinit single-id command, and I3.0.4 new visible-reinit batch command.
+    - Documented that this machine currently only has `Grounded_SAM_2`, not `Grounded_SAM_3`, so the SAM3-project commands currently fall back to SAM2/DINO2.
+  - Validation:
+    - The three related scripts passed `py_compile`.
+    - A DINO forward smoke test in the `inpainting-sam3-dino3` environment printed `[ok] detect call completed 0`, confirming both compatibility failures are bypassed.
+    - The new I3.0 command blocks passed `bash -n`.
+## 2026-05-29 (Fix D435 AnyGrasp Viewer First-Keyframe Target Display)
+
+- Fixed execution-preview frame selection in `plan_anygrasp_keyframes_r1.py`:
+  - Added `active_frame_by_arm` to `DebugExecutionState`.
+  - Dual-arm `pregrasp/grasp` now display each arm's first keyframe target/candidate gripper; `action` switches to each arm's second keyframe.
+  - `record_frame()`, `update_candidate_debug_visuals()`, and the debug execution preview now use the per-arm active frame, avoiding the previous left-arm-only `active_frame` behavior that could show the later or wrong frame in the viewer.
+  - `pose_debug.jsonl` and `execution_metrics.jsonl` now record `active_frame_by_arm` for viewer-frame auditing.
+- Documentation synced:
+  - Added L15.14 to `COMMAND_LIBRARY.zh.md` with the cause, fix, and `jq` inspection command.
+  - Updated `agent-read/COMMANDS/piper_anygrasp_keyframes.zh.md` / `.en.md` with L15.14.
+- Validation:
+  - `python3 -m py_compile code_painting/plan_anygrasp_keyframes_r1.py` passed.
+  - `bash -n code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh` passed.
+  - `run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --dry_run --tasks pick_diverse_bottles --id_start 0 --id_end 10 ...` resolved 11 D435 summaries for ids 0-10.
+  - A non-viewer `pick_diverse_bottles id0 --debug_stop_after_keyframe1` smoke run wrote to `/tmp/anygrasp_active_frame_by_arm_check`; `pose_debug.jsonl` showed `stage=pregrasp active_frame_by_arm={"left": 38, "right": 38}`, confirming that keyframe-1 display state is correct.
+## 2026-05-29 (Stack Cups id0 No-Collision Target-Only Debug)
+
+- Added D435/Piper six-task wrapper debug switches:
+  - `--disable_execution_collisions`: passes `--enable_grasp_action_object_collision 0` to the planner to rule out grasp/action object collision and contact-stop close logic.
+  - `--target_axes_only`: keeps only the active execution target axes and hides candidate gripper axes, selected-keyframe axes, and IK waypoint markers, reducing viewer coordinate-frame clutter.
+  - Added passthrough controls for `--debug_candidate_top_k`, `--debug_common_candidate_top_k`, `--debug_visualize_selected_keyframe_axes`, and `--debug_visualize_ik_waypoints`.
+- Added `--debug_visualize_selected_keyframe_axes` to `plan_anygrasp_keyframes_r1.py` so execution previews can hide selected-keyframe axis actors.
+- Rechecked `stack_cups/foundation_input_0`:
+  - The D435 summary uses per-arm keyframes: left `[139, 195]`, right `[51, 106]`.
+  - Therefore `active_frame_by_arm={"left": 139, "right": 51}` during pregrasp is expected.
+  - The earlier viewer "four coordinate systems" came from simultaneously showing active target axes, selected-keyframe axes, candidate gripper axes, and IK waypoint markers.
+- Validation:
+  - `python3 -m py_compile code_painting/plan_anygrasp_keyframes_r1.py` passed.
+  - `bash -n code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh` passed.
+  - The `--dry_run --tasks stack_cups --ids 0 --target_axes_only --disable_execution_collisions ...` command resolved correctly.
+  - A no-viewer smoke run under `/tmp/stack_cups_id0_no_collision_target_axes_only` confirmed `enable_grasp_action_object_collision=0`, but stack_cups id0 still failed to reach; the current primary issue is not object collision but IK/trajectory execution tracking error and candidate-pose reachability.
+## 2026-05-29 (Added Direct Piper Hand Replay Viewer Comparison Command)
+
+- Added L15.16 to `COMMAND_LIBRARY.zh.md`:
+  - Provides a `stack_cups id0` viewer command for directly replaying the stored HaMeR NPZ gripper poses.
+  - Shows both the target gripper axes and the robot execution.
+  - Enables `--debug_mode 1 --debug_post_execute 1` to inspect target EE/TCP pose versus actual execution error.
+  - Saves `world_targets_and_status.npz` for later target pose/status inspection.
+- Updated `agent-read/COMMANDS/piper_anygrasp_keyframes.zh.md` / `.en.md` and the command changelog.

@@ -1,3 +1,146 @@
+## 2026-05-28 19:20:00 +08
+
+- 新增 `COMMAND_LIBRARY.zh.md` L15.6：
+  - 六任务各前 5 个 D435 summary 的 no-viewer 指令。
+  - 六任务各前 5 个 D435 summary 的 viewer 指令，使用脚本 `--viewer` 和独立输出根目录。
+  - 第一关键帧 debug 指令：`--debug_stop_after_keyframe1` 只执行 init -> pregrasp -> grasp，不关爪、不进入第二关键帧。
+- 更新 `run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh`：
+  - 新增 `--viewer`、`--output_root`、`--debug_stop_after_keyframe1`、`--trajectory_mode`、`--cartesian_auto_step_m`、`--joint_interp_waypoints`、`--replan_attempts`、`--allow_partial_dual_stage`、`--print_pose_every`。
+  - 默认传 `--require_keyframe1_reached_before_close 1`，第一关键帧未 reached 时不关夹爪。
+  - 恢复默认执行节奏为 `execute_interp_steps=24`、`joint_command_scene_steps=10`、`settle_steps=30`、`joint_target_wait_steps=25`。
+- 新增 planner 参数：
+  - `--debug_stop_after_keyframe1`
+  - 用途：隔离第一关键帧可达性，判断失败是否发生在 keyframe-1 的 cartesian waypoint IK 阶段。
+  - `--require_keyframe1_reached_before_close`
+  - 用途：对齐旧 R1/V7 的行为意图，第一关键帧未到位时不进入抓取闭合。
+  - `--print_execution_pose_every`
+  - 用途：执行期间按步输出 TCP/EE world position，用于确认 waypoint 执行是否真的改变 pose。
+
+## 2026-05-28 18:30:00 +08
+
+- 新增 `COMMAND_LIBRARY.zh.md` L15.5：
+  - `stack_cups id0` 的 D435 viewer 单条调试命令。
+  - 先运行 `probe_sapien_viewer.py`，再用 `unset CUDA_VISIBLE_DEVICES` + `--enable_viewer 1` 打开 SAPIEN viewer。
+  - 记录该 id 的 per-arm 关键帧：right 51/106，left 139/195。
+  - 记录 planner `rank_previews` 与 J1.1 D435 preview 的区别：前者是 SAPIEN 3D 渲染并包含 `candidate_target_local_x_offset_m=-0.05` 的 5 cm TCP 补偿；`approach_offset_m=0.12` 只影响 pregrasp。
+  - J1.1 源 preview 已复制到 `anygrasp_plan_keyframes_piper_d435_v1/stack_cups/foundation_input_0/preview_compare_d435/`。
+  - 补充 viewer 探针失败条件：如果 `DISPLAY=` 为空并报 `Renderer does not support display`，需要从图形终端或正确 X11/Wayland forwarding 环境运行。
+- 更新 `agent-read/COMMANDS/piper_anygrasp_keyframes.zh.md`：
+  - 增加 L15.5 viewer 入口说明。
+
+## 2026-05-28 09:30:00 +08
+
+- 更新 `COMMAND_LIBRARY.zh.md` L15.1 说明：
+  - 将 `dual_stage_require_all_plans` 与 `require_keyframe1_reached_before_action` 表述为对齐旧 V7 行为意图的显式约束，而不是旧 V7 原有参数。
+- 新增 `COMMAND_LIBRARY.zh.md` L15.2：
+  - 无 viewer 批跑版：保留 `CUDA_VISIBLE_DEVICES=${GPU}`，用于 id0-id10 稳定批处理。
+  - viewer 单条调试版：先 `unset CUDA_VISIBLE_DEVICES`，避免 SAPIEN viewer 因 display GPU 被 mask 而无法弹窗。
+  - 增加 `probe_sapien_viewer.py` 最小 viewer 探针命令。
+
+## 2026-05-27 22:10:00 +08
+
+- 新增 `COMMAND_LIBRARY.zh.md` L5.1：
+  - 6 task 原始人手 head + pure replay action/wrist 的 processed HDF5 命令。
+  - prompt 使用用户给定的 6 task 完整英文描述。
+- 新增 `COMMAND_LIBRARY.zh.md` L5.2：
+  - 新三任务当前可用的原始人手 head + D435 pure replay action/wrist 命令。
+  - 记录 L5.1 skip 的原因：新三任务缺少 `h2_pure/<TASK>/id<ID>_z005`，但已有 `h2_pure_d435/<TASK>/id<ID>_d435_z005`。
+- 新增 `COMMAND_LIBRARY.zh.md` I1.1/I3.5/L8.1：
+  - I1.1：新三任务 Stage-1 人手抠除背景。
+  - I3.5：新三任务 D435 visible-reinit robot repaint。
+  - L8.1：把 I3.5 输出转成 processed HDF5。
+- 新增 `COMMAND_LIBRARY.zh.md` L0/L10.5：
+  - L0：按 human、robot replay、AnyGrasp replay 三条数据线说明执行顺序。
+  - L10.5：把 L5.2 的新三任务 `human_head_pure_d435_action` 转成 LeRobot cache。
+- 新增 `COMMAND_LIBRARY.zh.md` L11.1：
+  - 为 3 个默认广角 robot replay 数据集和 3 个 AnyGrasp robot 数据集增加 25 episode 子集抽取命令。
+  - 新增显式 zip 命令：`robot_replay_3task_25ep.zip` 和 `robot_anygrasp_3task_25ep.zip`，避免 `*_25ep` 把无关历史子集一起打包。
+  - 新增 6 个 `_25ep` 输出的 `meta/info.json` 检查命令。
+- 新增 `COMMAND_LIBRARY.zh.md` L11.2：
+  - 把 25 episode 抽取扩展到 6 个 task：`pick_diverse_bottles`、`place_bread_basket`、`stack_cups`、`handover_bottle`、`pnp_bread`、`pnp_tray`。
+  - 分别生成 `robot_replay_6task_25ep.zip` 和 `robot_anygrasp_6task_25ep.zip`。
+- 新增 `COMMAND_LIBRARY.zh.md` L11.3：
+  - 记录 task prompt 应在 processed data 的 `episode_*/instructions.json` 设置；当前 `convert_aloha_data_to_lerobot_R1.py --task` 不覆盖该文本。
+- 补齐 `COMMAND_LIBRARY.zh.md` L6.1/L9.1/L10.4：
+  - L6.1：6 task `pure_repaint` processed HDF5。
+  - L9.1：6 task `anygrasp_repaint` processed HDF5。
+  - L10.4：把 human_head_pure_action、pure_repaint、anygrasp_repaint 三类 processed HDF5 转成 LeRobot cache，作为 L11/L11.2 的源数据。
+- 验证：
+  - L5.1/L5.2/L6.1/L9.1/L10.4/L10.5/L11.1/L11.2/L11.3/I1.1/I3.5/L8.1 新增 bash 代码块抽取后通过 `bash -n`。
+
+## 2026-05-27 21:45:00 +08
+
+- 新增 `COMMAND_LIBRARY.zh.md` L15.1：
+  - Piper AnyGrasp id0-id10 viewer 可视化版。
+  - 执行节奏对齐旧 V7：`--execute_interp_steps 24`、`--joint_command_scene_steps 10`、`--settle_steps 30`、`--joint_target_wait_steps 25`。
+  - 新增 `--require_keyframe1_reached_before_action 1`，第一关键帧 grasp 未 reached 时跳过第二关键帧 action。
+- 新增 CLI：
+  - `--require_keyframe1_reached_before_action`
+
+## 2026-05-27 21:10:00 +08
+
+- 更新 Piper AnyGrasp 批量运行命令：
+  - `COMMAND_LIBRARY.zh.md` 新增 L15，给出 `pick_diverse_bottles` id0-id10 命令。
+  - L15 不再传 `--keyframes 38 78`，改为依赖 `--reuse_preview_frame_mode annotated_json_keyframes` 读取每个 id 的手动标注关键帧。
+  - 命令新增 `--dual_stage_require_all_plans 1`，确保双臂 stage 只有在左右臂都规划成功时才一起执行。
+  - 补充说明 `settle_steps/joint_target_wait_steps` 与 IK 失败、视频停留帧之间的区别。
+
+## 2026-05-27 14:00:00 +08
+
+- 新增命令库小节：`COMMAND_LIBRARY.zh.md` C1.2。
+- 新增内容：六个 H2O 任务的 FoundationPose replay D435 内参版命令。
+- 关键参数：
+  - `--image_width 640`
+  - `--image_height 480`
+  - `--fovy_deg 42.499880046655484`
+  - `--camera_cv_axis_mode legacy_r1`
+  - `--robot_config /home/zaijia001/ssd/RoboTwin/robot_config_PiperPika_agx_dual_table_0515.json`
+- 输出约定：`/home/zaijia001/ssd/data/piper/hand/<TASK>/foundation_replay_d435`。
+- 使用备注：该组命令用于让 FoundationPose 物体 replay 的 head 画面与后续 D435 robot pure replay 保持相同内参。
+
+## 2026-05-26 21:30:00 +08
+
+- 更新 Piper AnyGrasp 两关键帧规划命令：
+  - `COMMAND_LIBRARY.zh.md` L14 增加 id0-id10 批量命令。
+  - 推荐调试参数改为 `--urdfik_cartesian_interp_auto_step_m 0.02`、`--urdfik_max_position_threshold_m 0.02`、`--urdfik_max_rotation_threshold_rad 0.12`。
+  - 位置优先调试阶段建议 `--reach_rot_tol_deg 180`；确认位置可达后再收紧旋转容差。
+  - `--debug_visualize_ik_waypoints` 明确为 0/1 开关，使用 `1`。
+  - 新增 `--head_only 0 --third_person_view 1 --vscode_compatible_video 1`，让 head/third 输出可直接在 VS Code 预览。
+- 相关代码：
+  - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - `code_painting/render_hand_retarget_piper_dual_npz_urdfik.py`
+  - `code_painting/urdfik.py`
+
+## 2026-05-25 16:10:00 +08
+
+- 后续修复：
+  - L1 明确为“原始人手 head + pure replay action/wrist”，并新增 `--head-dir-template '.' --head-video-name 'rgb_{id}.mp4'` 命令。
+  - L1/L2/L3 都新增 `--review-json /home/zaijia001/ssd/RoboTwin/code_painting/h2o_manual_review/${TASK}/hand_keyframes_all.json`，用于排除 `reject/discard/bad`。
+  - 相关转换脚本已支持 `hand_keyframes_all.json` 的 `status` 字段过滤和 `{id}` 视频文件名模板。
+  - 验证：L1/L2/L3 新命令通过 `bash -n`；L1 与 L2 单 id 临时转换通过。
+- 后续补充：
+  - 新增 `COMMAND_LIBRARY.zh.md` L5/L6/L7。
+  - L5/L6 分别列出 `pick_diverse_bottles`、`place_bread_basket`、`stack_cups` 三个任务的可复制转换命令。
+  - L7 新增 episode 数量统计、HDF5 结构检查和 `visualize_processed_hdf5_episode.py` review mp4 可视化命令。
+  - 新增可视化入口：`policy/pi0/scripts/visualize_processed_hdf5_episode.py`。
+- 继续补充：
+  - 新增 `COMMAND_LIBRARY.zh.md` L8：D435 visible-reinit head + D435 pure replay action/wrist，分别列出三个任务命令。
+  - 新增 `COMMAND_LIBRARY.zh.md` L9：AnyGrasp repaint head + planner action/wrist，分别列出三个任务命令，并注明需要 planner wrist 视频已补齐。
+  - 验证：L8/L9 代表命令通过 `bash -n`。
+- 继续补充：
+  - 新增 `COMMAND_LIBRARY.zh.md` L10，记录 3 种已可用模式 x 3 个任务的 HDF5 -> LeRobot 转换命令。
+  - L10 使用 `examples/aloha_real/convert_aloha_data_to_lerobot_R1.py --use-wrist --mode video`，不使用 `convert_aloha_data_to_lerobot_robotwin.py`，因为当前 H2O processed HDF5 使用 `/observations/state`，而后者普通分支读取 `/observations/qpos`。
+  - L10 明确 L6/L8 差异：L6 是默认广角 replay/repaint，L8 是 D435 visible-reinit replay/repaint。
+- 更新 `COMMAND_LIBRARY.zh.md`，新增 `L. pi0 训练数据整理：原始人手、pure replay、AnyGrasp replay`。
+- 新增命令说明：
+  - 原始人手数据路径与既有 `policy/pi0/processed_data` 检查命令。
+  - 未使用 AnyGrasp 的 pure replay：`process_repainted_headcam_with_wrist.py` 读取 repaint head、`world_targets_and_status.npz`、左右 wrist replay，并输出 pi0 HDF5。
+  - AnyGrasp planner replay：`process_repainted_planner_outputs.py` 读取 repaint head、`pose_debug.jsonl`、左右 planner wrist 视频。
+- 明确当前 AnyGrasp H2O planner 目录缺少 `left_wrist_cam_plan.mp4` / `right_wrist_cam_plan.mp4`，L3 命令需要先补齐这两个输入才能稳定产出训练数据。
+- 新增配套命令文档：
+  - `agent-read/COMMANDS/pi0_h2o_training_data.zh.md`
+  - `agent-read/COMMANDS/pi0_h2o_training_data.en.md`
+
 ## 2026-05-22 16:20:00 +08
 
 - 修复 K1 Piper AnyGrasp planner 参数兼容性：
@@ -311,6 +454,22 @@
     - `code_painting/visualize_piper_pika_single.py`
   - 用途：
     - 加载并可视化新组装的 `assets/embodiments/piper_pika/piper_pika.urdf`
+- 2026-05-26
+  - 新增命令组：Piper hand `origin/` 原始数据可视化审核。
+  - 相关命令：
+    - `python code_painting/review_piper_hand_origin.py --task pnp_tray --delay-ms 45`
+    - `python code_painting/review_piper_hand_origin.py --task handover_bottle --delay-ms 45`
+    - `python code_painting/review_piper_hand_origin.py --task pnp_bread --delay-ms 45`
+  - 重要参数：
+    - `--task` 指定任务目录。
+    - `--start-id` 从指定 episode id 开始。
+    - `--dry-run` 只写审核日志不移动目录。
+  - 代码位置：
+    - `code_painting/review_piper_hand_origin.py`
+  - 使用说明：
+    - 在 `RoboTwin_openvla` 环境运行。
+    - 按 `b` / `d` 会把当前 episode 从 `origin/` 移动到 `bad/`，后续预处理会自然跳过。
+
   - 关键参数：
     - `--urdf`
     - `--offscreen-only`
@@ -1110,6 +1269,23 @@
   - 目的：
     - 用 `dx/dy/dz` 曲线判断物体与人手 z 轴偏低更像检测问题还是 replay/标定链路问题
 
+- 2026-05-26
+  - 新增 `COMMAND_LIBRARY.zh.md` L12：直接修正已生成 LeRobot cache 的 task 文本。
+  - 新增命令：
+    - 备份 `meta/tasks.jsonl` 和 `meta/episodes.jsonl`，然后用 `perl -0pi` 将 `pick diverse bottles` 替换为完整英文指令。
+  - 说明：
+    - 当前 LeRobot parquet 只存 `task_index`，任务文本在 meta 文件中；只改已生成 cache 时无需改 parquet。
+
+- 2026-05-26
+  - 新增 `COMMAND_LIBRARY.zh.md` L11：从已生成 LeRobot cache 中抽取指定 episode 并重新编号。
+  - 新增脚本命令：
+    - `uv run python scripts/subset_lerobot_episodes.py --source <repo-or-path> --output-repo-id <repo> --episodes '0-24' --overwrite`
+    - `--episodes` 支持 `0,1-5,7` 这种逗号列表和闭区间范围，脚本会去重、升序排序并输出连续 `0..N-1` episode。
+  - 关键用途：
+    - 从 `local/h2o_pick_diverse_bottles_human_head_pure_action` 等已转换数据中直接抽 25 个 episode，避免重新跑 HDF5 -> LeRobot 转换。
+  - 相关代码：
+    - `policy/pi0/scripts/subset_lerobot_episodes.py`
+
 - 2026-05-21
   - 更新 G 部分距离曲线可视化规则：
     - `plot_piper_gripper_wrist_object_axis_distances.py` 默认 `--plot_clip_abs_m 0.5`
@@ -1199,3 +1375,317 @@
     - K1 去掉 `--ids $(seq 0 10)`，按 task 根目录批处理全部可用 `foundation_input_<id>`。
   - 旧版链路确认：先用人工关键帧 JSON 生成 preview summary，再由 planner 通过 `--reuse_preview_frame_mode annotated_json_keyframes` 消费 summary。
   - 验证：wrapper `bash -n` 通过；K0.3/K1 两个命令块 `bash -n` 通过。
+
+- 2026-05-22
+  - 新增命令组：`COMMAND_LIBRARY.zh.md` E2.4 / I3。
+  - 新增内容：
+    - E2.4：D435 正常 head 视角 pure Piper replay，使用 `--image_width 640 --image_height 480 --fovy_deg 42.499880046655484`。
+    - I3：使用 E2.4 的 `zed_replay_d435.mp4` 贴回 I1 背景。
+  - 重要路径：
+    - D435 参数来源：`/home/zaijia001/ssd/data/piper/hand/pick_diverse_bottles/harmer_input/params_35.json`
+    - replay 输出：`/home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure_d435/<TASK>/id<ID>_d435_z005/`
+    - repaint 输出：`/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_d435/e0_robot/<TASK>/id_<ID>_d435/`
+  - 使用注意：默认旧 replay 的 `fovy_deg=90` 是广角虚拟相机；D435 对齐版本应使用 E2.4/I3，并保留 `d435` 文件名后缀。
+  - 验证：新增命令块 `bash -n` 通过。
+  - 后续澄清：E2.4 的 `fovy_deg=42.499880046655484` 是从实际 RGB camera_info 内参换算得到；官方 D435 depth FOV `85.2 x 58` 不适用于 `/camera/color/image_raw` RGB replay。
+  - 后续诊断：新增 I3.1，记录 D435 Stage-2 mask 失效原因和复查命令；结论是旧版 Stage-2 参数不能直接复用于 D435 窄视角 robot replay。
+
+- 2026-05-23
+  - 更新命令组：`COMMAND_LIBRARY.zh.md` I3.2 / I3.3。
+  - 新增内容：
+    - I3.2：D435 首帧无机器人/误检背景的参数建议和可见起始帧 contact sheet 检查命令。
+    - I3.3：SAM3 直接复用 I1 Stage-1 背景做 D435 robot repaint 的单条调试命令。
+  - 关键参数：
+    - 建议 D435 初始调参使用 `--robot_box_threshold 0.35 --robot_text_threshold 0.30 --max_mask_area_ratio 0.35`。
+    - SAM3 命令使用 `remove_anything_video_sam3_robot.py --target_video "$BG"`，避免通过 SAM3 总入口重新跑 Stage-1 human inpainting。
+  - 注意：
+    - 当前 SAM2/SAM3 robot 脚本都固定从第 0 帧初始化；如果第 0 帧完全没有机器人，必须同步裁剪 robot/BG 或后续改代码支持非 0 初始化帧。
+  - 验证：新增 bash 命令 `bash -n` 通过。
+
+- 2026-05-26
+  - 更新命令组：`COMMAND_LIBRARY.zh.md` L14。
+  - 新增 Piper AnyGrasp 两关键帧规划调试命令：
+    - 入口：`code_painting/plan_anygrasp_keyframes_piper.py`
+    - 推荐参数：`--planner_backend urdfik --urdfik_trajectory_mode cartesian_interp_ik --urdfik_cartesian_interp_steps -1 --urdfik_cartesian_interp_auto_step_m 0.01`
+    - 调试参数：`--debug_visualize_targets 1 --debug_visualize_ik_waypoints 1 --save_pose_debug 1 --save_debug_execution_preview 1`
+  - 相关代码：
+    - `plan_anygrasp_keyframes_piper.py` 现在使用 Piper dual renderer，按 arm 保留左右 base。
+  - 验证：
+    - `plan_anygrasp_keyframes_piper.py` 语法编译通过。
+
+- 2026-05-28
+  - 更新命令组：`COMMAND_LIBRARY.zh.md` J0.1 / J1.1。
+  - 新增内容：
+    - J0.1：6 task D435 AnyGrasp / `foundation_replay_d435` / HaMeR 输入可用性检查。
+    - J1.1：6 task D435 关键帧候选 preview/summary 生成命令，输出到 `anygrasp_h2o_preview_d435`。
+    - 路径与默认广角区分：D435 使用 `foundation_replay_d435` 和独立 preview root。
+  - 验证：
+    - 新命令块通过 `bash -n`。
+
+- 2026-05-28
+  - 更新命令组：`COMMAND_LIBRARY.zh.md` L11.2.4。
+  - 新增内容：
+    - D435 robot replay `_25ep` 抽取改为按 processed `source_episode_id` 过滤 bad 原始 id。
+    - 排除规则沿用 human replay：`handover_bottle=0,7,12,29`，`pnp_bread=0,1,2,3,4,5,6,22,70`。
+    - 命令会自动补足前 25 个可用 LeRobot episode index，并由 `subset_lerobot_episodes.py` 重新编号为 `0..24`。
+  - 验证：
+    - 新命令块通过 `bash -n`。
+
+- 2026-05-28
+  - 更新命令组：`COMMAND_LIBRARY.zh.md` I3.5。
+  - 新增内容：
+    - 说明 `d435_final` 的输出路径和生成链路：`batch_visible_reinit_d435_repaint.py` -> `remove_anything_video_sam3_robot_visible_reinit.py` -> `final_repainted.mp4`。
+    - 明确当前本机 I3.5 批处理实际为 SAM2/DINO2 fallback，虽然入口位于 `inpainting_sam3_robot`。
+    - 新增“先补到至少 25 个 final”的批处理命令，使用 `--overwrite 0` 保留已有输出，并复用一次加载的 DINO/SAM checkpoint。
+  - 验证：
+    - 新命令块通过 `bash -n`。
+
+- 2026-05-28
+  - 更新命令组：`COMMAND_LIBRARY.zh.md` I1.1.1 / I3.5。
+  - 新增内容：
+    - I1.1.1：新三任务只补缺失 Stage-1 BG 的 resume 命令，已有 `removed_w_mask_*.mp4` 的 id 会跳过。
+    - I3.5：新增 `--id_start 0 --id_end 80 --overwrite 0` 的 D435 visible-reinit repaint resume 命令，已有 `final_repainted.mp4` 的 id 会跳过。
+  - 使用场景：
+    - 当 L8.2 输出 episode 很少，且日志显示缺 `/results_repaint_piper_h2_d435_sam3_visible_reinit/.../final_repainted.mp4` 时，先跑 I1.1.1，再跑 I3.5 resume，最后回到 L8.2。
+  - 验证：
+    - 新命令块通过 `bash -n`。
+
+- 2026-05-28
+  - 更新命令组：`COMMAND_LIBRARY.zh.md` L6.1 / L8.2 / L10.6 / L11.2.4。
+  - 新增内容：
+    - L6.1 增加默认广角 `h2_pure` 与 D435 `h2_pure_d435` 的边界说明，解释新三任务为何会 `No usable episodes were processed`。
+    - L8.2 提供六任务 D435 visible-reinit robot replay 转 processed HDF5 命令。
+    - L10.6 提供六任务 D435 robot replay processed HDF5 转 LeRobot cache 命令。
+    - L11.2.4 提供六任务 D435 robot replay `_25ep` 抽取、zip 和 `rclone --dry-run` 命令。
+  - 运行顺序：
+    - 旧三任务：I1 -> I3.4 -> L8/L8.2 -> L10.3/L10.6 -> L11.2.4。
+    - 新三任务：I1.1 -> I3.5 -> L8.1/L8.2 -> L10.6 -> L11.2.4。
+  - 验证：
+    - 新命令块通过 `bash -n`。
+
+- 2026-05-28
+  - 更新命令组：`COMMAND_LIBRARY.zh.md` J0.1 / J1.1。
+  - 新增说明：
+    - J0.1 的 `MISS` 要按 `anygrasp/replay/hand` 三列判断；`seq 0 120` 超过真实 episode 数时出现 MISS 是正常的。
+    - J1.1 现在支持 `left_keyframes/right_keyframes`，并会把它们写入 `effective_keyframes_by_arm`。
+    - L15.4 改为调用 `run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh`，避免 zsh 不支持 `mapfile`。
+    - L15.4 增加每任务前 5 个 summary 的测试命令，并建议使用 `--continue_on_error`。
+  - 相关代码：
+    - `code_painting/render_anygrasp_ranked_preview.py`
+    - `code_painting/run_render_anygrasp_ranked_preview_keyframes_batch.sh`
+    - `code_painting/plan_anygrasp_keyframes_r1.py`
+    - `code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh`
+  - 验证：
+    - `place_bread_basket id0` D435 preview 单条生成成功，summary 中记录 per-arm effective keyframes。
+    - 六任务脚本 dry-run 可正确解析每个任务第一个 summary。
+    - `pick_diverse_bottles id0` D435 planner 单条执行通过脚本层面验证并生成视频/summary。
+    - L15.4 六任务 D435 planner 命令块通过 `bash -n`。
+
+- 2026-05-28
+  - 更新命令组：`COMMAND_LIBRARY.zh.md` J1.2 / L15.3。
+  - 新增：
+    - J1.2：D435 候选 preview/summary 的指定 id 重跑命令，示例使用 `pick_diverse_bottles` 的 `2 17 18 19 20 21`。
+    - L15.3：D435 AnyGrasp planner 命令，强制使用 `foundation_replay_d435` 和 `anygrasp_h2o_preview_d435` 的 `summary.json`。
+  - 关键参数：
+    - `--image_width 640 --image_height 480 --fovy_deg 42.499880046655484`
+    - `--reuse_preview_summary_json .../anygrasp_h2o_preview_d435/<TASK>/foundation_input_<ID>/summary.json`
+    - `--replay_dir .../foundation_replay_d435/foundation_input_<ID>`
+  - 用法说明：
+    - D435 summary 缺失时直接 skip，应先重跑 J1.1/J1.2，不要 fallback 到默认广角 `anygrasp_h2o_preview`。
+  - 验证：
+    - 新增 bash 命令块通过 `bash -n`。
+
+- 2026-05-28
+  - 更新命令组：`COMMAND_LIBRARY.zh.md` L15.11。
+  - 新增内容：
+    - `--execute_partial_cartesian_plan` viewer/no-viewer 调试命令。
+    - 说明该开关只对 `cartesian_interp_ik` 生效，执行成功 waypoint 前缀但不算 reached。
+    - 记录位置优先/朝向优先 IK 的当前状态和后续可改方向。
+  - 验证：
+    - L15.11 bash block 通过 `bash -n`。
+
+- 2026-05-28
+  - 更新命令组：`COMMAND_LIBRARY.zh.md` L15.9/L15.10。
+  - 调整内容：
+    - L15.9 主目录 preview 命令改为 `--candidate_target_local_x_offset_m 0.0`。
+    - L15.10 改为 offset -5cm 对比命令，输出到 `anygrasp_h2o_preview_d435_offset_minus_5cm_compare`。
+    - 补充 `planner_selected_orientation_rank1.png` 输出说明。
+  - 验证：
+    - L15.9/L15.10 bash block 通过 `bash -n`。
+
+- 2026-05-28
+  - 更新命令组：`COMMAND_LIBRARY.zh.md` L15.10。
+  - 新增内容：
+    - raw/no-offset 对比版 D435 preview 生成命令，设置 `--candidate_target_local_x_offset_m 0.0`，输出到 `anygrasp_h2o_preview_d435_no_offset_compare`。
+    - 增加 summary 对比脚本，用于比较 `translation_cam`、`visual_translation_cam` 和 `translation_world`。
+  - 验证：
+    - L15.10 bash block 通过 `bash -n`。
+
+- 2026-05-28
+  - 更新命令组：`COMMAND_LIBRARY.zh.md` L15.9。
+  - 新增内容：
+    - 在文件末尾追加复制安全版三步运行指令：D435 preview/summary 重生成、无 viewer replay、viewer target 可视化 replay。
+    - 第一步改用 `bash <<'BASH'`，避免 zsh 断行导致 `OUT_ROOT=/ home/...`、参数 fallback 到默认 `replay_m_obj_pose_d_pour_blue_norobot` 或 `--candidate_target_local_x_offset_m: command not found`。
+  - 验证：
+    - L15.9 bash block 通过 `bash -n`。
+
+- 2026-05-28
+  - 更新命令组：`COMMAND_LIBRARY.zh.md` L15.8。
+  - 新增内容：
+    - 记录 D435 preview 与 planner target 的真实映射关系：`translation_cam` 为原始 AnyGrasp，`visual_translation_cam/translation_world` 为 offset 后的实际绘制/规划目标。
+    - 补充六任务 D435 preview 重新生成命令，确保后续 `anygrasp_h2o_preview_d435` 图片和 summary/planner 目标一致。
+    - 补充 offset 修正后的无 viewer replay 与 viewer target 可视化命令。
+  - 验证：
+    - L15.8 命令块通过 `bash -n`。
+    - `pick_diverse_bottles id0` offsetfix debug preview 生成成功。
+
+- 2026-05-28
+  - 更新命令组：`COMMAND_LIBRARY.zh.md` L15.7。
+  - 新增内容：
+    - D435/Piper 六任务 wrapper 默认 `--reach_error_pose_source ee`，并支持显式覆盖。
+    - 记录当前关键帧执行逻辑：D435 summary per-arm keyframes -> 第一关键帧 `pregrasp/grasp` -> reached 后 close/action。
+    - 补齐六任务分别前 5 个 episode 的严格同步命令。
+    - 补齐六任务分别前 5 个 episode 的 partial + `joint_interp` + `--print_pose_every 5` 诊断命令。
+  - 关键说明：
+    - `tcp` reached 检查会留下约 12 cm TCP/EE 偏移；当前 Piper D435 planner 默认按 `ee` 判定到位。
+    - `--allow_partial_dual_stage` 只用于诊断，不建议作为最终数据设置。
+  - 验证：
+    - wrapper `bash -n` 通过。
+    - 六任务 dry-run 通过。
+    - `pick_diverse_bottles id0` partial 复跑确认右臂 EE reached。
+
+- 2026-05-28
+  - 更新命令组：`COMMAND_LIBRARY.zh.md` L15.7。
+  - 新增内容：
+    - viewer 命令统一增加 `--visualize_targets` 示例，用于显示目标 axis 和 active candidate gripper。
+    - 记录 `<OUT>/source_preview_compare/` 输出，包括 D435/legacy preview 原图和 `selected_candidate_mapping.json`。
+  - 验证：
+    - L15.7 新增 bash block 通过 `bash -n`。
+    - `pick_diverse_bottles id0` 生成 source preview compare 输出。
+
+- 2026-05-28
+  - 更新命令组：`COMMAND_LIBRARY.zh.md` L11.1.3。
+  - 新增内容：
+    - L10.5 后续专用 `_25ep` 抽取命令，源 repo 为 `local/h2o_<TASK>_human_head_pure_d435_action`。
+    - 通过 processed `instructions.json/source_episode_id` 排除新三任务中的已知坏原始 id，并自动补足 25 个 episode。
+    - 新增 `human_d435_action_3task_25ep.zip` 打包和 `rclone --dry-run` 上传检查命令。
+  - 关键区别：
+    - L11.2.1 的 `local/h2o_<TASK>_pure_repaint` 只用于 L6/L6.1 robot replay，不能作为 L10.5 的后续。
+  - 验证：
+    - 新增命令块通过 `bash -n`。
+
+- 2026-05-25
+  - 新增命令/模式设计：`COMMAND_LIBRARY.zh.md` I3.4。
+  - 新增内容：
+    - 记录“可见帧重初始化 SAM 模式”的设计，用于 D435 窄视角 robot replay。
+    - 新模式建议使用 `--init_policy first_visible --reinit_policy on_lost --empty_mask_when_lost 1` 等待实现接口。
+    - 新模式输出根目录建议为 `results_repaint_piper_h2_d435_sam3_visible_reinit`，和当前 SAM2/SAM3 输出并列比较。
+  - 注意：
+    - 这是待实现接口和状态机设计，不是当前可运行脚本；本轮没有修改任何运行代码。
+  - 验证：I3.4 待实现命令 `bash -n` 通过。
+
+- 2026-05-25
+  - 更新命令组：`COMMAND_LIBRARY.zh.md` I3.4。
+  - 新增可运行入口：
+    - 单视频：`/home/zaijia001/ssd/inpainting_sam3_robot/remove_anything_video_sam3_robot_visible_reinit.py`
+    - 批处理：`/home/zaijia001/ssd/inpainting_sam3_robot/batch_visible_reinit_d435_repaint.py`
+  - 新增命令：
+    - 单 id 调试命令，输出到 `results_repaint_piper_h2_d435_sam3_visible_reinit/e0_robot/<TASK>/id_<ID>_d435`。
+    - 三 task 批处理命令，使用 `--id_start/--id_end` 控制范围，并通过单进程复用 DINO/SAM checkpoint。
+    - dry-run 命令，用于检查 BG/ROBOT 输入是否存在。
+  - 关键参数：
+    - `--init_policy first_visible`
+    - `--reinit_policy on_lost`
+    - `--empty_mask_when_lost 1`
+    - `--detector_stride 1`
+    - `--lost_patience 2`
+    - `--max_mask_area_ratio 0.35`
+    - `--max_white_pixel_ratio_in_mask 0.60`
+  - 验证：
+    - 两个新脚本 `py_compile` 通过。
+    - 两个新脚本 `--help` 通过。
+    - 批处理 dry-run 能解析 `pick_diverse_bottles id0` 的输入路径。
+    - I3.4 命令 `bash -n` 通过。
+
+- 2026-05-25
+  - 更新命令组说明：`COMMAND_LIBRARY.zh.md` I3.3 / I3.4。
+  - 标题调整：
+    - I3.3 改为“当前 SAM3 项目首帧初始化：直接复用 I1 背景做 D435 robot repaint”。
+    - I3.4 改为“新逻辑：可见帧重初始化 SAM2/SAM3 模式”。
+  - 新增说明：
+    - 原 SAM2 指令、当前 SAM3 项目指令、新可见帧重初始化指令的区别。
+    - 当前环境日志 `[backend] SAM=sam2, DINO=dino2` 表示实际 fallback 到 SAM2/GroundingDINO2；如果看到 `[backend] SAM=sam3, DINO=dino3` 才是真正 SAM3/DINO3。
+    - 新脚本已局部修复 transformers/GroundingDINO 的 `BertModel.get_head_mask` 兼容问题。
+  - 验证：
+    - 新脚本可完成模型加载。
+    - 两个新脚本 `py_compile` 通过。
+
+- 2026-05-25
+  - 更新命令组：`COMMAND_LIBRARY.zh.md` I3.0 / I3.3 / I3.4。
+  - 新增 I3.0 对照表和独立命令：
+    - I3.0.1：原 SAM2 固定第 0 帧初始化单 id 调试命令。
+    - I3.0.2：SAM3 项目固定第 0 帧初始化单 id 调试命令。
+    - 真正 SAM3 backend 模板：设置 `GROUNDED_SAM3_DIR=/path/to/Grounded_SAM_3` 后运行 I3.0.2 或 I3.4，并检查日志 `[backend] SAM=sam3, DINO=dino3`。
+    - I3.0.3：新逻辑可见帧重初始化单 id 调试命令。
+    - I3.0.4：新逻辑可见帧重初始化批处理复用 checkpoint 命令。
+  - 兼容修复记录：
+    - `remove_anything_video_sam3_robot.py` 和 `remove_anything_video_sam3_robot_visible_reinit.py` 现在都会 patch 旧 GroundingDINO 需要的 BERT helper，兼容 transformers 5.3.0。
+  - 验证：
+    - I3.0 命令块 `bash -n` 通过。
+    - DINO forward smoke test 通过。
+## 2026-05-28（L15.12 Piper AnyGrasp 轴修正与 IK 阈值 wrapper）
+
+- 新增/更新：
+  - `COMMAND_LIBRARY.zh.md` 新增 L15.12，记录 Piper preview gripper 与 URDF link6 的轴转换关系。
+  - `run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh` 新增 `--ik_max_position_threshold_m`、`--ik_max_rotation_threshold_rad`。
+  - `run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --viewer` 默认不再停在每个 id 末尾；新增 `--viewer_wait_at_end 1` 用于需要手动停留检查的情况。
+  - `COMMAND_LIBRARY.zh.md` 新增 L15.13，补充六任务分别跑 id0-10 的 viewer 命令和轴颜色说明。
+  - `run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh` 新增 `--id_start`、`--id_end`、`--ids`、`--piper_apply_global_trans_to_ik`。
+- 关键参数：
+  - 默认仍为 `--ik_max_rotation_threshold_rad 0.12`，保持严格完整姿态 IK。
+  - 诊断位置优先可临时使用 `--ik_max_rotation_threshold_rad 3.14`，确认静止是否来自朝向约束。
+- 相关代码：
+  - `code_painting/render_hand_retarget_piper_dual_npz_urdfik.py`
+  - `code_painting/plan_anygrasp_keyframes_r1.py`
+  - `code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh`
+## 2026-05-29（L15.14 Viewer per-arm active frame 检查）
+
+- 更新命令文档：
+  - `COMMAND_LIBRARY.zh.md` 新增 L15.14。
+  - `agent-read/COMMANDS/piper_anygrasp_keyframes.zh.md` / `.en.md` 增加 viewer 目标夹爪按左右手关键帧显示的说明。
+- 相关命令：
+  - dry-run 检查 `pick_diverse_bottles id0-10` 的 viewer 轴检查命令是否能解析 D435 summary。
+  - `jq -c '{stage,active_frame,active_frame_by_arm}' <OUT>/pose_debug.jsonl | head -n 20` 用于确认 pregrasp/grasp 显示第一关键帧、action 显示第二关键帧。
+  - 若当前 shell 没有 `jq`，文档同步提供 `head ... | sed -E ...` 的检查版本。
+- 重要参数：
+  - `--visualize_targets`
+  - `--id_start 0 --id_end 10`
+  - `--piper_apply_global_trans_to_ik 0`
+  - `--ik_max_rotation_threshold_rad 3.14`
+## 2026-05-29（L15.15 Stack Cups id0 无碰撞 target-only 命令）
+
+- 新增命令文档：
+  - `COMMAND_LIBRARY.zh.md` 增加 L15.15。
+  - `agent-read/COMMANDS/piper_anygrasp_keyframes.zh.md` / `.en.md` 同步 stack_cups id0 target-only 调试命令。
+- 新增 wrapper 参数：
+  - `--disable_execution_collisions`
+  - `--target_axes_only`
+  - `--debug_candidate_top_k`
+  - `--debug_common_candidate_top_k`
+  - `--debug_visualize_selected_keyframe_axes`
+  - `--debug_visualize_ik_waypoints`
+- 用途：
+  - 排除执行物体碰撞。
+  - 只保留当前执行 target 轴，避免 viewer 中 target/candidate/selected/waypoint 多套坐标系混淆。
+## 2026-05-29（L15.16 Direct Piper hand replay viewer 对照命令）
+
+- `COMMAND_LIBRARY.zh.md` 新增 L15.16。
+- 新增 direct replay 对照命令：
+  - 入口：`code_painting/render_hand_retarget_piper_dual_npz_urdfik_main.py`
+  - 示例：`stack_cups id0`
+  - 用途：不走 AnyGrasp，直接 replay HaMeR NPZ 中存好的 gripper pose。
+- 关键参数：
+  - `--debug_visualize_targets 1`
+  - `--debug_mode 1 --debug_post_execute 1`
+  - `--save_world_targets 1`
+  - `--enable_viewer 1 --viewer_wait_at_end 1`

@@ -228,6 +228,41 @@ zip -r pnp_bread_foundation_replay.zip foundation_replay
 CUDA_VISIBLE_DEVICES=1 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_multi_object_pose_r1_npz_batch.sh /home/zaijia001/ssd/data/piper/hand/pnp_tray/foundation_vis/obs_vis /home/zaijia001/ssd/data/piper/hand/pnp_tray/foundation_replay 5 --lighting_mode front_no_shadow --hide_robot 1 --save_head_depth 1 --save_anygrasp_frames 1 --save_pose_debug 1 --robot_config /home/zaijia001/ssd/RoboTwin/robot_config_PiperPika_agx_dual_table_0515.json --camera_cv_axis_mode legacy_r1 --head_camera_local_pos 0.11210396690038413 -0.39189397826604927 0.4753892624100325 --head_camera_local_quat_wxyz 0.8524694864910365 -0.0011011947849308937 0.5226654778798345 0.010740586780925399 --object "right bottle=/home/zaijia001/ssd/data/R1/hand/obj_mesh/bottle/bottle.obj"  --object "left dark red cup=/home/zaijia001/ssd/data/R1/hand/obj_mesh/dark_red_cup/dark_red_cup.obj" 
 zip -r pnp_tray_foundation_replay.zip foundation_replay
 
+# pnp_bread
+CUDA_VISIBLE_DEVICES=2 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_multi_object_pose_r1_npz_batch.sh /home/zaijia001/ssd/data/piper/hand/pnp_bread/foundation_vis/obs_vis /home/zaijia001/ssd/data/piper/hand/pnp_bread/foundation_replay_d435 5 --skip_existing 0  --image_width 640 --image_height 480 --fovy_deg 42.499880046655484 --lighting_mode front_no_shadow --hide_robot 1 --save_head_depth 1 --save_anygrasp_frames 1 --save_pose_debug 1 --robot_config /home/zaijia001/ssd/RoboTwin/robot_config_PiperPika_agx_dual_table_0515.json  --camera_cv_axis_mode legacy_r1 --head_camera_local_pos 0.11210396690038413 -0.39189397826604927 0.4753892624100325 --head_camera_local_quat_wxyz 0.8524694864910365 -0.0011011947849308937 0.5226654778798345 0.010740586780925399 --object "right_bread=/home/zaijia001/ssd/data/R1/hand/obj_mesh/bread_yr/bread_yerong.obj" --object "left_bread=/home/zaijia001/ssd/data/R1/hand/obj_mesh/bread_nj/bread_niujiao.obj"
+```
+
+
+### C1.2. 六个 H2O 任务：D435 相机内参版 FoundationPose replay
+
+说明：本节复用 C1 的 FoundationPose 结果、Piper 0515 head D435 外参和 `legacy_r1` 坐标转换，但把渲染相机内参改成和后面 E2.4 机器人 pure replay 一致的真实 D435 color 设置：`--image_width 640 --image_height 480 --fovy_deg 42.499880046655484`。输出目录统一使用 `foundation_replay_d435`，避免覆盖 C1 的默认广角/旧内参 replay。
+
+```bash
+CUDA_VISIBLE_DEVICES=2 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_multi_object_pose_r1_npz_batch.sh /home/zaijia001/ssd/data/piper/hand/pick_diverse_bottles/foundation_vis/obs_vis /home/zaijia001/ssd/data/piper/hand/pick_diverse_bottles/foundation_replay_d435 5 --image_width 640 --image_height 480 --fovy_deg 42.499880046655484 --lighting_mode front_no_shadow --hide_robot 1 --save_head_depth 1 --save_anygrasp_frames 1 --save_pose_debug 1 --robot_config /home/zaijia001/ssd/RoboTwin/robot_config_PiperPika_agx_dual_table_0515.json --camera_cv_axis_mode legacy_r1 --head_camera_local_pos 0.11210396690038413 -0.39189397826604927 0.4753892624100325 --head_camera_local_quat_wxyz 0.8524694864910365 -0.0011011947849308937 0.5226654778798345 0.010740586780925399 --object "right bottle=/home/zaijia001/ssd/data/R1/hand/obj_mesh/bottle/bottle.obj" --object "left bottle=/home/zaijia001/ssd/data/R1/hand/obj_mesh/cola/cola.obj"
+
+cd /home/zaijia001/ssd/data/piper/hand/pick_diverse_bottles && zip -r pick_diverse_bottles_foundation_replay_d435.zip foundation_replay_d435
+
+CUDA_VISIBLE_DEVICES=2 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_multi_object_pose_r1_npz_batch.sh /home/zaijia001/ssd/data/piper/hand/place_bread_basket/foundation_vis/obs_vis /home/zaijia001/ssd/data/piper/hand/place_bread_basket/foundation_replay_d435 5 --image_width 640 --image_height 480 --fovy_deg 42.499880046655484 --lighting_mode front_no_shadow --hide_robot 1 --save_head_depth 1 --save_anygrasp_frames 1 --save_pose_debug 1 --robot_config /home/zaijia001/ssd/RoboTwin/robot_config_PiperPika_agx_dual_table_0515.json --camera_cv_axis_mode legacy_r1 --head_camera_local_pos 0.11210396690038413 -0.39189397826604927 0.4753892624100325 --head_camera_local_quat_wxyz 0.8524694864910365 -0.0011011947849308937 0.5226654778798345 0.010740586780925399 --object "basket=/home/zaijia001/ssd/data/R1/hand/obj_mesh/basket/basket.obj" --object "bread=/home/zaijia001/ssd/data/R1/hand/obj_mesh/bread_y/bread_y.obj"
+
+cd /home/zaijia001/ssd/data/piper/hand/place_bread_basket && zip -r place_bread_basket_foundation_replay_d435.zip foundation_replay_d435
+
+CUDA_VISIBLE_DEVICES=1 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_multi_object_pose_r1_npz_batch.sh /home/zaijia001/ssd/data/piper/hand/stack_cups/foundation_vis/obs_vis /home/zaijia001/ssd/data/piper/hand/stack_cups/foundation_replay_d435 5 --image_width 640 --image_height 480 --fovy_deg 42.499880046655484 --lighting_mode front_no_shadow --hide_robot 1 --save_head_depth 1 --save_anygrasp_frames 1 --save_pose_debug 1 --robot_config /home/zaijia001/ssd/RoboTwin/robot_config_PiperPika_agx_dual_table_0515.json --camera_cv_axis_mode legacy_r1 --head_camera_local_pos 0.11210396690038413 -0.39189397826604927 0.4753892624100325 --head_camera_local_quat_wxyz 0.8524694864910365 -0.0011011947849308937 0.5226654778798345 0.010740586780925399 --object "right dark red cup=/home/zaijia001/ssd/data/R1/hand/obj_mesh/dark_red_cup/dark_red_cup.obj" --object "left light pink cup=/home/zaijia001/ssd/data/R1/hand/obj_mesh/light_pink_cup/light_pink_cup.obj"
+
+cd /home/zaijia001/ssd/data/piper/hand/stack_cups && zip -r stack_cups_foundation_replay_d435.zip foundation_replay_d435
+
+CUDA_VISIBLE_DEVICES=1 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_multi_object_pose_r1_npz_batch.sh /home/zaijia001/ssd/data/piper/hand/handover_bottle/foundation_vis/obs_vis /home/zaijia001/ssd/data/piper/hand/handover_bottle/foundation_replay_d435 5 --image_width 640 --image_height 480 --fovy_deg 42.499880046655484 --lighting_mode front_no_shadow --hide_robot 1 --save_head_depth 1 --save_anygrasp_frames 1 --save_pose_debug 1 --robot_config /home/zaijia001/ssd/RoboTwin/robot_config_PiperPika_agx_dual_table_0515.json --camera_cv_axis_mode legacy_r1 --head_camera_local_pos 0.11210396690038413 -0.39189397826604927 0.4753892624100325 --head_camera_local_quat_wxyz 0.8524694864910365 -0.0011011947849308937 0.5226654778798345 0.010740586780925399 --object "right bottle=/home/zaijia001/ssd/data/R1/hand/obj_mesh/bottle/bottle.obj"
+
+cd /home/zaijia001/ssd/data/piper/hand/handover_bottle && zip -r handover_bottle_foundation_replay_d435.zip foundation_replay_d435
+
+CUDA_VISIBLE_DEVICES=2 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_multi_object_pose_r1_npz_batch.sh /home/zaijia001/ssd/data/piper/hand/pnp_bread/foundation_vis/obs_vis /home/zaijia001/ssd/data/piper/hand/pnp_bread/foundation_replay_d435 5 --image_width 640 --image_height 480 --fovy_deg 42.499880046655484 --lighting_mode front_no_shadow --hide_robot 1 --save_head_depth 1 --save_anygrasp_frames 1 --save_pose_debug 1 --robot_config /home/zaijia001/ssd/RoboTwin/robot_config_PiperPika_agx_dual_table_0515.json --camera_cv_axis_mode legacy_r1 --head_camera_local_pos 0.11210396690038413 -0.39189397826604927 0.4753892624100325 --head_camera_local_quat_wxyz 0.8524694864910365 -0.0011011947849308937 0.5226654778798345 0.010740586780925399 --object "right bread=/home/zaijia001/ssd/data/R1/hand/obj_mesh/bread_yerong/bread_yerong.obj" --object "left bread=/home/zaijia001/ssd/data/R1/hand/obj_mesh/bread_niujiao/bread_niujiao.obj"
+
+CUDA_VISIBLE_DEVICES=2 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_multi_object_pose_r1_npz_batch.sh /home/zaijia001/ssd/data/piper/hand/pnp_bread/foundation_vis/obs_vis /home/zaijia001/ssd/data/piper/hand/pnp_bread/foundation_replay_d435 5 --image_width 640 --image_height 480 --fovy_deg 42.499880046655484 --lighting_mode front_no_shadow --hide_robot 1 --save_head_depth 1 --save_anygrasp_frames 1 --save_pose_debug 1 --robot_config /home/zaijia001/ssd/RoboTwin/robot_config_PiperPika_agx_dual_table_0515.json --camera_cv_axis_mode legacy_r1 --head_camera_local_pos 0.11210396690038413 -0.39189397826604927 0.4753892624100325 --head_camera_local_quat_wxyz 0.8524694864910365 -0.0011011947849308937 0.5226654778798345 0.010740586780925399 --object "right bread=/home/zaijia001/ssd/data/R1/hand/obj_mesh/bread_yr/bread_yerong.obj" --object "left bread=/home/zaijia001/ssd/data/R1/hand/obj_mesh/bread_nj/bread_niujiao.obj"
+
+cd /home/zaijia001/ssd/data/piper/hand/pnp_bread && zip -r pnp_bread_foundation_replay_d435.zip foundation_replay_d435
+
+CUDA_VISIBLE_DEVICES=1 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_multi_object_pose_r1_npz_batch.sh /home/zaijia001/ssd/data/piper/hand/pnp_tray/foundation_vis/obs_vis /home/zaijia001/ssd/data/piper/hand/pnp_tray/foundation_replay_d435 5 --image_width 640 --image_height 480 --fovy_deg 42.499880046655484 --lighting_mode front_no_shadow --hide_robot 1 --save_head_depth 1 --save_anygrasp_frames 1 --save_pose_debug 1 --robot_config /home/zaijia001/ssd/RoboTwin/robot_config_PiperPika_agx_dual_table_0515.json --camera_cv_axis_mode legacy_r1 --head_camera_local_pos 0.11210396690038413 -0.39189397826604927 0.4753892624100325 --head_camera_local_quat_wxyz 0.8524694864910365 -0.0011011947849308937 0.5226654778798345 0.010740586780925399 --object "right bottle=/home/zaijia001/ssd/data/R1/hand/obj_mesh/bottle/bottle.obj" --object "left dark red cup=/home/zaijia001/ssd/data/R1/hand/obj_mesh/dark_red_cup/dark_red_cup.obj"
+
+cd /home/zaijia001/ssd/data/piper/hand/pnp_tray && zip -r pnp_tray_foundation_replay_d435.zip foundation_replay_d435
 ```
 
 
@@ -568,6 +603,10 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && GPU=3; FPS=5; MA
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && GPU=3; FPS=5; MAX_FRAMES=3000; RETREAT=0.05; for TASK in pick_diverse_bottles place_bread_basket stack_cups; do for ID in $(seq 90 120); do IN=/home/zaijia001/ssd/data/piper/hand/${TASK}/harmer_output/hand_detections_${ID}.npz; OUT=/home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure_d435/${TASK}/id${ID}_d435_z005; [[ -f "$IN" ]] || { echo "[skip] missing $IN"; continue; }; CUDA_VISIBLE_DEVICES=${GPU} conda run -n RoboTwin_bw python /home/zaijia001/ssd/RoboTwin/code_painting/render_hand_retarget_piper_dual_npz_urdfik_main.py --input_npz "$IN" --output_dir "$OUT" --image_width 640 --image_height 480 --fovy_deg 42.499880046655484 --fps ${FPS} --max_frames ${MAX_FRAMES} --arms both --piper_calibration_bundle /home/zaijia001/ssd/RoboTwin/calibration_bundle_piper_new_table_0515.json --camera_cv_axis_mode legacy_r1 --require_stored_gripper_pose 1 --pose_source gripper --orientation_remap_label identity --stored_orientation_post_rot_xyz_deg 0 0 0 --target_local_forward_retreat_m ${RETREAT} --target_world_offset_xyz 0 0.1 0.1 --execute_waypoint_scene_steps 5 --execute_settle_scene_steps 20 --urdfik_joint_interp_waypoints 10 --debug_mode 0 --debug_post_execute 0 --debug_frame_limit -1 --debug_visualize_targets 0 --debug_visualize_cameras 0 --clean_output 1 --overlay_text_enable 0 --save_png_frames 0 --lighting_mode front_no_shadow; rm -f "$OUT"/zed_depth.mp4 "$OUT"/left_wrist_replay.mp4 "$OUT"/right_wrist_replay.mp4 "$OUT"/smooth_*.mp4; rm -rf "$OUT"/frames; for V in zed_replay third_replay; do [[ -f "$OUT/${V}.mp4" ]] || continue; ffmpeg -y -i "$OUT/${V}.mp4" -an -c:v libx264 -pix_fmt yuv420p -movflags +faststart "$OUT/${V}_d435.tmp.mp4" && mv "$OUT/${V}_d435.tmp.mp4" "$OUT/${V}_d435.mp4"; done; done; done
 ```
 
+#### new 3 task
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && GPU=1; FPS=5; MAX_FRAMES=3000; RETREAT=0.05; for TASK in pnp_tray pnp_bread handover_bottle; do for ID in $(seq 0 30); do IN=/home/zaijia001/ssd/data/piper/hand/${TASK}/harmer_output/hand_detections_${ID}.npz; OUT=/home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure_d435/${TASK}/id${ID}_d435_z005; [[ -f "$IN" ]] || { echo "[skip] missing $IN"; continue; }; CUDA_VISIBLE_DEVICES=${GPU} conda run -n RoboTwin_bw python /home/zaijia001/ssd/RoboTwin/code_painting/render_hand_retarget_piper_dual_npz_urdfik_main.py --input_npz "$IN" --output_dir "$OUT" --image_width 640 --image_height 480 --fovy_deg 42.499880046655484 --fps ${FPS} --max_frames ${MAX_FRAMES} --arms both --piper_calibration_bundle /home/zaijia001/ssd/RoboTwin/calibration_bundle_piper_new_table_0515.json --camera_cv_axis_mode legacy_r1 --require_stored_gripper_pose 1 --pose_source gripper --orientation_remap_label identity --stored_orientation_post_rot_xyz_deg 0 0 0 --target_local_forward_retreat_m ${RETREAT} --target_world_offset_xyz 0 0.1 0.1 --execute_waypoint_scene_steps 5 --execute_settle_scene_steps 20 --urdfik_joint_interp_waypoints 10 --debug_mode 0 --debug_post_execute 0 --debug_frame_limit -1 --debug_visualize_targets 0 --debug_visualize_cameras 0 --clean_output 1 --overlay_text_enable 0 --save_png_frames 0 --lighting_mode front_no_shadow; rm -f "$OUT"/zed_depth.mp4 "$OUT"/left_wrist_replay.mp4 "$OUT"/right_wrist_replay.mp4 "$OUT"/smooth_*.mp4; rm -rf "$OUT"/frames; for V in zed_replay third_replay; do [[ -f "$OUT/${V}.mp4" ]] || continue; ffmpeg -y -i "$OUT/${V}.mp4" -an -c:v libx264 -pix_fmt yuv420p -movflags +faststart "$OUT/${V}_d435.tmp.mp4" && mv "$OUT/${V}_d435.tmp.mp4" "$OUT/${V}_d435.mp4"; done; done; done
+```
 输出检查：
 
 ```bash
@@ -757,6 +796,44 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate i
 
 ```bash
 find /home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2/stage1 -path '*/stage1_human_inpaint/removed_w_mask_*.mp4' | sort
+```
+
+### I1.1 新三任务：只做人手抠除背景缓存
+
+用途：给 `handover_bottle / pnp_bread / pnp_tray` 生成 Stage-1 人手抠除背景，供后续 I3.5 D435 robot visible-reinit repaint 使用。主输出位于：
+
+```text
+/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2/stage1/<TASK>/id_<ID>/stage1_human_inpaint/removed_w_mask_rgb_<ID>.mp4
+```
+
+运行命令：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate inpainting-sam2-r1 && cd /home/zaijia001/ssd/inpainting_sam2_robot && GPU=3; FPS=5; DUMMY_ROBOT=$(find /home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure_d435 -path '*id*_d435_z005/zed_replay_d435.mp4' 2>/dev/null | sort | head -n 1); [[ -f "$DUMMY_ROBOT" ]] || { echo "[error] missing dummy D435 robot video"; exit 1; }; echo "[stage1] dummy robot_video=$DUMMY_ROBOT"; for TASK in handover_bottle pnp_bread pnp_tray; do for ID in $(seq 20 40); do HUMAN=/home/zaijia001/ssd/data/piper/hand/${TASK}/harmer_input/rgb_${ID}.mp4; OUT=/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2/stage1/${TASK}/id_${ID}; [[ -f "$HUMAN" ]] || { echo "[skip] task=${TASK} id=${ID} missing HUMAN=$HUMAN"; continue; }; CUDA_VISIBLE_DEVICES=${GPU} python run_human_robot_inpaint_repaint.py --human_video "$HUMAN" --robot_video "$DUMMY_ROBOT" --output_dir "$OUT" --coords_type key_in --point_coords 10 80 --point_labels 1 --human_dilate_kernel_size 100 --robot_dilate_kernel_size 0 --robot_text_prompt "left robot arm, right robot arm, forearm, wrist, gripper, end effector." --robot_box_threshold 0.20 --robot_text_threshold 0.20 --robot_max_mask_area_ratio 1.0 --robot_erode_kernel_size 3 --robot_composite_erode_kernel_size 1 --robot_blend_alpha_sigma 1.0 --robot_exclude_bottom_ratio 0.14 --mask_idx 2 --fps ${FPS} --device cuda --human_save_debug_artifacts 0 --robot_save_removed_video 0 --robot_save_mask_artifacts 0 --robot_save_debug_videos 0 --robot_save_composite_video 0; done; done
+
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate inpainting-sam2-r1 && cd /home/zaijia001/ssd/inpainting_sam2_robot && GPU=2; FPS=5; DUMMY_ROBOT=$(find /home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure_d435 -path '*id*_d435_z005/zed_replay_d435.mp4' 2>/dev/null | sort | head -n 1); [[ -f "$DUMMY_ROBOT" ]] || { echo "[error] missing dummy D435 robot video"; exit 1; }; echo "[stage1] dummy robot_video=$DUMMY_ROBOT"; for TASK in handover_bottle pnp_bread pnp_tray; do for ID in $(seq 40 60); do HUMAN=/home/zaijia001/ssd/data/piper/hand/${TASK}/harmer_input/rgb_${ID}.mp4; OUT=/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2/stage1/${TASK}/id_${ID}; [[ -f "$HUMAN" ]] || { echo "[skip] task=${TASK} id=${ID} missing HUMAN=$HUMAN"; continue; }; CUDA_VISIBLE_DEVICES=${GPU} python run_human_robot_inpaint_repaint.py --human_video "$HUMAN" --robot_video "$DUMMY_ROBOT" --output_dir "$OUT" --coords_type key_in --point_coords 10 80 --point_labels 1 --human_dilate_kernel_size 100 --robot_dilate_kernel_size 0 --robot_text_prompt "left robot arm, right robot arm, forearm, wrist, gripper, end effector." --robot_box_threshold 0.20 --robot_text_threshold 0.20 --robot_max_mask_area_ratio 1.0 --robot_erode_kernel_size 3 --robot_composite_erode_kernel_size 1 --robot_blend_alpha_sigma 1.0 --robot_exclude_bottom_ratio 0.14 --mask_idx 2 --fps ${FPS} --device cuda --human_save_debug_artifacts 0 --robot_save_removed_video 0 --robot_save_mask_artifacts 0 --robot_save_debug_videos 0 --robot_save_composite_video 0; done; done
+```
+
+检查：
+
+```bash
+for TASK in handover_bottle pnp_bread pnp_tray; do echo "===== ${TASK} ====="; find /home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2/stage1/${TASK} -path '*/stage1_human_inpaint/removed_w_mask_*.mp4' 2>/dev/null | wc -l; done
+```
+
+#### I1.1.1 新三任务 Stage-1 缺失 id 补跑
+
+用途：如果 I3.5/L8.2 发现新三任务只有少量 episode，先检查 Stage-1 背景是否缺失。`L8.2` 只会读取已经存在的 D435 repaint final，不会自动补 Stage-1 或 repaint。
+
+当前检查逻辑：
+
+```bash
+for TASK in handover_bottle pnp_bread pnp_tray; do echo "===== ${TASK} ====="; echo -n "h2_pure_d435 ids: "; find /home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure_d435/${TASK} -maxdepth 1 -type d -name 'id*_d435_z005' 2>/dev/null | wc -l; echo -n "stage1 BG: "; find /home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2/stage1/${TASK} -path '*/stage1_human_inpaint/removed_w_mask_*.mp4' 2>/dev/null | wc -l; echo -n "D435 final: "; find /home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_d435_sam3_visible_reinit/e0_robot/${TASK} -maxdepth 2 -type f -name final_repainted.mp4 2>/dev/null | wc -l; done
+```
+
+只补缺失 Stage-1 BG，不覆盖已存在输出：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate inpainting-sam2-r1 && cd /home/zaijia001/ssd/inpainting_sam2_robot && GPU=2; FPS=5; DUMMY_ROBOT=$(find /home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure_d435 -path '*id*_d435_z005/zed_replay_d435.mp4' 2>/dev/null | sort | head -n 1); [[ -f "$DUMMY_ROBOT" ]] || { echo "[error] missing dummy D435 robot video"; exit 1; }; for TASK in handover_bottle pnp_bread pnp_tray; do for ID in $(seq 0 80); do HUMAN=/home/zaijia001/ssd/data/piper/hand/${TASK}/harmer_input/rgb_${ID}.mp4; OUT=/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2/stage1/${TASK}/id_${ID}; EXISTING=$(find "$OUT/stage1_human_inpaint" -maxdepth 1 -type f -name 'removed_w_mask_*.mp4' 2>/dev/null | head -n 1); [[ -n "$EXISTING" ]] && { echo "[skip-existing] task=${TASK} id=${ID} BG=$EXISTING"; continue; }; [[ -f "$HUMAN" ]] || { echo "[skip] task=${TASK} id=${ID} missing HUMAN=$HUMAN"; continue; }; echo "[stage1-missing] task=${TASK} id=${ID}"; CUDA_VISIBLE_DEVICES=${GPU} python run_human_robot_inpaint_repaint.py --human_video "$HUMAN" --robot_video "$DUMMY_ROBOT" --output_dir "$OUT" --coords_type key_in --point_coords 10 80 --point_labels 1 --human_dilate_kernel_size 100 --robot_dilate_kernel_size 0 --robot_text_prompt "left robot arm, right robot arm, forearm, wrist, gripper, end effector." --robot_box_threshold 0.20 --robot_text_threshold 0.20 --robot_max_mask_area_ratio 1.0 --robot_erode_kernel_size 3 --robot_composite_erode_kernel_size 1 --robot_blend_alpha_sigma 1.0 --robot_exclude_bottom_ratio 0.14 --mask_idx 2 --fps ${FPS} --device cuda --human_save_debug_artifacts 0 --robot_save_removed_video 0 --robot_save_mask_artifacts 0 --robot_save_debug_videos 0 --robot_save_composite_video 0; done; done
 ```
 
 ### I2. 三个任务：把 E0 pure replay 贴回 I1 背景
@@ -1040,6 +1117,68 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate i
 /home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_d435_sam3_visible_reinit/e0_robot/<TASK>/id_<ID>_d435/
 ```
 
+### I3.5 新三任务：D435 visible-reinit robot repaint
+
+用途：给 `handover_bottle / pnp_bread / pnp_tray` 生成 D435 robot replay 版本，用于和 L5.2 的真实人手 head baseline 对比。前提是 I1.1 已经生成 Stage-1 人手抠除背景，且 E2.4/new 3 task 已经生成 `h2_pure_d435/<TASK>/id<ID>_d435_z005/zed_replay_d435.mp4`。
+
+d435 final 的来源：
+
+```text
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_d435_sam3_visible_reinit/e0_robot/<TASK>/id_<ID>_d435/final_repainted.mp4
+```
+
+它不是 L8.2 生成的。L8.2 只读取这个 `final_repainted.mp4` 并转换成 processed HDF5。这个 final 由下面的 `batch_visible_reinit_d435_repaint.py` 生成；单个视频内部由 `remove_anything_video_sam3_robot_visible_reinit.py` 生成 `target_with_original_zed_replay_d435.mp4`，再复制成 `final_repainted.mp4`。
+
+虽然脚本目录叫 `inpainting_sam3_robot`，但当前本机没有 `Grounded_SAM_3`，启动日志会显示：
+
+```text
+[backend] SAM=sam2, DINO=dino2
+[model] loading DINO once: ...
+[model] loading SAM image predictor once: ...
+```
+
+因此当前这条批处理实际就是 SAM2/DINO2 后端，并且只加载一次 DINO/SAM checkpoint 后循环处理所有 task/id；不是每个视频都重新加载 ckpt。
+
+先 dry-run 检查输入，不加载模型：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate inpainting-sam3-dino3 && cd /home/zaijia001/ssd/inpainting_sam3_robot && python batch_visible_reinit_d435_repaint.py --tasks handover_bottle pnp_bread pnp_tray --id_start 0 --id_end 120 --dry_run
+```
+
+正式运行：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate inpainting-sam3-dino3 && cd /home/zaijia001/ssd/inpainting_sam3_robot && CUDA_VISIBLE_DEVICES=1 python batch_visible_reinit_d435_repaint.py --tasks handover_bottle pnp_bread pnp_tray --id_start 0 --id_end 20 --fps 5 --device cuda --init_policy first_visible --reinit_policy on_lost --detector_stride 1 --redetect_every_n 0 --min_visible_consecutive 1 --lost_patience 2 --empty_mask_when_lost 1 --text_prompt "robot arm, robotic gripper, robot wrist, robot forearm." --box_threshold 0.35 --text_threshold 0.30 --max_mask_area_ratio 0.35 --min_mask_area_ratio 0.002 --max_white_pixel_ratio_in_mask 0.60 --exclude_bottom_ratio 0.14 --erode_kernel_size 3 --composite_erode_kernel_size 1 --blend_alpha_sigma 1.0 --save_removed_video 0 --save_mask_frames 0 --save_mask_video 1 --save_vis_mask_video 1 --save_vis_box_video 1 --save_target_composite_video 1 --overwrite 0 --continue_on_error 1
+```
+
+补跑缺失 id：`--overwrite 0` 会跳过已经有 `final_repainted.mp4` 的输出；如果某个 id 缺 Stage-1 BG，会继续 skip，所以先跑 I1.1.1。
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate inpainting-sam3-dino3 && cd /home/zaijia001/ssd/inpainting_sam3_robot && CUDA_VISIBLE_DEVICES=1 python batch_visible_reinit_d435_repaint.py --tasks handover_bottle pnp_bread pnp_tray --id_start 0 --id_end 80 --fps 5 --device cuda --init_policy first_visible --reinit_policy on_lost --detector_stride 1 --redetect_every_n 0 --min_visible_consecutive 1 --lost_patience 2 --empty_mask_when_lost 1 --text_prompt "robot arm, robotic gripper, robot wrist, robot forearm." --box_threshold 0.35 --text_threshold 0.30 --max_mask_area_ratio 0.35 --min_mask_area_ratio 0.002 --max_white_pixel_ratio_in_mask 0.60 --exclude_bottom_ratio 0.14 --erode_kernel_size 3 --composite_erode_kernel_size 1 --blend_alpha_sigma 1.0 --save_removed_video 0 --save_mask_frames 0 --save_mask_video 1 --save_vis_mask_video 1 --save_vis_box_video 1 --save_target_composite_video 1 --overwrite 0 --continue_on_error 1
+```
+
+如果目标只是先让三个任务都达到至少 25 个 `final_repainted.mp4`，当前已有 Stage-1 的候选已经够用，可以先直接跑下面这条 SAM2/DINO2 fallback 批处理命令；如果后续发现某些 id 因 Stage-1 缺失被 skip，再回到 I1.1.1 补 Stage-1。
+
+当前已存在 final / 还需要补的数量大致是：
+
+```text
+handover_bottle: final=12，还需至少 13；已有 Stage-1 可补 id 4,5,6,7,8,10,12,17,18,21...
+pnp_bread: final=2，还需至少 23；已有 Stage-1 可补 id 21,22,23,...,41,44,58
+pnp_tray: final=14，还需至少 11；已有 Stage-1 可补 id 21,22,23,...,40,45,50
+```
+
+先补到至少 25 个 final 的命令：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate inpainting-sam3-dino3 && cd /home/zaijia001/ssd/inpainting_sam3_robot && CUDA_VISIBLE_DEVICES=1 python batch_visible_reinit_d435_repaint.py --tasks handover_bottle pnp_bread pnp_tray --id_start 0 --id_end 60 --fps 5 --device cuda --init_policy first_visible --reinit_policy on_lost --detector_stride 1 --redetect_every_n 0 --min_visible_consecutive 1 --lost_patience 2 --empty_mask_when_lost 1 --text_prompt "robot arm, robotic gripper, robot wrist, robot forearm." --box_threshold 0.35 --text_threshold 0.30 --max_mask_area_ratio 0.35 --min_mask_area_ratio 0.002 --max_white_pixel_ratio_in_mask 0.60 --exclude_bottom_ratio 0.14 --erode_kernel_size 3 --composite_erode_kernel_size 1 --blend_alpha_sigma 1.0 --save_removed_video 0 --save_mask_frames 0 --save_mask_video 1 --save_vis_mask_video 1 --save_vis_box_video 1 --save_target_composite_video 1 --overwrite 0 --continue_on_error 1
+```
+
+检查输出：
+
+```bash
+for TASK in handover_bottle pnp_bread pnp_tray; do echo "===== ${TASK} ====="; find /home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_d435_sam3_visible_reinit/e0_robot/${TASK} -maxdepth 2 -type f -name final_repainted.mp4 2>/dev/null | wc -l; done
+```
+
 对比时优先看这几类帧：
 
 - 开头 robot 还没进入画面的帧：新模式应只显示 I1 背景，不应贴白底。
@@ -1076,6 +1215,134 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && for TASK in pick
 ```bash
 find /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview -name summary.json | sort
 find /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview -name '*orientation_rank.png' | sort | head -n 30
+```
+
+### J0.1 六任务 D435：筛选可用 AnyGrasp / D435 replay / HaMeR 数据
+
+用途：D435 版本的候选筛选使用 D435 replay 的原始 head 图像作为底图，对应路径是：
+
+```text
+AnyGrasp: /home/zaijia001/ssd/data/piper/hand/<TASK>/<TASK>_output/foundation_input_<ID>
+D435 replay: /home/zaijia001/ssd/data/piper/hand/<TASK>/foundation_replay_d435/foundation_input_<ID>
+HaMeR: /home/zaijia001/ssd/data/piper/hand/<TASK>/harmer_output/hand_detections_<ID>.npz
+```
+
+注意：`place_bread_basket` 当前只检查到 `place_bread_basket_output_old_cam`，所以命令里对这个任务做了 fallback。如果你已经把 D435 AnyGrasp 结果整理成 `place_bread_basket_output`，可以把 `ANY_ROOT` 改回 `${TASK}_output`。
+
+`seq 0 120` 是粗扫，不代表每个任务都有 121 个 episode。当前本机可用基础输入统计大致是：
+
+```text
+pick_diverse_bottles: AnyGrasp/D435 replay/HaMeR 交集 102 个，D435 summary 已生成 102 个
+place_bread_basket: AnyGrasp/D435 replay/HaMeR 交集 92 个，按左右手 effective keyframes 可生成 43 个
+stack_cups: AnyGrasp/D435 replay/HaMeR 交集 47 个，按左右手 effective keyframes 可生成 41 个
+handover_bottle: AnyGrasp/D435 replay/HaMeR 交集 47 个，按左右手 effective keyframes 可生成 47 个
+pnp_bread: AnyGrasp/D435 replay/HaMeR 交集 72 个，按左右手 effective keyframes 可生成 72 个
+pnp_tray: AnyGrasp/D435 replay/HaMeR 交集 51 个，D435 summary 已生成 51 个
+```
+
+如果看到很多 `MISS`，先看是哪一列为 0：
+
+- `anygrasp=0`: 对应 `foundation_input_<ID>/grasps` 不存在，说明 AnyGrasp 检测没生成或该 id 本来不存在。
+- `replay=0`: 对应 `foundation_replay_d435/foundation_input_<ID>/head_anygrasp_frames` 不存在，说明 D435 FoundationPose replay 没生成。
+- `hand=0`: 对应 HaMeR `hand_detections_<ID>.npz` 不存在。
+- 三列都是 0 且 id 超过任务实际最大 id，通常只是 `seq 0 120` 扫得太宽。
+
+```bash
+for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do REPORT=/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview_d435/${TASK}_availability.txt; mkdir -p "$(dirname "$REPORT")"; : > "$REPORT"; ANY_ROOT=/home/zaijia001/ssd/data/piper/hand/${TASK}/${TASK}_output; [[ -d "$ANY_ROOT" ]] || ANY_ROOT=/home/zaijia001/ssd/data/piper/hand/${TASK}/${TASK}_output_old_cam; for ID in $(seq 0 120); do A=${ANY_ROOT}/foundation_input_${ID}; R=/home/zaijia001/ssd/data/piper/hand/${TASK}/foundation_replay_d435/foundation_input_${ID}; H=/home/zaijia001/ssd/data/piper/hand/${TASK}/harmer_output/hand_detections_${ID}.npz; if [[ -d "$A/grasps" && -d "$R/head_anygrasp_frames" && -f "$H" ]]; then echo "OK task=${TASK} id=${ID} anygrasp=$A replay=$R hand=$H" | tee -a "$REPORT"; else echo "MISS task=${TASK} id=${ID} anygrasp=$([[ -d "$A/grasps" ]] && echo 1 || echo 0) replay=$([[ -d "$R/head_anygrasp_frames" ]] && echo 1 || echo 0) hand=$([[ -f "$H" ]] && echo 1 || echo 0) A=$A R=$R H=$H" | tee -a "$REPORT"; fi; done; done
+```
+
+更推荐的交集统计命令：
+
+```bash
+python3 - <<'PY'
+from pathlib import Path
+import json, re
+TASKS = ["pick_diverse_bottles", "place_bread_basket", "stack_cups", "handover_bottle", "pnp_bread", "pnp_tray"]
+BASE = Path("/home/zaijia001/ssd/data/piper/hand")
+PREVIEW = Path("/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview_d435")
+ANNROOT = Path("/home/zaijia001/ssd/RoboTwin/code_painting/h2o_manual_review")
+def ids_any(task):
+    root = BASE / task / f"{task}_output"
+    if not root.exists():
+        root = BASE / task / f"{task}_output_old_cam"
+    return {int(m.group(1)) for p in root.glob("foundation_input_*/grasps") if (m := re.search(r"foundation_input_(\d+)", str(p)))}
+def ids_replay(task):
+    return {int(m.group(1)) for p in (BASE / task / "foundation_replay_d435").glob("foundation_input_*/head_anygrasp_frames") if (m := re.search(r"foundation_input_(\d+)", str(p)))}
+def ids_hand(task):
+    return {int(m.group(1)) for p in (BASE / task / "harmer_output").glob("hand_detections_*.npz") if (m := re.search(r"hand_detections_(\d+)\.npz", p.name))}
+def ids_summary(task):
+    return {int(m.group(1)) for p in (PREVIEW / task).glob("foundation_input_*/summary.json") if (m := re.search(r"foundation_input_(\d+)", str(p)))}
+def dedup(xs):
+    out, seen = [], set()
+    for x in xs:
+        x = int(x)
+        if x not in seen:
+            seen.add(x); out.append(x)
+    return out
+def effective(info, arm):
+    global_k = [int(v) for v in info.get("keyframes", [])]
+    arm_k = [int(v) for v in info.get(f"{arm}_keyframes", [])]
+    return arm_k[:2] if len(arm_k) >= 2 else dedup(arm_k + global_k)[:2]
+for task in TASKS:
+    ann = ANNROOT / task / "hand_keyframes_all.json"
+    videos = json.load(open(ann)).get("videos", {}) if ann.exists() else {}
+    annotated = set()
+    for name, info in videos.items():
+        m = re.search(r"hand_vis_(\d+)", name)
+        if not m or str(info.get("status", "done")).lower() in {"reject", "discard", "bad"}:
+            continue
+        if len(effective(info, "left")) >= 2 and len(effective(info, "right")) >= 2:
+            annotated.add(int(m.group(1)))
+    base_ok = ids_any(task) & ids_replay(task) & ids_hand(task)
+    ready = base_ok & annotated
+    summaries = ids_summary(task)
+    print(f"{task}: base_ok={len(base_ok)} annotated_ready={len(ready)} d435_summary={len(summaries)} missing_summary={sorted(ready - summaries)[:20]}")
+PY
+```
+
+### J1.1 六任务 D435：用人工关键帧生成候选 preview/summary
+
+用途：和 K0.2 一样读取 `hand_keyframes_all.json`，但输入 replay 换成 D435 的 `foundation_replay_d435`，输出写入独立目录：
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview_d435/<TASK>/foundation_input_<ID>/summary.json
+```
+
+下游 D435 AnyGrasp planner 应使用这个 `summary.json`，不要再复用默认广角的 `anygrasp_h2o_preview`。当前 preview 脚本支持两类标注：
+
+- `keyframes` 有两帧：作为全局两关键帧。
+- `keyframes` 不足两帧但 `left_keyframes/right_keyframes` 可补足：写入 `frame_selection.effective_keyframes_by_arm`，下游 planner 会按左右手各自两帧执行。
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do case "$TASK" in pick_diverse_bottles) LEFT_OBJ=left_bottle; RIGHT_OBJ=right_bottle ;; place_bread_basket) LEFT_OBJ=basket; RIGHT_OBJ=bread ;; stack_cups) LEFT_OBJ=left_light_pink_cup; RIGHT_OBJ=right_dark_red_cup ;; handover_bottle) LEFT_OBJ=right_bottle; RIGHT_OBJ=right_bottle ;; pnp_bread) LEFT_OBJ=left_bread; RIGHT_OBJ=right_bread ;; pnp_tray) LEFT_OBJ=left_dark_red_cup; RIGHT_OBJ=right_bottle ;; esac; ANN=/home/zaijia001/ssd/RoboTwin/code_painting/h2o_manual_review/${TASK}/hand_keyframes_all.json; ANY_ROOT=/home/zaijia001/ssd/data/piper/hand/${TASK}/${TASK}_output; [[ -d "$ANY_ROOT" ]] || ANY_ROOT=/home/zaijia001/ssd/data/piper/hand/${TASK}/${TASK}_output_old_cam; REPLAY_ROOT=/home/zaijia001/ssd/data/piper/hand/${TASK}/foundation_replay_d435; HAND_ROOT=/home/zaijia001/ssd/data/piper/hand/${TASK}/harmer_output; OUT_ROOT=/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview_d435/${TASK}; [[ -f "$ANN" ]] || { echo "[skip] task=${TASK} missing annotation $ANN"; continue; }; [[ -d "$ANY_ROOT" ]] || { echo "[skip] task=${TASK} missing ANY_ROOT=$ANY_ROOT"; continue; }; [[ -d "$REPLAY_ROOT" ]] || { echo "[skip] task=${TASK} missing REPLAY_ROOT=$REPLAY_ROOT"; continue; }; VIDEO_PREFIX=foundation_input CUDA_VISIBLE_DEVICES=2 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_render_anygrasp_ranked_preview_keyframes_batch.sh "$ANY_ROOT" "$REPLAY_ROOT" "$HAND_ROOT" "$OUT_ROOT" --hand_keyframes_json "$ANN" --left_target_object "$LEFT_OBJ" --right_target_object "$RIGHT_OBJ" --anygrasp_score_weight 0.25 --orientation_score_weight 0.75 --max_rotation_distance_deg 90 --candidate_target_local_x_offset_m -0.05 --draw_object_overlay 1 --draw_hand_reference 1 --debug_dump_object_distances 1 --top_k 20 --camera_cv_axis_mode legacy_r1; done
+```
+
+输出检查：
+
+```bash
+find /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview_d435 -name summary.json | sort | head -n 50
+find /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview_d435 -name '*orientation_rank.png' | sort | head -n 50
+for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do echo "===== ${TASK} ====="; find /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview_d435/${TASK} -name summary.json 2>/dev/null | wc -l; done
+```
+
+### J1.2 D435：只重跑指定 id 的候选 preview/summary
+
+用途：如果 J1.1 只在部分 id 上生成了正确的 D435 AnyGrasp 检测结果，可以只重跑这些 id 的关键帧候选选择，避免覆盖或等待全任务。下面命令以你当前看到有 D435 preview 图的 `pick_diverse_bottles` id 为例。输出仍然是：
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview_d435/pick_diverse_bottles/foundation_input_<ID>/summary.json
+```
+
+重要：这一步只生成候选 preview/summary；后面的 planner 必须使用 `L15.3` 的 D435 路径，不要混用默认广角的 `foundation_replay` 或 `anygrasp_h2o_preview`。
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && TASK=pick_diverse_bottles; IDS="2 17 18 19 20 21"; case "$TASK" in pick_diverse_bottles) LEFT_OBJ=left_bottle; RIGHT_OBJ=right_bottle ;; pnp_tray) LEFT_OBJ=left_dark_red_cup; RIGHT_OBJ=right_bottle ;; *) echo "[error] add object mapping for TASK=$TASK"; exit 1 ;; esac; ANN=/home/zaijia001/ssd/RoboTwin/code_painting/h2o_manual_review/${TASK}/hand_keyframes_all.json; ANY_ROOT=/home/zaijia001/ssd/data/piper/hand/${TASK}/${TASK}_output; [[ -d "$ANY_ROOT" ]] || ANY_ROOT=/home/zaijia001/ssd/data/piper/hand/${TASK}/${TASK}_output_old_cam; REPLAY_ROOT=/home/zaijia001/ssd/data/piper/hand/${TASK}/foundation_replay_d435; HAND_ROOT=/home/zaijia001/ssd/data/piper/hand/${TASK}/harmer_output; OUT_ROOT=/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview_d435/${TASK}; [[ -f "$ANN" ]] || { echo "[error] missing annotation $ANN"; exit 1; }; [[ -d "$ANY_ROOT" ]] || { echo "[error] missing ANY_ROOT=$ANY_ROOT"; exit 1; }; [[ -d "$REPLAY_ROOT" ]] || { echo "[error] missing REPLAY_ROOT=$REPLAY_ROOT"; exit 1; }; VIDEO_PREFIX=foundation_input CUDA_VISIBLE_DEVICES=2 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_render_anygrasp_ranked_preview_keyframes_batch.sh "$ANY_ROOT" "$REPLAY_ROOT" "$HAND_ROOT" "$OUT_ROOT" --ids ${IDS} --hand_keyframes_json "$ANN" --left_target_object "$LEFT_OBJ" --right_target_object "$RIGHT_OBJ" --anygrasp_score_weight 0.25 --orientation_score_weight 0.75 --max_rotation_distance_deg 90 --candidate_target_local_x_offset_m -0.05 --draw_object_overlay 1 --draw_hand_reference 1 --debug_dump_object_distances 1 --top_k 20 --camera_cv_axis_mode legacy_r1
+```
+
+指定 id 输出检查：
+
+```bash
+TASK=pick_diverse_bottles; for ID in 2 17 18 19 20 21; do echo "===== id=${ID} ====="; ls -lh /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview_d435/${TASK}/foundation_input_${ID}/summary.json /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview_d435/${TASK}/foundation_input_${ID}/*orientation_rank.png 2>/dev/null || true; done
 ```
 
 ## K. AnyGrasp replay + SAM repaint：使用 J 的候选贴回人手背景
@@ -1628,6 +1895,71 @@ find /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_plan -maxdepth 3 -t
 
 不推荐把 `h2_pure/<TASK>/id<ID>_z005/left_wrist_replay.mp4` 直接当作 AnyGrasp wrist，因为它对应的是人手 retarget pure replay，不是 AnyGrasp planner 的 `pose_debug.jsonl`，wrist 图像和 action/state 可能不对齐。临时调试可以这样做，但不建议作为最终训练数据。
 
+### L0. H2O pi0 三类数据处理总览和运行顺序
+
+本段是索引，避免把 human 数据、普通 robot replay 数据、AnyGrasp replay 数据混在一起。三类数据最终都要走：
+
+```text
+视频/轨迹源 -> processed HDF5 -> LeRobot cache -> 25 episode subset/zip
+```
+
+#### L0.1 Human 数据：真实人手 head + replay action/wrist
+
+用途：`cam_high` 保留真实人手视频，action/state/wrist 来自 replay 计算结果。适合作为真实视觉 baseline。
+
+旧三任务默认广角 action/wrist：
+
+```text
+L5 或 L5.1 -> L10.4 的 human_head_pure_action -> L11
+```
+
+新三任务当前已有的是 D435 action/wrist：
+
+```text
+L5.2 -> L10.5 -> L11.1.3
+```
+
+注意：`handover_bottle / pnp_bread / pnp_tray` 当前没有 `h2_pure/<TASK>/id<ID>_z005`，所以不要对这三个任务跑 L5.1；应跑 L5.2。
+
+#### L0.2 Robot replay 数据：repaint robot head + pure replay action/wrist
+
+默认广角 robot replay：
+
+```text
+旧三任务：已有 L6，六任务批量用 L6.1 -> L10.4 的 pure_repaint -> L11.2
+```
+
+D435 robot replay / visible-reinit：
+
+```text
+旧三任务：I1 -> I3.4 -> L8 或 L8.2 -> L10.3 或 L10.6 -> L11.2.4
+新三任务：I1.1 -> I3.5 -> L8.1 或 L8.2 -> L10.6 -> L11.2.4
+```
+
+当前新三任务还缺 Stage-1 和 D435 robot repaint，所以要先跑 I1.1，再跑 I3.5，最后跑 L8.1。
+
+#### L0.3 AnyGrasp replay 数据：AnyGrasp repaint head + planner action/wrist
+
+用途：`cam_high` 使用 AnyGrasp planner/repaint 的 robot 视频，action/state/wrist 来自 planner 输出。
+
+```text
+L9 或 L9.1 -> L10.4 的 anygrasp_repaint -> L11.2
+```
+
+前提是每个 planner episode 已有：
+
+```text
+pose_debug.jsonl
+left_wrist_cam_plan.mp4
+right_wrist_cam_plan.mp4
+```
+
+如果 wrist plan 视频没补齐，L9/L9.1 会 skip，严重时会报 `No usable episodes were processed`。
+
+#### L0.4 task prompt 设置位置
+
+prompt 应在 processed HDF5 生成阶段设置，也就是 L5/L5.1/L5.2/L6.1/L8.1/L9.1 的 `INSTRUCTION="..."`。当前 `convert_aloha_data_to_lerobot_R1.py --task` 不会覆盖已经写进 `episode_*/instructions.json` 的文本；如果 processed data 已经生成但还没转 LeRobot，先按 L11.3 改 `instructions.json`。
+
 ### L5. 三个任务分别转换：L1 原始人手 head + pure replay action/wrist
 
 用途：`cam_high` 使用真实人手原始视频 `rgb_<ID>.mp4`，action/state 与左右 wrist 使用 L2 pure replay 计算结果。三条命令都用 `hand_keyframes_all.json` 过滤 `reject/discard/bad`。
@@ -1643,6 +1975,68 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate R
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin/policy/pi0 && TASK=stack_cups; INSTRUCTION="stack cups"; N=120; python scripts/process_repainted_headcam_with_wrist.py "h2o_${TASK}_human_head_pure_action" "$INSTRUCTION" ${N} --head-root /home/zaijia001/ssd/data/piper/hand/${TASK}/harmer_input --head-dir-template '.' --head-video-name 'rgb_{id}.mp4' --retarget-root /home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure/${TASK} --retarget-dir-template 'id{id}_z005' --world-targets-name world_targets_and_status.npz --left-wrist-video-name left_wrist_replay.mp4 --right-wrist-video-name right_wrist_replay.mp4 --review-json /home/zaijia001/ssd/RoboTwin/code_painting/h2o_manual_review/${TASK}/hand_keyframes_all.json --output-dir /home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_${TASK}_human_head_pure_action-${N}
 ```
 
+### L5.1 六个任务转换：原始人手 head + pure replay action/wrist
+
+用途：这是 L5 的 6-task 版本。`cam_high` 使用真实人手原始视频 `harmer_input/rgb_<ID>.mp4`，action/state 与左右 wrist 使用 `h2_pure/<TASK>/id<ID>_z005` 的 pure replay 结果。生成后续 LeRobot cache：
+
+```text
+/home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_<TASK>_human_head_pure_action-120
+```
+
+前提：每个 task/id 已经存在：
+
+```text
+/home/zaijia001/ssd/data/piper/hand/<TASK>/harmer_input/rgb_<ID>.mp4
+/home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure/<TASK>/id<ID>_z005/world_targets_and_status.npz
+/home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure/<TASK>/id<ID>_z005/left_wrist_replay.mp4
+/home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure/<TASK>/id<ID>_z005/right_wrist_replay.mp4
+```
+
+运行命令：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin/policy/pi0 && N=120; for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do case "$TASK" in pick_diverse_bottles) INSTRUCTION="pick up one bottle with one arm, and pick up another bottle with the other arm." ;; place_bread_basket) INSTRUCTION="Use one arm to pick up the bread, put it into the basket, and use another arm to lift the basket." ;; stack_cups) INSTRUCTION="Stack the dark red and light red cups onto the green cup." ;; handover_bottle) INSTRUCTION="Use the right arm to grasp the bottle on the table, handover it to the left arm." ;; pnp_bread) INSTRUCTION="Pick up two breads, then place them onto the blue plate." ;; pnp_tray) INSTRUCTION="Use the left arm to grasp the red cup, and use the right arm to grasp the bottle, then place them onto the blue tray." ;; esac; echo "===== process human_head_pure_action TASK=${TASK} ====="; python scripts/process_repainted_headcam_with_wrist.py "h2o_${TASK}_human_head_pure_action" "$INSTRUCTION" ${N} --head-root /home/zaijia001/ssd/data/piper/hand/${TASK}/harmer_input --head-dir-template '.' --head-video-name 'rgb_{id}.mp4' --retarget-root /home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure/${TASK} --retarget-dir-template 'id{id}_z005' --world-targets-name world_targets_and_status.npz --left-wrist-video-name left_wrist_replay.mp4 --right-wrist-video-name right_wrist_replay.mp4 --review-json /home/zaijia001/ssd/RoboTwin/code_painting/h2o_manual_review/${TASK}/hand_keyframes_all.json --output-dir /home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_${TASK}_human_head_pure_action-${N}; done
+```
+
+检查 6 个 processed HDF5 数量：
+
+```bash
+for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do ROOT=/home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_${TASK}_human_head_pure_action-120; echo "===== ${TASK} ====="; find "$ROOT" -mindepth 2 -maxdepth 2 -type f -name 'episode_*.hdf5' 2>/dev/null | sort | wc -l; done
+```
+
+### L5.2 新三任务当前可用版本：原始人手 head + D435 pure replay action/wrist
+
+用途：`handover_bottle / pnp_bread / pnp_tray` 当前检查到已经生成的是：
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure_d435/<TASK>/id<ID>_d435_z005
+```
+
+而不是：
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure/<TASK>/id<ID>_z005
+```
+
+所以直接跑 L5.1 会在新三任务上因为缺少 `h2_pure/<TASK>/id<ID>_z005` 全部 skip。若要先使用当前已有结果处理新三任务的人手视频，应使用下面的 D435 action/wrist 版本：`cam_high` 仍是真实人手 `rgb_<ID>.mp4`，action/state 与 wrist 来自 `h2_pure_d435`。
+
+如果目标是后续和 D435 robot replay 对比，推荐顺序：
+
+1. 先跑 L5.2，得到真实人手 head + D435 action/wrist 的 baseline。
+2. 再跑 I1.1，生成新三任务 Stage-1 人手抠除背景。
+3. 再跑 I3.5，生成新三任务 D435 visible-reinit robot repaint。
+4. 最后跑 L8.1，把新三任务 D435 robot repaint 转成 processed HDF5。
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin/policy/pi0 && N=120; for TASK in handover_bottle pnp_bread pnp_tray; do case "$TASK" in handover_bottle) INSTRUCTION="Use the right arm to grasp the bottle on the table, handover it to the left arm." ;; pnp_bread) INSTRUCTION="Pick up two breads, then place them onto the blue plate." ;; pnp_tray) INSTRUCTION="Use the left arm to grasp the red cup, and use the right arm to grasp the bottle, then place them onto the blue tray." ;; esac; echo "===== process human_head_pure_d435_action TASK=${TASK} ====="; python scripts/process_repainted_headcam_with_wrist.py "h2o_${TASK}_human_head_pure_d435_action" "$INSTRUCTION" ${N} --head-root /home/zaijia001/ssd/data/piper/hand/${TASK}/harmer_input --head-dir-template '.' --head-video-name 'rgb_{id}.mp4' --retarget-root /home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure_d435/${TASK} --retarget-dir-template 'id{id}_d435_z005' --world-targets-name world_targets_and_status.npz --left-wrist-video-name left_wrist_replay.mp4 --right-wrist-video-name right_wrist_replay.mp4 --review-json /home/zaijia001/ssd/RoboTwin/code_painting/h2o_manual_review/${TASK}/hand_keyframes_all.json --output-dir /home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_${TASK}_human_head_pure_d435_action-${N}; done
+```
+
+检查：
+
+```bash
+for TASK in handover_bottle pnp_bread pnp_tray; do ROOT=/home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_${TASK}_human_head_pure_d435_action-120; echo "===== ${TASK} ====="; find "$ROOT" -mindepth 2 -maxdepth 2 -type f -name 'episode_*.hdf5' 2>/dev/null | sort | wc -l; done
+```
+
 ### L6. 三个任务分别转换：L2 repaint robot head + pure replay action/wrist
 
 用途：`cam_high` 使用 Stage-2 最终合成的 `final_repainted.mp4`，action/state 与左右 wrist 使用同一条 pure replay 结果。
@@ -1656,6 +2050,50 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate R
 
 # stack_cups
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin/policy/pi0 && TASK=stack_cups; INSTRUCTION="stack cups"; N=120; python scripts/process_repainted_headcam_with_wrist.py "h2o_${TASK}_pure_repaint" "$INSTRUCTION" ${N} --head-root /home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2/e0_robot/${TASK} --head-dir-template 'id_{id}' --head-video-name final_repainted.mp4 --retarget-root /home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure/${TASK} --retarget-dir-template 'id{id}_z005' --world-targets-name world_targets_and_status.npz --left-wrist-video-name left_wrist_replay.mp4 --right-wrist-video-name right_wrist_replay.mp4 --review-json /home/zaijia001/ssd/RoboTwin/code_painting/h2o_manual_review/${TASK}/hand_keyframes_all.json --output-dir /home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_${TASK}_pure_repaint-${N}
+```
+
+### L6.1 六个任务转换：repaint robot head + pure replay action/wrist
+
+用途：这是 L11.2 抽取 `local/h2o_<TASK>_pure_repaint` 前必须先跑的前置步骤之一。它会把 6 个 task 的 robot repaint head 和 pure replay action/wrist 先转换成 pi0 intermediate HDF5：
+
+```text
+/home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_<TASK>_pure_repaint-120
+```
+
+前提：每个 task/id 已经存在：
+
+```text
+/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2/e0_robot/<TASK>/id_<ID>/final_repainted.mp4
+/home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure/<TASK>/id<ID>_z005/world_targets_and_status.npz
+/home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure/<TASK>/id<ID>_z005/left_wrist_replay.mp4
+/home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure/<TASK>/id<ID>_z005/right_wrist_replay.mp4
+```
+
+重要：L6.1 是默认广角 `h2_pure` 流程，不是 D435 流程。当前检查结果是：
+
+```text
+旧三任务 pick_diverse_bottles/place_bread_basket/stack_cups：有 h2_pure、默认 repaint head，也有 h2_pure_d435。
+新三任务 handover_bottle/pnp_bread/pnp_tray：只有 h2_pure_d435，没有 h2_pure，也没有默认广角 results_repaint_piper_h2/e0_robot/<TASK>/id_<ID>/final_repainted.mp4。
+```
+
+所以对新三任务运行 L6.1 会全部 skip，并最终报：
+
+```text
+RuntimeError: No usable episodes were processed. Check directory templates and video names.
+```
+
+这不是 `process_repainted_headcam_with_wrist.py` 的逻辑错误，而是输入路径不属于同一条 pipeline。新三任务要处理 robot replay，应走 D435 流程：`I1.1 -> I3.5 -> L8.1/L8.2 -> L10.6 -> L11.2.4`。
+
+运行命令：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin/policy/pi0 && N=120; for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do case "$TASK" in pick_diverse_bottles) INSTRUCTION="pick up one bottle with one arm, and pick up another bottle with the other arm." ;; place_bread_basket) INSTRUCTION="Use one arm to pick up the bread, put it into the basket, and use another arm to lift the basket." ;; stack_cups) INSTRUCTION="Stack the dark red and light red cups onto the green cup." ;; handover_bottle) INSTRUCTION="Use the right arm to grasp the bottle on the table, handover it to the left arm." ;; pnp_bread) INSTRUCTION="Pick up two breads, then place them onto the blue plate." ;; pnp_tray) INSTRUCTION="Use the left arm to grasp the red cup, and use the right arm to grasp the bottle, then place them onto the blue tray." ;; esac; echo "===== process pure_repaint TASK=${TASK} ====="; python scripts/process_repainted_headcam_with_wrist.py "h2o_${TASK}_pure_repaint" "$INSTRUCTION" ${N} --head-root /home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2/e0_robot/${TASK} --head-dir-template 'id_{id}' --head-video-name final_repainted.mp4 --retarget-root /home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure/${TASK} --retarget-dir-template 'id{id}_z005' --world-targets-name world_targets_and_status.npz --left-wrist-video-name left_wrist_replay.mp4 --right-wrist-video-name right_wrist_replay.mp4 --review-json /home/zaijia001/ssd/RoboTwin/code_painting/h2o_manual_review/${TASK}/hand_keyframes_all.json --output-dir /home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_${TASK}_pure_repaint-${N}; done
+```
+
+检查 6 个 processed HDF5 数量：
+
+```bash
+for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do ROOT=/home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_${TASK}_pure_repaint-120; echo "===== ${TASK} ====="; find "$ROOT" -mindepth 2 -maxdepth 2 -type f -name 'episode_*.hdf5' 2>/dev/null | sort | wc -l; done
 ```
 
 ### L7. 检查和可视化 pi0 processed_data
@@ -1720,6 +2158,62 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate R
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin/policy/pi0 && TASK=stack_cups; INSTRUCTION="stack cups"; N=120; python scripts/process_repainted_headcam_with_wrist.py "h2o_${TASK}_pure_d435_visible_reinit" "$INSTRUCTION" ${N} --head-root /home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_d435_sam3_visible_reinit/e0_robot/${TASK} --head-dir-template 'id_{id}_d435' --head-video-name final_repainted.mp4 --retarget-root /home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure_d435/${TASK} --retarget-dir-template 'id{id}_d435_z005' --world-targets-name world_targets_and_status.npz --left-wrist-video-name left_wrist_replay.mp4 --right-wrist-video-name right_wrist_replay.mp4 --review-json /home/zaijia001/ssd/RoboTwin/code_painting/h2o_manual_review/${TASK}/hand_keyframes_all.json --output-dir /home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_${TASK}_pure_d435_visible_reinit-${N}
 ```
 
+### L8.1 新三任务：D435 visible-reinit robot repaint head + D435 pure replay action/wrist
+
+用途：把 I3.5 的 D435 robot repaint 结果转成 pi0 processed HDF5。输出可直接和 L5.2 的 `h2o_<TASK>_human_head_pure_d435_action-120` 对比。
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin/policy/pi0 && N=120; for TASK in handover_bottle pnp_bread pnp_tray; do case "$TASK" in handover_bottle) INSTRUCTION="Use the right arm to grasp the bottle on the table, handover it to the left arm." ;; pnp_bread) INSTRUCTION="Pick up two breads, then place them onto the blue plate." ;; pnp_tray) INSTRUCTION="Use the left arm to grasp the red cup, and use the right arm to grasp the bottle, then place them onto the blue tray." ;; esac; echo "===== process pure_d435_visible_reinit TASK=${TASK} ====="; python scripts/process_repainted_headcam_with_wrist.py "h2o_${TASK}_pure_d435_visible_reinit" "$INSTRUCTION" ${N} --head-root /home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_d435_sam3_visible_reinit/e0_robot/${TASK} --head-dir-template 'id_{id}_d435' --head-video-name final_repainted.mp4 --retarget-root /home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure_d435/${TASK} --retarget-dir-template 'id{id}_d435_z005' --world-targets-name world_targets_and_status.npz --left-wrist-video-name left_wrist_replay.mp4 --right-wrist-video-name right_wrist_replay.mp4 --review-json /home/zaijia001/ssd/RoboTwin/code_painting/h2o_manual_review/${TASK}/hand_keyframes_all.json --output-dir /home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_${TASK}_pure_d435_visible_reinit-${N}; done
+```
+
+检查：
+
+```bash
+for TASK in handover_bottle pnp_bread pnp_tray; do ROOT=/home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_${TASK}_pure_d435_visible_reinit-120; echo "===== ${TASK} ====="; find "$ROOT" -mindepth 2 -maxdepth 2 -type f -name 'episode_*.hdf5' 2>/dev/null | sort | wc -l; done
+```
+
+### L8.2 六个任务 D435 robot replay：visible-reinit head + D435 action/wrist 转 processed HDF5
+
+用途：这是 D435 robot replay 的六任务统一转换入口，输出：
+
+```text
+/home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_<TASK>_pure_d435_visible_reinit-120
+```
+
+前置关系：
+
+```text
+旧三任务：E2.4 D435 retarget -> I1 Stage-1 BG -> I3.4 D435 visible-reinit repaint -> L8.2
+新三任务：E2.5 D435 retarget -> I1.1 Stage-1 BG -> I3.5 D435 visible-reinit repaint -> L8.2
+```
+
+每个 id 需要同时存在：
+
+```text
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_d435_sam3_visible_reinit/e0_robot/<TASK>/id_<ID>_d435/final_repainted.mp4
+/home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure_d435/<TASK>/id<ID>_d435_z005/world_targets_and_status.npz
+/home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure_d435/<TASK>/id<ID>_d435_z005/left_wrist_replay.mp4
+/home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure_d435/<TASK>/id<ID>_d435_z005/right_wrist_replay.mp4
+```
+
+当前前置完成情况可以先用这个命令检查：
+
+```bash
+for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do echo "===== ${TASK} ====="; echo -n "h2_pure_d435 dirs: "; find /home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure_d435/${TASK} -maxdepth 1 -type d -name 'id*_d435_z005' 2>/dev/null | wc -l; echo -n "D435 repaint finals: "; find /home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_d435_sam3_visible_reinit/e0_robot/${TASK} -maxdepth 2 -type f -name final_repainted.mp4 2>/dev/null | wc -l; done
+```
+
+运行命令：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin/policy/pi0 && N=120; for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do case "$TASK" in pick_diverse_bottles) INSTRUCTION="pick up one bottle with one arm, and pick up another bottle with the other arm." ;; place_bread_basket) INSTRUCTION="Use one arm to pick up the bread, put it into the basket, and use another arm to lift the basket." ;; stack_cups) INSTRUCTION="Stack the dark red and light red cups onto the green cup." ;; handover_bottle) INSTRUCTION="Use the right arm to grasp the bottle on the table, handover it to the left arm." ;; pnp_bread) INSTRUCTION="Pick up two breads, then place them onto the blue plate." ;; pnp_tray) INSTRUCTION="Use the left arm to grasp the red cup, and use the right arm to grasp the bottle, then place them onto the blue tray." ;; esac; echo "===== process pure_d435_visible_reinit TASK=${TASK} ====="; python scripts/process_repainted_headcam_with_wrist.py "h2o_${TASK}_pure_d435_visible_reinit" "$INSTRUCTION" ${N} --head-root /home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_d435_sam3_visible_reinit/e0_robot/${TASK} --head-dir-template 'id_{id}_d435' --head-video-name final_repainted.mp4 --retarget-root /home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure_d435/${TASK} --retarget-dir-template 'id{id}_d435_z005' --world-targets-name world_targets_and_status.npz --left-wrist-video-name left_wrist_replay.mp4 --right-wrist-video-name right_wrist_replay.mp4 --review-json /home/zaijia001/ssd/RoboTwin/code_painting/h2o_manual_review/${TASK}/hand_keyframes_all.json --output-dir /home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_${TASK}_pure_d435_visible_reinit-${N}; done
+```
+
+检查 6 个 processed HDF5 数量：
+
+```bash
+for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do ROOT=/home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_${TASK}_pure_d435_visible_reinit-120; echo "===== ${TASK} ====="; find "$ROOT" -mindepth 2 -maxdepth 2 -type f -name 'episode_*.hdf5' 2>/dev/null | sort | wc -l; done
+```
+
 ### L9. 三个任务分别转换：AnyGrasp repaint head + planner action/wrist
 
 前提：每个 planner episode 已经补齐 `left_wrist_cam_plan.mp4` 和 `right_wrist_cam_plan.mp4`。如果还没补齐，下面命令会逐 id skip，并最终可能报 `No usable episodes were processed`。
@@ -1733,6 +2227,37 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate R
 
 # stack_cups
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin/policy/pi0 && TASK=stack_cups; INSTRUCTION="stack cups"; N=60; python scripts/process_repainted_planner_outputs.py "h2o_${TASK}_anygrasp_repaint" "$INSTRUCTION" ${N} --head-root /home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2/anygrasp/${TASK} --head-dir-template 'id_{id}' --head-video-name final_repainted.mp4 --planner-root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_plan/${TASK} --planner-dir-template 'foundation_input_{id}' --left-wrist-video-name left_wrist_cam_plan.mp4 --right-wrist-video-name right_wrist_cam_plan.mp4 --pose-debug-name pose_debug.jsonl --review-json /home/zaijia001/ssd/RoboTwin/code_painting/h2o_manual_review/${TASK}/hand_keyframes_all.json --output-dir /home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_${TASK}_anygrasp_repaint-${N}
+```
+
+### L9.1 六个任务转换：AnyGrasp repaint head + planner action/wrist
+
+用途：这是 L11.2 抽取 `local/h2o_<TASK>_anygrasp_repaint` 前必须先跑的前置步骤之一。它会把 6 个 task 的 AnyGrasp repaint head 和 planner action/wrist 转换成 pi0 intermediate HDF5：
+
+```text
+/home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_<TASK>_anygrasp_repaint-60
+```
+
+前提：每个 task/id 已经存在：
+
+```text
+/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2/anygrasp/<TASK>/id_<ID>/final_repainted.mp4
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_plan/<TASK>/foundation_input_<ID>/pose_debug.jsonl
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_plan/<TASK>/foundation_input_<ID>/left_wrist_cam_plan.mp4
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_plan/<TASK>/foundation_input_<ID>/right_wrist_cam_plan.mp4
+```
+
+如果 wrist plan 视频还没补齐，命令会 skip 对应 id，严重时最后会报 `No usable episodes were processed`。
+
+运行命令：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin/policy/pi0 && N=60; for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do case "$TASK" in pick_diverse_bottles) INSTRUCTION="pick up one bottle with one arm, and pick up another bottle with the other arm." ;; place_bread_basket) INSTRUCTION="place the bread into the basket." ;; stack_cups) INSTRUCTION="stack the cups." ;; handover_bottle) INSTRUCTION="handover the bottle." ;; pnp_bread) INSTRUCTION="pick and place the bread." ;; pnp_tray) INSTRUCTION="pick and place the objects on the tray." ;; esac; echo "===== process anygrasp_repaint TASK=${TASK} ====="; python scripts/process_repainted_planner_outputs.py "h2o_${TASK}_anygrasp_repaint" "$INSTRUCTION" ${N} --head-root /home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2/anygrasp/${TASK} --head-dir-template 'id_{id}' --head-video-name final_repainted.mp4 --planner-root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_plan/${TASK} --planner-dir-template 'foundation_input_{id}' --left-wrist-video-name left_wrist_cam_plan.mp4 --right-wrist-video-name right_wrist_cam_plan.mp4 --pose-debug-name pose_debug.jsonl --review-json /home/zaijia001/ssd/RoboTwin/code_painting/h2o_manual_review/${TASK}/hand_keyframes_all.json --output-dir /home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_${TASK}_anygrasp_repaint-${N}; done
+```
+
+检查 6 个 AnyGrasp processed HDF5 数量：
+
+```bash
+for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do ROOT=/home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_${TASK}_anygrasp_repaint-60; echo "===== ${TASK} ====="; find "$ROOT" -mindepth 2 -maxdepth 2 -type f -name 'episode_*.hdf5' 2>/dev/null | sort | wc -l; done
 ```
 
 L8/L9 的输出也用 L7 的统计、HDF5 结构检查和 `visualize_processed_hdf5_episode.py` 生成 review mp4。把 L7 里的 `DATASET` 替换成：
@@ -1794,6 +2319,94 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate R
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_openvla && cd /home/zaijia001/ssd/RoboTwin/policy/pi0 && TASK=stack_cups; DATASET=/home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_${TASK}_pure_d435_visible_reinit-120; uv run examples/aloha_real/convert_aloha_data_to_lerobot_R1.py --raw-dir "$DATASET" --repo-id "local/h2o_${TASK}_pure_d435_visible_reinit" --task "stack cups" --use-wrist --mode video
 ```
 
+#### L10.4 六个任务：把 L6.1/L9.1 的 processed HDF5 转成 LeRobot cache
+
+用途：这是 L11.2 抽取 `_25ep` 前必须先跑的前置步骤。你刚才遇到的 `Dataset not found as path or repo id: local/h2o_<TASK>_pure_repaint`，就是因为这一步还没生成对应 LeRobot cache。
+
+注意：当前 `convert_aloha_data_to_lerobot_R1.py` 的 `--task` 不会覆盖 processed episode 里已有的 `instructions.json`。prompt 要在 L6.1/L9.1 的 `INSTRUCTION="..."` 设置，或者按 L11.3 先批量改 `episode_*/instructions.json` 后再运行这里。
+
+六任务原始人手 head + pure action：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_openvla && cd /home/zaijia001/ssd/RoboTwin/policy/pi0 && for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do DATASET=/home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_${TASK}_human_head_pure_action-120; case "$TASK" in pick_diverse_bottles) INSTRUCTION="pick up one bottle with one arm, and pick up another bottle with the other arm." ;; place_bread_basket) INSTRUCTION="Use one arm to pick up the bread, put it into the basket, and use another arm to lift the basket." ;; stack_cups) INSTRUCTION="Stack the dark red and light red cups onto the green cup." ;; handover_bottle) INSTRUCTION="Use the right arm to grasp the bottle on the table, handover it to the left arm." ;; pnp_bread) INSTRUCTION="Pick up two breads, then place them onto the blue plate." ;; pnp_tray) INSTRUCTION="Use the left arm to grasp the red cup, and use the right arm to grasp the bottle, then place them onto the blue tray." ;; esac; [[ -d "$DATASET" ]] || { echo "[skip] missing DATASET=$DATASET; run L5.1 first"; continue; }; uv run examples/aloha_real/convert_aloha_data_to_lerobot_R1.py --raw-dir "$DATASET" --repo-id "local/h2o_${TASK}_human_head_pure_action" --task "$INSTRUCTION" --use-wrist --mode video; done
+```
+
+六任务默认广角 robot replay：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_openvla && cd /home/zaijia001/ssd/RoboTwin/policy/pi0 && for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do DATASET=/home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_${TASK}_pure_repaint-120; case "$TASK" in pick_diverse_bottles) INSTRUCTION="pick up one bottle with one arm, and pick up another bottle with the other arm." ;; place_bread_basket) INSTRUCTION="Use one arm to pick up the bread, put it into the basket, and use another arm to lift the basket." ;; stack_cups) INSTRUCTION="Stack the dark red and light red cups onto the green cup." ;; handover_bottle) INSTRUCTION="Use the right arm to grasp the bottle on the table, handover it to the left arm." ;; pnp_bread) INSTRUCTION="Pick up two breads, then place them onto the blue plate." ;; pnp_tray) INSTRUCTION="Use the left arm to grasp the red cup, and use the right arm to grasp the bottle, then place them onto the blue tray." ;; esac; [[ -d "$DATASET" ]] || { echo "[skip] missing DATASET=$DATASET; run L6.1 first"; continue; }; uv run examples/aloha_real/convert_aloha_data_to_lerobot_R1.py --raw-dir "$DATASET" --repo-id "local/h2o_${TASK}_pure_repaint" --task "$INSTRUCTION" --use-wrist --mode video; done
+```
+
+六任务 AnyGrasp robot：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_openvla && cd /home/zaijia001/ssd/RoboTwin/policy/pi0 && for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do DATASET=/home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_${TASK}_anygrasp_repaint-60; case "$TASK" in pick_diverse_bottles) INSTRUCTION="pick up one bottle with one arm, and pick up another bottle with the other arm." ;; place_bread_basket) INSTRUCTION="Use one arm to pick up the bread, put it into the basket, and use another arm to lift the basket." ;; stack_cups) INSTRUCTION="Stack the dark red and light red cups onto the green cup." ;; handover_bottle) INSTRUCTION="Use the right arm to grasp the bottle on the table, handover it to the left arm." ;; pnp_bread) INSTRUCTION="Pick up two breads, then place them onto the blue plate." ;; pnp_tray) INSTRUCTION="Use the left arm to grasp the red cup, and use the right arm to grasp the bottle, then place them onto the blue tray." ;; esac; [[ -d "$DATASET" ]] || { echo "[skip] missing DATASET=$DATASET; run L9.1 first"; continue; }; uv run examples/aloha_real/convert_aloha_data_to_lerobot_R1.py --raw-dir "$DATASET" --repo-id "local/h2o_${TASK}_anygrasp_repaint" --task "$INSTRUCTION" --use-wrist --mode video; done
+```
+
+#### L10.5 新三任务 L5.2：human head + D435 action/wrist 转 LeRobot
+
+用途：L5.2 的输出数据集名是 `h2o_<TASK>_human_head_pure_d435_action-120`，不能用 L10.4 里的 `human_head_pure_action` 命令转换。跑完 L5.2 后，使用这里的命令转成 LeRobot cache：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_openvla && cd /home/zaijia001/ssd/RoboTwin/policy/pi0 && for TASK in handover_bottle pnp_bread pnp_tray; do DATASET=/home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_${TASK}_human_head_pure_d435_action-120; case "$TASK" in handover_bottle) INSTRUCTION="Use the right arm to grasp the bottle on the table, handover it to the left arm." ;; pnp_bread) INSTRUCTION="Pick up two breads, then place them onto the blue plate." ;; pnp_tray) INSTRUCTION="Use the left arm to grasp the red cup, and use the right arm to grasp the bottle, then place them onto the blue tray." ;; esac; [[ -d "$DATASET" ]] || { echo "[skip] missing DATASET=$DATASET; run L5.2 first"; continue; }; uv run examples/aloha_real/convert_aloha_data_to_lerobot_R1.py --raw-dir "$DATASET" --repo-id "local/h2o_${TASK}_human_head_pure_d435_action" --task "$INSTRUCTION" --use-wrist --mode video; done
+```
+
+检查：
+
+```bash
+for TASK in handover_bottle pnp_bread pnp_tray; do ROOT=/home/zaijia001/.cache/huggingface/lerobot/local/h2o_${TASK}_human_head_pure_d435_action; echo "===== h2o_${TASK}_human_head_pure_d435_action ====="; if [[ -f "$ROOT/meta/info.json" ]]; then python3 - "$ROOT" <<'PY'
+import json, sys
+from pathlib import Path
+root = Path(sys.argv[1])
+info = json.load(open(root / "meta/info.json"))
+print("total_episodes:", info.get("total_episodes"))
+print("total_frames:", info.get("total_frames"))
+PY
+else echo "missing"; fi; done
+```
+
+#### L10.6 六个任务 L8.2：D435 robot replay 转 LeRobot cache
+
+用途：把 L8/L8.1/L8.2 生成的六任务 D435 robot replay processed HDF5 转成 LeRobot cache：
+
+```text
+local/h2o_<TASK>_pure_d435_visible_reinit
+```
+
+注意：如果某个 task 的 L8.2 processed HDF5 还是 0 个 episode，这一步会失败或生成无效 cache。先用 L8.2 的数量检查确认前置完成。
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_openvla && cd /home/zaijia001/ssd/RoboTwin/policy/pi0 && for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do DATASET=/home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_${TASK}_pure_d435_visible_reinit-120; case "$TASK" in pick_diverse_bottles) INSTRUCTION="pick up one bottle with one arm, and pick up another bottle with the other arm." ;; place_bread_basket) INSTRUCTION="Use one arm to pick up the bread, put it into the basket, and use another arm to lift the basket." ;; stack_cups) INSTRUCTION="Stack the dark red and light red cups onto the green cup." ;; handover_bottle) INSTRUCTION="Use the right arm to grasp the bottle on the table, handover it to the left arm." ;; pnp_bread) INSTRUCTION="Pick up two breads, then place them onto the blue plate." ;; pnp_tray) INSTRUCTION="Use the left arm to grasp the red cup, and use the right arm to grasp the bottle, then place them onto the blue tray." ;; esac; COUNT=$(find "$DATASET" -mindepth 2 -maxdepth 2 -type f -name 'episode_*.hdf5' 2>/dev/null | wc -l); [[ "$COUNT" -gt 0 ]] || { echo "[skip] ${TASK}: no HDF5 under $DATASET; run I1/I1.1 -> I3.4/I3.5 -> L8.2 first"; continue; }; uv run examples/aloha_real/convert_aloha_data_to_lerobot_R1.py --raw-dir "$DATASET" --repo-id "local/h2o_${TASK}_pure_d435_visible_reinit" --task "$INSTRUCTION" --use-wrist --mode video; done
+```
+
+检查：
+
+```bash
+for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do ROOT=/home/zaijia001/.cache/huggingface/lerobot/local/h2o_${TASK}_pure_d435_visible_reinit; echo "===== h2o_${TASK}_pure_d435_visible_reinit ====="; if [[ -f "$ROOT/meta/info.json" ]]; then python3 - "$ROOT" <<'PY'
+import json, sys
+from pathlib import Path
+root = Path(sys.argv[1])
+info = json.load(open(root / "meta/info.json"))
+print("total_episodes:", info.get("total_episodes"))
+print("total_frames:", info.get("total_frames"))
+PY
+else echo "missing"; fi; done
+```
+
+检查 LeRobot cache 是否生成：
+
+```bash
+for MODE in human_head_pure_action pure_repaint anygrasp_repaint; do for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do ROOT=/home/zaijia001/.cache/huggingface/lerobot/local/h2o_${TASK}_${MODE}; echo "===== h2o_${TASK}_${MODE} ====="; if [[ -f "$ROOT/meta/info.json" ]]; then python3 - "$ROOT" <<'PY'
+import json, sys
+from pathlib import Path
+root = Path(sys.argv[1])
+info = json.load(open(root / "meta/info.json"))
+print("total_episodes:", info.get("total_episodes"))
+print("total_frames:", info.get("total_frames"))
+PY
+else echo "missing"; fi; done; done
+```
+
 输出检查：LeRobot 数据默认写到 `$HF_LEROBOT_HOME/<repo-id>`。如果没有设置 `HF_LEROBOT_HOME`，按当前 LeRobot 包默认目录检查。
 
 ### L11. 从已生成 LeRobot 数据中抽取指定 episode 并重新编号
@@ -1849,6 +2462,364 @@ local/h2o_<TASK>_pure_repaint
 local/h2o_<TASK>_pure_d435_visible_reinit
 ```
 
+### L11.1 Robot 数据：从已生成 LeRobot cache 抽取 25 episode、打包、上传
+
+用途：L11 已经给出原始人手 head + pure action 的 3 个任务抽取命令；这里新增 robot 版本的 6 个 LeRobot 数据集抽取命令：
+
+- 默认广角 robot replay head + pure replay action/wrist：`local/h2o_<TASK>_pure_repaint`
+- AnyGrasp robot repaint head + planner action/wrist：`local/h2o_<TASK>_anygrasp_repaint`
+
+运行顺序：
+
+1. 先确认对应完整 LeRobot cache 已经生成。默认广角 robot replay 对应 L10.2；AnyGrasp robot 对应 L9 的 HDF5 处理完成后，再用 `convert_aloha_data_to_lerobot_R1.py` 转成 `local/h2o_<TASK>_anygrasp_repaint`。
+2. 运行下面的 6 条 `subset_lerobot_episodes.py` 命令，生成 `_25ep` 子集。
+3. 进入 `/home/zaijia001/.cache/huggingface/lerobot/local` 后分别 zip。
+4. 先用 `rclone --dry-run` 检查，再去掉 `--dry-run` 真正上传。
+
+#### L11.1.1 默认广角 robot replay：3 个任务各抽 25 episode
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_openvla && cd /home/zaijia001/ssd/RoboTwin/policy/pi0 && uv run python scripts/subset_lerobot_episodes.py --source local/h2o_pick_diverse_bottles_pure_repaint --output-repo-id local/h2o_pick_diverse_bottles_pure_repaint_25ep --episodes '0-24' --overwrite
+
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_openvla && cd /home/zaijia001/ssd/RoboTwin/policy/pi0 && uv run python scripts/subset_lerobot_episodes.py --source local/h2o_place_bread_basket_pure_repaint --output-repo-id local/h2o_place_bread_basket_pure_repaint_25ep --episodes '0-24' --overwrite
+
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_openvla && cd /home/zaijia001/ssd/RoboTwin/policy/pi0 && uv run python scripts/subset_lerobot_episodes.py --source local/h2o_stack_cups_pure_repaint --output-repo-id local/h2o_stack_cups_pure_repaint_25ep --episodes '0-24' --overwrite
+```
+
+打包和上传检查：
+
+```bash
+cd /home/zaijia001/.cache/huggingface/lerobot/local && zip -r robot_replay_3task_25ep.zip h2o_pick_diverse_bottles_pure_repaint_25ep h2o_place_bread_basket_pure_repaint_25ep h2o_stack_cups_pure_repaint_25ep
+rclone copy /home/zaijia001/.cache/huggingface/lerobot/local/robot_replay_3task_25ep.zip gdrive:piper/multi/3task/robot_replay -P --drive-chunk-size 64M --transfers 4 --dry-run
+```
+
+#### L11.1.2 AnyGrasp robot：3 个任务各抽 25 episode
+
+前提：下面三个源 repo 需要已经存在：
+
+```text
+/home/zaijia001/.cache/huggingface/lerobot/local/h2o_pick_diverse_bottles_anygrasp_repaint
+/home/zaijia001/.cache/huggingface/lerobot/local/h2o_place_bread_basket_anygrasp_repaint
+/home/zaijia001/.cache/huggingface/lerobot/local/h2o_stack_cups_anygrasp_repaint
+```
+
+抽取命令：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_openvla && cd /home/zaijia001/ssd/RoboTwin/policy/pi0 && uv run python scripts/subset_lerobot_episodes.py --source local/h2o_pick_diverse_bottles_anygrasp_repaint --output-repo-id local/h2o_pick_diverse_bottles_anygrasp_repaint_25ep --episodes '0-24' --overwrite
+
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_openvla && cd /home/zaijia001/ssd/RoboTwin/policy/pi0 && uv run python scripts/subset_lerobot_episodes.py --source local/h2o_place_bread_basket_anygrasp_repaint --output-repo-id local/h2o_place_bread_basket_anygrasp_repaint_25ep --episodes '0-24' --overwrite
+
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_openvla && cd /home/zaijia001/ssd/RoboTwin/policy/pi0 && uv run python scripts/subset_lerobot_episodes.py --source local/h2o_stack_cups_anygrasp_repaint --output-repo-id local/h2o_stack_cups_anygrasp_repaint_25ep --episodes '0-24' --overwrite
+```
+
+打包和上传检查：
+
+```bash
+cd /home/zaijia001/.cache/huggingface/lerobot/local && zip -r robot_anygrasp_3task_25ep.zip h2o_pick_diverse_bottles_anygrasp_repaint_25ep h2o_place_bread_basket_anygrasp_repaint_25ep h2o_stack_cups_anygrasp_repaint_25ep
+rclone copy /home/zaijia001/.cache/huggingface/lerobot/local/robot_anygrasp_3task_25ep.zip gdrive:piper/multi/3task/robot_anygrasp -P --drive-chunk-size 64M --transfers 4 --dry-run
+```
+
+#### L11.1.3 L10.5 后续：新三任务 human head + D435 action/wrist 抽 25 episode
+
+用途：这是 L5.2 -> L10.5 后的专用抽取步骤。源 repo 是：
+
+```text
+local/h2o_handover_bottle_human_head_pure_d435_action
+local/h2o_pnp_bread_human_head_pure_d435_action
+local/h2o_pnp_tray_human_head_pure_d435_action
+```
+
+不要用 `local/h2o_<TASK>_pure_repaint` 抽 L10.5 的结果；`pure_repaint` 是 L6/L6.1 -> L10.4 的 robot replay 数据，不是原始人手 head + D435 action/wrist 数据。
+
+坏数据排除说明：
+
+```text
+handover_bottle 原始 bad id：0,7,12,29
+pnp_bread 原始 bad id：0,1,2,3,4,5,6,22,70
+pnp_tray 当前未在这里额外排除
+```
+
+直接 `--episodes '0-24'` 会按 LeRobot episode index 抽取，不会自动理解原始 id。当前检查结果里：
+
+```text
+handover_bottle 的 0-24 会包含原始 id 7 和 12
+pnp_bread 的 0-24 会包含原始 id 22
+```
+
+所以下面命令先读取 processed data 的 `episode_*/instructions.json` 里的 `source_episode_id`，跳过上述 bad 原始 id，再取前 25 个可用 LeRobot episode index。输出仍会重新编号成 `0..24`。
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_openvla && cd /home/zaijia001/ssd/RoboTwin/policy/pi0 && for TASK in handover_bottle pnp_bread pnp_tray; do case "$TASK" in handover_bottle) BAD_IDS="0,7,12,29" ;; pnp_bread) BAD_IDS="0,1,2,3,4,5,6,22,70" ;; pnp_tray) BAD_IDS="" ;; esac; DATASET=/home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_${TASK}_human_head_pure_d435_action-120; SOURCE=local/h2o_${TASK}_human_head_pure_d435_action; [[ -d "$DATASET" ]] || { echo "[skip] missing processed DATASET=$DATASET; run L5.2 first"; continue; }; [[ -d "/home/zaijia001/.cache/huggingface/lerobot/${SOURCE}" ]] || { echo "[skip] missing LeRobot SOURCE=${SOURCE}; run L10.5 first"; continue; }; EPISODES=$(python3 - "$DATASET" "$BAD_IDS" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+bad = {int(x) for x in sys.argv[2].split(",") if x.strip()}
+keep = []
+
+for p in sorted(root.glob("episode_*/instructions.json"), key=lambda p: int(p.parent.name.split("_")[-1])):
+    ep = int(p.parent.name.split("_")[-1])
+    row = json.loads(p.read_text())
+    src = int(row.get("source_episode_id", ep))
+    if src in bad:
+        continue
+    keep.append(ep)
+    if len(keep) >= 25:
+        break
+
+if len(keep) < 25:
+    raise SystemExit(f"only {len(keep)} usable episodes after excluding {sorted(bad)}")
+print(",".join(map(str, keep)))
+PY
+); echo "===== subset ${TASK}: episodes=${EPISODES} ====="; uv run python scripts/subset_lerobot_episodes.py --source "$SOURCE" --output-repo-id local/h2o_${TASK}_human_head_pure_d435_action_25ep --episodes "$EPISODES" --overwrite; done
+```
+
+当前检查得到的安全抽取 episode index 是：
+
+```text
+handover_bottle: 0,1,2,3,4,5,7,8,9,10,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26
+pnp_bread: 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,16,17,18,19,20,21,22,23,24,25
+pnp_tray: 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24
+```
+
+打包和上传检查：
+
+```bash
+cd /home/zaijia001/.cache/huggingface/lerobot/local && zip -r human_d435_action_3task_25ep.zip h2o_handover_bottle_human_head_pure_d435_action_25ep h2o_pnp_bread_human_head_pure_d435_action_25ep h2o_pnp_tray_human_head_pure_d435_action_25ep
+rclone copy /home/zaijia001/.cache/huggingface/lerobot/local/human_d435_action_3task_25ep.zip gdrive:piper/multi/3task/human_d435_action -P --drive-chunk-size 64M --transfers 4 --dry-run
+```
+
+检查 3 个输出是否都是 25 episode：
+
+```bash
+for TASK in handover_bottle pnp_bread pnp_tray; do ROOT=/home/zaijia001/.cache/huggingface/lerobot/local/h2o_${TASK}_human_head_pure_d435_action_25ep; echo "===== h2o_${TASK}_human_head_pure_d435_action_25ep ====="; python3 - "$ROOT" <<'PY'
+import json, sys
+from pathlib import Path
+root = Path(sys.argv[1])
+if not root.exists():
+    print("missing")
+    raise SystemExit
+info = json.load(open(root / "meta/info.json"))
+print("total_episodes:", info.get("total_episodes"))
+print("total_frames:", info.get("total_frames"))
+print("first episodes:", (root / "meta/episodes.jsonl").read_text().splitlines()[:3])
+PY
+done
+```
+
+检查 6 个输出是否都是 25 episode：
+
+```bash
+for D in h2o_pick_diverse_bottles_pure_repaint_25ep h2o_place_bread_basket_pure_repaint_25ep h2o_stack_cups_pure_repaint_25ep h2o_pick_diverse_bottles_anygrasp_repaint_25ep h2o_place_bread_basket_anygrasp_repaint_25ep h2o_stack_cups_anygrasp_repaint_25ep; do ROOT=/home/zaijia001/.cache/huggingface/lerobot/local/${D}; echo "===== ${D} ====="; python3 - "$ROOT" <<'PY'
+import json, sys
+from pathlib import Path
+root = Path(sys.argv[1])
+if not root.exists():
+    print("missing")
+    raise SystemExit
+info = json.load(open(root / "meta/info.json"))
+print("total_episodes:", info.get("total_episodes"))
+print("total_frames:", info.get("total_frames"))
+print("first episodes:", (root / "meta/episodes.jsonl").read_text().splitlines()[:3])
+PY
+done
+```
+
+### L11.2 六个 H2O task：robot replay / AnyGrasp LeRobot cache 抽取 25 episode
+
+用途：覆盖 FoundationPose 章节里的 6 个 H2O task：
+
+```text
+pick_diverse_bottles
+place_bread_basket
+stack_cups
+handover_bottle
+pnp_bread
+pnp_tray
+```
+
+运行顺序：
+
+1. 先确认每个完整 LeRobot cache 已存在，例如 `/home/zaijia001/.cache/huggingface/lerobot/local/h2o_<TASK>_pure_repaint` 和 `/home/zaijia001/.cache/huggingface/lerobot/local/h2o_<TASK>_anygrasp_repaint`。
+2. 运行 L11.2.1 抽取 6 个 robot replay `_25ep`。
+3. 运行 L11.2.2 抽取 6 个 AnyGrasp robot `_25ep`。
+4. 如果处理 D435 robot replay，先确认 L10.6 已生成 `local/h2o_<TASK>_pure_d435_visible_reinit`，再运行 L11.2.4。
+5. 运行 L11.2.3 检查默认广角和 AnyGrasp 的 12 个输出；D435 用 L11.2.4 自带检查。
+6. 分别 zip，再先用 `rclone --dry-run` 检查上传路径；确认无误后去掉 `--dry-run`。
+
+#### L11.2.1 六任务默认广角 robot replay：各抽 25 episode
+
+注意：这条命令只适用于 L6/L6.1 -> L10.4 生成的 `local/h2o_<TASK>_pure_repaint`。如果你要处理 L10.5 的新三任务 human head + D435 action/wrist，使用 L11.1.3。
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_openvla && cd /home/zaijia001/ssd/RoboTwin/policy/pi0 && for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do uv run python scripts/subset_lerobot_episodes.py --source local/h2o_${TASK}_pure_repaint --output-repo-id local/h2o_${TASK}_pure_repaint_25ep --episodes '0-24' --overwrite; done
+```
+
+打包和上传检查：
+
+```bash
+cd /home/zaijia001/.cache/huggingface/lerobot/local && zip -r robot_replay_6task_25ep.zip h2o_pick_diverse_bottles_pure_repaint_25ep h2o_place_bread_basket_pure_repaint_25ep h2o_stack_cups_pure_repaint_25ep h2o_handover_bottle_pure_repaint_25ep h2o_pnp_bread_pure_repaint_25ep h2o_pnp_tray_pure_repaint_25ep
+rclone copy /home/zaijia001/.cache/huggingface/lerobot/local/robot_replay_6task_25ep.zip gdrive:piper/multi/6task/robot_replay -P --drive-chunk-size 64M --transfers 4 --dry-run
+```
+
+#### L11.2.2 六任务 AnyGrasp robot：各抽 25 episode
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_openvla && cd /home/zaijia001/ssd/RoboTwin/policy/pi0 && for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do uv run python scripts/subset_lerobot_episodes.py --source local/h2o_${TASK}_anygrasp_repaint --output-repo-id local/h2o_${TASK}_anygrasp_repaint_25ep --episodes '0-24' --overwrite; done
+```
+
+打包和上传检查：
+
+```bash
+cd /home/zaijia001/.cache/huggingface/lerobot/local && zip -r robot_anygrasp_6task_25ep.zip h2o_pick_diverse_bottles_anygrasp_repaint_25ep h2o_place_bread_basket_anygrasp_repaint_25ep h2o_stack_cups_anygrasp_repaint_25ep h2o_handover_bottle_anygrasp_repaint_25ep h2o_pnp_bread_anygrasp_repaint_25ep h2o_pnp_tray_anygrasp_repaint_25ep
+rclone copy /home/zaijia001/.cache/huggingface/lerobot/local/robot_anygrasp_6task_25ep.zip gdrive:piper/multi/6task/robot_anygrasp -P --drive-chunk-size 64M --transfers 4 --dry-run
+```
+
+#### L11.2.3 检查 12 个六任务输出
+
+```bash
+for MODE in pure_repaint anygrasp_repaint; do for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do ROOT=/home/zaijia001/.cache/huggingface/lerobot/local/h2o_${TASK}_${MODE}_25ep; echo "===== h2o_${TASK}_${MODE}_25ep ====="; python3 - "$ROOT" <<'PY'
+import json, sys
+from pathlib import Path
+root = Path(sys.argv[1])
+if not root.exists():
+    print("missing")
+    raise SystemExit
+info = json.load(open(root / "meta/info.json"))
+print("total_episodes:", info.get("total_episodes"))
+print("total_frames:", info.get("total_frames"))
+print("first episodes:", (root / "meta/episodes.jsonl").read_text().splitlines()[:3])
+PY
+done; done
+```
+
+#### L11.2.4 六任务 D435 robot replay：各抽 25 episode
+
+用途：从 L10.6 生成的 `local/h2o_<TASK>_pure_d435_visible_reinit` 中抽取 `_25ep`。这条链路对应 D435 robot replay，不要和 L11.2.1 的默认广角 `pure_repaint` 混用。
+
+前提：
+
+```text
+I1/I1.1 Stage-1 BG 已完成
+I3.4/I3.5 D435 visible-reinit repaint 已完成
+L8.2 processed HDF5 已完成
+L10.6 LeRobot cache 已完成
+```
+
+抽取命令：
+
+和 L11.1.3 一样，这里不要盲目使用 `--episodes '0-24'`。D435 robot replay 的 processed HDF5 里也有 `episode_*/instructions.json/source_episode_id`，所以可以按原始 id 对齐并排除 bad id，再补足 25 个 LeRobot episode index。当前明确排除：
+
+```text
+handover_bottle 原始 bad id：0,7,12,29
+pnp_bread 原始 bad id：0,1,2,3,4,5,6,22,70
+pnp_tray 当前未在这里额外排除
+```
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_openvla && cd /home/zaijia001/ssd/RoboTwin/policy/pi0 && for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do case "$TASK" in handover_bottle) BAD_IDS="0,7,12,29" ;; pnp_bread) BAD_IDS="0,1,2,3,4,5,6,22,70" ;; *) BAD_IDS="" ;; esac; DATASET=/home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_${TASK}_pure_d435_visible_reinit-120; SOURCE=local/h2o_${TASK}_pure_d435_visible_reinit; [[ -d "$DATASET" ]] || { echo "[skip] missing processed DATASET=$DATASET; run L8.2 first"; continue; }; [[ -d "/home/zaijia001/.cache/huggingface/lerobot/${SOURCE}" ]] || { echo "[skip] missing LeRobot SOURCE=${SOURCE}; run L10.6 first"; continue; }; EPISODES=$(python3 - "$DATASET" "$BAD_IDS" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+bad = {int(x) for x in sys.argv[2].split(",") if x.strip()}
+keep = []
+
+for p in sorted(root.glob("episode_*/instructions.json"), key=lambda p: int(p.parent.name.split("_")[-1])):
+    ep = int(p.parent.name.split("_")[-1])
+    row = json.loads(p.read_text())
+    src = int(row.get("source_episode_id", ep))
+    if src in bad:
+        continue
+    keep.append(ep)
+    if len(keep) >= 25:
+        break
+
+if len(keep) < 25:
+    raise SystemExit(f"only {len(keep)} usable episodes after excluding {sorted(bad)}")
+print(",".join(map(str, keep)))
+PY
+); echo "===== subset D435 ${TASK}: episodes=${EPISODES} ====="; uv run python scripts/subset_lerobot_episodes.py --source "$SOURCE" --output-repo-id local/h2o_${TASK}_pure_d435_visible_reinit_25ep --episodes "$EPISODES" --overwrite; done
+```
+
+按当前 processed data 检查，安全抽取 episode index 是：
+
+```text
+pick_diverse_bottles: 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24
+place_bread_basket: 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24
+stack_cups: 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24
+handover_bottle: 0,1,2,3,4,5,7,8,9,10,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26
+pnp_bread: 0,1,2,3,4,5,6,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25
+pnp_tray: 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24
+```
+
+打包和上传检查：
+
+```bash
+cd /home/zaijia001/.cache/huggingface/lerobot/local && zip -r robot_d435_visible_reinit_6task_25ep.zip h2o_pick_diverse_bottles_pure_d435_visible_reinit_25ep h2o_place_bread_basket_pure_d435_visible_reinit_25ep h2o_stack_cups_pure_d435_visible_reinit_25ep h2o_handover_bottle_pure_d435_visible_reinit_25ep h2o_pnp_bread_pure_d435_visible_reinit_25ep h2o_pnp_tray_pure_d435_visible_reinit_25ep
+rclone copy /home/zaijia001/.cache/huggingface/lerobot/local/robot_d435_visible_reinit_6task_25ep.zip gdrive:piper/multi/6task/robot_d435_visible_reinit -P --drive-chunk-size 64M --transfers 4 --dry-run
+```
+
+检查 6 个 D435 输出是否都是 25 episode：
+
+```bash
+for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do ROOT=/home/zaijia001/.cache/huggingface/lerobot/local/h2o_${TASK}_pure_d435_visible_reinit_25ep; echo "===== h2o_${TASK}_pure_d435_visible_reinit_25ep ====="; python3 - "$ROOT" <<'PY'
+import json, sys
+from pathlib import Path
+root = Path(sys.argv[1])
+if not root.exists():
+    print("missing")
+    raise SystemExit
+info = json.load(open(root / "meta/info.json"))
+print("total_episodes:", info.get("total_episodes"))
+print("total_frames:", info.get("total_frames"))
+print("first episodes:", (root / "meta/episodes.jsonl").read_text().splitlines()[:3])
+PY
+done
+```
+
+### L11.3 task prompt 设置位置：先改 processed episode 的 `instructions.json`
+
+注意：当前 `examples/aloha_real/convert_aloha_data_to_lerobot_R1.py --task "..."` 对已经写好的 episode prompt 不会生效。该脚本实际读取每个 processed episode 目录里的：
+
+```text
+/home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/<DATASET>/episode_*/instructions.json
+```
+
+因此 task prompt 的推荐设置顺序是：
+
+1. 在 L5/L6/L8/L9 这类 HDF5 生成命令里设置 `INSTRUCTION="..."`，让 `process_repainted_headcam_with_wrist.py` 或 `process_repainted_planner_outputs.py` 写出正确 `instructions.json`。
+2. 如果 processed data 已经生成，但还没转 LeRobot，先批量替换 `episode_*/instructions.json`，再运行 L10 的 LeRobot 转换命令。
+3. 如果 LeRobot cache 已经生成，只想快速修正已生成 cache，用 L12 直接替换 `meta/tasks.jsonl` 和 `meta/episodes.jsonl`。
+
+示例：在 LeRobot 转换前，批量把某个 processed dataset 的 prompt 改成新文本：
+
+```bash
+DATASET=/home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_pick_diverse_bottles_human_head_pure_action-120; PROMPT='pick up one bottle with one arm, and pick up another bottle with the other arm.'; python3 - "$DATASET" "$PROMPT" <<'PY'
+import json, sys
+from pathlib import Path
+root = Path(sys.argv[1])
+prompt = sys.argv[2]
+count = 0
+for p in sorted(root.glob("episode_*/instructions.json")):
+    data = json.loads(p.read_text())
+    data["instructions"] = [prompt]
+    p.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+    count += 1
+print("updated instructions.json:", count)
+print("prompt:", prompt)
+PY
+```
+
+检查：
+
+```bash
+DATASET=/home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_pick_diverse_bottles_human_head_pure_action-120; find "$DATASET" -name instructions.json | sort | head -n 3 | xargs -r -I{} sh -c 'echo ===== {}; sed -n "1,20p" {}'
+```
+
 ### L12. 直接修改已生成 LeRobot cache 的 task 文本
 
 用途：已经生成好的 LeRobot 数据不想重新转换时，直接把 `meta/tasks.jsonl` 和 `meta/episodes.jsonl` 里的旧任务名替换成新任务名。当前 parquet 里只存 `task_index=0`，不存任务文本，所以不需要改 parquet。
@@ -1865,7 +2836,7 @@ ROOT=/home/zaijia001/.cache/huggingface/lerobot/local/h2o_pick_diverse_bottles_h
 ROOT=/home/zaijia001/.cache/huggingface/lerobot/local/h2o_pick_diverse_bottles_human_head_pure_action; sed -n '1,5p' "$ROOT/meta/tasks.jsonl"; sed -n '1,5p' "$ROOT/meta/episodes.jsonl"
 ```
 
-### L13. AnyGrasp Piper keyframe planner：pick_diverse_bottles id0-id10
+### L13. AnyGrasp Piper keyframe planner：pick_diverse_bottles id0-id10（旧版，保留历史）
 
 用途：把单条 `foundation_input_0` 的 AnyGrasp Piper keyframe planner 命令扩展到 `id0-id10`。每个 id 自动替换 `anygrasp_dir`、`replay_dir`、`hand_npz`、`reuse_preview_summary_json` 和 `output_dir`。
 
@@ -1893,7 +2864,7 @@ PY
 done
 ```
 
-注意：`--settle_steps` 和 `--joint_target_wait_steps` 主要用于推进 physics/controller 收敛，不等价于在输出视频里多写 100 帧。当前代码只在阶段完成后记录一帧最终状态；如果要让视频中明显停留，需要增加 `--hold_frames_after_stage`，如果要每个 waypoint 更充分收敛，可以增加 `--joint_command_scene_steps` 或 `--execute_interp_steps`。
+注意：本小节命令含 `--keyframes 38 78`，只适用于当时 id0 的临时实验，不应作为批量命令使用。新命令见文末 `L15`，会通过 `--reuse_preview_frame_mode annotated_json_keyframes` 读取每个 id 手动标注的两个关键帧。
 
 ### L13. Piper hand 原始 origin 数据可视化审核并移动 bad episode
 
@@ -2035,3 +3006,1127 @@ ls -lh /tmp/piper_anygrasp_dual_base_cart_id0/head_cam_plan.mp4 /tmp/piper_anygr
 ```
 
 批量时保持同样参数，只需要按 id 替换四个输入路径和 `--reuse_preview_summary_json`。注意不要拿 `foundation_input_2/rank_previews` 判断 `foundation_input_0` 的执行结果；每个 id 的 `summary.json` 和关键帧不同。
+
+### L15. Piper AnyGrasp id0-id10：按手动标注关键帧、双臂同阶段同步执行
+
+用途：批量运行 `pick_diverse_bottles` 的 `id0-id10`。本命令不写 `--keyframes 38 78`；关键帧来自每个 id 对应 preview summary 里的 `frame_selection.annotated_keyframes[:2]`。代码侧 `--dual_stage_require_all_plans 1` 表示每个 stage 必须左右臂都规划成功才会一起执行，避免某一只手 IK 失败时另一只手先单独移动。
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && cd /home/zaijia001/ssd/RoboTwin && GPU=2; TASK=pick_diverse_bottles; OUT_ROOT=/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_v3/4/${TASK}; for ID in $(seq 0 10); do ANY=/home/zaijia001/ssd/data/piper/hand/${TASK}/${TASK}_output/foundation_input_${ID}; REPLAY=/home/zaijia001/ssd/data/piper/hand/${TASK}/foundation_replay/foundation_input_${ID}; HAND=/home/zaijia001/ssd/data/piper/hand/${TASK}/harmer_output/hand_detections_${ID}.npz; PREVIEW=/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview/${TASK}/foundation_input_${ID}/summary.json; OUT=${OUT_ROOT}/foundation_input_${ID}; [[ -d "$ANY" ]] || { echo "[skip] missing anygrasp $ANY"; continue; }; [[ -d "$REPLAY" ]] || { echo "[skip] missing replay $REPLAY"; continue; }; [[ -f "$HAND" ]] || { echo "[skip] missing hand $HAND"; continue; }; [[ -f "$PREVIEW" ]] || { echo "[skip] missing preview $PREVIEW"; continue; }; CUDA_VISIBLE_DEVICES=${GPU} conda run -n RoboTwin_bw python /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_piper.py --anygrasp_dir "$ANY" --replay_dir "$REPLAY" --hand_npz "$HAND" --output_dir "$OUT" --reuse_preview_summary_json "$PREVIEW" --reuse_preview_frame_mode annotated_json_keyframes --reuse_preview_candidate_group orientation --reuse_preview_top_rank 1 --arm auto --execute_both_arms 1 --dual_stage_require_all_plans 1 --planner_backend urdfik --urdfik_trajectory_mode cartesian_interp_ik --urdfik_cartesian_interp_steps -1 --urdfik_cartesian_interp_auto_step_m 0.02 --urdfik_max_position_threshold_m 0.02 --urdfik_max_rotation_threshold_rad 0.12 --candidate_selection_mode planner --left_target_object left_bottle --right_target_object right_bottle --candidate_target_local_x_offset_m -0.05 --approach_offset_m 0.12 --reach_error_pose_source tcp --replan_until_reached 1 --replan_until_reached_max_attempts 3 --save_debug_preview 1 --save_debug_execution_preview 1 --save_pose_debug 1 --debug_visualize_targets 1 --debug_visualize_ik_waypoints 1 --reach_pos_tol_m 0.03 --reach_rot_tol_deg 180 --settle_steps 100 --joint_target_wait_steps 100 --joint_command_scene_steps 4 --execute_interp_steps 40 --hold_frames_after_stage 8 --pure_scene_output 1 --overlay_text 0 --head_only 0 --third_person_view 1 --vscode_compatible_video 1 --lighting_mode front_no_shadow --robot_config /home/zaijia001/ssd/RoboTwin/robot_config_PiperPika_agx_dual_table_0515.json --camera_cv_axis_mode legacy_r1 --head_camera_local_pos 0.11210396690038413 -0.39189397826604927 0.4753892624100325 --head_camera_local_quat_wxyz 0.8524694864910365 -0.0011011947849308937 0.5226654778798345 0.010740586780925399 --enable_viewer 0 --viewer_wait_at_end 0 --object_mesh_override left_bottle=/home/zaijia001/ssd/data/R1/hand/obj_mesh/cola/cola.obj --object_mesh_override right_bottle=/home/zaijia001/ssd/data/R1/hand/obj_mesh/bottle/bottle.obj; done
+```
+
+为什么 `--settle_steps 100 --joint_target_wait_steps 100` 仍可能不到位：
+
+- 它们只是在已有 joint trajectory 执行完以后继续推进仿真/等待关节收敛，不能把 IK 失败的目标变成可达目标。
+- 如果日志里有 `Failed to converge` 或某个 arm 的 plan status 不是 `Success`，等待再久也不会生成可执行轨迹。
+- 如果 `reach_rot_tol_deg` 很小，而候选朝向和当前 TCP 差到 160 度左右，位置即使靠近也会被判定 `reached=0`。位置优先调试先用 `--reach_rot_tol_deg 180`，之后再收紧。
+- 视频里想看到阶段结束后停留，需要 `--hold_frames_after_stage`；`settle_steps` 本身不等价于多写 100 帧视频。
+
+### L15.1 Piper AnyGrasp id0-id10：viewer 可视化版，对齐旧 V7 执行节奏
+
+用途：和 L15 一样按每个 id 的手动标注关键帧执行，但打开 viewer，并把执行节奏改得更接近旧 V7：`execute_interp_steps=24`、`joint_command_scene_steps=10`、`settle_steps=30`、`joint_target_wait_steps=25`。同时启用 `--require_keyframe1_reached_before_action 1`，如果第一关键帧 grasp 未到位，就不进入第二关键帧 action。
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && cd /home/zaijia001/ssd/RoboTwin && GPU=2; TASK=pick_diverse_bottles; OUT_ROOT=/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_v5_viewer/${TASK}; for ID in $(seq 0 10); do ANY=/home/zaijia001/ssd/data/piper/hand/${TASK}/${TASK}_output/foundation_input_${ID}; REPLAY=/home/zaijia001/ssd/data/piper/hand/${TASK}/foundation_replay/foundation_input_${ID}; HAND=/home/zaijia001/ssd/data/piper/hand/${TASK}/harmer_output/hand_detections_${ID}.npz; PREVIEW=/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview/${TASK}/foundation_input_${ID}/summary.json; OUT=${OUT_ROOT}/foundation_input_${ID}; [[ -d "$ANY" ]] || { echo "[skip] missing anygrasp $ANY"; continue; }; [[ -d "$REPLAY" ]] || { echo "[skip] missing replay $REPLAY"; continue; }; [[ -f "$HAND" ]] || { echo "[skip] missing hand $HAND"; continue; }; [[ -f "$PREVIEW" ]] || { echo "[skip] missing preview $PREVIEW"; continue; }; CUDA_VISIBLE_DEVICES=${GPU} conda run -n RoboTwin_bw python /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_piper.py --anygrasp_dir "$ANY" --replay_dir "$REPLAY" --hand_npz "$HAND" --output_dir "$OUT" --reuse_preview_summary_json "$PREVIEW" --reuse_preview_frame_mode annotated_json_keyframes --reuse_preview_candidate_group orientation --reuse_preview_top_rank 1 --arm auto --execute_both_arms 1 --dual_stage_require_all_plans 1 --require_keyframe1_reached_before_action 1 --planner_backend urdfik --urdfik_trajectory_mode cartesian_interp_ik --urdfik_cartesian_interp_steps -1 --urdfik_cartesian_interp_auto_step_m 0.01 --urdfik_max_position_threshold_m 0.02 --urdfik_max_rotation_threshold_rad 0.12 --candidate_selection_mode planner --left_target_object left_bottle --right_target_object right_bottle --candidate_target_local_x_offset_m -0.05 --approach_offset_m 0.12 --reach_error_pose_source tcp --replan_until_reached 1 --replan_until_reached_max_attempts 1 --save_debug_preview 1 --save_debug_execution_preview 0 --save_pose_debug 1 --debug_visualize_targets 0 --debug_visualize_ik_waypoints 1 --reach_pos_tol_m 0.03 --reach_rot_tol_deg 180 --enable_grasp_action_object_collision 1 --grasp_action_object_collision_start_stage pregrasp --execution_object_collision_mode convex --execution_object_visual_scale_override left_bottle=0.8 --execution_object_collision_scale_override left_bottle=0.8 --execution_object_visual_scale_override right_bottle=0.8 --execution_object_collision_scale_override right_bottle=0.8 --gripper_contact_monitor_mode all_robot_links --execute_interp_steps 24 --joint_command_scene_steps 10 --settle_steps 30 --joint_target_wait_steps 25 --joint_target_wait_tol_rad 0.01 --hold_frames_after_stage 8 --pure_scene_output 1 --overlay_text 0 --head_only 0 --third_person_view 1 --vscode_compatible_video 1 --lighting_mode front_no_shadow --robot_config /home/zaijia001/ssd/RoboTwin/robot_config_PiperPika_agx_dual_table_0515.json --camera_cv_axis_mode legacy_r1 --head_camera_local_pos 0.11210396690038413 -0.39189397826604927 0.4753892624100325 --head_camera_local_quat_wxyz 0.8524694864910365 -0.0011011947849308937 0.5226654778798345 0.010740586780925399 --enable_viewer 1 --viewer_wait_at_end 0 --viewer_show_camera_frustums 0 --object_mesh_override left_bottle=/home/zaijia001/ssd/data/R1/hand/obj_mesh/cola/cola.obj --object_mesh_override right_bottle=/home/zaijia001/ssd/data/R1/hand/obj_mesh/bottle/bottle.obj; done
+```
+
+和旧 V7 的关系：
+
+- 旧 V7 用的是 `cup/bottle` 和 R1 数据路径；这里是 Piper H2O `left_bottle/right_bottle`。
+- 旧 V7 的执行节奏是 `execute_interp_steps=24`、每 waypoint `joint_command_scene_steps=10`、`settle_steps=30`、`joint_target_wait_steps=25`；L15.1 已按这个节奏设置。
+- 旧 V7 的实际期望是“第一关键帧到位后再进入第二关键帧”。L15.1 用 `--dual_stage_require_all_plans 1` 和 `--require_keyframe1_reached_before_action 1` 把这个行为显式化：任一 arm 规划失败则该 stage 不执行，第一关键帧未 reached 则不进入第二关键帧。
+
+### L15.2 Piper AnyGrasp 最终推荐命令：无 viewer 批跑版 + viewer 单条调试版
+
+用途：这组命令是 L15/L15.1 的整理版。无 viewer 版本用于稳定批跑 id0-id10；viewer 版本用于单条交互检查。注意 SAPIEN viewer 需要能看到驱动 VNC/X display 的 GPU，所以 viewer 版本不要设置 `CUDA_VISIBLE_DEVICES=2`，而是先 `unset CUDA_VISIBLE_DEVICES`。
+
+无 viewer 批跑版：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && cd /home/zaijia001/ssd/RoboTwin && GPU=2; TASK=pick_diverse_bottles; OUT_ROOT=/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_v6_noviewer/${TASK}; for ID in $(seq 0 10); do ANY=/home/zaijia001/ssd/data/piper/hand/${TASK}/${TASK}_output/foundation_input_${ID}; REPLAY=/home/zaijia001/ssd/data/piper/hand/${TASK}/foundation_replay/foundation_input_${ID}; HAND=/home/zaijia001/ssd/data/piper/hand/${TASK}/harmer_output/hand_detections_${ID}.npz; PREVIEW=/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview/${TASK}/foundation_input_${ID}/summary.json; OUT=${OUT_ROOT}/foundation_input_${ID}; [[ -d "$ANY" ]] || { echo "[skip] missing anygrasp $ANY"; continue; }; [[ -d "$REPLAY" ]] || { echo "[skip] missing replay $REPLAY"; continue; }; [[ -f "$HAND" ]] || { echo "[skip] missing hand $HAND"; continue; }; [[ -f "$PREVIEW" ]] || { echo "[skip] missing preview $PREVIEW"; continue; }; CUDA_VISIBLE_DEVICES=${GPU} conda run -n RoboTwin_bw python /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_piper.py --anygrasp_dir "$ANY" --replay_dir "$REPLAY" --hand_npz "$HAND" --output_dir "$OUT" --reuse_preview_summary_json "$PREVIEW" --reuse_preview_frame_mode annotated_json_keyframes --reuse_preview_candidate_group orientation --reuse_preview_top_rank 1 --arm auto --execute_both_arms 1 --dual_stage_require_all_plans 1 --require_keyframe1_reached_before_action 1 --planner_backend urdfik --urdfik_trajectory_mode cartesian_interp_ik --urdfik_cartesian_interp_steps -1 --urdfik_cartesian_interp_auto_step_m 0.01 --urdfik_max_position_threshold_m 0.02 --urdfik_max_rotation_threshold_rad 0.12 --candidate_selection_mode planner --left_target_object left_bottle --right_target_object right_bottle --candidate_target_local_x_offset_m -0.05 --approach_offset_m 0.12 --reach_error_pose_source tcp --replan_until_reached 1 --replan_until_reached_max_attempts 1 --save_debug_preview 1 --save_debug_execution_preview 0 --save_pose_debug 1 --debug_visualize_targets 0 --debug_visualize_ik_waypoints 1 --reach_pos_tol_m 0.03 --reach_rot_tol_deg 180 --enable_grasp_action_object_collision 1 --grasp_action_object_collision_start_stage pregrasp --execution_object_collision_mode convex --execution_object_visual_scale_override left_bottle=0.8 --execution_object_collision_scale_override left_bottle=0.8 --execution_object_visual_scale_override right_bottle=0.8 --execution_object_collision_scale_override right_bottle=0.8 --gripper_contact_monitor_mode all_robot_links --execute_interp_steps 24 --joint_command_scene_steps 10 --settle_steps 30 --joint_target_wait_steps 25 --joint_target_wait_tol_rad 0.01 --hold_frames_after_stage 8 --pure_scene_output 1 --overlay_text 0 --head_only 0 --third_person_view 1 --vscode_compatible_video 1 --lighting_mode front_no_shadow --robot_config /home/zaijia001/ssd/RoboTwin/robot_config_PiperPika_agx_dual_table_0515.json --camera_cv_axis_mode legacy_r1 --head_camera_local_pos 0.11210396690038413 -0.39189397826604927 0.4753892624100325 --head_camera_local_quat_wxyz 0.8524694864910365 -0.0011011947849308937 0.5226654778798345 0.010740586780925399 --enable_viewer 0 --viewer_wait_at_end 0 --viewer_show_camera_frustums 0 --object_mesh_override left_bottle=/home/zaijia001/ssd/data/R1/hand/obj_mesh/cola/cola.obj --object_mesh_override right_bottle=/home/zaijia001/ssd/data/R1/hand/obj_mesh/bottle/bottle.obj; done
+```
+
+viewer 单条调试版：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && cd /home/zaijia001/ssd/RoboTwin && unset CUDA_VISIBLE_DEVICES; [[ -f /etc/vulkan/icd.d/nvidia_icd.json ]] && export VK_ICD_FILENAMES=/etc/vulkan/icd.d/nvidia_icd.json; echo "DISPLAY=$DISPLAY CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-unset} VK_ICD_FILENAMES=${VK_ICD_FILENAMES:-unset}"; TASK=pick_diverse_bottles; ID=0; ANY=/home/zaijia001/ssd/data/piper/hand/${TASK}/${TASK}_output/foundation_input_${ID}; REPLAY=/home/zaijia001/ssd/data/piper/hand/${TASK}/foundation_replay/foundation_input_${ID}; HAND=/home/zaijia001/ssd/data/piper/hand/${TASK}/harmer_output/hand_detections_${ID}.npz; PREVIEW=/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview/${TASK}/foundation_input_${ID}/summary.json; OUT=/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_v6_viewer/${TASK}/foundation_input_${ID}; conda run -n RoboTwin_bw python /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_piper.py --anygrasp_dir "$ANY" --replay_dir "$REPLAY" --hand_npz "$HAND" --output_dir "$OUT" --reuse_preview_summary_json "$PREVIEW" --reuse_preview_frame_mode annotated_json_keyframes --reuse_preview_candidate_group orientation --reuse_preview_top_rank 1 --arm auto --execute_both_arms 1 --dual_stage_require_all_plans 1 --require_keyframe1_reached_before_action 1 --planner_backend urdfik --urdfik_trajectory_mode cartesian_interp_ik --urdfik_cartesian_interp_steps -1 --urdfik_cartesian_interp_auto_step_m 0.01 --urdfik_max_position_threshold_m 0.02 --urdfik_max_rotation_threshold_rad 0.12 --candidate_selection_mode planner --left_target_object left_bottle --right_target_object right_bottle --candidate_target_local_x_offset_m -0.05 --approach_offset_m 0.12 --reach_error_pose_source tcp --replan_until_reached 1 --replan_until_reached_max_attempts 1 --save_debug_preview 1 --save_debug_execution_preview 0 --save_pose_debug 1 --debug_visualize_targets 1 --debug_visualize_ik_waypoints 1 --reach_pos_tol_m 0.03 --reach_rot_tol_deg 180 --enable_grasp_action_object_collision 1 --grasp_action_object_collision_start_stage pregrasp --execution_object_collision_mode convex --execution_object_visual_scale_override left_bottle=0.8 --execution_object_collision_scale_override left_bottle=0.8 --execution_object_visual_scale_override right_bottle=0.8 --execution_object_collision_scale_override right_bottle=0.8 --gripper_contact_monitor_mode all_robot_links --execute_interp_steps 24 --joint_command_scene_steps 10 --settle_steps 30 --joint_target_wait_steps 25 --joint_target_wait_tol_rad 0.01 --hold_frames_after_stage 8 --pure_scene_output 1 --overlay_text 0 --head_only 0 --third_person_view 1 --vscode_compatible_video 1 --lighting_mode front_no_shadow --robot_config /home/zaijia001/ssd/RoboTwin/robot_config_PiperPika_agx_dual_table_0515.json --camera_cv_axis_mode legacy_r1 --head_camera_local_pos 0.11210396690038413 -0.39189397826604927 0.4753892624100325 --head_camera_local_quat_wxyz 0.8524694864910365 -0.0011011947849308937 0.5226654778798345 0.010740586780925399 --enable_viewer 1 --viewer_wait_at_end 1 --viewer_frame_delay 0.02 --viewer_show_camera_frustums 0 --object_mesh_override left_bottle=/home/zaijia001/ssd/data/R1/hand/obj_mesh/cola/cola.obj --object_mesh_override right_bottle=/home/zaijia001/ssd/data/R1/hand/obj_mesh/bottle/bottle.obj
+```
+
+viewer 如果仍然不弹窗，先跑最小探针：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && cd /home/zaijia001/ssd/RoboTwin && unset CUDA_VISIBLE_DEVICES; [[ -f /etc/vulkan/icd.d/nvidia_icd.json ]] && export VK_ICD_FILENAMES=/etc/vulkan/icd.d/nvidia_icd.json; echo "DISPLAY=$DISPLAY CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-unset} VK_ICD_FILENAMES=${VK_ICD_FILENAMES:-unset}" && conda run -n RoboTwin_bw python /home/zaijia001/ssd/RoboTwin/code_painting/probe_sapien_viewer.py
+```
+
+### L15.3 Piper AnyGrasp D435：使用 J1.1/J1.2 的 D435 summary 和 D435 replay
+
+用途：重新尝试 D435 链路时使用这一条，不要用 L15/L15.2 的默认广角路径。本命令有三个强约束：
+
+- `REPLAY` 指向 `/home/zaijia001/ssd/data/piper/hand/${TASK}/foundation_replay_d435/foundation_input_${ID}`
+- `PREVIEW` 指向 `/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview_d435/${TASK}/foundation_input_${ID}/summary.json`
+- 渲染相机使用 D435 color 内参：`--image_width 640 --image_height 480 --fovy_deg 42.499880046655484`
+
+如果某个 id 没有 D435 `summary.json`，命令会直接 skip；这表示应该先回到 J1.1/J1.2 重新生成候选，而不是 fallback 到默认广角 `anygrasp_h2o_preview`。
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && cd /home/zaijia001/ssd/RoboTwin && GPU=2; TASK=pick_diverse_bottles; IDS=($(seq 0 10)); OUT_ROOT=/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v1/${TASK}; case "$TASK" in pick_diverse_bottles) LEFT_OBJ=left_bottle; RIGHT_OBJ=right_bottle; MESH_ARGS=(--object_mesh_override left_bottle=/home/zaijia001/ssd/data/R1/hand/obj_mesh/cola/cola.obj --object_mesh_override right_bottle=/home/zaijia001/ssd/data/R1/hand/obj_mesh/bottle/bottle.obj) ;; pnp_tray) LEFT_OBJ=left_dark_red_cup; RIGHT_OBJ=right_bottle; MESH_ARGS=(--object_mesh_override left_dark_red_cup=/home/zaijia001/ssd/data/R1/hand/obj_mesh/dark_red_cup/dark_red_cup.obj --object_mesh_override right_bottle=/home/zaijia001/ssd/data/R1/hand/obj_mesh/bottle/bottle.obj) ;; *) echo "[error] add object mapping for TASK=$TASK"; exit 1 ;; esac; for ID in "${IDS[@]}"; do ANY_ROOT=/home/zaijia001/ssd/data/piper/hand/${TASK}/${TASK}_output; [[ -d "$ANY_ROOT" ]] || ANY_ROOT=/home/zaijia001/ssd/data/piper/hand/${TASK}/${TASK}_output_old_cam; ANY=${ANY_ROOT}/foundation_input_${ID}; REPLAY=/home/zaijia001/ssd/data/piper/hand/${TASK}/foundation_replay_d435/foundation_input_${ID}; HAND=/home/zaijia001/ssd/data/piper/hand/${TASK}/harmer_output/hand_detections_${ID}.npz; PREVIEW=/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview_d435/${TASK}/foundation_input_${ID}/summary.json; OUT=${OUT_ROOT}/foundation_input_${ID}; [[ -d "$ANY" ]] || { echo "[skip] id=${ID} missing anygrasp $ANY"; continue; }; [[ -d "$REPLAY" ]] || { echo "[skip] id=${ID} missing D435 replay $REPLAY"; continue; }; [[ -f "$HAND" ]] || { echo "[skip] id=${ID} missing hand $HAND"; continue; }; [[ -f "$PREVIEW" ]] || { echo "[skip] id=${ID} missing D435 preview summary $PREVIEW; run J1.1/J1.2 first"; continue; }; echo "[run-d435] task=${TASK} id=${ID} preview=${PREVIEW} replay=${REPLAY}"; CUDA_VISIBLE_DEVICES=${GPU} conda run -n RoboTwin_bw python /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_piper.py --anygrasp_dir "$ANY" --replay_dir "$REPLAY" --hand_npz "$HAND" --output_dir "$OUT" --reuse_preview_summary_json "$PREVIEW" --reuse_preview_frame_mode annotated_json_keyframes --reuse_preview_candidate_group orientation --reuse_preview_top_rank 1 --image_width 640 --image_height 480 --fovy_deg 42.499880046655484 --arm auto --execute_both_arms 1 --dual_stage_require_all_plans 1 --require_keyframe1_reached_before_action 1 --planner_backend urdfik --urdfik_trajectory_mode cartesian_interp_ik --urdfik_cartesian_interp_steps -1 --urdfik_cartesian_interp_auto_step_m 0.01 --urdfik_max_position_threshold_m 0.02 --urdfik_max_rotation_threshold_rad 0.12 --candidate_selection_mode planner --left_target_object "$LEFT_OBJ" --right_target_object "$RIGHT_OBJ" --candidate_target_local_x_offset_m -0.05 --approach_offset_m 0.12 --reach_error_pose_source tcp --replan_until_reached 1 --replan_until_reached_max_attempts 1 --save_debug_preview 1 --save_debug_execution_preview 0 --save_pose_debug 1 --debug_visualize_targets 0 --debug_visualize_ik_waypoints 1 --reach_pos_tol_m 0.03 --reach_rot_tol_deg 180 --enable_grasp_action_object_collision 1 --grasp_action_object_collision_start_stage pregrasp --execution_object_collision_mode convex --execution_object_visual_scale_override ${LEFT_OBJ}=0.8 --execution_object_collision_scale_override ${LEFT_OBJ}=0.8 --execution_object_visual_scale_override ${RIGHT_OBJ}=0.8 --execution_object_collision_scale_override ${RIGHT_OBJ}=0.8 --gripper_contact_monitor_mode all_robot_links --execute_interp_steps 24 --joint_command_scene_steps 10 --settle_steps 30 --joint_target_wait_steps 25 --joint_target_wait_tol_rad 0.01 --hold_frames_after_stage 8 --pure_scene_output 1 --overlay_text 0 --head_only 0 --third_person_view 1 --vscode_compatible_video 1 --lighting_mode front_no_shadow --robot_config /home/zaijia001/ssd/RoboTwin/robot_config_PiperPika_agx_dual_table_0515.json --camera_cv_axis_mode legacy_r1 --head_camera_local_pos 0.11210396690038413 -0.39189397826604927 0.4753892624100325 --head_camera_local_quat_wxyz 0.8524694864910365 -0.0011011947849308937 0.5226654778798345 0.010740586780925399 --enable_viewer 0 --viewer_wait_at_end 0 --viewer_show_camera_frustums 0 "${MESH_ARGS[@]}"; done
+```
+
+检查 D435 planner 输出：
+
+```bash
+TASK=pick_diverse_bottles; for ID in $(seq 0 10); do OUT=/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v1/${TASK}/foundation_input_${ID}; echo "===== id=${ID} ====="; [[ -f "$OUT/plan_summary.json" ]] && jq '{success:.execution_success, failed:.execution_failed, failed_stage_records:.failed_stage_records, preview:.reuse_preview_summary_json}' "$OUT/plan_summary.json" || echo "missing $OUT/plan_summary.json"; ffprobe -v error -show_entries format=duration -of csv=p=0 "$OUT/head_cam_plan.mp4" 2>/dev/null || true; done
+```
+
+单条 viewer 调试版把上面命令改成 `ID=18` 这类已确认有 D435 summary 的 id，并替换末尾 viewer 参数：
+
+```bash
+--enable_viewer 1 --viewer_wait_at_end 1 --viewer_frame_delay 0.02 --viewer_show_camera_frustums 0
+```
+
+### L15.4 Piper AnyGrasp D435：六任务从 summary 到执行
+
+用途：这是 J1.1/J1.2 之后的六任务 D435 planner 入口。执行链是：
+
+```text
+C1.2 生成 foundation_replay_d435
+J0.1 检查 AnyGrasp grasps + D435 replay + HaMeR 是否齐全
+J1.1/J1.2 生成 anygrasp_h2o_preview_d435/<TASK>/foundation_input_<ID>/summary.json
+L15.4 使用 D435 summary + D435 replay 执行 Piper AnyGrasp planner
+```
+
+这条命令只跑已经存在 D435 summary 的 id；如果某个任务 summary 数量为 0，先回到 J1.1 重新生成。不要在 zsh 里直接粘贴含 `mapfile` 的旧版长命令；`mapfile` 是 bash 内建。现在使用脚本入口，zsh 中也用 `bash ...` 调用。
+
+先 dry-run 检查 6 个任务会跑哪些 id，不真正执行 planner：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --dry_run
+```
+
+6 个任务各跑 1 个 id 做 smoke test：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --gpu 2 --max_per_task 3
+```
+
+只跑某个任务的前 1 个 summary：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --gpu 2 --max_per_task 1 --tasks pick_diverse_bottles
+```
+
+六任务全量执行：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --gpu 2
+```
+
+六个任务各跑前 5 个 D435 summary，单个 id 出错也继续后面的任务：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error
+```
+
+六个任务分别跑前 5 个 D435 summary：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --tasks pick_diverse_bottles
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --tasks place_bread_basket
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --tasks stack_cups
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --tasks handover_bottle
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --tasks pnp_bread
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --tasks pnp_tray
+```
+
+输出检查，不依赖 `jq`：
+
+```bash
+python3 - <<'PY'
+import json
+from pathlib import Path
+tasks = ["pick_diverse_bottles", "place_bread_basket", "stack_cups", "handover_bottle", "pnp_bread", "pnp_tray"]
+root = Path("/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v1")
+for task in tasks:
+    print(f"===== {task} =====")
+    for summary in sorted((root / task).glob("foundation_input_*/plan_summary.json"))[:20]:
+        data = json.load(open(summary))
+        print(summary.parent.name, "success=", data.get("execution_success"), "failed=", data.get("execution_failed"), "preview=", data.get("reuse_preview_summary_json"))
+PY
+```
+
+### L15.5 Piper AnyGrasp D435：stack_cups id0 viewer 单条调试
+
+用途：先用 `stack_cups/foundation_input_0` 交互确认 D435 summary、per-arm keyframes、rank preview 和执行目标。这个 id 的人工关键帧是：
+
+```text
+right: 51, 106
+left: 139, 195
+```
+
+planner 的 `rank_previews` 应包含 4 张图：
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v1/stack_cups/foundation_input_0/rank_previews/keyframe_000051_rank_1.png
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v1/stack_cups/foundation_input_0/rank_previews/keyframe_000106_rank_1.png
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v1/stack_cups/foundation_input_0/rank_previews/keyframe_000139_rank_1.png
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v1/stack_cups/foundation_input_0/rank_previews/keyframe_000195_rank_1.png
+```
+
+对应的 J1.1 D435 原始 preview 图已经复制到：
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v1/stack_cups/foundation_input_0/preview_compare_d435/
+```
+
+注意：planner `rank_previews` 是 SAPIEN 里渲染的 3D 夹爪模型；J1.1 preview 是 raw D435 图片上的候选投影。两者视觉样式不同。`--approach_offset_m 0.12` 只影响 pregrasp，不影响 rank preview；rank preview 里的目标位置包含 `--candidate_target_local_x_offset_m -0.05` 的 5 cm TCP 补偿。
+
+先测 viewer 环境：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && cd /home/zaijia001/ssd/RoboTwin && unset CUDA_VISIBLE_DEVICES; [[ -f /etc/vulkan/icd.d/nvidia_icd.json ]] && export VK_ICD_FILENAMES=/etc/vulkan/icd.d/nvidia_icd.json; echo "DISPLAY=$DISPLAY CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-unset} VK_ICD_FILENAMES=${VK_ICD_FILENAMES:-unset}" && conda run -n RoboTwin_bw python /home/zaijia001/ssd/RoboTwin/code_painting/probe_sapien_viewer.py
+```
+
+如果这里打印 `DISPLAY=` 为空并报 `Renderer does not support display`，说明当前 shell 没有连到图形会话；需要在本机图形终端运行，或先正确设置 X11/Wayland forwarding。这个报错和 AnyGrasp/planner 参数无关。
+
+viewer 单条调试命令：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && cd /home/zaijia001/ssd/RoboTwin && unset CUDA_VISIBLE_DEVICES; [[ -f /etc/vulkan/icd.d/nvidia_icd.json ]] && export VK_ICD_FILENAMES=/etc/vulkan/icd.d/nvidia_icd.json; TASK=stack_cups; ID=0; ANY=/home/zaijia001/ssd/data/piper/hand/${TASK}/${TASK}_output/foundation_input_${ID}; REPLAY=/home/zaijia001/ssd/data/piper/hand/${TASK}/foundation_replay_d435/foundation_input_${ID}; HAND=/home/zaijia001/ssd/data/piper/hand/${TASK}/harmer_output/hand_detections_${ID}.npz; PREVIEW=/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview_d435/${TASK}/foundation_input_${ID}/summary.json; OUT=/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_viewer/${TASK}/foundation_input_${ID}; conda run -n RoboTwin_bw python /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_piper.py --anygrasp_dir "$ANY" --replay_dir "$REPLAY" --hand_npz "$HAND" --output_dir "$OUT" --reuse_preview_summary_json "$PREVIEW" --reuse_preview_frame_mode annotated_json_keyframes --reuse_preview_candidate_group orientation --reuse_preview_top_rank 1 --image_width 640 --image_height 480 --fovy_deg 42.499880046655484 --arm auto --execute_both_arms 1 --dual_stage_require_all_plans 1 --require_keyframe1_reached_before_action 1 --planner_backend urdfik --urdfik_trajectory_mode cartesian_interp_ik --urdfik_cartesian_interp_steps -1 --urdfik_cartesian_interp_auto_step_m 0.01 --urdfik_max_position_threshold_m 0.02 --urdfik_max_rotation_threshold_rad 0.12 --candidate_selection_mode planner --left_target_object left_light_pink_cup --right_target_object right_dark_red_cup --candidate_target_local_x_offset_m -0.05 --approach_offset_m 0.12 --reach_error_pose_source tcp --replan_until_reached 1 --replan_until_reached_max_attempts 1 --save_debug_preview 1 --save_debug_execution_preview 0 --save_pose_debug 1 --debug_visualize_targets 1 --debug_visualize_ik_waypoints 1 --reach_pos_tol_m 0.03 --reach_rot_tol_deg 180 --enable_grasp_action_object_collision 1 --grasp_action_object_collision_start_stage pregrasp --execution_object_collision_mode convex --execution_object_visual_scale_override left_light_pink_cup=0.8 --execution_object_collision_scale_override left_light_pink_cup=0.8 --execution_object_visual_scale_override right_dark_red_cup=0.8 --execution_object_collision_scale_override right_dark_red_cup=0.8 --gripper_contact_monitor_mode all_robot_links --execute_interp_steps 24 --joint_command_scene_steps 10 --settle_steps 30 --joint_target_wait_steps 25 --joint_target_wait_tol_rad 0.01 --hold_frames_after_stage 8 --pure_scene_output 1 --overlay_text 0 --head_only 0 --third_person_view 1 --vscode_compatible_video 1 --lighting_mode front_no_shadow --robot_config /home/zaijia001/ssd/RoboTwin/robot_config_PiperPika_agx_dual_table_0515.json --camera_cv_axis_mode legacy_r1 --head_camera_local_pos 0.11210396690038413 -0.39189397826604927 0.4753892624100325 --head_camera_local_quat_wxyz 0.8524694864910365 -0.0011011947849308937 0.5226654778798345 0.010740586780925399 --enable_viewer 1 --viewer_wait_at_end 1 --viewer_frame_delay 0.02 --viewer_show_camera_frustums 0 --object_mesh_override left_light_pink_cup=/home/zaijia001/ssd/data/R1/hand/obj_mesh/light_pink_cup/light_pink_cup.obj --object_mesh_override right_dark_red_cup=/home/zaijia001/ssd/data/R1/hand/obj_mesh/dark_red_cup/dark_red_cup.obj
+```
+
+### L15.6 Piper AnyGrasp D435：六任务 5 episode viewer/no-viewer 与第一关键帧 debug
+
+本节使用统一脚本：
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh
+```
+
+它会从每个任务的 `anygrasp_h2o_preview_d435/<TASK>/foundation_input_<ID>/summary.json` 读取 D435 候选和人工关键帧，不再手写 `--keyframes 38 78`。脚本内部已支持：
+
+```text
+--viewer                         打开 SAPIEN viewer，默认输出到 anygrasp_plan_keyframes_piper_d435_viewer
+--output_root PATH               覆盖输出根目录
+--debug_stop_after_keyframe1      只执行 init -> pregrasp -> grasp，不关爪、不进入第二关键帧
+--continue_on_error              单个 id 失败后继续后续 id/task
+--trajectory_mode MODE            cartesian_interp_ik 或 joint_interp
+--cartesian_auto_step_m M         cartesian_interp_ik 的自动插值步长，默认 0.01
+--joint_interp_waypoints N        joint_interp 的关节插值点数，默认 40
+--replan_attempts N               每个 stage 的重规划次数，默认 1
+--allow_partial_dual_stage        允许单臂 plan 成功时单臂执行，仅用于诊断，不推荐做最终数据
+```
+
+脚本默认同时传：
+
+```text
+--require_keyframe1_reached_before_close 1
+--require_keyframe1_reached_before_action 1
+```
+
+这表示第一关键帧 grasp 未 reached 时，不关夹爪，也不进入第二关键帧。这样 viewer 里不会再出现“stage 没执行到位但马上闭合夹爪”的误导画面。
+
+无 viewer：六任务各跑前 5 个 D435 summary：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v2/1
+```
+
+viewer：六任务各跑前 5 个 D435 summary。注意必须在图形终端或正确 X11/Wayland forwarding 环境中运行；如果 `DISPLAY=` 为空，先不要跑 viewer：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && cd /home/zaijia001/ssd/RoboTwin && unset CUDA_VISIBLE_DEVICES; [[ -f /etc/vulkan/icd.d/nvidia_icd.json ]] && export VK_ICD_FILENAMES=/etc/vulkan/icd.d/nvidia_icd.json; echo "DISPLAY=$DISPLAY CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-unset} VK_ICD_FILENAMES=${VK_ICD_FILENAMES:-unset}" && conda run -n RoboTwin_bw python /home/zaijia001/ssd/RoboTwin/code_painting/probe_sapien_viewer.py
+
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --max_per_task 5 --continue_on_error --viewer --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_viewer
+```
+
+viewer 中如果只是想确认“机械臂是否会动”，建议先用更接近旧 R1/V7 观感的关节插值模式。它只要求最终点 IK 成功，不会像 `cartesian_interp_ik` 那样要求每 1 cm 中间 waypoint 都 IK 成功：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --max_per_task 5 --continue_on_error --viewer --trajectory_mode joint_interp --joint_interp_waypoints 40 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_viewer_joint_interp
+```
+
+如果仍然使用 `cartesian_interp_ik`，但想减少中间 waypoint 失败，可以先把自动步长从 1 cm 放宽到 3 cm，并允许最多 3 次重规划：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --cartesian_auto_step_m 0.03 --replan_attempts 3 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_cart003
+```
+
+第一关键帧 debug：六任务各跑前 5 个，只从初始位置规划/执行到第一关键帧的 pregrasp/grasp；不关爪，也不进入第二关键帧。这个命令用于判断问题是否已经发生在第一关键帧 IK/轨迹阶段：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --debug_stop_after_keyframe1 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_keyframe1_debug
+```
+
+如果只调一个任务，例如 `stack_cups`：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --gpu 2 --max_per_task 1 --continue_on_error --tasks stack_cups --debug_stop_after_keyframe1
+```
+
+结果检查：
+
+```bash
+python3 - <<'PY'
+import json
+from pathlib import Path
+roots = [
+    Path('/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v1'),
+    Path('/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_keyframe1_debug'),
+]
+for root in roots:
+    print(f"===== {root} =====")
+    for p in sorted(root.glob('*/*/plan_summary.json'))[:60]:
+        d = json.load(open(p))
+        print(p.parent.parent.name, p.parent.name, "success=", d.get("execution_success"), "failed=", d.get("execution_failed"), "debug_kf1=", d.get("debug_stop_after_keyframe1"), "video=", d.get("head_video"))
+        for rec in d.get("failed_stage_records", []):
+            print("  ", rec.get("arm"), rec.get("stage"), rec.get("status"), "p=", rec.get("pos_err_m"), "r=", rec.get("rot_err_deg"))
+PY
+```
+
+`stack_cups id0` 当前定位结果：第一关键帧就没有执行到位，不是 `joint_target_wait_steps/settle_steps` 太小。`cartesian_interp_ik` 会把当前 TCP 到目标之间按 `--urdfik_cartesian_interp_auto_step_m 0.01` 插成很多 1 cm waypoint；只要中间 waypoint IK 失败，整个 plan 就是 `Fail`。实测第一关键帧：
+
+```text
+pregrasp: left failed during cartesian waypoint IK waypoint=13/23, right waypoint=28/48
+grasp:    left failed during cartesian waypoint IK waypoint=16/28, right waypoint=25/45
+```
+
+因为 `--dual_stage_require_all_plans 1`，任意 arm 的 plan 失败都会跳过整个双臂 stage，所以视频里看起来“几乎没有执行 waypoint”。这是严格同步门控的结果，不是 wait steps 没生效。
+
+参数含义：
+
+```text
+execute_interp_steps / joint_command_scene_steps / settle_steps / joint_target_wait_steps
+```
+
+这些都只在 plan 已经是 `Success` 后才影响执行过程。如果日志里已经出现 `[plan-fail]` 或 `[dual-plan] skip stage execution`，这些 step 设置再大也不会让机械臂动起来。此时要改的是 IK/轨迹模式，例如 `joint_interp`、更大的 `cartesian_auto_step_m`、更宽松的候选/姿态选择，或者重新选可达的 AnyGrasp candidate。
+
+当前脚本已恢复 R1/V7 风格执行节奏：
+
+```text
+--execute_interp_steps 24
+--joint_command_scene_steps 10
+--settle_steps 30
+--joint_target_wait_steps 25
+```
+
+不要把 `execute_interp_steps` 和 `joint_command_scene_steps` 同时设到几千。之前出现过实际命令为 `--execute_interp_steps 2400 --joint_command_scene_steps 1000`，这会让每个 stage 变成极长 physics stepping，viewer 看起来像卡在 waypoint。
+
+如果要在终端确认 TCP/EE 是否真的移动，加 `--print_pose_every N`。例如先允许单臂成功时执行，用来验证命令链和 viewer/pose 更新是否正常：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --tasks pick_diverse_bottles --trajectory_mode joint_interp --joint_interp_waypoints 40 --allow_partial_dual_stage --print_pose_every 5 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v2/3-pdb
+```
+
+期望看到类似：
+
+```text
+[exec-pose] stage=pregrasp_try1 step=1/25 ... right:tcp=(+0.5611,-0.0440,+0.9314)
+[exec-pose] stage=pregrasp_try1 step=25/25 ... right:tcp=(+0.2808,+0.2035,+1.1518)
+[exec-pose] stage=grasp_try1 step=25/25 ... right:tcp=(+0.1905,+0.2235,+1.0345)
+```
+
+这说明执行链是会动的。若不开 `--allow_partial_dual_stage`，当前 `pick_diverse_bottles id0` 左臂 first-keyframe plan 失败，严格双臂同步会整体跳过 stage，因此 TCP 不变；这是同步门控预期行为。最终数据建议仍保持严格同步，`--allow_partial_dual_stage` 只用于诊断。
+
+### L15.7 Piper AnyGrasp D435：当前关键帧执行逻辑、EE 到位判定与六任务分开运行
+
+当前推荐使用 L15.6 脚本入口：
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh
+```
+
+关键修正记录：
+
+- D435/Piper 脚本默认 `--reach_error_pose_source ee`。原因是当前 AnyGrasp 目标经过 `_trans_from_gripper_to_endlink()` 后实际送入 IK 的是 Piper wrist/endlink 约定；如果用 `tcp` 做 reached 检查，会固定留下约 12 cm 的 TCP/EE 偏移，表现为机械臂看起来已经到夹爪位置附近但日志仍显示 `pos≈0.12m, rot≈180deg`。
+- `target_pose_for_error(..., ee)` 已按 arm 使用 `world_pose_to_base_pose_for_arm/base_pose_to_world_pose_for_arm`，避免右臂目标被错误转换到左臂 base。
+- partial 诊断模式下，如果一只 arm plan 失败，另一只 arm 执行时会持续 hold 失败 arm 的当前关节，避免失败臂在物理仿真中漂移。
+- `plan-solution` 现在用 target joints 的 FK/TCP 评估，不再把 `target_pose_world` 直接回填成 planned pose。
+
+当前关键帧执行逻辑：
+
+1. J1.1/J1.2 先读取人工标注，生成 `anygrasp_h2o_preview_d435/<TASK>/foundation_input_<ID>/summary.json`。
+2. planner 只复用这个 D435 `summary.json`，不再手写 `--keyframes 38 78`；如果 summary 内有 `effective_keyframes_by_arm`，左右手分别使用各自的前两个 effective keyframes。
+3. 第一关键帧执行顺序是 `pregrasp -> grasp`。`pregrasp` 是在 grasp 目标基础上按 `--approach_offset_m` 做后退；`grasp` 是 rank1 候选加 `--candidate_target_local_x_offset_m` 后的目标。
+4. 如果 `--dual_stage_require_all_plans 1`，双臂 stage 要求左右臂 plan 都是 `Success` 才执行；任一 arm 失败则该 stage 两只手都不动。
+5. 如果第一关键帧 grasp 没有 reached，脚本默认 `--require_keyframe1_reached_before_close 1 --require_keyframe1_reached_before_action 1`，所以不会闭合夹爪，也不会进入第二关键帧 action。
+6. 第二关键帧 action 只有在第一关键帧 grasp reached 后才执行，避免第一关键帧没到位就开始第二关键帧 replay。
+
+`pick_diverse_bottles id0` 的复查结论：
+
+- 在旧 `tcp` reached 检查下，右臂最终 EE 已接近目标，但 TCP 相对 EE 多了约 12 cm 偏移，所以日志显示 right grasp `pos≈0.125m, rot≈179.9deg`。
+- 切到 `ee` 并修正 per-arm base 后，右臂 grasp 到位误差为 `pos≈0.0057m`，说明 waypoint 执行链本身可以动并能到右臂目标。
+- id0 仍整体失败的原因是左臂第一关键帧 IK/目标失败，严格双臂同步会阻断整个 stage。`--allow_partial_dual_stage` 只用于诊断时确认右臂可达，不建议作为最终数据设置。
+
+六任务分别跑前 5 个，严格同步、无 viewer：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --tasks pick_diverse_bottles --reach_error_pose_source ee --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v2/strict-ee
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --tasks place_bread_basket --reach_error_pose_source ee --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v2/strict-ee
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --tasks stack_cups --reach_error_pose_source ee --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v2/strict-ee
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --tasks handover_bottle --reach_error_pose_source ee --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v2/strict-ee
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --tasks pnp_bread --reach_error_pose_source ee --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v2/strict-ee
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --tasks pnp_tray --reach_error_pose_source ee --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v2/strict-ee
+```
+
+六任务分别跑前 5 个，partial 诊断 + `joint_interp` + pose 打印：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --tasks pick_diverse_bottles --trajectory_mode joint_interp --joint_interp_waypoints 40 --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v2/partial-ee
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --tasks place_bread_basket --trajectory_mode joint_interp --joint_interp_waypoints 40 --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v2/partial-ee
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --tasks stack_cups --trajectory_mode joint_interp --joint_interp_waypoints 40 --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v2/partial-ee
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --tasks handover_bottle --trajectory_mode joint_interp --joint_interp_waypoints 40 --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v2/partial-ee
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --tasks pnp_bread --trajectory_mode joint_interp --joint_interp_waypoints 40 --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v2/partial-ee
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --tasks pnp_tray --trajectory_mode joint_interp --joint_interp_waypoints 40 --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v2/partial-ee
+```
+
+viewer 版本同样建议先用单任务和 partial 诊断确认显示环境与运动链路：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && cd /home/zaijia001/ssd/RoboTwin && unset CUDA_VISIBLE_DEVICES; [[ -f /etc/vulkan/icd.d/nvidia_icd.json ]] && export VK_ICD_FILENAMES=/etc/vulkan/icd.d/nvidia_icd.json; echo "DISPLAY=$DISPLAY CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-unset} VK_ICD_FILENAMES=${VK_ICD_FILENAMES:-unset}" && conda run -n RoboTwin_bw python /home/zaijia001/ssd/RoboTwin/code_painting/probe_sapien_viewer.py
+
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --max_per_task 5 --continue_on_error --viewer --visualize_targets --tasks pick_diverse_bottles --trajectory_mode joint_interp --joint_interp_waypoints 40 --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v2/viewer-partial-ee
+```
+
+六任务分别跑前 5 个，viewer + partial 诊断 + 目标 gripper/axis 可视化：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --max_per_task 5 --continue_on_error --viewer --visualize_targets --tasks pick_diverse_bottles --trajectory_mode joint_interp --joint_interp_waypoints 40 --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v2/viewer-partial-ee
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --max_per_task 5 --continue_on_error --viewer --visualize_targets --tasks place_bread_basket --trajectory_mode joint_interp --joint_interp_waypoints 40 --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v2/viewer-partial-ee
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --max_per_task 5 --continue_on_error --viewer --visualize_targets --tasks stack_cups --trajectory_mode joint_interp --joint_interp_waypoints 40 --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v2/viewer-partial-ee
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --max_per_task 5 --continue_on_error --viewer --visualize_targets --tasks handover_bottle --trajectory_mode joint_interp --joint_interp_waypoints 40 --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v2/viewer-partial-ee
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --max_per_task 5 --continue_on_error --viewer --visualize_targets --tasks pnp_bread --trajectory_mode joint_interp --joint_interp_waypoints 40 --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v2/viewer-partial-ee
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --max_per_task 5 --continue_on_error --viewer --visualize_targets --tasks pnp_tray --trajectory_mode joint_interp --joint_interp_waypoints 40 --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v2/viewer-partial-ee
+```
+
+`--visualize_targets` 会自动把 `pure_scene_output` 关掉，并传 `--debug_visualize_targets 1`，viewer 中会显示当前 stage 的目标 axis 和 active frame 的候选 gripper。不开这个开关时，脚本默认保留 clean video，目标可视化不会出现在主 viewer/head 视频里。
+
+最佳候选对应关系会自动保存到输出目录：
+
+```text
+<OUT>/source_preview_compare/
+  frame_000038_d435_orientation_rank.png
+  frame_000038_d435_fused_rank.png
+  frame_000038_legacy_orientation_rank.png
+  frame_000038_legacy_fused_rank.png
+  selected_candidate_mapping.json
+```
+
+结果快速检查：
+
+```bash
+python3 - <<'PY'
+import json
+from pathlib import Path
+root = Path('/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v2')
+for p in sorted(root.glob('*/*/foundation_input_*/plan_summary.json')):
+    d = json.load(open(p))
+    print(p, 'success=', d.get('execution_success'), 'reach_pose=', d.get('reach_error_pose_source'), 'failed=', d.get('failed_stage_records'))
+PY
+```
+
+### L15.8 AnyGrasp 候选可视化与 planner 映射一致性排查：D435 preview、local-X offset、replay 指令
+
+本轮排查结论：
+
+- 用户截图中的 `source_frame=38 left_candidate=16 right_candidate=11` 对应的是 D435 preview：
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview_d435/pick_diverse_bottles/foundation_input_0/summary.json
+```
+
+- 它不对应默认广角 preview：
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview/pick_diverse_bottles/foundation_input_0/summary.json
+```
+
+默认广角 frame 38 的 rank1 candidate id 和 D435 不同。因此调 D435 planner 时必须复用 `anygrasp_h2o_preview_d435`，不能拿 `anygrasp_h2o_preview` 的图去找对应候选。
+
+发现的真实不一致点：
+
+- `render_anygrasp_ranked_preview.py` 之前在 summary/world target 中应用了 `--candidate_target_local_x_offset_m -0.05`，但是图片上的 grasp wireframe 仍然画原始 AnyGrasp `translation_cam/rotation_matrix`。
+- planner 复用 summary 时使用的是已经带 local-X offset 的 `translation_world`，所以会出现“源 AnyGrasp 图片看着在一个位置，planner/rank_previews 里夹爪靠后一点”的现象。
+- 现在已修正：preview 图片绘制也使用同一套 remap/post-rot/local-X offset 后的 camera-frame target pose，并在 summary 中同时写入：
+
+```text
+translation_cam              原始 AnyGrasp 相机坐标
+visual_translation_cam       实际绘制、summary world target、planner 使用的相机坐标
+translation_world            实际 planner target world 坐标
+rotation_matrix              原始 AnyGrasp 旋转
+visual_rotation_matrix       实际绘制/目标旋转
+```
+
+`pick_diverse_bottles id0 frame 38` 的验证值：
+
+```text
+left_orientation rank1 candidate=16
+  raw_cam    = [-0.137713, -0.049211, 0.378072]
+  visual_cam = [-0.149713, -0.000824, 0.374238]
+  world      = [-0.064218, 0.029608, 0.893666]
+
+right_orientation rank1 candidate=11
+  raw_cam    = [0.141768, -0.098418, 0.359000]
+  visual_cam = [0.137988, -0.112478, 0.311167]
+  world      = [0.223036, 0.106104, 0.997832]
+```
+
+这说明 5cm offset 已经明确体现在 `visual_cam/world` 中。后续对比应看 `visual_translation_cam` 或 planner 输出的 `<OUT>/source_preview_compare/selected_candidate_mapping.json`。
+
+D435 AnyGrasp 候选 preview 重新生成：六任务一起跑。这个命令会重新生成带修正后 wireframe 的 `anygrasp_h2o_preview_d435`：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do case "$TASK" in pick_diverse_bottles) LEFT_OBJ=left_bottle; RIGHT_OBJ=right_bottle ;; place_bread_basket) LEFT_OBJ=basket; RIGHT_OBJ=bread ;; stack_cups) LEFT_OBJ=left_light_pink_cup; RIGHT_OBJ=right_dark_red_cup ;; handover_bottle) LEFT_OBJ=right_bottle; RIGHT_OBJ=right_bottle ;; pnp_bread) LEFT_OBJ=left_bread; RIGHT_OBJ=right_bread ;; pnp_tray) LEFT_OBJ=left_dark_red_cup; RIGHT_OBJ=right_bottle ;; esac; ANN=/home/zaijia001/ssd/RoboTwin/code_painting/h2o_manual_review/${TASK}/hand_keyframes_all.json; ANY_ROOT=/home/zaijia001/ssd/data/piper/hand/${TASK}/${TASK}_output; [[ -d "$ANY_ROOT" ]] || ANY_ROOT=/home/zaijia001/ssd/data/piper/hand/${TASK}/${TASK}_output_old_cam; REPLAY_ROOT=/home/zaijia001/ssd/data/piper/hand/${TASK}/foundation_replay_d435; HAND_ROOT=/home/zaijia001/ssd/data/piper/hand/${TASK}/harmer_output; OUT_ROOT=/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview_d435/${TASK}; [[ -f "$ANN" ]] || { echo "[skip] task=${TASK} missing annotation $ANN"; continue; }; [[ -d "$ANY_ROOT" ]] || { echo "[skip] task=${TASK} missing ANY_ROOT=$ANY_ROOT"; continue; }; [[ -d "$REPLAY_ROOT" ]] || { echo "[skip] task=${TASK} missing REPLAY_ROOT=$REPLAY_ROOT"; continue; }; VIDEO_PREFIX=foundation_input CUDA_VISIBLE_DEVICES=2 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_render_anygrasp_ranked_preview_keyframes_batch.sh "$ANY_ROOT" "$REPLAY_ROOT" "$HAND_ROOT" "$OUT_ROOT" --hand_keyframes_json "$ANN" --left_target_object "$LEFT_OBJ" --right_target_object "$RIGHT_OBJ" --anygrasp_score_weight 0.25 --orientation_score_weight 0.75 --max_rotation_distance_deg 90 --candidate_target_local_x_offset_m -0.05 --draw_object_overlay 1 --draw_hand_reference 1 --debug_dump_object_distances 1 --top_k 20 --camera_cv_axis_mode legacy_r1; done
+```
+
+单 id 验证，不覆盖主结果：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && cd /home/zaijia001/ssd/RoboTwin && VIDEO_PREFIX=foundation_input CUDA_VISIBLE_DEVICES=2 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_render_anygrasp_ranked_preview_keyframes_batch.sh /home/zaijia001/ssd/data/piper/hand/pick_diverse_bottles/pick_diverse_bottles_output /home/zaijia001/ssd/data/piper/hand/pick_diverse_bottles/foundation_replay_d435 /home/zaijia001/ssd/data/piper/hand/pick_diverse_bottles/harmer_output /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview_d435_offsetfix_debug/pick_diverse_bottles --ids 0 --hand_keyframes_json /home/zaijia001/ssd/RoboTwin/code_painting/h2o_manual_review/pick_diverse_bottles/hand_keyframes_all.json --left_target_object left_bottle --right_target_object right_bottle --anygrasp_score_weight 0.25 --orientation_score_weight 0.75 --max_rotation_distance_deg 90 --candidate_target_local_x_offset_m -0.05 --draw_object_overlay 1 --draw_hand_reference 1 --debug_dump_object_distances 1 --top_k 20 --camera_cv_axis_mode legacy_r1
+```
+
+检查 frame 38 rank1 的 raw/visual/world 映射：
+
+```bash
+/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python - <<'PY'
+import json
+from pathlib import Path
+p = Path('/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview_d435_offsetfix_debug/pick_diverse_bottles/foundation_input_0/summary.json')
+d = json.loads(p.read_text())
+for e in d['frames']:
+    if int(e['frame']) == 38:
+        for key in ['left_orientation', 'right_orientation']:
+            c = e['top_candidates'][key][0]
+            print(key, 'idx=', c['candidate_idx'])
+            print('  raw_cam=', [round(x, 6) for x in c['translation_cam']])
+            print('  visual_cam=', [round(x, 6) for x in c['visual_translation_cam']])
+            print('  world=', [round(x, 6) for x in c['translation_world']])
+PY
+```
+
+D435 AnyGrasp planner/replay：严格同步、六任务前 5 个，无 viewer：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --reach_error_pose_source ee --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v2/strict-ee-offsetfix
+```
+
+D435 AnyGrasp planner/replay：viewer + 目标 gripper/axis 可视化，用于确认 planner 实际目标：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && cd /home/zaijia001/ssd/RoboTwin && unset CUDA_VISIBLE_DEVICES; [[ -f /etc/vulkan/icd.d/nvidia_icd.json ]] && export VK_ICD_FILENAMES=/etc/vulkan/icd.d/nvidia_icd.json; echo "DISPLAY=$DISPLAY CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-unset} VK_ICD_FILENAMES=${VK_ICD_FILENAMES:-unset}" && conda run -n RoboTwin_bw python /home/zaijia001/ssd/RoboTwin/code_painting/probe_sapien_viewer.py
+
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --max_per_task 5 --continue_on_error --viewer --visualize_targets --trajectory_mode joint_interp --joint_interp_waypoints 40 --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v2/viewer-partial-ee-offsetfix
+```
+
+输出对比路径：
+
+```text
+<OUT>/source_preview_compare/
+  frame_000038_d435_orientation_rank.png
+  frame_000038_d435_fused_rank.png
+  frame_000038_legacy_orientation_rank.png
+  frame_000038_legacy_fused_rank.png
+  selected_candidate_mapping.json
+```
+
+`selected_candidate_mapping.json` 中的 `source_entry_translation_world` 应与 planner 的 `planner_target_pose_world_wxyz[:3]` 对齐；如果 `planner_raw_pose_world_wxyz[:3]` 和 target 相差约 5cm，这是 `--candidate_target_local_x_offset_m -0.05` 的预期效果。
+
+### L15.9 D435 AnyGrasp no-offset：复制安全版三步运行指令
+
+用途：把原始 no-offset AnyGrasp 候选 preview/summary 保存到主目录 `/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview_d435`。避免 zsh 手动换行导致 `OUT_ROOT=/ home/...`、`--candidate_target_local_x_offset_m: command not found` 或脚本 fallback 到默认 `replay_m_obj_pose_d_pour_blue_norobot`。下面 3 段按顺序运行；第一段使用 `bash <<'BASH'`，可以整体复制到 zsh。
+
+#### 1. 重新生成六任务 D435 AnyGrasp preview/summary
+
+```bash
+bash <<'BASH'
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
+
+for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do
+  case "$TASK" in
+    pick_diverse_bottles) LEFT_OBJ=left_bottle; RIGHT_OBJ=right_bottle ;;
+    place_bread_basket) LEFT_OBJ=basket; RIGHT_OBJ=bread ;;
+    stack_cups) LEFT_OBJ=left_light_pink_cup; RIGHT_OBJ=right_dark_red_cup ;;
+    handover_bottle) LEFT_OBJ=right_bottle; RIGHT_OBJ=right_bottle ;;
+    pnp_bread) LEFT_OBJ=left_bread; RIGHT_OBJ=right_bread ;;
+    pnp_tray) LEFT_OBJ=left_dark_red_cup; RIGHT_OBJ=right_bottle ;;
+  esac
+
+  ANN=/home/zaijia001/ssd/RoboTwin/code_painting/h2o_manual_review/${TASK}/hand_keyframes_all.json
+  ANY_ROOT=/home/zaijia001/ssd/data/piper/hand/${TASK}/${TASK}_output
+  [[ -d "$ANY_ROOT" ]] || ANY_ROOT=/home/zaijia001/ssd/data/piper/hand/${TASK}/${TASK}_output_old_cam
+  REPLAY_ROOT=/home/zaijia001/ssd/data/piper/hand/${TASK}/foundation_replay_d435
+  HAND_ROOT=/home/zaijia001/ssd/data/piper/hand/${TASK}/harmer_output
+  OUT_ROOT=/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview_d435/${TASK}
+
+  VIDEO_PREFIX=foundation_input CUDA_VISIBLE_DEVICES=2 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_render_anygrasp_ranked_preview_keyframes_batch.sh \
+    "$ANY_ROOT" \
+    "$REPLAY_ROOT" \
+    "$HAND_ROOT" \
+    "$OUT_ROOT" \
+    --hand_keyframes_json "$ANN" \
+    --left_target_object "$LEFT_OBJ" \
+    --right_target_object "$RIGHT_OBJ" \
+    --anygrasp_score_weight 0.25 \
+    --orientation_score_weight 0.75 \
+    --max_rotation_distance_deg 90 \
+    --candidate_target_local_x_offset_m 0.0 \
+    --draw_object_overlay 1 \
+    --draw_hand_reference 1 \
+    --debug_dump_object_distances 1 \
+    --top_k 20 \
+    --camera_cv_axis_mode legacy_r1
+done
+BASH
+```
+
+运行时必须看到每个 task 的 replay root 是 D435 路径：
+
+```text
+[run-anygrasp-preview-keyframes-batch] replay_root=/home/zaijia001/ssd/data/piper/hand/<TASK>/foundation_replay_d435
+```
+
+如果仍然出现 `replay_m_obj_pose_d_pour_blue_norobot`，说明命令参数没有正确传进脚本。
+
+#### 2. 无 viewer 跑六任务 D435 planner/replay
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh \
+  --gpu 2 \
+  --max_per_task 5 \
+  --continue_on_error \
+  --reach_error_pose_source ee \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v2/strict-ee-offsetfix
+```
+
+#### 3. viewer 跑六任务 D435 planner/replay，并显示 gripper 目标
+
+先检查 viewer 环境：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && cd /home/zaijia001/ssd/RoboTwin && unset CUDA_VISIBLE_DEVICES; [[ -f /etc/vulkan/icd.d/nvidia_icd.json ]] && export VK_ICD_FILENAMES=/etc/vulkan/icd.d/nvidia_icd.json; echo "DISPLAY=$DISPLAY CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-unset} VK_ICD_FILENAMES=${VK_ICD_FILENAMES:-unset}" && conda run -n RoboTwin_bw python /home/zaijia001/ssd/RoboTwin/code_painting/probe_sapien_viewer.py
+```
+
+再运行 viewer 版本：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh \
+  --max_per_task 5 \
+  --continue_on_error \
+  --viewer \
+  --visualize_targets \
+  --trajectory_mode joint_interp \
+  --joint_interp_waypoints 40 \
+  --allow_partial_dual_stage \
+  --print_pose_every 5 \
+  --reach_error_pose_source ee \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v2/viewer-partial-ee-offsetfix
+```
+
+说明：
+
+- 当前本节 preview 保留原始 no-offset AnyGrasp candidate：`--candidate_target_local_x_offset_m 0.0`。
+- 如果后续 planner 仍设置 `--candidate_target_local_x_offset_m -0.05`，planner 会在执行阶段再沿 local +X 反方向退 5cm；因此主 preview 表示“原始 AnyGrasp 候选”，planner `rank_previews/source_preview_compare` 表示“执行 target”。
+- gripper 局部轴约定：`local +X = gripper approach/forward axis = rotation_matrix[:, 0]`。
+
+preview 图片说明：
+
+```text
+frame_XXXXXX_left_right_orientation_rank.png
+  只按朝向相似度排序。orientation_score = max(0, 1 - aligned_rot / 180)。
+  当前 downstream planner 默认使用 --reuse_preview_candidate_group orientation --reuse_preview_top_rank 1，
+  因此 orientation rank1 是默认会送入 planner 的候选。
+
+frame_XXXXXX_left_right_fused_rank.png
+  按综合分数排序。fused_score = anygrasp_score * 0.25 + orientation_score * 0.75。
+  用于参考 AnyGrasp 置信度和手部朝向的折中结果；当前默认 planner 不使用 fused。
+
+frame_XXXXXX_left_right_planner_selected_orientation_rank1.png
+  只画 downstream planner 当前默认会选择的候选：orientation rank1。
+  这是最直接的“最终选择”可视化。
+```
+
+颜色说明：
+
+```text
+候选 AnyGrasp gripper wireframe:
+  左手候选：蓝色系
+  右手候选：橙色系
+
+人手参考 gripper / hand reference:
+  左手参考：绿色
+  右手参考：紫色
+```
+
+因此你看到的绿色/紫色通常不是 AnyGrasp 最终候选，而是 HaMeR 人手参考夹爪，用来给 orientation 排序做对照。
+
+### L15.10 D435 AnyGrasp offset -5cm 对比版：保存到单独目录做可视化对照
+
+用途：如果想对比 planner 执行时常用的 5cm local-X 补偿，运行本节命令。它把 `--candidate_target_local_x_offset_m` 改为 `-0.05`，输出到单独目录，不覆盖主 D435 no-offset preview：
+
+```text
+当前 L15.9 主目录: --candidate_target_local_x_offset_m 0.0 -> 保留原始 AnyGrasp candidate 位置
+本节 L15.10 对比目录: --candidate_target_local_x_offset_m -0.05 -> 沿 local +X 反方向退 5cm
+```
+
+该目录只用于判断 5cm local-X offset 是否是你看到的“夹爪靠后”的来源。
+
+#### 1. 生成 offset -5cm D435 preview/summary 到对比目录
+
+```bash
+bash <<'BASH'
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
+
+for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do
+  case "$TASK" in
+    pick_diverse_bottles) LEFT_OBJ=left_bottle; RIGHT_OBJ=right_bottle ;;
+    place_bread_basket) LEFT_OBJ=basket; RIGHT_OBJ=bread ;;
+    stack_cups) LEFT_OBJ=left_light_pink_cup; RIGHT_OBJ=right_dark_red_cup ;;
+    handover_bottle) LEFT_OBJ=right_bottle; RIGHT_OBJ=right_bottle ;;
+    pnp_bread) LEFT_OBJ=left_bread; RIGHT_OBJ=right_bread ;;
+    pnp_tray) LEFT_OBJ=left_dark_red_cup; RIGHT_OBJ=right_bottle ;;
+  esac
+
+  ANN=/home/zaijia001/ssd/RoboTwin/code_painting/h2o_manual_review/${TASK}/hand_keyframes_all.json
+  ANY_ROOT=/home/zaijia001/ssd/data/piper/hand/${TASK}/${TASK}_output
+  [[ -d "$ANY_ROOT" ]] || ANY_ROOT=/home/zaijia001/ssd/data/piper/hand/${TASK}/${TASK}_output_old_cam
+  REPLAY_ROOT=/home/zaijia001/ssd/data/piper/hand/${TASK}/foundation_replay_d435
+  HAND_ROOT=/home/zaijia001/ssd/data/piper/hand/${TASK}/harmer_output
+  OUT_ROOT=/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview_d435_offset_minus_5cm_compare/${TASK}
+
+  VIDEO_PREFIX=foundation_input CUDA_VISIBLE_DEVICES=2 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_render_anygrasp_ranked_preview_keyframes_batch.sh \
+    "$ANY_ROOT" \
+    "$REPLAY_ROOT" \
+    "$HAND_ROOT" \
+    "$OUT_ROOT" \
+    --hand_keyframes_json "$ANN" \
+    --left_target_object "$LEFT_OBJ" \
+    --right_target_object "$RIGHT_OBJ" \
+    --anygrasp_score_weight 0.25 \
+    --orientation_score_weight 0.75 \
+    --max_rotation_distance_deg 90 \
+    --candidate_target_local_x_offset_m -0.05 \
+    --draw_object_overlay 1 \
+    --draw_hand_reference 1 \
+    --debug_dump_object_distances 1 \
+    --top_k 20 \
+    --camera_cv_axis_mode legacy_r1
+done
+BASH
+```
+
+#### 2. 对比同一 id/frame 的 no-offset 与 offset summary
+
+```bash
+/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python - <<'PY'
+import json
+from pathlib import Path
+
+task = "pick_diverse_bottles"
+episode = "foundation_input_0"
+frame = 38
+paths = {
+    "raw_no_offset_main": Path(f"/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview_d435/{task}/{episode}/summary.json"),
+    "offset_minus_5cm_compare": Path(f"/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview_d435_offset_minus_5cm_compare/{task}/{episode}/summary.json"),
+}
+for label, path in paths.items():
+    print(f"===== {label} =====")
+    d = json.loads(path.read_text())
+    for entry in d["frames"]:
+        if int(entry["frame"]) != frame:
+            continue
+        for key in ["left_orientation", "right_orientation"]:
+            c = entry["top_candidates"][key][0]
+            print(key, "idx=", c["candidate_idx"])
+            print("  translation_cam=", [round(x, 6) for x in c["translation_cam"]])
+            print("  visual_translation_cam=", [round(x, 6) for x in c.get("visual_translation_cam", c["translation_cam"])])
+            print("  translation_world=", [round(x, 6) for x in c["translation_world"]])
+PY
+```
+
+#### 3. 对比图片路径
+
+```text
+raw/no-offset main:
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview_d435/<TASK>/foundation_input_<ID>/frame_000038_left_right_orientation_rank.png
+
+offset -5cm compare:
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview_d435_offset_minus_5cm_compare/<TASK>/foundation_input_<ID>/frame_000038_left_right_orientation_rank.png
+```
+
+注意：如果要让 preview 和 planner 的最终执行 target 完全一致，preview 和 planner 的 `--candidate_target_local_x_offset_m` 必须相同。当前你的要求是主 `anygrasp_h2o_preview_d435` 保存 no-offset 原始候选，所以它主要用于候选检查；planner 是否再加 `-0.05` 由后续执行命令控制。
+
+### L15.11 D435 AnyGrasp viewer：执行 Cartesian IK 成功前缀，直到第一个不可达 waypoint
+
+用途：当 `cartesian_interp_ik` 在中间 waypoint IK 失败时，默认严格逻辑会把整段 plan 标记为 `Fail`，双臂同步模式下可能直接跳过 stage，所以 viewer 里看起来“有目标/waypoint，但机器人不动”。本节新增诊断开关：
+
+```text
+--execute_partial_cartesian_plan
+```
+
+开启后，如果第 N 个 Cartesian waypoint IK 失败，但前面 1..N-1 已经求解成功，planner 会返回 `status=Partial`，并执行成功前缀到最后一个可达 waypoint。日志会打印：
+
+```text
+[plan-partial] ... failed_waypoint=N/M solved_prefix=K
+[exec-pose] ...
+```
+
+注意：
+
+- 该开关只对 `--trajectory_mode cartesian_interp_ik` 有意义。
+- `joint_interp` 只求最终点 IK，然后做关节插值；没有 Cartesian waypoint 前缀，所以不会触发 partial cartesian 行为。
+- `Partial` 会执行，但不会被认为 reached；第一关键帧没 reached 时，当前 close/action guard 仍会阻止关爪和进入第二关键帧。
+- 这是调试可达边界的命令，不是最终推荐数据生成命令。
+
+viewer 调试命令：六任务前 5 个，显示 target/waypoint，并执行可达 waypoint 前缀：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh \
+  --max_per_task 5 \
+  --continue_on_error \
+  --viewer \
+  --visualize_targets \
+  --trajectory_mode cartesian_interp_ik \
+  --cartesian_auto_step_m 0.03 \
+  --execute_partial_cartesian_plan \
+  --allow_partial_dual_stage \
+  --print_pose_every 5 \
+  --reach_error_pose_source ee \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v2/viewer-cartesian-partial-prefix
+```
+
+单任务调试版本，例如 `pick_diverse_bottles`：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh \
+  --max_per_task 5 \
+  --continue_on_error \
+  --tasks pick_diverse_bottles \
+  --viewer \
+  --visualize_targets \
+  --trajectory_mode cartesian_interp_ik \
+  --cartesian_auto_step_m 0.03 \
+  --execute_partial_cartesian_plan \
+  --allow_partial_dual_stage \
+  --print_pose_every 5 \
+  --reach_error_pose_source ee \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v2/viewer-cartesian-partial-prefix-pdb
+```
+
+无 viewer 批量诊断：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh \
+  --gpu 2 \
+  --max_per_task 5 \
+  --continue_on_error \
+  --trajectory_mode cartesian_interp_ik \
+  --cartesian_auto_step_m 0.03 \
+  --execute_partial_cartesian_plan \
+  --allow_partial_dual_stage \
+  --print_pose_every 5 \
+  --reach_error_pose_source ee \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v2/cartesian-partial-prefix
+```
+
+位置优先 / 朝向优先的说明：
+
+- 当前 URDFIK 的成功判定同时约束位置和朝向：`--urdfik_position_threshold_m`、`--urdfik_rotation_threshold_rad`，并可放宽到 `--urdfik_max_position_threshold_m`、`--urdfik_max_rotation_threshold_rad`。
+- 当前脚本中已经把执行 reached 判定放宽成位置优先调试：`--reach_rot_tol_deg 180`，这只影响“是否算 reached”，不改变 IK 求解本身。
+- 如果想在 IK 求解阶段真正“位置优先”，需要让 IK solver 支持位置/姿态不同权重，或者在失败时用多级策略：先用完整姿态求解；失败后放宽 rotation threshold；再失败则只保留位置、用当前 EE 朝向或候选朝向附近采样。这个属于下一步 IK 策略修改，不是本节 partial-prefix 执行改动。
+
+### L15.12 D435 AnyGrasp Piper 轴修正版：验证 preview gripper 与执行 gripper 的坐标系
+
+用途：检查 viewer 中的执行夹爪朝向是否和 `anygrasp_h2o_preview_d435` 的 gripper wireframe 一致。
+
+当前确认的坐标系关系：
+
+```text
+AnyGrasp / preview target:
+  local +X = gripper approach / forward axis = rotation_matrix[:, 0]
+
+Piper robot reported gripper pose:
+  R_report = R_link6 @ global_trans_matrix @ delta_matrix
+
+当前 Piper 配置:
+  global_trans_matrix = diag(1, -1, -1)
+  delta_matrix = I
+```
+
+因此送给 URDFIK 的 link6 目标朝向必须是：
+
+```text
+R_link6_target = R_preview_gripper @ inv(global_trans_matrix @ delta_matrix)
+```
+
+之前 Piper URDFIK 路径只反掉了 `delta_matrix`，没有反掉 `global_trans_matrix`；这会让 viewer 里真正渲染出来的 gripper 相对 preview gripper 绕 local +X 翻转约 180 度。现在 `render_hand_retarget_piper_dual_npz_urdfik.py` 已在 `_target_tcp_world_to_ee_base()` 中补上 `global_trans_matrix` 的逆变换。`plan_anygrasp_keyframes_r1.py` 的 `reach_error_pose_source=ee` 也保持 Piper dual 的可见 gripper 坐标系，不再把目标错误转换成 raw link6 坐标系。
+
+如果只是检查“轴是否已经对齐”，先跑下面的 viewer 命令：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh \
+  --max_per_task 5 \
+  --continue_on_error \
+  --viewer \
+  --visualize_targets \
+  --trajectory_mode cartesian_interp_ik \
+  --cartesian_auto_step_m 0.03 \
+  --execute_partial_cartesian_plan \
+  --allow_partial_dual_stage \
+  --print_pose_every 5 \
+  --reach_error_pose_source ee \
+  --ik_max_rotation_threshold_rad 3.14 \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v2/viewer-cartesian-partial-prefix-axisfix
+```
+
+注意：如果不加 `--ik_max_rotation_threshold_rad 3.14`，当前默认仍是严格完整姿态 IK 的 `0.12rad`。实测 `pick_diverse_bottles id0` 会在第一个 Cartesian waypoint 失败，因此 viewer 看起来完全不动。这个现象说明 IK 姿态约束过紧或候选朝向不可达，不说明 step/settle 不够。
+
+如果 viewer 中仍然“有 target/waypoint 但机器人完全不动”，用下面的位置优先诊断版。它把 IK 旋转成功阈值上限临时放宽到 `3.14rad`，用于确认失败是否主要来自朝向约束，而不是位置不可达：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh \
+  --gpu 2 \
+  --max_per_task 1 \
+  --continue_on_error \
+  --tasks pick_diverse_bottles \
+  --trajectory_mode cartesian_interp_ik \
+  --cartesian_auto_step_m 0.03 \
+  --execute_partial_cartesian_plan \
+  --allow_partial_dual_stage \
+  --print_pose_every 5 \
+  --visualize_targets \
+  --reach_error_pose_source ee \
+  --ik_max_rotation_threshold_rad 3.14 \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v2/axis-fix-posfirst-smoke
+```
+
+实测 `pick_diverse_bottles id0`：
+
+- 默认 `--ik_max_rotation_threshold_rad 0.12` 时，pregrasp/grasp 都在第一个 Cartesian waypoint IK 失败，机器人不会动；这不是 `settle_steps` 或 `joint_target_wait_steps` 不够。
+- 放宽到 `3.14rad` 后，会输出连续 `[exec-pose]`，证明执行链和 waypoint 执行本身是通的。
+- 但这只是诊断命令：它允许很大的朝向误差，所以不能作为最终数据生成质量标准。
+
+当前 partial-prefix 逻辑还增加了一个小 fallback：如果第一个 Cartesian waypoint 就失败，会在当前 pose 到第一个失败 waypoint 之间再采样更短的小步，尝试执行最远的可解小步。若仍然完全不动，说明连这个短距离小步在当前完整姿态约束下也不可解。
+
+如果要做真正的“位置优先 IK”，下一步应实现多级 IK fallback：
+
+```text
+1. full pose IK
+2. relaxed rotation IK
+3. position-only / keep-current-orientation IK
+4. around preview orientation sampling
+```
+
+当前 L15.12 只提供第 2 步的命令级诊断入口。
+
+viewer 批跑说明：
+
+- 现在 wrapper 的 `--viewer` 默认 `--viewer_wait_at_end 0`，一个 id 结束后会自动进入下一个 id，不再必须关闭 SAPIEN 窗口。
+- 如果想单个 id 结束后停在 viewer 中检查，显式加：
+
+```bash
+--viewer_wait_at_end 1
+```
+
+### L15.13 D435 AnyGrasp Piper viewer 轴检查：六任务 id0-10 单独命令
+
+轴说明：
+
+- `anygrasp_h2o_preview_d435/*orientation_rank.png` 里的 gripper wireframe 使用 `rotation_matrix[:, 0]` 作为 local +X。图上它是从掌根横杆指向两根手指指尖/缺口方向的轴。
+- viewer 中 `--visualize_targets` 画的是坐标轴 actor，不是夹爪模型：红色 = local +X，绿色 = local +Y，蓝色 = local +Z。
+- 因此判断 preview gripper 和 viewer target 是否一致时，优先比较“preview 两根手指从掌根到指尖的方向”和 viewer 红轴方向。
+- Piper 真实夹爪 mesh 的 link 轴不一定等于 viewer target 轴。`robot_config_PiperPika_agx_dual_table_0515.json` 中 `global_trans_matrix=diag(1,-1,-1)`，会翻转 local Y/Z；所以绿/蓝轴看起来和 mesh 不一致时，不一定表示 local +X 前进轴错了。
+- 当前默认 `--piper_apply_global_trans_to_ik 0`，保持和前面 direct replay 相同的 Piper URDFIK 约定。`--piper_apply_global_trans_to_ik 1` 只作为对照诊断，不作为默认。
+- 如果红轴和 preview wireframe 的手指/缺口方向一致，但机器人执行后真实夹爪没对齐，这是 IK/执行结果错误；如果红轴本身就和 preview wireframe 不一致，才是 planner target 可视化或 candidate 映射错误。
+
+注意：下面命令都用 `--id_start 0 --id_end 10`，不要再用 `--max_per_task 5`。`output_root` 必须保持一整行，不能被终端换行切成两个 token。
+
+#### pick_diverse_bottles id0-10 viewer
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --tasks pick_diverse_bottles --id_start 0 --id_end 10 --continue_on_error --viewer --visualize_targets --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --piper_apply_global_trans_to_ik 0 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v2/viewer-axischeck-id0-10
+```
+
+#### place_bread_basket id0-10 viewer
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --tasks place_bread_basket --id_start 0 --id_end 10 --continue_on_error --viewer --visualize_targets --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --piper_apply_global_trans_to_ik 0 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v2/viewer-axischeck-id0-10
+```
+
+#### stack_cups id0-10 viewer
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --tasks stack_cups --id_start 0 --id_end 10 --continue_on_error --viewer --visualize_targets --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --piper_apply_global_trans_to_ik 0 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v2/viewer-axischeck-id0-10
+```
+
+#### handover_bottle id0-10 viewer
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --tasks handover_bottle --id_start 0 --id_end 10 --continue_on_error --viewer --visualize_targets --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --piper_apply_global_trans_to_ik 0 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v2/viewer-axischeck-id0-10
+```
+
+#### pnp_bread id0-10 viewer
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --tasks pnp_bread --id_start 0 --id_end 10 --continue_on_error --viewer --visualize_targets --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --piper_apply_global_trans_to_ik 0 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v2/viewer-axischeck-id0-10
+```
+
+#### pnp_tray id0-10 viewer
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --tasks pnp_tray --id_start 0 --id_end 10 --continue_on_error --viewer --visualize_targets --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --piper_apply_global_trans_to_ik 0 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v2/viewer-axischeck-id0-10
+```
+
+### L15.14 Viewer 目标夹爪帧显示修正：按左右手分别显示当前关键帧
+
+问题现象：
+
+- 运行 L15.13 这类 viewer 命令时，`--visualize_targets` 看到的 gripper/axis 目标像是后一关键帧，第一关键帧没有正确显示。
+- 这不一定是 AnyGrasp candidate 本身错了；之前执行预览只保存了一个全局 `active_frame`，并且在双臂模式下用左手帧作为当前帧。若左右手的 effective keyframes 不同，或者阶段切换到 action 后残留了后一帧，viewer 中的候选和 target actor 会按错误帧显示。
+
+修正内容：
+
+- `plan_anygrasp_keyframes_r1.py` 的 `DebugExecutionState` 增加 `active_frame_by_arm`。
+- pregrasp/grasp 阶段写入 `{left: left_keyframe1, right: right_keyframe1}`，action 阶段写入 `{left: left_keyframe2, right: right_keyframe2}`。
+- `record_frame()` 和 `update_candidate_debug_visuals()` 现在按每只手自己的 active frame 更新 selected gripper、candidate gripper 和 debug execution preview。
+- `pose_debug.jsonl` / `execution_metrics.jsonl` 现在也会记录 `active_frame_by_arm`，方便确认 viewer 当前显示的是哪一帧。
+
+复查命令：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --dry_run --tasks pick_diverse_bottles --id_start 0 --id_end 10 --continue_on_error --viewer --visualize_targets --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --piper_apply_global_trans_to_ik 0 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v2/viewer-axischeck-id0-10
+```
+
+运行实际 viewer 时仍使用 L15.13 的六任务 id0-10 命令。检查方式：
+
+```bash
+jq -c '{stage,active_frame,active_frame_by_arm}' /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v2/viewer-axischeck-id0-10/pick_diverse_bottles/foundation_input_0/pose_debug.jsonl | head -n 20
+```
+
+如果当前 shell 没有 `jq`，用这个 sed 版本：
+
+```bash
+head -n 20 /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v2/viewer-axischeck-id0-10/pick_diverse_bottles/foundation_input_0/pose_debug.jsonl | sed -E 's/.*"active_frame": ([^,]+), "active_frame_by_arm": \{([^}]*)\}, "stage": "([^"]+)".*/stage=\3 active_frame=\1 active_frame_by_arm={\2}/'
+```
+
+预期：
+
+- `stage=pregrasp` / `stage=grasp` 时，`active_frame_by_arm` 应该是第一关键帧。
+- `stage=action` 时，`active_frame_by_arm` 才切到第二关键帧。
+- viewer 红轴仍表示 target local +X；它应该和 D435 preview 中 gripper wireframe 从掌根到指尖/缺口方向一致。
+
+### L15.15 Stack Cups id0：关闭碰撞、只显示当前 target 轴的规划调试
+
+用途：单独排查 `stack_cups/foundation_input_0` 的 IK/执行问题，避免物体碰撞、候选 gripper 坐标轴、selected-keyframe 坐标轴和 IK waypoint marker 混在一起。
+
+新增 wrapper 参数：
+
+```text
+--disable_execution_collisions
+  将 planner 的 --enable_grasp_action_object_collision 设为 0；不再启用 grasp/action 物体碰撞和 contact-stop close 逻辑。
+
+--target_axes_only
+  自动打开 --visualize_targets，同时隐藏候选 gripper 轴、selected-keyframe 轴和 IK waypoint marker。
+  该模式下 viewer 里应主要只剩左右手当前执行 target 的坐标轴。
+
+--debug_candidate_top_k <N>
+--debug_common_candidate_top_k <N>
+--debug_visualize_selected_keyframe_axes <0|1>
+--debug_visualize_ik_waypoints <0|1>
+  细粒度控制调试 actor。
+```
+
+为什么之前会看到“四个坐标系”：
+
+- `stack_cups id0` 的 D435 summary 是 per-arm keyframes：左手第一关键帧为 `139`，右手第一关键帧为 `51`，不是同一帧。
+- viewer 中同时可能存在：
+  - 当前执行 target 轴：左右手各一套，红/绿/蓝分别是 local X/Y/Z。
+  - selected-keyframe 轴：按关键帧配色，第一关键帧是橙/黄系，第二关键帧是蓝/紫系。
+  - candidate gripper 轴：候选夹爪上的红/绿/蓝轴。
+  - IK waypoint / endpoint marker。
+- 因此判断 gripper target 时，推荐先用 `--target_axes_only`，只看当前执行 target 轴。红轴仍是 target local +X；不要用其它候选轴混判。
+
+stack_cups id0 viewer，关闭碰撞，只显示当前 target 轴：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --tasks stack_cups --ids 0 --continue_on_error --viewer --target_axes_only --disable_execution_collisions --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --piper_apply_global_trans_to_ik 0 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v2/stackcups-id0-nocollision-targetaxes
+```
+
+只调第一关键帧，关闭碰撞、无 viewer：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh --tasks stack_cups --ids 0 --continue_on_error --target_axes_only --disable_execution_collisions --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 20 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --piper_apply_global_trans_to_ik 0 --debug_stop_after_keyframe1 --output_root /tmp/stack_cups_id0_no_collision_target_axes_only
+```
+
+本机无 viewer 实测结论：
+
+- wrapper 已确认 `collisions=0`，`plan_summary.json` 中 `enable_grasp_action_object_collision=0`。
+- `pose_debug.jsonl` 显示 pregrasp 阶段为 `active_frame_by_arm={"left": 139, "right": 51}`，符合 stack_cups per-arm 关键帧。
+- 关闭碰撞后仍未到位：pregrasp 末端误差约 left `0.386m/147deg`、right `0.337m/82deg`；grasp 仍失败或 partial。
+- 因此 `stack_cups id0` 当前主要不是物体碰撞导致，而是 IK 解/轨迹执行后实际关节跟踪偏差很大。日志中能看到 plan target 误差小，但执行后 `joint_err` 仍较大，下一步应重点看控制器跟踪、关节插值执行时间/scene steps、以及候选姿态是否导致远距离绕行。
+
+### L15.16 Direct Piper hand replay viewer：对照 AnyGrasp planner 的目标轴和执行误差
+
+用途：回看“直接 replay 人手 gripper pose”的 Piper URDFIK 执行效果，和 AnyGrasp planner 的 target 轴/执行误差做对照。该命令不走 AnyGrasp candidate 选择，只读取 HaMeR/hand NPZ 中存好的 gripper pose。
+
+要点：
+
+- `--debug_visualize_targets 1`：viewer 中显示每一帧目标 gripper 坐标轴。
+- `--debug_mode 1 --debug_post_execute 1`：每帧执行后打印 target 与实际 TCP/EE 的误差，用于看 plan 执行差距。
+- `--save_world_targets 1`：保存目标 pose 和执行状态到 `world_targets_and_status.npz`。
+- `--enable_viewer 1 --viewer_wait_at_end 1`：打开 SAPIEN viewer，执行结束后停住检查。
+- 如果只想快速看关键帧附近，可把 `--frame_start/--frame_end` 改成更小范围，例如 `--frame_start 45 --frame_end 115`。
+
+stack_cups id0 直接 replay viewer：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && cd /home/zaijia001/ssd/RoboTwin && unset CUDA_VISIBLE_DEVICES && conda run -n RoboTwin_bw python /home/zaijia001/ssd/RoboTwin/code_painting/render_hand_retarget_piper_dual_npz_urdfik_main.py \
+  --input_npz /home/zaijia001/ssd/data/piper/hand/stack_cups/harmer_output/hand_detections_0.npz \
+  --output_dir /home/zaijia001/ssd/RoboTwin/code_painting/direct_replay_debug_piper_d435/stack_cups/id0_viewer_axes \
+  --image_width 640 \
+  --image_height 480 \
+  --fovy_deg 42.499880046655484 \
+  --fps 5 \
+  --frame_start 0 \
+  --frame_end 220 \
+  --max_frames 221 \
+  --arms both \
+  --piper_calibration_bundle /home/zaijia001/ssd/RoboTwin/calibration_bundle_piper_new_table_0515.json \
+  --camera_cv_axis_mode legacy_r1 \
+  --require_stored_gripper_pose 1 \
+  --pose_source gripper \
+  --orientation_remap_label identity \
+  --stored_orientation_post_rot_xyz_deg 0 0 0 \
+  --target_local_forward_retreat_m 0.05 \
+  --target_world_offset_xyz 0 0.1 0.1 \
+  --execute_waypoint_scene_steps 5 \
+  --execute_settle_scene_steps 20 \
+  --urdfik_joint_interp_waypoints 10 \
+  --debug_mode 1 \
+  --debug_post_execute 1 \
+  --debug_frame_limit -1 \
+  --debug_visualize_targets 1 \
+  --debug_target_axis_length 0.10 \
+  --debug_visualize_cameras 0 \
+  --save_world_targets 1 \
+  --clean_output 0 \
+  --overlay_text_enable 1 \
+  --save_png_frames 0 \
+  --lighting_mode front_no_shadow \
+  --enable_viewer 1 \
+  --viewer_frame_delay 0.02 \
+  --viewer_wait_at_end 1
+```
+
+输出检查：
+
+```bash
+ls -lh /home/zaijia001/ssd/RoboTwin/code_painting/direct_replay_debug_piper_d435/stack_cups/id0_viewer_axes
+python3 - <<'PY'
+import numpy as np
+p='/home/zaijia001/ssd/RoboTwin/code_painting/direct_replay_debug_piper_d435/stack_cups/id0_viewer_axes/world_targets_and_status.npz'
+d=np.load(p, allow_pickle=True)
+print(d.files)
+for k in d.files:
+    arr=d[k]
+    print(k, getattr(arr, 'shape', None), getattr(arr, 'dtype', None))
+PY
+```

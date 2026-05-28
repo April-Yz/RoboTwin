@@ -6,6 +6,8 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
+import subprocess
 import sys
 import time
 from dataclasses import dataclass, field, replace
@@ -134,6 +136,7 @@ class DebugExecutionState:
     arm_display_candidates: Dict[str, Dict[int, List[CandidatePose]]]
     head_intrinsic: np.ndarray
     active_frame: Optional[int] = None
+    active_frame_by_arm: Dict[str, int] = field(default_factory=dict)
     record_index: int = 0
     pose_debug_path: Optional[Path] = None
     metrics_debug_path: Optional[Path] = None
@@ -144,6 +147,7 @@ class DebugExecutionState:
     target_object_by_arm: Optional[Dict[str, str]] = None
     goal_label_by_arm: Optional[Dict[str, str]] = None
     reach_error_pose_source: str = "tcp"
+    show_selected_keyframe_axes: bool = True
 
 
 @dataclass
@@ -153,6 +157,14 @@ class RankPreviewRecord:
     image_path: str
     left_candidate_idx: Optional[int]
     right_candidate_idx: Optional[int]
+
+
+@dataclass
+class SourcePreviewCompareRecord:
+    frame: int
+    image_path: str
+    source_path: str
+    source_kind: str
 
 
 @dataclass
@@ -177,6 +189,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--keyframes", type=int, nargs=2, default=[1, 22], metavar=("GRASP_FRAME", "ACTION_FRAME"))
     parser.add_argument("--arm", choices=["auto", "left", "right"], default="auto")
     parser.add_argument("--execute_both_arms", type=int, default=1, help="If 1 and --arm auto, execute synchronized dual-arm stages and advance only when both arms satisfy reach checks.")
+    parser.add_argument("--dual_stage_require_all_plans", type=int, default=1, help="If 1 in dual-arm mode, do not execute either arm in a stage unless both left/right plans are successful. This prevents one arm from moving alone when the other arm's IK fails.")
+    parser.add_argument("--require_keyframe1_reached_before_close", type=int, default=0, help="If 1, skip gripper close and second-keyframe action unless the first-keyframe grasp stage reached the configured pose tolerance.")
+    parser.add_argument("--require_keyframe1_reached_before_action", type=int, default=0, help="If 1, skip the second-keyframe action stage unless the first-keyframe grasp stage reached the configured pose tolerance.")
+    parser.add_argument("--debug_stop_after_keyframe1", type=int, default=0, help="If 1, stop execution after the first-keyframe pregrasp/grasp stages. The gripper is not closed and the second-keyframe action is marked skipped. Use this to debug init-to-keyframe1 reachability in isolation.")
     parser.add_argument("--planner_backend", choices=["urdfik", "curobo"], default="urdfik")
     parser.add_argument(
         "--candidate_selection_mode",
@@ -203,11 +219,24 @@ def parse_args() -> argparse.Namespace:
         help="Number of Cartesian TCP waypoints for urdfik_trajectory_mode=cartesian_interp_ik, including start and goal.",
     )
     parser.add_argument(
+        "--urdfik_joint_interp_waypoints",
+        type=int,
+        default=10,
+        help="Number of joint-space interpolation waypoints for urdfik_trajectory_mode=joint_interp (default 10). More waypoints = smoother motion.",
+    )
+    parser.add_argument(
         "--urdfik_cartesian_interp_auto_step_m",
         type=float,
         default=0.05,
         help="When --urdfik_cartesian_interp_steps=-1, translation threshold in meters used by auto waypoint mode. Smaller values create denser Cartesian interpolation.",
     )
+    parser.add_argument("--urdfik_position_threshold_m", type=float, default=0.001, help="Initial URDF IK position success threshold in meters.")
+    parser.add_argument("--urdfik_rotation_threshold_rad", type=float, default=0.02, help="Initial URDF IK rotation success threshold in radians.")
+    parser.add_argument("--urdfik_max_position_threshold_m", type=float, default=None, help="Maximum relaxed URDF IK position threshold in meters. Default preserves the solver's old 2 mm cap.")
+    parser.add_argument("--urdfik_max_rotation_threshold_rad", type=float, default=None, help="Maximum relaxed URDF IK rotation threshold in radians. Default preserves the solver's old 0.04 rad cap.")
+    parser.add_argument("--urdfik_num_seeds", type=int, default=1, help="Number of CuRobo IK seeds used by URDF IK.")
+    parser.add_argument("--execute_partial_cartesian_plan", type=int, default=0, help="If 1, cartesian_interp_ik plans that fail at an intermediate waypoint still execute the successfully solved waypoint prefix as a Partial plan. Diagnostic only; reached remains false unless the final target is reached.")
+    parser.add_argument("--piper_urdfik_apply_global_trans_to_ik", type=int, default=0, help="Piper diagnostic only. If 1, additionally remove global_trans_matrix from the gripper target before URDFIK. Default 0 matches the direct Piper hand replay convention.")
     parser.add_argument("--left_target_object", type=str, default="cup")
     parser.add_argument("--right_target_object", type=str, default="bottle")
     parser.add_argument("--candidate_max_rotation_distance_deg", type=float, default=-1.0, help="If >= 0, drop planner candidates whose hand-orientation rotation distance exceeds this threshold before selection.")
@@ -217,6 +246,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--debug_candidate_top_k", type=int, default=5)
     parser.add_argument("--debug_show_all_candidates", type=int, default=1)
     parser.add_argument("--debug_common_candidate_top_k", type=int, default=0, help="How many raw-score candidates to show in green per keyframe. 0 hides them.")
+    parser.add_argument("--debug_visualize_selected_keyframe_axes", type=int, default=1, help="If 1, show selected-keyframe axis actors in addition to the active target axes. Set 0 for target-axes-only viewer debugging.")
     parser.add_argument("--candidate_orientation_remap_label", type=str, default="identity")
     parser.add_argument("--candidate_post_rot_xyz_deg", type=float, nargs=3, default=[0.0, 0.0, 0.0])
     parser.add_argument("--candidate_keep_camera_up", type=int, default=0, help="If 1, keep the gripper/camera top side facing upward overall while preserving the original grasp direction. The planner only resolves the redundant roll about the gripper forward axis.")
@@ -239,6 +269,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--joint_command_scene_steps", type=int, default=2, help="Physics scene steps to advance after each commanded arm waypoint.")
     parser.add_argument("--joint_target_wait_steps", type=int, default=60, help="Maximum extra physics scene steps used after a stage trajectory to let the arm converge to the final commanded joint target.")
     parser.add_argument("--joint_target_wait_tol_rad", type=float, default=0.01, help="Per-joint absolute tolerance in radians used by the final post-trajectory convergence wait.")
+    parser.add_argument("--print_execution_pose_every", type=int, default=0, help="If >0, print TCP/EE world positions every N executed trajectory steps. Useful for confirming that viewer motion is actually changing the robot pose.")
     parser.add_argument("--reach_pos_tol_m", type=float, default=0.03)
     parser.add_argument("--reach_rot_tol_deg", type=float, default=20.0)
     parser.add_argument("--reach_error_pose_source", choices=["tcp", "ee"], default="tcp", help="Which arm pose to use when computing reach error against the target.")
@@ -279,6 +310,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--head_only", type=int, default=1)
     parser.add_argument("--overlay_text", type=int, default=1)
     parser.add_argument("--third_person_view", type=int, default=0)
+    parser.add_argument("--vscode_compatible_video", type=int, default=1, help="If 1, transcode head/third mp4 outputs to H.264 yuv420p faststart so VS Code can preview them reliably when ffmpeg is available.")
     parser.add_argument("--enable_viewer", type=int, default=0)
     parser.add_argument("--viewer_show_camera_frustums", type=int, default=0, help="If 1, keep SAPIEN viewer camera frustum lines visible. Original viewer plugin field: show_camera_linesets.")
     parser.add_argument("--viewer_frame_delay", type=float, default=0.0)
@@ -455,10 +487,10 @@ def resolve_frames_from_preview_summary(
         if requested_relative_frame is not None:
             raise ValueError("--candidate_selection_relative_frame is not used with --reuse_preview_frame_mode annotated_json_keyframes")
         frame_selection = preview_summary.get("frame_selection", {})
-        annotated_keyframes = [int(v) for v in frame_selection.get("annotated_keyframes", [])]
+        annotated_keyframes = preview_frame_selection_keyframes(frame_selection)
         if len(annotated_keyframes) < 2:
             raise ValueError(
-                "Preview summary does not contain at least two annotated keyframes in frame_selection.annotated_keyframes"
+                "Preview summary does not contain at least two usable keyframes in frame_selection"
             )
         requested_from_preview = annotated_keyframes[:2]
         resolved_keyframe_pairs = [
@@ -484,6 +516,24 @@ def resolve_frames_from_preview_summary(
     return [int(v) for v in requested_keyframes], keyframes, resolved_keyframe_pairs, resolved_relative_frame
 
 
+def preview_frame_selection_keyframes(frame_selection: Dict[str, object]) -> List[int]:
+    for key in ("effective_keyframes", "annotated_keyframes"):
+        values = frame_selection.get(key, [])
+        if isinstance(values, list) and len(values) >= 2:
+            return [int(v) for v in values]
+    return []
+
+
+def preview_frame_selection_keyframes_for_arm(frame_selection: Dict[str, object], arm: str) -> List[int]:
+    for key in ("effective_keyframes_by_arm", "annotated_keyframes_by_arm"):
+        payload = frame_selection.get(key, {})
+        if isinstance(payload, dict):
+            values = payload.get(str(arm), [])
+            if isinstance(values, list) and len(values) >= 2:
+                return [int(v) for v in values]
+    return preview_frame_selection_keyframes(frame_selection)
+
+
 def load_reused_preview_summary(
     renderer: ReplayRenderer,
     args: argparse.Namespace,
@@ -505,9 +555,15 @@ def load_reused_preview_summary(
     frame_entries = {
         int(item["frame"]): item for item in summary.get("frames", []) if isinstance(item, dict) and "frame" in item
     }
+    resolved_map: Dict[int, int] = {}
+    for item in summary.get("resolved_frames", []):
+        if not isinstance(item, dict):
+            continue
+        resolved_map[int(item["requested"])] = int(item["resolved"])
     if int(args.reuse_preview_top_rank) <= 0:
         raise ValueError(f"reuse_preview_top_rank must be >= 1, got {args.reuse_preview_top_rank}")
     rank_index = int(args.reuse_preview_top_rank) - 1
+    frame_selection = summary.get("frame_selection", {})
 
     candidate_arms = [requested_arm_mode] if requested_arm_mode in ("left", "right") else ["left", "right"]
     arm_debugs: Dict[str, ArmDebugInfo] = {}
@@ -522,7 +578,13 @@ def load_reused_preview_summary(
         selected_keyframes: List[SelectedKeyframe] = []
         diagnostics: Dict[int, Dict[str, int]] = {}
         failed = False
-        for frame in keyframes:
+        arm_requested_keyframes = keyframes
+        if str(args.reuse_preview_frame_mode) == "annotated_json_keyframes" and isinstance(frame_selection, dict):
+            arm_requested_keyframes = [
+                int(resolved_map.get(int(frame), int(frame)))
+                for frame in preview_frame_selection_keyframes_for_arm(frame_selection, arm)[:2]
+            ]
+        for frame in arm_requested_keyframes:
             frame_entry = frame_entries.get(int(frame))
             if frame_entry is None:
                 failed = True
@@ -673,8 +735,16 @@ def build_renderer(args: argparse.Namespace) -> ReplayRenderer:
     )
     if args.planner_backend == "urdfik":
         renderer_kwargs["urdfik_trajectory_mode"] = str(args.urdfik_trajectory_mode)
+        renderer_kwargs["urdfik_joint_interp_waypoints"] = int(args.urdfik_joint_interp_waypoints)
         renderer_kwargs["urdfik_cartesian_interp_steps"] = int(args.urdfik_cartesian_interp_steps)
         renderer_kwargs["urdfik_cartesian_interp_auto_step_m"] = float(args.urdfik_cartesian_interp_auto_step_m)
+        renderer_kwargs["urdfik_position_threshold_m"] = float(args.urdfik_position_threshold_m)
+        renderer_kwargs["urdfik_rotation_threshold_rad"] = float(args.urdfik_rotation_threshold_rad)
+        renderer_kwargs["urdfik_max_position_threshold_m"] = args.urdfik_max_position_threshold_m
+        renderer_kwargs["urdfik_max_rotation_threshold_rad"] = args.urdfik_max_rotation_threshold_rad
+        renderer_kwargs["urdfik_num_seeds"] = int(args.urdfik_num_seeds)
+        renderer_kwargs["urdfik_execute_partial_cartesian_plan"] = bool(args.execute_partial_cartesian_plan)
+        renderer_kwargs["urdfik_apply_global_trans_to_ik"] = bool(args.piper_urdfik_apply_global_trans_to_ik)
     renderer = renderer_cls(**renderer_kwargs)
     # SAPIEN viewer draws camera frustum lines through ControlWindow.show_camera_linesets.
     # Keep them off by default so viewer recordings match the intended clean video output.
@@ -2349,6 +2419,21 @@ def selected_keyframes_for_active_frame(
     return [item for item in selected_keyframes if int(item.source_frame) == frame]
 
 
+def selected_keyframes_for_active_frames_by_arm(
+    selected_keyframes: Sequence[SelectedKeyframe],
+    active_frame: Optional[int],
+    active_frame_by_arm: Optional[Dict[str, int]],
+) -> List[SelectedKeyframe]:
+    if active_frame_by_arm:
+        result: List[SelectedKeyframe] = []
+        for item in selected_keyframes:
+            arm_frame = active_frame_by_arm.get(str(item.arm))
+            if arm_frame is not None and int(item.source_frame) == int(arm_frame):
+                result.append(item)
+        return result
+    return selected_keyframes_for_active_frame(selected_keyframes, active_frame)
+
+
 def build_display_candidates_per_frame(
     args: argparse.Namespace,
     keyframes: Sequence[int],
@@ -2559,18 +2644,21 @@ def record_frame(
                 for actor in actors:
                     hide_actor(actor)
         if debug_execution_state is not None and not bool(pure_scene_main):
-            for item in selected_keyframes_for_active_frame(
-                debug_execution_state.selected_keyframes,
-                debug_execution_state.active_frame,
-            ):
-                actor = debug_visuals.keyframe_axis_actors.get((int(item.source_frame), item.arm))
-                if actor is not None:
-                    set_actor_pose(actor, item.candidate.pose_world_wxyz)
+            if bool(debug_execution_state.show_selected_keyframe_axes):
+                for item in selected_keyframes_for_active_frames_by_arm(
+                    debug_execution_state.selected_keyframes,
+                    debug_execution_state.active_frame,
+                    debug_execution_state.active_frame_by_arm,
+                ):
+                    actor = debug_visuals.keyframe_axis_actors.get((int(item.source_frame), item.arm))
+                    if actor is not None:
+                        set_actor_pose(actor, item.candidate.pose_world_wxyz)
             update_candidate_debug_visuals(
                 debug_visuals,
                 debug_execution_state.active_frame,
                 debug_execution_state.common_candidates_per_frame,
                 debug_execution_state.arm_display_candidates,
+                debug_execution_state.active_frame_by_arm,
             )
     if bool(pure_scene_main):
         renderer.update_target_axis_visuals(None, None)
@@ -2628,9 +2716,10 @@ def record_frame(
             debug_execution_state.active_frame,
             debug_execution_state.common_candidates_per_frame,
             debug_execution_state.arm_display_candidates,
-            selected_keyframes_for_active_frame(
+            selected_keyframes_for_active_frames_by_arm(
                 debug_execution_state.selected_keyframes,
                 debug_execution_state.active_frame,
+                debug_execution_state.active_frame_by_arm,
             ),
         )
         if frame_metrics is not None:
@@ -2678,6 +2767,7 @@ def record_frame(
         pose_debug = {
             "record_index": int(debug_execution_state.record_index),
             "active_frame": None if debug_execution_state.active_frame is None else int(debug_execution_state.active_frame),
+            "active_frame_by_arm": {str(k): int(v) for k, v in debug_execution_state.active_frame_by_arm.items()},
             "stage": debug_execution_state.current_stage,
             "overlay_lines": list(overlay_lines),
             "current_head_camera_pose_world_wxyz": pose_like_to_world_wxyz(current_head_pose).tolist(),
@@ -2754,6 +2844,7 @@ def build_execution_frame_metrics(
     current_head_pose = renderer.get_head_camera_pose()
     metrics: Dict[str, object] = {
         "active_frame": None if debug_execution_state.active_frame is None else int(debug_execution_state.active_frame),
+        "active_frame_by_arm": {str(k): int(v) for k, v in debug_execution_state.active_frame_by_arm.items()},
         "stage": debug_execution_state.current_stage,
         "reach_error_pose_source": str(debug_execution_state.reach_error_pose_source),
         "current_head_camera_pose_world_wxyz": (
@@ -2869,6 +2960,47 @@ def load_jsonl_records(path: Path) -> List[Dict[str, object]]:
                 continue
             records.append(json.loads(line))
     return records
+
+
+def transcode_mp4_for_vscode(path: Path) -> bool:
+    path = Path(path)
+    if not path.is_file():
+        return False
+    ffmpeg = shutil.which("ffmpeg")
+    if ffmpeg is None:
+        print(f"[video] skip vscode transcode because ffmpeg is unavailable: {path}")
+        return False
+    tmp_path = path.with_name(f"{path.stem}.vscode_tmp{path.suffix}")
+    cmd = [
+        ffmpeg,
+        "-y",
+        "-v",
+        "error",
+        "-i",
+        str(path),
+        "-an",
+        "-c:v",
+        "libx264",
+        "-pix_fmt",
+        "yuv420p",
+        "-movflags",
+        "+faststart",
+        str(tmp_path),
+    ]
+    try:
+        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=False)
+    except Exception as exc:
+        print(f"[video] failed to launch ffmpeg for {path}: {exc}")
+        return False
+    if result.returncode != 0 or not tmp_path.is_file() or tmp_path.stat().st_size <= 0:
+        if tmp_path.exists():
+            tmp_path.unlink()
+        err = result.stderr.strip().splitlines()[-1] if result.stderr.strip() else "unknown ffmpeg error"
+        print(f"[video] vscode transcode failed path={path} error={err}")
+        return False
+    tmp_path.replace(path)
+    print(f"[video] vscode-compatible h264/yuv420p: {path}")
+    return True
 
 
 def iter_stage_spans(stage_names: Sequence[str]) -> List[Tuple[int, int, str]]:
@@ -3048,6 +3180,14 @@ def target_pose_for_error(renderer: ReplayRenderer, arm: str, target_tcp_pose_wo
         # Direct comparison in planner TCP/gripper space.
         return target_tcp_pose_world_wxyz
     if pose_source == "ee":
+        if hasattr(renderer, "world_pose_to_base_pose_for_arm") and hasattr(renderer, "base_pose_to_world_pose_for_arm"):
+            # Piper dual robot.get_*_ee_pose() reports the same visible gripper
+            # orientation convention as the preview target, with only the
+            # reference point shifted to the EE position. Under the current Piper
+            # config gripper_bias == 0.12, so the target position is unchanged.
+            # Do not convert this to raw link6/endlink space; that would compare
+            # the corrected visual target against the wrong local axes.
+            return target_tcp_pose_world_wxyz
         # Convert the planner TCP/gripper target into the wrist/endlink convention before
         # comparing against robot.get_*_ee_pose(). Under the current R1 config,
         # gripper_bias == 0.12, so this conversion contributes no extra translation and
@@ -3098,6 +3238,8 @@ def compute_supervision_errors(
             "forward_axis_err_deg": float(breakdown["forward_axis_err_deg"]),
             "forward_axis_signed_err_m": float(breakdown["forward_axis_signed_err_m"]),
             "forward_axis_signed_err_cm": float(breakdown["forward_axis_signed_err_cm"]),
+            "lateral_to_forward_axis_m": float(breakdown["lateral_to_forward_axis_m"]),
+            "lateral_to_forward_axis_cm": float(breakdown["lateral_to_forward_axis_cm"]),
         }
     return errors
 
@@ -3122,6 +3264,9 @@ def pose_error_breakdown(
     # Negative means the actual gripper is behind the target along that same axis.
     actual_minus_target = current_pose_world_wxyz[:3] - target_pose_world_wxyz[:3]
     forward_axis_signed_err_m = float(np.dot(actual_minus_target, target_forward_world))
+    lateral_to_forward_axis_m = float(
+        np.linalg.norm(actual_minus_target - forward_axis_signed_err_m * target_forward_world)
+    )
     return {
         "dx_m": float(delta[0]),
         "dy_m": float(delta[1]),
@@ -3131,6 +3276,8 @@ def pose_error_breakdown(
         "forward_axis_err_deg": forward_axis_err_deg,
         "forward_axis_signed_err_m": forward_axis_signed_err_m,
         "forward_axis_signed_err_cm": float(forward_axis_signed_err_m * 100.0),
+        "lateral_to_forward_axis_m": lateral_to_forward_axis_m,
+        "lateral_to_forward_axis_cm": float(lateral_to_forward_axis_m * 100.0),
     }
 
 
@@ -3203,6 +3350,23 @@ def _ee_base_pose_to_world_wxyz(renderer: ReplayRenderer, ee_pos_base: np.ndarra
     return np.concatenate([ee_world[:3, 3], quat]).astype(np.float64)
 
 
+def _ee_base_pose_to_world_wxyz_for_arm(
+    renderer: ReplayRenderer,
+    arm: str,
+    ee_pos_base: np.ndarray,
+    ee_quat_wxyz_base: np.ndarray,
+) -> np.ndarray:
+    ee_pose_base = np.concatenate(
+        [
+            np.asarray(ee_pos_base, dtype=np.float64).reshape(3),
+            base.normalize_quat_wxyz(ee_quat_wxyz_base),
+        ]
+    ).astype(np.float64)
+    if hasattr(renderer, "base_pose_to_world_pose_for_arm"):
+        return np.asarray(renderer.base_pose_to_world_pose_for_arm(ee_pose_base, arm), dtype=np.float64).reshape(7)
+    return _ee_base_pose_to_world_wxyz(renderer, ee_pose_base[:3], ee_pose_base[3:])
+
+
 def planned_eval_pose_from_plan(
     renderer: ReplayRenderer,
     arm: str,
@@ -3211,7 +3375,7 @@ def planned_eval_pose_from_plan(
 ) -> Optional[np.ndarray]:
     if not isinstance(plan, dict):
         return None
-    if str(plan.get("status", "")) != "Success":
+    if str(plan.get("status", "")) not in {"Success", "Partial"}:
         return None
     if "target_joints" not in plan:
         return None
@@ -3220,19 +3384,64 @@ def planned_eval_pose_from_plan(
         return None
 
     target_arm = np.asarray(plan["target_joints"], dtype=np.float64).reshape(6)
-    full_joints = np.concatenate([np.asarray(renderer.torso_qpos, dtype=np.float64).reshape(4), target_arm], dtype=np.float64)
-    ee_pos_base, ee_quat_wxyz_base, _ = solver.forward_kinematics(full_joints)
-    ee_world_wxyz = _ee_base_pose_to_world_wxyz(renderer, ee_pos_base, ee_quat_wxyz_base)
+    if hasattr(renderer, "base_pose_to_world_pose_for_arm"):
+        fk_joints = target_arm
+    else:
+        fk_joints = np.concatenate([np.asarray(renderer.torso_qpos, dtype=np.float64).reshape(4), target_arm], dtype=np.float64)
+    ee_pos_base, ee_quat_wxyz_base, _ = solver.forward_kinematics(fk_joints)
+    ee_world_wxyz = _ee_base_pose_to_world_wxyz_for_arm(renderer, arm, ee_pos_base, ee_quat_wxyz_base)
+    robot = getattr(renderer, "robot", None)
+    global_trans = None if robot is None else getattr(robot, f"{arm}_global_trans_matrix", None)
+    delta_matrix = None if robot is None else getattr(robot, f"{arm}_delta_matrix", None)
+    gripper_bias = 0.12 if robot is None else float(getattr(robot, f"{arm}_gripper_bias", 0.12))
+    if global_trans is not None and delta_matrix is not None:
+        link_world = pose_wxyz_to_matrix(ee_world_wxyz)
+        report_rot = base.orthonormalize_rotation(
+            link_world[:3, :3]
+            @ np.asarray(global_trans, dtype=np.float64).reshape(3, 3)
+            @ np.asarray(delta_matrix, dtype=np.float64).reshape(3, 3)
+        )
+        report_quat = base.quat_xyzw_to_wxyz(R.from_matrix(report_rot).as_quat())
+        if pose_source == "ee":
+            report_pos = link_world[:3, 3] + report_rot @ np.array([gripper_bias - 0.12, 0.0, 0.0], dtype=np.float64)
+            return np.concatenate([report_pos, report_quat]).astype(np.float64)
+        if pose_source == "tcp":
+            report_pos = link_world[:3, 3] + report_rot @ np.array([gripper_bias, 0.0, 0.0], dtype=np.float64)
+            return np.concatenate([report_pos, report_quat]).astype(np.float64)
     if pose_source == "ee":
         return ee_world_wxyz
     if pose_source == "tcp":
-        tcp_world = pose_wxyz_to_matrix(ee_world_wxyz)
-        # Current planner convention uses local +X as the forward axis and TCP reference point.
-        # Under the current R1 config the TCP is 0.12 m forward of the ee/endlink pose.
-        tcp_world[:3, 3] += tcp_world[:3, 0] * 0.12
+        inv_delta = None if robot is None else getattr(robot, f"{arm}_inv_delta_matrix", None)
+        if inv_delta is not None:
+            # robot._trans_from_gripper_to_endlink applies E = G * T, where G is the
+            # planner TCP/gripper pose and E is the wrist/endlink pose used by IK.
+            # Invert that same static transform so the FK target joints are evaluated
+            # in the same TCP convention as get_current_tcp_pose().
+            gripper_to_ee = np.eye(4, dtype=np.float64)
+            gripper_to_ee[:3, :3] = np.asarray(inv_delta, dtype=np.float64).reshape(3, 3)
+            gripper_to_ee[:3, 3] = np.array([0.12 - gripper_bias, 0.0, 0.0], dtype=np.float64)
+            tcp_world = pose_wxyz_to_matrix(ee_world_wxyz) @ np.linalg.inv(gripper_to_ee)
+        else:
+            tcp_world = pose_wxyz_to_matrix(ee_world_wxyz)
+            # Fallback for older R1-style configs that do not expose the static
+            # gripper/endlink transform on the robot object.
+            tcp_world[:3, 3] += tcp_world[:3, 0] * 0.12
         quat = base.quat_xyzw_to_wxyz(R.from_matrix(base.orthonormalize_rotation(tcp_world[:3, :3])).as_quat())
         return np.concatenate([tcp_world[:3, 3], quat]).astype(np.float64)
     return None
+
+
+def plan_is_executable(plan: Optional[Dict]) -> bool:
+    if not isinstance(plan, dict):
+        return False
+    if str(plan.get("status", "")) not in {"Success", "Partial"}:
+        return False
+    if "position" not in plan or "velocity" not in plan:
+        return False
+    try:
+        return np.asarray(plan["position"], dtype=np.float64).reshape(-1, 6).shape[0] >= 2
+    except Exception:
+        return False
 
 
 def tcp_pose_errors(target_pose_world_wxyz: np.ndarray, current_pose_world_wxyz: np.ndarray) -> Tuple[float, float]:
@@ -3350,6 +3559,10 @@ def settle_arms_to_targets(
             metrics[arm_name] = joint_error_metrics(get_current_arm_joint_vector(renderer, arm_name), targets[arm_name])
         return metrics
 
+    zero_vel = np.zeros(6, dtype=np.float64)
+    for arm_name in arms:
+        renderer.robot.set_arm_joints(targets[arm_name], zero_vel, arm_name)
+
     final_metrics = _collect()
     if max_wait_steps <= 0:
         return final_metrics
@@ -3357,6 +3570,8 @@ def settle_arms_to_targets(
     for _ in range(max_wait_steps):
         if all(metrics["max_abs_err_rad"] <= tol_rad for metrics in final_metrics.values()):
             break
+        for arm_name in arms:
+            renderer.robot.set_arm_joints(targets[arm_name], zero_vel, arm_name)
         if object_replay is not None:
             update_execution_object_replay(object_replay, 1.0)
         else:
@@ -3440,7 +3655,7 @@ def execute_single_arm_plan(
     if target_visual_label:
         overlay_lines.append(f"goal={target_visual_label}")
     set_single_arm_target_visual(renderer, arm, target_visual_pose)
-    if status != "Success":
+    if not plan_is_executable(plan):
         record_frame(renderer, head_writer, third_writer, overlay_lines, use_overlay, debug_visuals, debug_execution_state, pure_scene_main=pure_scene_main, use_overlay_debug=use_overlay_debug)
         return status
 
@@ -3547,6 +3762,7 @@ def execute_stage_until_reached(
             f"dist={float(pre_plan_diag['error']['dist_m']):.4f} rot={float(pre_plan_diag['error']['rot_err_deg']):.2f} "
             f"fwd_rot={float(pre_plan_diag['error']['forward_axis_err_deg']):.2f} "
             f"fwd_cm={colorize_forward_cm(float(pre_plan_diag['error']['forward_axis_signed_err_cm']))} "
+            f"lat_cm={float(pre_plan_diag['error']['lateral_to_forward_axis_cm']):.2f} "
             f"theory={short_direction_label(str(pre_plan_diag['theoretical_forward_axis_motion']))}"
         )
         plan = renderer.plan_path(arm, target_pose_world_wxyz)
@@ -3558,9 +3774,11 @@ def execute_stage_until_reached(
             print(
                 f"[plan-solution] stage={label} arm={arm} try={attempt} "
                 f"plan_vs_target_fwd_cm={colorize_forward_cm(float(plan_vs_target['error']['forward_axis_signed_err_cm']))} "
+                f"plan_vs_target_lat_cm={float(plan_vs_target['error']['lateral_to_forward_axis_cm']):.2f} "
                 f"plan_vs_target_dist={float(plan_vs_target['error']['dist_m']):.4f} "
                 f"plan_vs_target_rot={float(plan_vs_target['error']['rot_err_deg']):.2f} "
                 f"plan_vs_current_fwd_cm={colorize_forward_cm(float(plan_vs_current['error']['forward_axis_signed_err_cm']))} "
+                f"plan_vs_current_lat_cm={float(plan_vs_current['error']['lateral_to_forward_axis_cm']):.2f} "
                 f"plan_vs_current_dist={float(plan_vs_current['error']['dist_m']):.4f} "
                 f"plan_vs_current_rot={float(plan_vs_current['error']['rot_err_deg']):.2f} "
                 f"theory={short_direction_label(str(plan_vs_current['theoretical_forward_axis_motion']))}"
@@ -3617,6 +3835,7 @@ def execute_stage_until_reached(
             f"dist={stage_error['dist_m']:.4f} rot={stage_error['rot_err_deg']:.2f} "
             f"fwd_rot={stage_error['forward_axis_err_deg']:.2f} "
             f"fwd_cm={colorize_forward_cm(float(stage_error['forward_axis_signed_err_cm']))} "
+            f"lat_cm={float(stage_error['lateral_to_forward_axis_cm']):.2f} "
             f"reached={int(reached)}"
         )
         for supervision_arm, supervision_error in supervision_errors.items():
@@ -3626,7 +3845,8 @@ def execute_stage_until_reached(
                 f"dz={float(supervision_error.get('dz_m', 0.0)):.4f} dist={float(supervision_error.get('pos_err_m', 0.0)):.4f} "
                 f"rot={float(supervision_error.get('rot_err_deg', 0.0)):.2f} "
                 f"fwd_rot={float(supervision_error.get('forward_axis_err_deg', 0.0)):.2f} "
-                f"fwd_cm={colorize_forward_cm(float(supervision_error.get('forward_axis_signed_err_cm', 0.0)))}"
+                f"fwd_cm={colorize_forward_cm(float(supervision_error.get('forward_axis_signed_err_cm', 0.0)))} "
+                f"lat_cm={float(supervision_error.get('lateral_to_forward_axis_cm', 0.0)):.2f}"
             )
         record_frame(
             renderer,
@@ -3672,6 +3892,46 @@ def execute_stage_until_reached(
     }
 
 
+def skipped_action_result_for_arm(
+    renderer: ReplayRenderer,
+    arm: str,
+    action_pose_world_wxyz: np.ndarray,
+    args: argparse.Namespace,
+    reason: str,
+) -> Dict[str, object]:
+    current_eval_pose = get_current_pose_for_error(renderer, arm, args.reach_error_pose_source)
+    target_eval_pose = target_pose_for_error(renderer, arm, action_pose_world_wxyz, args.reach_error_pose_source)
+    error_breakdown = pose_error_breakdown(target_eval_pose, current_eval_pose)
+    return {
+        "status": "Skipped",
+        "skip_reason": str(reason),
+        "attempts": 0,
+        "reached": False,
+        "target_error": error_breakdown,
+        "pos_err_m": float(error_breakdown["dist_m"]),
+        "rot_err_deg": float(error_breakdown["rot_err_deg"]),
+        "attempt_history": [],
+    }
+
+
+def skipped_dual_action_result(
+    renderer: ReplayRenderer,
+    action_targets: Dict[str, np.ndarray],
+    args: argparse.Namespace,
+    reason: str,
+) -> Dict[str, object]:
+    return {
+        "attempts": 0,
+        "reached": False,
+        "skip_reason": str(reason),
+        "arms": {
+            arm: skipped_action_result_for_arm(renderer, arm, target, args, reason)
+            for arm, target in action_targets.items()
+        },
+        "attempt_history": [],
+    }
+
+
 def execute_dual_arm_plan(
     renderer: ReplayRenderer,
     plans_by_arm: Dict[str, Optional[Dict]],
@@ -3692,6 +3952,8 @@ def execute_dual_arm_plan(
     joint_command_scene_steps: int = 2,
     joint_target_wait_steps: int = 60,
     joint_target_wait_tol_rad: float = 0.01,
+    require_all_plans: bool = True,
+    print_pose_every: int = 0,
 ) -> Dict[str, str]:
     arms = [arm for arm in ("left", "right") if arm in plans_by_arm]
     statuses: Dict[str, str] = {arm: renderer._plan_status(plans_by_arm.get(arm)) for arm in arms}
@@ -3701,10 +3963,28 @@ def execute_dual_arm_plan(
         f"right_status={statuses.get('right', 'NA')}",
     ]
 
+    if bool(require_all_plans) and len(arms) > 1 and any(not plan_is_executable(plans_by_arm.get(arm)) for arm in arms):
+        print(
+            "[dual-plan] skip stage execution because not all arm plans are executable: "
+            + " ".join(f"{arm}={statuses.get(arm, 'Missing')}" for arm in arms)
+        )
+        record_frame(
+            renderer,
+            head_writer,
+            third_writer,
+            overlay_lines + ["dual_skip=not_all_plans_success"],
+            use_overlay,
+            debug_visuals,
+            debug_execution_state,
+            pure_scene_main=pure_scene_main,
+            use_overlay_debug=use_overlay_debug,
+        )
+        return statuses
+
     trajectories: Dict[str, Tuple[np.ndarray, np.ndarray]] = {}
     max_steps = 0
     for arm in arms:
-        if statuses[arm] != "Success":
+        if not plan_is_executable(plans_by_arm.get(arm)):
             continue
         plan = plans_by_arm[arm]
         position = np.asarray(plan["position"], dtype=np.float64)
@@ -3717,6 +3997,12 @@ def execute_dual_arm_plan(
         record_frame(renderer, head_writer, third_writer, overlay_lines, use_overlay, debug_visuals, debug_execution_state, pure_scene_main=pure_scene_main, use_overlay_debug=use_overlay_debug)
         return statuses
 
+    hold_joints_by_arm: Dict[str, np.ndarray] = {}
+    zero_hold_vel = np.zeros(6, dtype=np.float64)
+    for arm in arms:
+        if arm not in trajectories:
+            hold_joints_by_arm[arm] = get_current_arm_joint_vector(renderer, arm)
+
     scene_steps_per_waypoint = max(int(joint_command_scene_steps), 1)
     for step_idx in range(max_steps):
         for arm in arms:
@@ -3725,6 +4011,8 @@ def execute_dual_arm_plan(
             position, velocity = trajectories[arm]
             local_idx = min(step_idx, int(position.shape[0]) - 1)
             renderer.robot.set_arm_joints(position[local_idx], velocity[local_idx], arm)
+        for arm, hold_joints in hold_joints_by_arm.items():
+            renderer.robot.set_arm_joints(hold_joints, zero_hold_vel, arm)
         for arm in arms:
             actor = None if attached_actor_by_arm is None else attached_actor_by_arm.get(arm)
             tcp_to_object = None if tcp_to_object_by_arm is None else tcp_to_object_by_arm.get(arm)
@@ -3738,6 +4026,17 @@ def execute_dual_arm_plan(
         if object_replay is not None:
             update_execution_object_replay(object_replay, 0.0 if max_steps <= 1 else float(step_idx) / float(max_steps - 1))
         renderer.step_scene(steps=scene_steps_per_waypoint)
+        if int(print_pose_every) > 0 and (step_idx == 0 or (step_idx + 1) % int(print_pose_every) == 0 or step_idx == max_steps - 1):
+            pose_parts = []
+            for arm in arms:
+                tcp = np.asarray(renderer.get_current_tcp_pose(arm), dtype=np.float64).reshape(7)
+                ee_pose = renderer.robot.get_left_ee_pose() if arm == "left" else renderer.robot.get_right_ee_pose()
+                ee = pose_like_to_world_wxyz(ee_pose)
+                pose_parts.append(
+                    f"{arm}:tcp=({tcp[0]:+.4f},{tcp[1]:+.4f},{tcp[2]:+.4f}) "
+                    f"ee=({ee[0]:+.4f},{ee[1]:+.4f},{ee[2]:+.4f})"
+                )
+            print(f"[exec-pose] stage={label} step={step_idx + 1}/{max_steps} " + " ".join(pose_parts), flush=True)
         record_frame(
             renderer,
             head_writer,
@@ -3756,6 +4055,7 @@ def execute_dual_arm_plan(
         for arm in arms
         if arm in trajectories
     }
+    final_joint_targets.update(hold_joints_by_arm)
     final_joint_metrics = settle_arms_to_targets(
         renderer,
         final_joint_targets,
@@ -3765,6 +4065,18 @@ def execute_dual_arm_plan(
         tcp_to_object_by_arm=tcp_to_object_by_arm,
         object_replay=object_replay,
     )
+    if int(print_pose_every) > 0:
+        pose_parts = []
+        for arm in arms:
+            tcp = np.asarray(renderer.get_current_tcp_pose(arm), dtype=np.float64).reshape(7)
+            ee_pose = renderer.robot.get_left_ee_pose() if arm == "left" else renderer.robot.get_right_ee_pose()
+            ee = pose_like_to_world_wxyz(ee_pose)
+            joint_err = float(final_joint_metrics.get(arm, {}).get("max_abs_err_rad", 0.0))
+            pose_parts.append(
+                f"{arm}:tcp=({tcp[0]:+.4f},{tcp[1]:+.4f},{tcp[2]:+.4f}) "
+                f"ee=({ee[0]:+.4f},{ee[1]:+.4f},{ee[2]:+.4f}) joint_err={joint_err:.4f}"
+            )
+        print(f"[exec-pose] stage={label} settled " + " ".join(pose_parts), flush=True)
     if object_replay is not None:
         update_execution_object_replay(object_replay, 1.0)
     record_frame(
@@ -3840,11 +4152,32 @@ def execute_dual_stage_until_reached(
                 f"rot={float(pre_plan_by_arm[arm]['error']['rot_err_deg']):.2f} "
                 f"fwd_rot={float(pre_plan_by_arm[arm]['error']['forward_axis_err_deg']):.2f} "
                 f"fwd_cm={colorize_forward_cm(float(pre_plan_by_arm[arm]['error']['forward_axis_signed_err_cm']))} "
+                f"lat_cm={float(pre_plan_by_arm[arm]['error']['lateral_to_forward_axis_cm']):.2f} "
                 f"theory={short_direction_label(str(pre_plan_by_arm[arm]['theoretical_forward_axis_motion']))}"
             )
         plans_by_arm: Dict[str, Optional[Dict]] = {
             arm: renderer.plan_path(arm, target_pose_world_wxyz_by_arm[arm]) for arm in arms
         }
+        for arm in arms:
+            plan = plans_by_arm.get(arm)
+            if renderer._plan_status(plan) not in {"Success", "Partial"} and isinstance(plan, dict):
+                reason = plan.get("reason", "unknown")
+                waypoint_index = plan.get("failed_waypoint_index")
+                waypoint_count = plan.get("waypoint_count")
+                waypoint_text = ""
+                if waypoint_index is not None and waypoint_count is not None:
+                    waypoint_text = f" waypoint={int(waypoint_index)}/{int(waypoint_count)}"
+                print(f"[plan-fail] stage={label} try={attempt} arm={arm} reason={reason}{waypoint_text}")
+            elif renderer._plan_status(plan) == "Partial" and isinstance(plan, dict):
+                reason = plan.get("reason", "partial")
+                waypoint_index = plan.get("failed_waypoint_index")
+                waypoint_count = plan.get("waypoint_count")
+                solved_count = plan.get("solved_waypoint_count")
+                waypoint_text = ""
+                if waypoint_index is not None and waypoint_count is not None:
+                    waypoint_text = f" failed_waypoint={int(waypoint_index)}/{int(waypoint_count)}"
+                solved_text = "" if solved_count is None else f" solved_prefix={int(solved_count)}"
+                print(f"[plan-partial] stage={label} try={attempt} arm={arm} reason={reason}{waypoint_text}{solved_text}")
         update_ik_waypoint_visuals(renderer, args, plans_by_arm)
         plan_solution_by_arm: Dict[str, Dict[str, object]] = {}
         for arm in arms:
@@ -3868,9 +4201,11 @@ def execute_dual_stage_until_reached(
                 print(
                     f"  {arm}: "
                     f"plan_vs_target_fwd_cm={colorize_forward_cm(float(plan_solution_by_arm[arm]['plan_vs_target']['error']['forward_axis_signed_err_cm']))} "
+                    f"plan_vs_target_lat_cm={float(plan_solution_by_arm[arm]['plan_vs_target']['error']['lateral_to_forward_axis_cm']):.2f} "
                     f"plan_vs_target_dist={float(plan_solution_by_arm[arm]['plan_vs_target']['error']['dist_m']):.4f} "
                     f"plan_vs_target_rot={float(plan_solution_by_arm[arm]['plan_vs_target']['error']['rot_err_deg']):.2f} "
                     f"plan_vs_current_fwd_cm={colorize_forward_cm(float(plan_solution_by_arm[arm]['plan_vs_current']['error']['forward_axis_signed_err_cm']))} "
+                    f"plan_vs_current_lat_cm={float(plan_solution_by_arm[arm]['plan_vs_current']['error']['lateral_to_forward_axis_cm']):.2f} "
                     f"plan_vs_current_dist={float(plan_solution_by_arm[arm]['plan_vs_current']['error']['dist_m']):.4f} "
                     f"plan_vs_current_rot={float(plan_solution_by_arm[arm]['plan_vs_current']['error']['rot_err_deg']):.2f} "
                     f"theory={short_direction_label(str(plan_solution_by_arm[arm]['plan_vs_current']['theoretical_forward_axis_motion']))}"
@@ -3895,6 +4230,8 @@ def execute_dual_stage_until_reached(
             joint_command_scene_steps=args.joint_command_scene_steps,
             joint_target_wait_steps=args.joint_target_wait_steps,
             joint_target_wait_tol_rad=args.joint_target_wait_tol_rad,
+            require_all_plans=bool(args.dual_stage_require_all_plans),
+            print_pose_every=int(args.print_execution_pose_every),
         )
 
         arm_metrics: Dict[str, Dict[str, object]] = {}
@@ -3938,6 +4275,7 @@ def execute_dual_stage_until_reached(
                 f"rot={float(arm_metrics[arm]['target_error']['rot_err_deg']):.2f} "
                 f"fwd_rot={float(arm_metrics[arm]['target_error']['forward_axis_err_deg']):.2f} "
                 f"fwd_cm={colorize_forward_cm(float(arm_metrics[arm]['target_error']['forward_axis_signed_err_cm']))} "
+                f"lat_cm={float(arm_metrics[arm]['target_error']['lateral_to_forward_axis_cm']):.2f} "
                 f"reached={int(bool(arm_metrics[arm]['reached']))}"
             )
 
@@ -4019,11 +4357,17 @@ def update_candidate_debug_visuals(
     active_frame: Optional[int],
     common_candidates_per_frame: Dict[int, List[CandidatePose]],
     arm_display_candidates: Dict[str, Dict[int, List[CandidatePose]]],
+    active_frame_by_arm: Optional[Dict[str, int]] = None,
 ) -> None:
+    active_frame_set = set()
+    if active_frame is not None:
+        active_frame_set.add(int(active_frame))
+    if active_frame_by_arm:
+        active_frame_set.update(int(v) for v in active_frame_by_arm.values())
     for frame, actors in debug_visuals.common_candidate_actors.items():
         candidates = common_candidates_per_frame.get(int(frame), [])
         for idx, actor in enumerate(actors):
-            if active_frame is not None and int(frame) == int(active_frame) and idx < len(candidates):
+            if int(frame) in active_frame_set and idx < len(candidates):
                 set_actor_pose(actor, candidates[idx].pose_world_wxyz)
             else:
                 hide_actor(actor)
@@ -4033,8 +4377,9 @@ def update_candidate_debug_visuals(
         for frame, actors in per_frame.items():
             candidates = candidates_map.get(int(frame), [])
             axis_actors = axis_map.get(frame, [])
+            arm_active_frame = active_frame_by_arm.get(arm_name) if active_frame_by_arm else active_frame
             for idx, actor in enumerate(actors):
-                if active_frame is not None and int(frame) == int(active_frame) and idx < len(candidates):
+                if arm_active_frame is not None and int(frame) == int(arm_active_frame) and idx < len(candidates):
                     set_actor_pose(actor, candidates[idx].pose_world_wxyz)
                     if idx < len(axis_actors):
                         set_actor_pose(axis_actors[idx], candidates[idx].pose_world_wxyz)
@@ -4081,12 +4426,24 @@ def export_rank_preview_images(
         ),
     }
     selected_map = {int(item.source_frame): (item.arm, int(item.candidate.candidate_idx)) for item in selected_keyframes}
+    preview_frames = sorted(
+        {
+            int(frame)
+            for frame in keyframes
+        }
+        | {
+            int(item.source_frame)
+            for item in selected_keyframes
+        }
+    )
     records: List[RankPreviewRecord] = []
 
     try:
-        for frame in keyframes:
+        for frame in preview_frames:
             frame = int(frame)
-            object_states = object_states_per_frame[frame]
+            object_states = object_states_per_frame.get(frame)
+            if object_states is None:
+                continue
             for state in object_states.values():
                 if state.actor is None:
                     continue
@@ -4162,6 +4519,107 @@ def export_rank_preview_images(
     finally:
         for actor in temp_actors.values():
             hide_actor(actor)
+    return records
+
+
+def export_source_preview_compare(
+    args: argparse.Namespace,
+    reused_preview_summary: Optional[Dict],
+    selected_keyframes: List[SelectedKeyframe],
+) -> List[SourcePreviewCompareRecord]:
+    if reused_preview_summary is None or args.reuse_preview_summary_json is None:
+        return []
+
+    compare_dir = args.output_dir / "source_preview_compare"
+    compare_dir.mkdir(parents=True, exist_ok=True)
+    frame_entries = {
+        int(item["frame"]): item
+        for item in reused_preview_summary.get("frames", [])
+        if isinstance(item, dict) and "frame" in item
+    }
+    selected_by_frame_arm = {
+        (int(item.source_frame), str(item.arm)): item for item in selected_keyframes
+    }
+    frames = sorted({int(item.source_frame) for item in selected_keyframes})
+    records: List[SourcePreviewCompareRecord] = []
+    metadata: Dict[str, object] = {
+        "reuse_preview_summary_json": str(args.reuse_preview_summary_json),
+        "reuse_preview_candidate_group": str(args.reuse_preview_candidate_group),
+        "reuse_preview_top_rank": int(args.reuse_preview_top_rank),
+        "candidate_target_local_x_offset_m": float(args.candidate_target_local_x_offset_m),
+        "frames": {},
+    }
+
+    def _copy_one(src: Optional[str], frame: int, kind: str) -> None:
+        if not src:
+            return
+        src_path = Path(str(src))
+        if not src_path.is_file():
+            return
+        dst = compare_dir / f"frame_{frame:06d}_{kind}{src_path.suffix}"
+        shutil.copy2(src_path, dst)
+        records.append(SourcePreviewCompareRecord(frame=int(frame), image_path=str(dst), source_path=str(src_path), source_kind=str(kind)))
+
+    for frame in frames:
+        frame_entry = frame_entries.get(int(frame), {})
+        _copy_one(frame_entry.get("orientation_image"), frame, "d435_orientation_rank")
+        _copy_one(frame_entry.get("fused_image"), frame, "d435_fused_rank")
+        _copy_one(frame_entry.get("object_distance_debug_path"), frame, "d435_object_distance_debug")
+
+        # Also copy the legacy wide-FOV preview with the same relative path when it exists.
+        for key, kind in (
+            ("orientation_image", "legacy_orientation_rank"),
+            ("fused_image", "legacy_fused_rank"),
+            ("object_distance_debug_path", "legacy_object_distance_debug"),
+        ):
+            src = frame_entry.get(key)
+            if not src:
+                continue
+            legacy = Path(str(src).replace("/anygrasp_h2o_preview_d435/", "/anygrasp_h2o_preview/"))
+            _copy_one(str(legacy), frame, kind)
+
+        frame_meta: Dict[str, object] = {
+            "source_frame": int(frame),
+            "orientation_image": frame_entry.get("orientation_image"),
+            "fused_image": frame_entry.get("fused_image"),
+            "object_distance_debug_path": frame_entry.get("object_distance_debug_path"),
+            "selected": {},
+        }
+        for arm in ("left", "right"):
+            selected = selected_by_frame_arm.get((int(frame), arm))
+            candidate_key = f"{arm}_{args.reuse_preview_candidate_group}"
+            ranked_entries = list(frame_entry.get("top_candidates", {}).get(candidate_key, [])) if isinstance(frame_entry, dict) else []
+            source_entry = None
+            if selected is not None:
+                for rank_idx, entry in enumerate(ranked_entries, start=1):
+                    if int(entry.get("candidate_idx", -1)) == int(selected.candidate.candidate_idx):
+                        source_entry = dict(entry)
+                        source_entry["rank"] = int(rank_idx)
+                        break
+                frame_meta["selected"][arm] = {
+                    "candidate_idx": int(selected.candidate.candidate_idx),
+                    "rank": None if source_entry is None else int(source_entry["rank"]),
+                    "source_entry_translation_world": None if source_entry is None else source_entry.get("translation_world"),
+                    "source_entry_translation_cam": None if source_entry is None else source_entry.get("translation_cam"),
+                    "source_entry_rotation_matrix": None if source_entry is None else source_entry.get("rotation_matrix"),
+                    "planner_raw_pose_world_wxyz": np.asarray(selected.candidate.raw_pose_world_wxyz, dtype=np.float64).reshape(7).tolist(),
+                    "planner_target_pose_world_wxyz": np.asarray(selected.candidate.pose_world_wxyz, dtype=np.float64).reshape(7).tolist(),
+                    "local_x_offset_applied_m": float(args.candidate_target_local_x_offset_m),
+                    "nearest_object": str(selected.candidate.nearest_object),
+                    "rotation_distance_deg": float(selected.candidate.rotation_distance_deg),
+                }
+        metadata["frames"][str(int(frame))] = frame_meta
+
+    metadata_path = compare_dir / "selected_candidate_mapping.json"
+    metadata_path.write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
+    records.append(
+        SourcePreviewCompareRecord(
+            frame=-1,
+            image_path=str(metadata_path),
+            source_path=str(args.reuse_preview_summary_json),
+            source_kind="selected_candidate_mapping",
+        )
+    )
     return records
 
 
@@ -4394,11 +4852,16 @@ def main() -> None:
         )
         if not (bool(args.execute_both_arms) and args.arm == "auto"):
             execution_sequences = [(selection_result.arm, selection_result.selected_keyframes)]
-        selected_keyframes = selection_result.selected_keyframes
+        selected_keyframes = (
+            [item for _, seq in execution_sequences for item in seq]
+            if bool(args.execute_both_arms) and args.arm == "auto"
+            else selection_result.selected_keyframes
+        )
         args.requested_keyframes = [int(v) for v in requested_keyframes_used]
         args.resolved_keyframes = list(keyframes)
         args.resolved_keyframe_pairs = [(int(req), int(res)) for req, res in resolved_keyframe_pairs]
         args.resolved_candidate_selection_relative_frame = None if resolved_relative_frame is None else int(resolved_relative_frame)
+        preview_object_frames = sorted({int(frame) for frame in keyframes} | {int(item.source_frame) for item in selected_keyframes})
         object_states_per_frame = {
             frame: load_object_states(
                 args.replay_dir,
@@ -4407,7 +4870,7 @@ def main() -> None:
                 args.execution_object_visual_scale_overrides,
                 args.execution_object_collision_scale_overrides,
             )
-            for frame in keyframes
+            for frame in preview_object_frames
         }
         ranked_candidates_per_frame = selection_result.ranked_candidates_per_frame
         all_candidates_per_frame = selection_result.all_candidates_per_frame
@@ -4566,6 +5029,11 @@ def main() -> None:
         selected_keyframes=selected_keyframes,
         head_intrinsic=head_intrinsic,
     )
+    source_preview_compare_records = export_source_preview_compare(
+        args=args,
+        reused_preview_summary=reused_preview_summary,
+        selected_keyframes=selected_keyframes,
+    )
     for state in object_states.values():
         if state.actor is not None:
             set_object_state_pose(state, state.pose_world_wxyz)
@@ -4620,6 +5088,7 @@ def main() -> None:
         target_object_by_arm={},
         goal_label_by_arm={},
         reach_error_pose_source=str(args.reach_error_pose_source),
+        show_selected_keyframe_axes=bool(args.debug_visualize_selected_keyframe_axes),
     )
     use_overlay = bool(args.overlay_text) and not bool(args.pure_scene_output)
     use_overlay_debug = bool(args.overlay_text)
@@ -4710,6 +5179,9 @@ def main() -> None:
                 )
 
             debug_execution_state.active_frame = int(exec_selected_by_arm["left"][0].source_frame)
+            debug_execution_state.active_frame_by_arm = {
+                arm_name: int(seq[0].source_frame) for arm_name, seq in exec_selected_by_arm.items()
+            }
             debug_execution_state.current_stage = "pregrasp"
             debug_execution_state.target_pose_by_arm = {k: np.asarray(v, dtype=np.float64) for k, v in pregrasp_targets.items()}
             debug_execution_state.target_object_by_arm = dict(selected_objects_by_executed_arm)
@@ -4744,6 +5216,9 @@ def main() -> None:
 
             if skip_grasp_dual:
                 debug_execution_state.active_frame = int(exec_selected_by_arm["left"][0].source_frame)
+                debug_execution_state.active_frame_by_arm = {
+                    arm_name: int(seq[0].source_frame) for arm_name, seq in exec_selected_by_arm.items()
+                }
                 debug_execution_state.current_stage = "grasp_skipped_same_target"
                 debug_execution_state.target_pose_by_arm = {k: np.asarray(v, dtype=np.float64) for k, v in grasp_targets.items()}
                 debug_execution_state.goal_label_by_arm = {
@@ -4775,6 +5250,9 @@ def main() -> None:
                 print("[stage] grasp skipped because pregrasp target equals grasp target for both arms")
             else:
                 debug_execution_state.active_frame = int(exec_selected_by_arm["left"][0].source_frame)
+                debug_execution_state.active_frame_by_arm = {
+                    arm_name: int(seq[0].source_frame) for arm_name, seq in exec_selected_by_arm.items()
+                }
                 debug_execution_state.current_stage = "grasp"
                 debug_execution_state.target_pose_by_arm = {k: np.asarray(v, dtype=np.float64) for k, v in grasp_targets.items()}
                 debug_execution_state.goal_label_by_arm = {
@@ -4813,140 +5291,213 @@ def main() -> None:
                     )
                 )
 
-            if bool(args.enable_grasp_action_object_collision):
-                export_close_stage_snapshot(
-                    args.output_dir,
-                    tag="dual_before_close",
+            keyframe1_reached_dual = all(bool(grasp_dual["arms"].get(arm_name, {}).get("reached", False)) for arm_name in dual_arms)
+            stop_before_close_reason = None
+            if bool(args.debug_stop_after_keyframe1):
+                stop_before_close_reason = "debug_stop_after_keyframe1"
+            elif bool(args.require_keyframe1_reached_before_close) and not keyframe1_reached_dual:
+                stop_before_close_reason = "keyframe1_grasp_not_reached_before_close"
+
+            if stop_before_close_reason is not None:
+                action_dual = skipped_dual_action_result(
                     renderer=renderer,
-                    object_states=object_states,
-                    selected_objects_by_arm=selected_objects_by_executed_arm,
-                    arms=dual_arms,
+                    action_targets=action_targets,
+                    args=args,
+                    reason=stop_before_close_reason,
                 )
-                set_object_collision_for_names(
-                    object_states,
-                    [selected_objects_by_executed_arm[arm_name] for arm_name in dual_arms],
-                    enabled=True,
-                )
-                close_summary = close_grippers_progressively_with_collision_stop(
+                print(f"[stage] stopping before close_gripper reason={stop_before_close_reason}")
+                record_frame(
                     renderer,
-                    args.close_gripper,
-                    args.close_gripper,
-                    {arm_name: object_states[selected_objects_by_executed_arm[arm_name]].actor for arm_name in dual_arms},
-                    object_debug_by_arm={
-                        arm_name: {
-                            "object_name": selected_objects_by_executed_arm[arm_name],
-                            "collision_mode": object_states[selected_objects_by_executed_arm[arm_name]].collision_mode,
-                            "collision_debug_info": object_states[selected_objects_by_executed_arm[arm_name]].collision_debug_info,
-                        }
-                        for arm_name in dual_arms
-                    },
-                    debug_collision_report=bool(args.debug_collision_report),
-                    gripper_contact_monitor_mode=str(args.gripper_contact_monitor_mode),
+                    head_writer,
+                    third_writer,
+                    ["stage=close_skipped", "arm=both", f"reason={stop_before_close_reason}"],
+                    use_overlay,
+                    debug_visuals,
+                    debug_execution_state,
+                    pure_scene_main=pure_scene_main,
+                    use_overlay_debug=use_overlay_debug,
                 )
-                print(
-                    "[gripper-close] "
-                    + " ".join(
-                        f"{arm_name}:monitor={close_summary.get(arm_name, {}).get('monitor_mode', 'n/a')},"
-                        f"reason={close_summary.get(arm_name, {}).get('reason', 'n/a')},"
-                        f"cmd={float(close_summary.get(arm_name, {}).get('final_cmd', args.close_gripper)):.3f},"
-                        f"contact={int(bool(close_summary.get(arm_name, {}).get('had_contact', False)))},"
-                        f"base_contact={int(bool(close_summary.get(arm_name, {}).get('had_base_contact', False)))},"
-                        f"raw_target_contact={int(bool(close_summary.get(arm_name, {}).get('had_raw_target_contact', False)))}"
-                        for arm_name in dual_arms
-                    )
-                )
-            else:
-                renderer.set_grippers(args.close_gripper, args.close_gripper)
-            debug_execution_state.current_stage = "close_gripper"
-            record_frame(
-                renderer,
-                head_writer,
-                third_writer,
-                ["stage=close_gripper", "arm=both"],
-                use_overlay,
-                debug_visuals,
-                debug_execution_state,
-                pure_scene_main=pure_scene_main,
-                use_overlay_debug=use_overlay_debug,
-            )
-            pause_after_keyframe1(
-                renderer=renderer,
-                head_writer=head_writer,
-                third_writer=third_writer,
-                use_overlay=use_overlay,
-                args=args,
-                arm_label="both",
-                goal_frame=int(exec_selected_by_arm["left"][0].source_frame),
-                debug_visuals=debug_visuals,
-                debug_execution_state=debug_execution_state,
-                pure_scene_main=pure_scene_main,
-                use_overlay_debug=use_overlay_debug,
-            )
-
-            attached_actor_by_arm: Dict[str, Optional[sapien.Entity]] = {}
-            tcp_to_object_by_arm: Dict[str, Optional[np.ndarray]] = {}
-            if not bool(args.replay_objects_during_action):
                 for arm_name in dual_arms:
-                    obj_name = selected_objects_by_executed_arm[arm_name]
-                    attached_actor_by_arm[arm_name] = object_states[obj_name].actor
-                    tcp_pose = renderer.get_current_tcp_pose(arm_name)
-                    tcp_to_object_by_arm[arm_name] = np.linalg.inv(pose_wxyz_to_matrix(tcp_pose)) @ object_states[obj_name].pose_world_matrix
+                    stages_by_executed_arm[arm_name] = {
+                        "pregrasp": {
+                            "status": str(pregrasp_dual["arms"][arm_name]["status"]),
+                            "attempts": int(pregrasp_dual["attempts"]),
+                            "reached": bool(pregrasp_dual["arms"][arm_name]["reached"]),
+                            "pos_err_m": float(pregrasp_dual["arms"][arm_name]["pos_err_m"]),
+                            "rot_err_deg": float(pregrasp_dual["arms"][arm_name]["rot_err_deg"]),
+                            "attempt_history": pregrasp_dual["attempt_history"],
+                        },
+                        "grasp": {
+                            "status": str(grasp_dual["arms"][arm_name]["status"]),
+                            "attempts": int(grasp_dual["attempts"]),
+                            "reached": bool(grasp_dual["arms"][arm_name]["reached"]),
+                            "pos_err_m": float(grasp_dual["arms"][arm_name]["pos_err_m"]),
+                            "rot_err_deg": float(grasp_dual["arms"][arm_name]["rot_err_deg"]),
+                            "attempt_history": grasp_dual["attempt_history"],
+                        },
+                        "action": {
+                            "status": str(action_dual["arms"][arm_name]["status"]),
+                            "attempts": int(action_dual["attempts"]),
+                            "reached": bool(action_dual["arms"][arm_name]["reached"]),
+                            "pos_err_m": float(action_dual["arms"][arm_name]["pos_err_m"]),
+                            "rot_err_deg": float(action_dual["arms"][arm_name]["rot_err_deg"]),
+                            "attempt_history": action_dual["attempt_history"],
+                        },
+                    }
+                continue_execution_after_keyframe1 = False
+            else:
+                continue_execution_after_keyframe1 = True
 
-            debug_execution_state.active_frame = int(exec_selected_by_arm["left"][1].source_frame)
-            debug_execution_state.current_stage = "action"
-            debug_execution_state.target_pose_by_arm = {k: np.asarray(v, dtype=np.float64) for k, v in action_targets.items()}
-            debug_execution_state.goal_label_by_arm = {
-                arm_name: f"keyframe_{int(seq[1].source_frame)}_action" for arm_name, seq in exec_selected_by_arm.items()
-            }
-            set_dual_arm_target_visuals(
-                renderer,
-                action_targets.get("left"),
-                action_targets.get("right"),
-            )
-            action_dual = execute_dual_stage_until_reached(
-                renderer=renderer,
-                target_pose_world_wxyz_by_arm=action_targets,
-                label="action",
-                head_writer=head_writer,
-                third_writer=third_writer,
-                use_overlay=use_overlay,
-                args=args,
-                debug_visuals=debug_visuals,
-                debug_execution_state=debug_execution_state,
-                attached_actor_by_arm=attached_actor_by_arm,
-                tcp_to_object_by_arm=tcp_to_object_by_arm,
-                object_replay=action_object_replay,
-                pure_scene_main=pure_scene_main,
-                use_overlay_debug=use_overlay_debug,
-            )
+            if not continue_execution_after_keyframe1:
+                pass
+            else:
+                if bool(args.enable_grasp_action_object_collision):
+                    export_close_stage_snapshot(
+                        args.output_dir,
+                        tag="dual_before_close",
+                        renderer=renderer,
+                        object_states=object_states,
+                        selected_objects_by_arm=selected_objects_by_executed_arm,
+                        arms=dual_arms,
+                    )
+                    set_object_collision_for_names(
+                        object_states,
+                        [selected_objects_by_executed_arm[arm_name] for arm_name in dual_arms],
+                        enabled=True,
+                    )
+                    close_summary = close_grippers_progressively_with_collision_stop(
+                        renderer,
+                        args.close_gripper,
+                        args.close_gripper,
+                        {arm_name: object_states[selected_objects_by_executed_arm[arm_name]].actor for arm_name in dual_arms},
+                        object_debug_by_arm={
+                            arm_name: {
+                                "object_name": selected_objects_by_executed_arm[arm_name],
+                                "collision_mode": object_states[selected_objects_by_executed_arm[arm_name]].collision_mode,
+                                "collision_debug_info": object_states[selected_objects_by_executed_arm[arm_name]].collision_debug_info,
+                            }
+                            for arm_name in dual_arms
+                        },
+                        debug_collision_report=bool(args.debug_collision_report),
+                        gripper_contact_monitor_mode=str(args.gripper_contact_monitor_mode),
+                    )
+                    print(
+                        "[gripper-close] "
+                        + " ".join(
+                            f"{arm_name}:monitor={close_summary.get(arm_name, {}).get('monitor_mode', 'n/a')},"
+                            f"reason={close_summary.get(arm_name, {}).get('reason', 'n/a')},"
+                            f"cmd={float(close_summary.get(arm_name, {}).get('final_cmd', args.close_gripper)):.3f},"
+                            f"contact={int(bool(close_summary.get(arm_name, {}).get('had_contact', False)))},"
+                            f"base_contact={int(bool(close_summary.get(arm_name, {}).get('had_base_contact', False)))},"
+                            f"raw_target_contact={int(bool(close_summary.get(arm_name, {}).get('had_raw_target_contact', False)))}"
+                            for arm_name in dual_arms
+                        )
+                    )
+                else:
+                    renderer.set_grippers(args.close_gripper, args.close_gripper)
+                debug_execution_state.current_stage = "close_gripper"
+                record_frame(
+                    renderer,
+                    head_writer,
+                    third_writer,
+                    ["stage=close_gripper", "arm=both"],
+                    use_overlay,
+                    debug_visuals,
+                    debug_execution_state,
+                    pure_scene_main=pure_scene_main,
+                    use_overlay_debug=use_overlay_debug,
+                )
+                pause_after_keyframe1(
+                    renderer=renderer,
+                    head_writer=head_writer,
+                    third_writer=third_writer,
+                    use_overlay=use_overlay,
+                    args=args,
+                    arm_label="both",
+                    goal_frame=int(exec_selected_by_arm["left"][0].source_frame),
+                    debug_visuals=debug_visuals,
+                    debug_execution_state=debug_execution_state,
+                    pure_scene_main=pure_scene_main,
+                    use_overlay_debug=use_overlay_debug,
+                )
 
-            for arm_name in dual_arms:
-                stages_by_executed_arm[arm_name] = {
-                    "pregrasp": {
-                        "status": str(pregrasp_dual["arms"][arm_name]["status"]),
-                        "attempts": int(pregrasp_dual["attempts"]),
-                        "reached": bool(pregrasp_dual["arms"][arm_name]["reached"]),
-                        "pos_err_m": float(pregrasp_dual["arms"][arm_name]["pos_err_m"]),
-                        "rot_err_deg": float(pregrasp_dual["arms"][arm_name]["rot_err_deg"]),
-                        "attempt_history": pregrasp_dual["attempt_history"],
-                    },
-                    "grasp": {
-                        "status": str(grasp_dual["arms"][arm_name]["status"]),
-                        "attempts": int(grasp_dual["attempts"]),
-                        "reached": bool(grasp_dual["arms"][arm_name]["reached"]),
-                        "pos_err_m": float(grasp_dual["arms"][arm_name]["pos_err_m"]),
-                        "rot_err_deg": float(grasp_dual["arms"][arm_name]["rot_err_deg"]),
-                        "attempt_history": grasp_dual["attempt_history"],
-                    },
-                    "action": {
-                        "status": str(action_dual["arms"][arm_name]["status"]),
-                        "attempts": int(action_dual["attempts"]),
-                        "reached": bool(action_dual["arms"][arm_name]["reached"]),
-                        "pos_err_m": float(action_dual["arms"][arm_name]["pos_err_m"]),
-                        "rot_err_deg": float(action_dual["arms"][arm_name]["rot_err_deg"]),
-                        "attempt_history": action_dual["attempt_history"],
-                    },
+                attached_actor_by_arm: Dict[str, Optional[sapien.Entity]] = {}
+                tcp_to_object_by_arm: Dict[str, Optional[np.ndarray]] = {}
+                if not bool(args.replay_objects_during_action):
+                    for arm_name in dual_arms:
+                        obj_name = selected_objects_by_executed_arm[arm_name]
+                        attached_actor_by_arm[arm_name] = object_states[obj_name].actor
+                        tcp_pose = renderer.get_current_tcp_pose(arm_name)
+                        tcp_to_object_by_arm[arm_name] = np.linalg.inv(pose_wxyz_to_matrix(tcp_pose)) @ object_states[obj_name].pose_world_matrix
+
+                debug_execution_state.active_frame = int(exec_selected_by_arm["left"][1].source_frame)
+                debug_execution_state.active_frame_by_arm = {
+                    arm_name: int(seq[1].source_frame) for arm_name, seq in exec_selected_by_arm.items()
                 }
+                debug_execution_state.current_stage = "action"
+                debug_execution_state.target_pose_by_arm = {k: np.asarray(v, dtype=np.float64) for k, v in action_targets.items()}
+                debug_execution_state.goal_label_by_arm = {
+                    arm_name: f"keyframe_{int(seq[1].source_frame)}_action" for arm_name, seq in exec_selected_by_arm.items()
+                }
+                set_dual_arm_target_visuals(
+                    renderer,
+                    action_targets.get("left"),
+                    action_targets.get("right"),
+                )
+                action_dual = execute_dual_stage_until_reached(
+                    renderer=renderer,
+                    target_pose_world_wxyz_by_arm=action_targets,
+                    label="action",
+                    head_writer=head_writer,
+                    third_writer=third_writer,
+                    use_overlay=use_overlay,
+                    args=args,
+                    debug_visuals=debug_visuals,
+                    debug_execution_state=debug_execution_state,
+                    attached_actor_by_arm=attached_actor_by_arm,
+                    tcp_to_object_by_arm=tcp_to_object_by_arm,
+                    object_replay=action_object_replay,
+                    pure_scene_main=pure_scene_main,
+                    use_overlay_debug=use_overlay_debug,
+                ) if (
+                    not bool(args.require_keyframe1_reached_before_action)
+                    or all(bool(grasp_dual["arms"].get(arm_name, {}).get("reached", False)) for arm_name in dual_arms)
+                ) else skipped_dual_action_result(
+                    renderer=renderer,
+                    action_targets=action_targets,
+                    args=args,
+                    reason="keyframe1_grasp_not_reached",
+                )
+                if bool(action_dual.get("skip_reason")):
+                    print(f"[stage] action skipped reason={action_dual.get('skip_reason')}")
+
+                for arm_name in dual_arms:
+                    stages_by_executed_arm[arm_name] = {
+                        "pregrasp": {
+                            "status": str(pregrasp_dual["arms"][arm_name]["status"]),
+                            "attempts": int(pregrasp_dual["attempts"]),
+                            "reached": bool(pregrasp_dual["arms"][arm_name]["reached"]),
+                            "pos_err_m": float(pregrasp_dual["arms"][arm_name]["pos_err_m"]),
+                            "rot_err_deg": float(pregrasp_dual["arms"][arm_name]["rot_err_deg"]),
+                            "attempt_history": pregrasp_dual["attempt_history"],
+                        },
+                        "grasp": {
+                            "status": str(grasp_dual["arms"][arm_name]["status"]),
+                            "attempts": int(grasp_dual["attempts"]),
+                            "reached": bool(grasp_dual["arms"][arm_name]["reached"]),
+                            "pos_err_m": float(grasp_dual["arms"][arm_name]["pos_err_m"]),
+                            "rot_err_deg": float(grasp_dual["arms"][arm_name]["rot_err_deg"]),
+                            "attempt_history": grasp_dual["attempt_history"],
+                        },
+                        "action": {
+                            "status": str(action_dual["arms"][arm_name]["status"]),
+                            "attempts": int(action_dual["attempts"]),
+                            "reached": bool(action_dual["arms"][arm_name]["reached"]),
+                            "pos_err_m": float(action_dual["arms"][arm_name]["pos_err_m"]),
+                            "rot_err_deg": float(action_dual["arms"][arm_name]["rot_err_deg"]),
+                            "attempt_history": action_dual["attempt_history"],
+                        },
+                    }
         else:
             for exec_arm, exec_selected_keyframes in execution_sequences:
                 exec_object_name = exec_selected_keyframes[0].candidate.nearest_object
@@ -4998,6 +5549,7 @@ def main() -> None:
                         end_frame=int(exec_selected_keyframes[1].source_frame),
                     )
                 debug_execution_state.active_frame = int(exec_selected_keyframes[0].source_frame)
+                debug_execution_state.active_frame_by_arm = {exec_arm: int(exec_selected_keyframes[0].source_frame)}
                 debug_execution_state.current_stage = "init"
                 debug_execution_state.target_object_by_arm = {exec_arm: exec_object_name}
                 debug_execution_state.goal_label_by_arm = {exec_arm: f"keyframe_{int(exec_selected_keyframes[0].source_frame)}_grasp"}
@@ -5023,6 +5575,7 @@ def main() -> None:
                 )
 
                 debug_execution_state.current_stage = "pregrasp"
+                debug_execution_state.active_frame_by_arm = {exec_arm: int(exec_selected_keyframes[0].source_frame)}
                 debug_execution_state.target_pose_by_arm = {exec_arm: np.asarray(pregrasp_pose, dtype=np.float64)}
                 debug_execution_state.goal_label_by_arm = {exec_arm: f"keyframe_{int(exec_selected_keyframes[0].source_frame)}_pregrasp"}
                 pregrasp_result = execute_stage_until_reached(
@@ -5048,6 +5601,7 @@ def main() -> None:
 
                 if poses_are_effectively_same(pregrasp_pose, grasp_pose):
                     debug_execution_state.current_stage = "grasp_skipped_same_target"
+                    debug_execution_state.active_frame_by_arm = {exec_arm: int(exec_selected_keyframes[0].source_frame)}
                     debug_execution_state.target_pose_by_arm = {exec_arm: np.asarray(grasp_pose, dtype=np.float64)}
                     debug_execution_state.goal_label_by_arm = {exec_arm: f"keyframe_{int(exec_selected_keyframes[0].source_frame)}_grasp_skipped"}
                     set_single_arm_target_visual(renderer, exec_arm, grasp_pose)
@@ -5067,6 +5621,7 @@ def main() -> None:
                     print(f"[stage] grasp skipped because pregrasp target equals grasp target arm={exec_arm}")
                 else:
                     debug_execution_state.current_stage = "grasp"
+                    debug_execution_state.active_frame_by_arm = {exec_arm: int(exec_selected_keyframes[0].source_frame)}
                     debug_execution_state.target_pose_by_arm = {exec_arm: np.asarray(grasp_pose, dtype=np.float64)}
                     debug_execution_state.goal_label_by_arm = {exec_arm: f"keyframe_{int(exec_selected_keyframes[0].source_frame)}_grasp"}
                     grasp_result = execute_stage_until_reached(
@@ -5096,6 +5651,39 @@ def main() -> None:
                         f"{exec_arm}:pos={float(grasp_result.get('pos_err_m', 0.0)):.4f},"
                         f"rot={float(grasp_result.get('rot_err_deg', 0.0)):.2f}"
                     )
+
+                stop_before_close_reason = None
+                if bool(args.debug_stop_after_keyframe1):
+                    stop_before_close_reason = "debug_stop_after_keyframe1"
+                elif bool(args.require_keyframe1_reached_before_close) and not bool(grasp_result.get("reached", False)):
+                    stop_before_close_reason = "keyframe1_grasp_not_reached_before_close"
+
+                if stop_before_close_reason is not None:
+                    action_result = skipped_action_result_for_arm(
+                        renderer=renderer,
+                        arm=exec_arm,
+                        action_pose_world_wxyz=action_pose,
+                        args=args,
+                        reason=stop_before_close_reason,
+                    )
+                    print(f"[stage] stopping before close_gripper arm={exec_arm} reason={stop_before_close_reason}")
+                    record_frame(
+                        renderer,
+                        head_writer,
+                        third_writer,
+                        ["stage=close_skipped", f"arm={exec_arm}", f"reason={stop_before_close_reason}"],
+                        use_overlay,
+                        debug_visuals,
+                        debug_execution_state,
+                        pure_scene_main=pure_scene_main,
+                        use_overlay_debug=use_overlay_debug,
+                    )
+                    stages_by_executed_arm[exec_arm] = {
+                        "pregrasp": pregrasp_result,
+                        "grasp": grasp_result,
+                        "action": action_result,
+                    }
+                    continue
 
                 set_single_arm_target_visual(renderer, exec_arm, grasp_pose)
                 if bool(args.enable_grasp_action_object_collision):
@@ -5168,28 +5756,50 @@ def main() -> None:
                     tcp_to_object = np.linalg.inv(pose_wxyz_to_matrix(tcp_pose)) @ object_states[exec_object_name].pose_world_matrix
 
                 debug_execution_state.active_frame = int(exec_selected_keyframes[1].source_frame)
+                debug_execution_state.active_frame_by_arm = {exec_arm: int(exec_selected_keyframes[1].source_frame)}
                 debug_execution_state.current_stage = "action"
                 debug_execution_state.target_pose_by_arm = {exec_arm: np.asarray(action_pose, dtype=np.float64)}
                 debug_execution_state.goal_label_by_arm = {exec_arm: f"keyframe_{int(exec_selected_keyframes[1].source_frame)}_action"}
-                action_result = execute_stage_until_reached(
-                    renderer=renderer,
-                    arm=exec_arm,
-                    target_pose_world_wxyz=action_pose,
-                    label="action",
-                    head_writer=head_writer,
-                    third_writer=third_writer,
-                    use_overlay=use_overlay,
-                    args=args,
-                    attached_actor=attached_actor,
-                    tcp_to_object=tcp_to_object,
-                    target_visual_pose=action_pose,
-                    target_visual_label=f"keyframe_{exec_selected_keyframes[1].source_frame}",
-                    debug_visuals=debug_visuals,
-                    debug_execution_state=debug_execution_state,
-                    object_replay=action_object_replay,
-                    pure_scene_main=pure_scene_main,
-                    use_overlay_debug=use_overlay_debug,
-                )
+                if bool(args.require_keyframe1_reached_before_action) and not bool(grasp_result.get("reached", False)):
+                    action_result = skipped_action_result_for_arm(
+                        renderer=renderer,
+                        arm=exec_arm,
+                        action_pose_world_wxyz=action_pose,
+                        args=args,
+                        reason="keyframe1_grasp_not_reached",
+                    )
+                    print(f"[stage] action skipped arm={exec_arm} reason={action_result.get('skip_reason')}")
+                    record_frame(
+                        renderer,
+                        head_writer,
+                        third_writer,
+                        ["stage=action_skipped", f"arm={exec_arm}", f"reason={action_result.get('skip_reason')}"],
+                        use_overlay,
+                        debug_visuals,
+                        debug_execution_state,
+                        pure_scene_main=pure_scene_main,
+                        use_overlay_debug=use_overlay_debug,
+                    )
+                else:
+                    action_result = execute_stage_until_reached(
+                        renderer=renderer,
+                        arm=exec_arm,
+                        target_pose_world_wxyz=action_pose,
+                        label="action",
+                        head_writer=head_writer,
+                        third_writer=third_writer,
+                        use_overlay=use_overlay,
+                        args=args,
+                        attached_actor=attached_actor,
+                        tcp_to_object=tcp_to_object,
+                        target_visual_pose=action_pose,
+                        target_visual_label=f"keyframe_{exec_selected_keyframes[1].source_frame}",
+                        debug_visuals=debug_visuals,
+                        debug_execution_state=debug_execution_state,
+                        object_replay=action_object_replay,
+                        pure_scene_main=pure_scene_main,
+                        use_overlay_debug=use_overlay_debug,
+                    )
                 stages_by_executed_arm[exec_arm] = {
                     "pregrasp": pregrasp_result,
                     "grasp": grasp_result,
@@ -5208,6 +5818,10 @@ def main() -> None:
         if debug_execution_writer is not None:
             debug_execution_writer.release()
         renderer.update_target_axis_visuals(None, None)
+        if bool(args.vscode_compatible_video):
+            transcode_mp4_for_vscode(head_video_path)
+            if third_writer is not None:
+                transcode_mp4_for_vscode(third_video_path)
 
     primary_exec_arm = execution_sequences[0][0]
     primary_exec_selected_keyframes = execution_sequences[0][1]
@@ -5251,19 +5865,40 @@ def main() -> None:
         "resolved_candidate_selection_relative_frame": None if args.resolved_candidate_selection_relative_frame is None else int(args.resolved_candidate_selection_relative_frame),
         "candidate_max_rotation_distance_deg": float(args.candidate_max_rotation_distance_deg),
         "urdfik_trajectory_mode": str(args.urdfik_trajectory_mode),
+        "urdfik_joint_interp_waypoints": int(args.urdfik_joint_interp_waypoints),
         "urdfik_cartesian_interp_steps": int(args.urdfik_cartesian_interp_steps),
+        "urdfik_cartesian_interp_auto_step_m": float(args.urdfik_cartesian_interp_auto_step_m),
+        "urdfik_position_threshold_m": float(args.urdfik_position_threshold_m),
+        "urdfik_rotation_threshold_rad": float(args.urdfik_rotation_threshold_rad),
+        "urdfik_max_position_threshold_m": None if args.urdfik_max_position_threshold_m is None else float(args.urdfik_max_position_threshold_m),
+        "urdfik_max_rotation_threshold_rad": None if args.urdfik_max_rotation_threshold_rad is None else float(args.urdfik_max_rotation_threshold_rad),
+        "urdfik_num_seeds": int(args.urdfik_num_seeds),
+        "execute_partial_cartesian_plan": int(args.execute_partial_cartesian_plan),
+        "piper_urdfik_apply_global_trans_to_ik": int(args.piper_urdfik_apply_global_trans_to_ik),
+        "execute_interp_steps": int(args.execute_interp_steps),
+        "settle_steps": int(args.settle_steps),
         "joint_command_scene_steps": int(args.joint_command_scene_steps),
         "joint_target_wait_steps": int(args.joint_target_wait_steps),
         "joint_target_wait_tol_rad": float(args.joint_target_wait_tol_rad),
+        "print_execution_pose_every": int(args.print_execution_pose_every),
+        "reach_pos_tol_m": float(args.reach_pos_tol_m),
+        "reach_rot_tol_deg": float(args.reach_rot_tol_deg),
         "candidate_keep_camera_up": int(args.candidate_keep_camera_up),
         "candidate_camera_top_axis": str(args.candidate_camera_top_axis),
         "candidate_target_local_x_offset_m": float(args.candidate_target_local_x_offset_m),
         "enable_grasp_action_object_collision": int(args.enable_grasp_action_object_collision),
+        "grasp_action_object_collision_start_stage": str(args.grasp_action_object_collision_start_stage),
+        "disable_table": int(args.disable_table),
+        "base_occluder_enable": int(args.base_occluder_enable),
         "pure_scene_output": int(args.pure_scene_output),
         "save_pose_debug_effective": int(save_pose_debug_effective),
         "reach_error_pose_source": args.reach_error_pose_source,
         "init_prefix_frames": int(args.init_prefix_frames),
         "execute_both_arms": int(args.execute_both_arms),
+        "dual_stage_require_all_plans": int(args.dual_stage_require_all_plans),
+        "require_keyframe1_reached_before_close": int(args.require_keyframe1_reached_before_close),
+        "require_keyframe1_reached_before_action": int(args.require_keyframe1_reached_before_action),
+        "debug_stop_after_keyframe1": int(args.debug_stop_after_keyframe1),
         "execution_mode": "dual_sync" if dual_sync_mode else "single_or_sequential",
         "manual_candidate_overrides": {arm: {str(frame): idx for frame, idx in frame_map.items()} for arm, frame_map in args.manual_candidate_overrides.items() if frame_map},
         "arm_debugs": {
@@ -5419,12 +6054,22 @@ def main() -> None:
             }
             for item in rank_preview_records
         ],
+        "source_preview_compare": [
+            {
+                "frame": item.frame,
+                "source_kind": item.source_kind,
+                "image_path": item.image_path,
+                "source_path": item.source_path,
+            }
+            for item in source_preview_compare_records
+        ],
         "debug_execution_video": str(debug_execution_video_path) if debug_execution_writer is not None else None,
         "debug_execution_metrics": str(metrics_debug_path),
         "pose_debug": str(args.output_dir / "pose_debug.jsonl") if save_pose_debug_effective else None,
         "analysis_plots": analysis_plot_paths,
         "head_video": str(head_video_path),
         "third_video": str(third_video_path) if third_writer is not None else None,
+        "vscode_compatible_video": int(args.vscode_compatible_video),
         "left_wrist_video": str(left_wrist_video_path) if left_wrist_writer is not None else None,
         "right_wrist_video": str(right_wrist_video_path) if right_wrist_writer is not None else None,
     }

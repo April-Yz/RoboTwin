@@ -48,6 +48,8 @@ class CandidateRecord:
     raw_rotation_distance_deg: float
     translation: np.ndarray
     rotation_matrix: np.ndarray
+    visual_translation: np.ndarray
+    visual_rotation_matrix: np.ndarray
     width: float
     depth: float
     nearest_object: str
@@ -61,6 +63,8 @@ class SharedCandidateRecord:
     anygrasp_score: float
     translation: np.ndarray
     rotation_matrix: np.ndarray
+    visual_translation: np.ndarray
+    visual_rotation_matrix: np.ndarray
     width: float
     depth: float
     nearest_object: str
@@ -179,6 +183,23 @@ def deduplicate_int_list(values: Sequence[int]) -> List[int]:
     return result
 
 
+def resolve_effective_hand_keyframes(video_info: Dict[str, object]) -> Tuple[List[int], Dict[str, List[int]]]:
+    global_keyframes = [int(v) for v in video_info.get("keyframes", [])]
+    effective_by_arm: Dict[str, List[int]] = {}
+    for arm in ("left", "right"):
+        arm_keyframes = [int(v) for v in video_info.get(f"{arm}_keyframes", [])]
+        if len(arm_keyframes) >= 2:
+            effective = arm_keyframes[:2]
+        else:
+            effective = deduplicate_int_list(arm_keyframes + global_keyframes)[:2]
+        effective_by_arm[arm] = effective
+    if len(global_keyframes) >= 2:
+        effective_global = global_keyframes[:2]
+    else:
+        effective_global = sorted(deduplicate_int_list(effective_by_arm["left"] + effective_by_arm["right"] + global_keyframes))
+    return effective_global, effective_by_arm
+
+
 def resolve_requested_frames_from_args(args: argparse.Namespace) -> Tuple[List[int], Dict[str, object], List[Dict[str, object]]]:
     warnings_log: List[Dict[str, object]] = []
     if str(args.frame_selection_mode) == "manual":
@@ -202,13 +223,16 @@ def resolve_requested_frames_from_args(args: argparse.Namespace) -> Tuple[List[i
         raise KeyError(f"{video_name} not found in {hand_keyframes_json}")
     video_info = videos[video_name]
     keyframes = [int(v) for v in video_info.get("keyframes", [])]
-    requested_frames = deduplicate_int_list([0] + keyframes)
-    if len(keyframes) == 0:
+    left_keyframes = [int(v) for v in video_info.get("left_keyframes", [])]
+    right_keyframes = [int(v) for v in video_info.get("right_keyframes", [])]
+    effective_keyframes, effective_keyframes_by_arm = resolve_effective_hand_keyframes(video_info)
+    requested_frames = deduplicate_int_list([0] + effective_keyframes)
+    if len(effective_keyframes) == 0:
         warnings_log.append(
             {
                 "type": "hand_keyframe_selection_warning",
                 "video_name": str(video_name),
-                "message": f"{video_name} has no annotated keyframes; using only frame 0",
+                "message": f"{video_name} has no usable annotated keyframes; using only frame 0",
             }
         )
     metadata = {
@@ -217,6 +241,15 @@ def resolve_requested_frames_from_args(args: argparse.Namespace) -> Tuple[List[i
         "video_id": int(video_id),
         "video_name": str(video_name),
         "annotated_keyframes": [int(v) for v in keyframes],
+        "annotated_keyframes_by_arm": {
+            "left": [int(v) for v in left_keyframes],
+            "right": [int(v) for v in right_keyframes],
+        },
+        "effective_keyframes": [int(v) for v in effective_keyframes],
+        "effective_keyframes_by_arm": {
+            arm: [int(v) for v in frames]
+            for arm, frames in effective_keyframes_by_arm.items()
+        },
         "requested_frames": [int(v) for v in requested_frames],
     }
     return requested_frames, metadata, warnings_log
@@ -426,6 +459,27 @@ def camera_pose_to_world_pose(
     return pos_world.astype(np.float64), rot_world.astype(np.float64)
 
 
+def candidate_pose_to_preview_visual_pose(
+    translation_cam: np.ndarray,
+    rotation_cam: np.ndarray,
+    candidate_post_rot_matrix: np.ndarray,
+    candidate_orientation_remap_matrix: np.ndarray,
+    candidate_target_local_x_offset_m: float,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Return the camera-frame pose that the planner actually targets."""
+    translation_cam = np.asarray(translation_cam, dtype=np.float64).reshape(3)
+    rotation_cam = np.asarray(rotation_cam, dtype=np.float64).reshape(3, 3)
+    visual_rotation = orthonormalize_rotation(
+        orthonormalize_rotation(rotation_cam)
+        @ np.asarray(candidate_post_rot_matrix, dtype=np.float64).reshape(3, 3)
+        @ np.asarray(candidate_orientation_remap_matrix, dtype=np.float64).reshape(3, 3)
+    )
+    visual_translation = np.array(translation_cam, dtype=np.float64)
+    if abs(float(candidate_target_local_x_offset_m)) > 1e-12:
+        visual_translation = visual_translation + visual_rotation[:, 0] * float(candidate_target_local_x_offset_m)
+    return visual_translation.astype(np.float64), visual_rotation.astype(np.float64)
+
+
 def object_distances_world(
     candidate_world_position: np.ndarray,
     object_world_positions: Dict[str, np.ndarray],
@@ -597,6 +651,13 @@ def build_object_partitioned_candidates(
     for candidate_idx, grasp in enumerate(grasps):
         translation = np.asarray(grasp["translation"], dtype=np.float64).reshape(3)
         rotation_matrix = np.asarray(grasp["rotation_matrix"], dtype=np.float64).reshape(3, 3)
+        visual_translation, visual_rotation_matrix = candidate_pose_to_preview_visual_pose(
+            translation_cam=translation,
+            rotation_cam=rotation_matrix,
+            candidate_post_rot_matrix=candidate_post_rot_matrix,
+            candidate_orientation_remap_matrix=candidate_orientation_remap_matrix,
+            candidate_target_local_x_offset_m=candidate_target_local_x_offset_m,
+        )
         translation_world, rotation_world = camera_pose_to_world_pose(
             translation_cam=translation,
             rotation_cam=rotation_matrix,
@@ -615,6 +676,8 @@ def build_object_partitioned_candidates(
             anygrasp_score=float(grasp["score"]),
             translation=translation,
             rotation_matrix=rotation_matrix,
+            visual_translation=visual_translation,
+            visual_rotation_matrix=visual_rotation_matrix,
             width=float(grasp.get("width", 0.0)),
             depth=float(grasp.get("depth", 0.0)),
             nearest_object=str(nearest_object),
@@ -628,6 +691,7 @@ def build_object_partitioned_candidates(
             {
                 "candidate_idx": int(candidate_idx),
                 "candidate_translation_cam": translation.tolist(),
+                "candidate_visual_translation_cam": visual_translation.tolist(),
                 "candidate_translation_world": translation_world.tolist(),
                 "nearest_object": str(nearest_object),
                 "nearest_object_distance_m": float(nearest_dist),
@@ -672,6 +736,8 @@ def build_candidates_for_arm(
                 raw_rotation_distance_deg=raw_rotation_distance,
                 translation=np.asarray(candidate.translation, dtype=np.float64).reshape(3),
                 rotation_matrix=np.asarray(candidate.rotation_matrix, dtype=np.float64).reshape(3, 3),
+                visual_translation=np.asarray(candidate.visual_translation, dtype=np.float64).reshape(3),
+                visual_rotation_matrix=np.asarray(candidate.visual_rotation_matrix, dtype=np.float64).reshape(3, 3),
                 width=float(candidate.width),
                 depth=float(candidate.depth),
                 nearest_object=str(candidate.nearest_object),
@@ -713,6 +779,8 @@ def build_score_ranked_candidates_for_arm(
                 raw_rotation_distance_deg=raw_rotation_distance,
                 translation=translation,
                 rotation_matrix=rotation_matrix,
+                visual_translation=translation,
+                visual_rotation_matrix=rotation_matrix,
                 width=float(grasp.get("width", 0.0)),
                 depth=float(grasp.get("depth", 0.0)),
                 nearest_object="",
@@ -844,14 +912,14 @@ def annotate_arm_preview(
             draw_grasp_wireframe(
                 image=image,
                 camera_info=camera_info,
-                translation=item.translation,
-                rotation_matrix=item.rotation_matrix,
+                translation=item.visual_translation,
+                rotation_matrix=item.visual_rotation_matrix,
                 width_m=float(item.width),
                 depth_m=float(item.depth),
                 color=box_color,
                 thickness=int(box_thickness),
             )
-        pixel = project_camera_point(item.translation, camera_info)
+        pixel = project_camera_point(item.visual_translation, camera_info)
         if pixel is None:
             continue
         offset = (4, -4) if arm_name == "left" else (4, 10)
@@ -944,8 +1012,10 @@ def summarize_top_candidates(ranked: Sequence[CandidateRecord], top_n: int) -> L
                 "nearest_object": str(item.nearest_object),
                 "nearest_object_distance_m": float(item.nearest_object_distance_m),
                 "translation_cam": np.asarray(item.translation, dtype=np.float64).reshape(3).tolist(),
+                "visual_translation_cam": np.asarray(item.visual_translation, dtype=np.float64).reshape(3).tolist(),
                 "translation_world": np.asarray(item.translation_world, dtype=np.float64).reshape(3).tolist(),
                 "rotation_matrix": np.asarray(item.rotation_matrix, dtype=np.float64).reshape(3, 3).tolist(),
+                "visual_rotation_matrix": np.asarray(item.visual_rotation_matrix, dtype=np.float64).reshape(3, 3).tolist(),
                 "width": float(item.width),
                 "depth": float(item.depth),
             }
@@ -980,7 +1050,9 @@ def main() -> None:
         print(
             "[frame-select] "
             f"video={frame_selection_metadata['video_name']} "
-            f"annotated_keyframes={frame_selection_metadata['annotated_keyframes']}"
+            f"annotated_keyframes={frame_selection_metadata['annotated_keyframes']} "
+            f"effective_keyframes={frame_selection_metadata.get('effective_keyframes', [])} "
+            f"effective_by_arm={frame_selection_metadata.get('effective_keyframes_by_arm', {})}"
         )
     resolved_frame_pairs = resolve_requested_frames(requested_frames, available_frames)
     fixed_camera_pose_world_wxyz: Optional[np.ndarray] = None
@@ -1331,13 +1403,58 @@ def main() -> None:
                 line_builder=fused_line,
             ),
         )
+        planner_selected_image = build_combined_image(
+            annotate_arm_preview(
+                base_image=base_image,
+                arm_name="left",
+                ranked=left_orientation_ranked[:1],
+                hand_reference=left_hand_reference_overlay,
+                camera_info=camera_info,
+                object_world_positions=object_world_positions if bool(args.draw_object_overlay) else None,
+                camera_pose_world_wxyz=camera_pose_world_wxyz if bool(args.draw_object_overlay) else None,
+                camera_cv_axis_mode=str(args.camera_cv_axis_mode),
+                top_k=1,
+                draw_grasp_boxes=bool(args.draw_grasp_boxes),
+                box_thickness=max(int(args.box_thickness), 3),
+                font_scale=max(float(args.font_scale), 0.5),
+                panel_width=int(args.panel_width),
+                line_height=int(args.line_height),
+                stage_title="planner selected orientation rank1",
+                formula_lines=["planner = orientation rank1", "matches reuse_preview_candidate_group=orientation"],
+                warning_text=None if len(left_object_filtered) > 0 else f"NO LEFT CANDIDATE ({args.left_target_object})",
+                line_builder=orientation_line,
+            ),
+            annotate_arm_preview(
+                base_image=base_image,
+                arm_name="right",
+                ranked=right_orientation_ranked[:1],
+                hand_reference=right_hand_reference_overlay,
+                camera_info=camera_info,
+                object_world_positions=object_world_positions if bool(args.draw_object_overlay) else None,
+                camera_pose_world_wxyz=camera_pose_world_wxyz if bool(args.draw_object_overlay) else None,
+                camera_cv_axis_mode=str(args.camera_cv_axis_mode),
+                top_k=1,
+                draw_grasp_boxes=bool(args.draw_grasp_boxes),
+                box_thickness=max(int(args.box_thickness), 3),
+                font_scale=max(float(args.font_scale), 0.5),
+                panel_width=int(args.panel_width),
+                line_height=int(args.line_height),
+                stage_title="planner selected orientation rank1",
+                formula_lines=["planner = orientation rank1", "matches reuse_preview_candidate_group=orientation"],
+                warning_text=None if len(right_object_filtered) > 0 else f"NO RIGHT CANDIDATE ({args.right_target_object})",
+                line_builder=orientation_line,
+            ),
+        )
 
         orientation_path = args.output_dir / f"frame_{frame:06d}_left_right_orientation_rank.png"
         fused_path = args.output_dir / f"frame_{frame:06d}_left_right_fused_rank.png"
+        planner_selected_path = args.output_dir / f"frame_{frame:06d}_left_right_planner_selected_orientation_rank1.png"
         if not cv2.imwrite(str(orientation_path), orientation_image):
             raise RuntimeError(f"Failed to write {orientation_path}")
         if not cv2.imwrite(str(fused_path), fused_image):
             raise RuntimeError(f"Failed to write {fused_path}")
+        if not cv2.imwrite(str(planner_selected_path), planner_selected_image):
+            raise RuntimeError(f"Failed to write {planner_selected_path}")
 
         summary.append(
             {
@@ -1370,6 +1487,9 @@ def main() -> None:
                 },
                 "orientation_image": str(orientation_path),
                 "fused_image": str(fused_path),
+                "planner_selected_image": str(planner_selected_path),
+                "planner_selected_candidate_group": "orientation",
+                "planner_selected_top_rank": 1,
                 "top_k": int(args.top_k),
                 "score_weights": {
                     "anygrasp": float(args.anygrasp_score_weight),
