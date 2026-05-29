@@ -470,3 +470,30 @@ Validation record:
 - `bash -n code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh` passed.
 - `bash -n code_painting/run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh` passed.
 - A no-viewer `stack_cups id0 --debug_stop_after_keyframe1` smoke run completed and generated `head_cam_plan.mp4` / `third_cam_plan.mp4`; `plan_summary.json` records `candidate_target_local_z_offset_m=-0.05` and `approach_axis=local_z`, with both arms reaching keyframe-1 grasp.
+
+## L15.19 Design Note: Unify Gripper/Robot Frames During Candidate Filtering
+
+`COMMAND_LIBRARY.zh.md` now has L15.19 at the end. It records the design analysis and the current comparison command only; no code was changed. The older L15.18 `swap_red_blue + local_z` command remains available.
+
+Core analysis:
+
+- Viewer axis colors are still red = local +X, green = local +Y, blue = local +Z.
+- Blue/orange grippers in rank previews are left/right or candidate actor colors, not axis colors; orange usually means the right-hand gripper/candidate.
+- In the raw AnyGrasp C-shaped gripper frame, local +X is the in-plane palm-to-fingertip direction, local +Y is opening width, and local +Z is the side normal of the C plane.
+- A long-term fix should convert the raw AnyGrasp frame into a canonical robot/replay frame during candidate filtering, instead of relying only on planner-stage remapping.
+
+Recommended long-term frame:
+
+```text
+robot/replay target local +Z = AnyGrasp raw local +X
+robot/replay target local +Y = AnyGrasp raw local +Y
+robot/replay target local +X = -AnyGrasp raw local +Z
+```
+
+After that change, the blue axis still means local +Z; orange is still only the right-hand C-gripper color; the right-hand orange C-gripper fingertip direction should align with the robot target blue local +Z axis.
+
+The current L15.19 comparison command still uses the L15.18 wrapper and only changes the output root to:
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer_gripper
+```

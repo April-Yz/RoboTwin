@@ -2327,3 +2327,14 @@
   - `bash -n code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh` 通过。
   - `bash -n code_painting/run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh` 通过。
   - `run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh --tasks stack_cups --ids 0 --debug_stop_after_keyframe1 ...` 无 viewer 实测通过，输出到 `/tmp/stack_cups_id0_replay_axes_check/stack_cups/foundation_input_0`；`plan_summary.json` 记录 `candidate_target_local_z_offset_m=-0.05`、`approach_axis=local_z`，并生成 VSCode 兼容 `head_cam_plan.mp4` / `third_cam_plan.mp4`。该调试 run 中 keyframe1 grasp 左右手均 reached。
+
+## 2026-05-29（L15.19 筛选阶段统一 gripper/robot frame 设计记录）
+
+- 按用户要求仅更新文档，不修改代码。
+- `COMMAND_LIBRARY.zh.md` 末尾新增 L15.19：
+  - 记录为什么应在候选筛选阶段统一 AnyGrasp gripper frame 与 robot/replay frame。
+  - 明确 viewer 坐标轴颜色仍是红/绿/蓝对应 local +X/+Y/+Z。
+  - 明确 rank preview 中橙色是右手/candidate gripper 颜色，不是坐标轴颜色。
+  - 记录长期推荐 frame：`robot local +Z = AnyGrasp raw local +X`，`robot local +Y = AnyGrasp raw local +Y`，`robot local +X = -AnyGrasp raw local +Z`。
+  - 增加当前可运行对照命令，输出到 `/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer_gripper`。
+- 同步更新 `agent-read/COMMANDS/piper_anygrasp_keyframes.zh.md` / `.en.md`。

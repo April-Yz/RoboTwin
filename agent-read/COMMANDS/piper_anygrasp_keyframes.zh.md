@@ -470,3 +470,30 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_pipe
 - `bash -n code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh` 通过。
 - `bash -n code_painting/run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh` 通过。
 - 无 viewer 实测 `stack_cups id0 --debug_stop_after_keyframe1` 可运行并生成 `head_cam_plan.mp4` / `third_cam_plan.mp4`；`plan_summary.json` 中记录 `candidate_target_local_z_offset_m=-0.05`、`approach_axis=local_z`，keyframe1 grasp 左右手均 reached。
+
+## L15.19 筛选阶段统一 gripper/robot frame 的设计记录
+
+`COMMAND_LIBRARY.zh.md` 末尾新增 L15.19，只记录分析和当前对照命令，不修改代码。L15.18 的 `swap_red_blue + local_z` 旧指令保留。
+
+核心分析：
+
+- viewer 坐标轴颜色仍是红色 local +X、绿色 local +Y、蓝色 local +Z。
+- rank preview 中蓝色/橙色 gripper 是左右手/候选 actor 颜色，不是坐标轴颜色；橙色通常表示右手 gripper/candidate。
+- AnyGrasp C 形 gripper 的 raw local +X 是 C 平面内掌根到指尖方向，raw local +Y 是开合宽度，raw local +Z 是 C 平面侧向法线。
+- 如果要长期解决 gripper 可视化方向和 robot target 方向不一致，应在候选筛选阶段就把 AnyGrasp raw frame 转成 canonical robot/replay frame，而不是只在 planner 执行阶段 remap。
+
+建议的长期 frame：
+
+```text
+robot/replay target local +Z = AnyGrasp raw local +X
+robot/replay target local +Y = AnyGrasp raw local +Y
+robot/replay target local +X = -AnyGrasp raw local +Z
+```
+
+按该逻辑实现后，蓝色轴仍表示 local +Z；橙色仍只是右手 C gripper 颜色；右手橙色 C gripper 的指尖方向应与 robot target 蓝色 local +Z 对齐。
+
+L15.19 当前对照命令仍使用 L15.18 wrapper，只把结果保存到：
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer_gripper
+```

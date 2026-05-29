@@ -2329,3 +2329,14 @@
   - `bash -n code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh` passed.
   - `bash -n code_painting/run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh` passed.
   - A no-viewer `run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh --tasks stack_cups --ids 0 --debug_stop_after_keyframe1 ...` smoke run completed under `/tmp/stack_cups_id0_replay_axes_check/stack_cups/foundation_input_0`; `plan_summary.json` records `candidate_target_local_z_offset_m=-0.05` and `approach_axis=local_z`, and VSCode-compatible `head_cam_plan.mp4` / `third_cam_plan.mp4` were generated. In this debug run, both arms reached keyframe-1 grasp.
+
+## 2026-05-29 (L15.19 Candidate-Stage Gripper/Robot Frame Unification Design Note)
+
+- Documentation-only update as requested; no code was changed.
+- Added L15.19 to the end of `COMMAND_LIBRARY.zh.md`:
+  - Records why AnyGrasp gripper frame and robot/replay frame should be unified during candidate filtering.
+  - Clarifies that viewer axis colors remain red/green/blue for local +X/+Y/+Z.
+  - Clarifies that orange in rank previews is the right-hand/candidate gripper color, not an axis color.
+  - Records the long-term recommended frame: `robot local +Z = AnyGrasp raw local +X`, `robot local +Y = AnyGrasp raw local +Y`, and `robot local +X = -AnyGrasp raw local +Z`.
+  - Adds the current runnable comparison command that writes to `/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer_gripper`.
+- Updated `agent-read/COMMANDS/piper_anygrasp_keyframes.zh.md` / `.en.md`.

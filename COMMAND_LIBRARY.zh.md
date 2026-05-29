@@ -4280,3 +4280,67 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_pipe
 ```bash
 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh --gpu 2 --tasks stack_cups --id_start 0 --id_end 10 --continue_on_error --viewer --visualize_targets --disable_execution_collisions --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --viewer_wait_at_end 0 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/stack_cups_id0_10_viewer
 ```
+
+### L15.19 设计记录：在候选筛选阶段统一 AnyGrasp gripper 与 robot gripper 轴
+
+状态：本节只记录分析和对照运行命令，暂不修改代码。L15.18 的旧 `swap_red_blue + local_z` 指令保留。
+
+目标问题：
+
+- direct replay 的 hand/gripper frame 中，`local +Z` 是 robot/replay 的 approach/forward 轴；viewer 坐标轴颜色仍是标准定义：红色 = local +X，绿色 = local +Y，蓝色 = local +Z。
+- AnyGrasp 的 C 形 gripper 可视化中，C 平面内“掌根到指尖”的方向来自 AnyGrasp raw `rotation_matrix[:, 0]`，也就是 raw local +X；开合宽度是 raw local +Y；C 平面的侧向法线是 raw local +Z。
+- rank preview 中“蓝色/橙色 gripper”不是坐标轴颜色，而是左右手/候选 actor 颜色：通常蓝色表示 left，橙色表示 right。因此“橙色 C gripper”不等于“橙色轴”。
+
+如果要从筛选阶段就让 gripper 朝向和 robot 朝向一致，推荐的长期逻辑是：
+
+1. 在 `render_anygrasp_ranked_preview.py` 生成候选和写 `summary.json` 时，引入一个 canonical robot/replay gripper frame。
+2. 把 AnyGrasp raw candidate rotation 转成 robot/replay frame 后再参与筛选、保存 summary、输出 preview：
+
+```text
+robot/replay target local +Z = AnyGrasp raw local +X   # C gripper 指尖/前进方向
+robot/replay target local +Y = AnyGrasp raw local +Y   # gripper 开合宽度
+robot/replay target local +X = -AnyGrasp raw local +Z  # 保持右手系
+```
+
+3. hand reference 的 rotation 也必须在同一个 canonical frame 下计算 orientation distance。也就是说 `align_hand_rotation_to_candidate_convention()`、`build_candidates_for_arm()`、`build_score_ranked_candidates_for_arm()` 不能一边用 raw AnyGrasp frame、一边用 robot frame。
+4. planner 复用 D435 preview summary 时，应直接读取 canonical robot/replay target pose；此时执行阶段使用：
+
+```text
+--candidate_orientation_remap_label identity
+--candidate_target_local_x_offset_m 0.0
+--candidate_target_local_z_offset_m -0.05
+--approach_axis local_z
+```
+
+5. 同时要改 C 形 gripper 的可视化 actor 或 visual-only transform。因为当前 C gripper actor 的几何默认 local +X 是指尖方向；如果 target pose 改为 local +Z 是 robot 前进方向，而 actor 几何不改，就会出现“蓝轴对了但 C 形夹爪仍横着”的视觉错位。改完后应满足：
+
+```text
+viewer 蓝轴 = target local +Z = robot/replay approach
+C 形 gripper 指尖方向 = viewer 蓝轴方向
+```
+
+因此，按这套长期逻辑修改后：
+
+- 蓝色轴仍然表示 local +Z。
+- rank preview 中橙色仍然只是右手 gripper/candidate 的颜色，不表示轴。
+- 如果右手候选是橙色 C gripper，那么“橙色 C gripper 的指尖方向”应与 robot target 蓝色 local +Z 对齐。
+- 也就是说，不是“橙色轴和蓝轴对齐”，而是“橙色 C gripper 这个物体的前进方向与蓝色 local +Z 轴对齐”。
+
+与 L15.18 当前有问题/待确认指令的区别：
+
+- L15.18 是执行阶段 remap：候选筛选和 preview summary 仍主要来自 AnyGrasp raw/C-gripper frame，然后 planner wrapper 再用 `swap_red_blue + local_z` 把 raw local +X 映射到 target local +Z。
+- L15.18 因为筛选、summary、rank preview、planner target、C gripper actor 不是同一套 canonical robot frame，容易出现“robot 蓝轴”和“C gripper 可视化方向/侧面法线”的解释不一致。
+- L15.19 设计的长期版本是筛选阶段统一：summary 里保存的候选、orientation ranking 使用的候选、planner 执行 target、viewer target 轴、C gripper actor 都使用同一套 robot/replay frame。这样才不会在执行阶段靠 remap 补救。
+
+当前可运行对照命令：仍使用 L15.18 现有 wrapper，仅把输出放到新的 `viewer_gripper` 目录，用于和旧 `/viewer` 输出分开保存。注意：这条命令还不是“筛选阶段统一 frame”的实现，只是保留当前 replay-axis 路径的对照输出。
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --viewer --tasks pick_diverse_bottles --visualize_targets --disable_execution_collisions --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --viewer_wait_at_end 0 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer_gripper
+```
+
+如果后续实现筛选阶段统一 frame，建议新建独立 preview/output 根目录，避免覆盖现有 D435 summary：
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview_d435_robot_frame/
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_robot_frame/
+```

@@ -1718,3 +1718,14 @@
   - `--approach_axis local_z`
   - `--approach_offset_m 0.12`
 - L15.18 已写入六任务前 5 个 no-viewer 命令、viewer 命令，以及 `stack_cups id0-10` 小范围 viewer 调试命令。
+
+## 2026-05-29（L15.19 筛选阶段 frame 统一设计命令）
+
+- `COMMAND_LIBRARY.zh.md` 新增 L15.19。
+- 记录长期设计：
+  - 在 `render_anygrasp_ranked_preview.py` 候选筛选阶段统一 AnyGrasp raw frame 与 robot/replay frame。
+  - 目标 frame 为 `robot local +Z = AnyGrasp raw local +X`、`robot local +Y = AnyGrasp raw local +Y`、`robot local +X = -AnyGrasp raw local +Z`。
+- 新增当前可运行对照命令：
+  - 入口仍为 `run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh`。
+  - 输出根目录改为 `/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer_gripper`。
+- 说明：该命令目前仍使用 L15.18 wrapper，不代表筛选阶段统一 frame 已实现。

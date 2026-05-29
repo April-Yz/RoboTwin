@@ -1720,3 +1720,14 @@
   - `--approach_axis local_z`
   - `--approach_offset_m 0.12`
 - L15.18 now contains six-task first-five no-viewer commands, viewer commands, and a `stack_cups id0-10` small-range viewer debug command.
+
+## 2026-05-29 (L15.19 Candidate-Stage Frame-Unification Design Command)
+
+- Added L15.19 to `COMMAND_LIBRARY.zh.md`.
+- Records the long-term design:
+  - Unify the raw AnyGrasp frame with the robot/replay frame during candidate filtering in `render_anygrasp_ranked_preview.py`.
+  - Target frame: `robot local +Z = AnyGrasp raw local +X`, `robot local +Y = AnyGrasp raw local +Y`, and `robot local +X = -AnyGrasp raw local +Z`.
+- Added the current runnable comparison command:
+  - Entry point remains `run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh`.
+  - Output root is `/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer_gripper`.
+- Note: this command still uses the L15.18 wrapper; it does not mean candidate-stage frame unification has been implemented.
