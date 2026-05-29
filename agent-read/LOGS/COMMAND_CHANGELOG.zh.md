@@ -1729,3 +1729,16 @@
   - 入口仍为 `run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh`。
   - 输出根目录改为 `/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer_gripper`。
 - 说明：该命令目前仍使用 L15.18 wrapper，不代表筛选阶段统一 frame 已实现。
+
+## 2026-05-29（L15.19.1 robot-frame preview/planner 命令）
+
+- 新增 robot-frame preview 生成命令入口：
+  - `run_render_anygrasp_ranked_preview_keyframes_d435_robot_frame_six_tasks.sh`
+- 新增 robot-frame planner 命令入口：
+  - `run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh`
+- 新增关键参数：
+  - `--candidate_frame_mode robot_replay`
+  - `--candidate_target_local_z_offset_m`
+  - `--preview_root`
+  - `--debug_gripper_actor_forward_axis local_z`
+- 输出：planner viewer 结果写入 `/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer_gripper`。

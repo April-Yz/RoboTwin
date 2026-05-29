@@ -2338,3 +2338,23 @@
   - 记录长期推荐 frame：`robot local +Z = AnyGrasp raw local +X`，`robot local +Y = AnyGrasp raw local +Y`，`robot local +X = -AnyGrasp raw local +Z`。
   - 增加当前可运行对照命令，输出到 `/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer_gripper`。
 - 同步更新 `agent-read/COMMANDS/piper_anygrasp_keyframes.zh.md` / `.en.md`。
+
+## 2026-05-29（实现 L15.19 robot-frame preview 与 planner 路径）
+
+- 代码实现：
+  - `render_anygrasp_ranked_preview.py` 新增 `--candidate_frame_mode robot_replay` 和 `--candidate_target_local_z_offset_m`。
+  - robot-frame candidate rotation 保存为 `target local +Z = AnyGrasp raw local +X`、`target local +Y = AnyGrasp raw local +Y`、`target local +X = -AnyGrasp raw local +Z`。
+  - 2D preview 的 C 形 gripper wireframe 支持 local-Z 作为指尖方向。
+  - `plan_anygrasp_keyframes_r1.py` 新增 `--debug_gripper_actor_forward_axis local_z`，用于 viewer/rank preview 中把 C gripper actor 沿蓝色 local +Z 画出指尖方向。
+  - `run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh` 新增 `--preview_root` 和 `--debug_gripper_actor_forward_axis` 透传。
+- 新增脚本：
+  - `code_painting/run_render_anygrasp_ranked_preview_keyframes_d435_robot_frame_six_tasks.sh`
+  - `code_painting/run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh`
+- 文档：
+  - `COMMAND_LIBRARY.zh.md` 新增 L15.19.1，记录生成 robot-frame preview 与 viewer_gripper planner 的运行命令。
+  - `agent-read/COMMANDS/piper_anygrasp_keyframes.zh.md` / `.en.md` 同步命令。
+- 验证：
+  - `python3 -m py_compile code_painting/render_anygrasp_ranked_preview.py code_painting/plan_anygrasp_keyframes_r1.py` 通过。
+  - `bash -n code_painting/run_render_anygrasp_ranked_preview_keyframes_d435_robot_frame_six_tasks.sh`、`bash -n code_painting/run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh`、`bash -n code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh` 均通过。
+  - `run_render_anygrasp_ranked_preview_keyframes_d435_robot_frame_six_tasks.sh --tasks pick_diverse_bottles --ids 0` 实测生成 robot-frame summary，`summary.json` 记录 `candidate_frame_mode=robot_replay`、`candidate_target_local_z_offset_m=-0.05`。
+  - `run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh --tasks pick_diverse_bottles --ids 0 --debug_stop_after_keyframe1 ...` 无 viewer smoke run 成功生成 `head_cam_plan.mp4` / `third_cam_plan.mp4`。该调试 run 验证新路径可执行；右手仍未完全 reach，说明后续仍需继续调 IK/候选可达性，而不是入口或 frame 写入失败。

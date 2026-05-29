@@ -301,6 +301,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--pure_scene_output", type=int, default=0, help="If 1, keep head/third output videos clean: no overlay text, no candidate grippers, and no target-axis visualization. Also skip debug_selection_preview.mp4, keep head/left_wrist/right_wrist plan videos, and auto-save pose_debug.jsonl.")
     parser.add_argument("--debug_visualize_targets", type=int, default=1, help="If 1, show target axis actors. Original internal name: debug_visualize_targets.")
     parser.add_argument("--debug_visualize_ik_waypoints", type=int, default=0, help="If 1, visualize intermediate URDF IK Cartesian waypoints as point+forward-axis markers in viewer/debug output.")
+    parser.add_argument("--debug_gripper_actor_forward_axis", choices=["local_x", "local_z"], default="local_x", help="Visual-only C-gripper actor forward axis. Use local_z for robot/replay-frame summaries where blue local +Z is the approach axis.")
     parser.add_argument("--debug_visualize_cameras", type=int, default=0, help="If 1, draw calibrated camera axes/frustums in rendered debug outputs.")
     parser.add_argument("--debug_camera_axis_length", type=float, default=0.16)
     parser.add_argument("--debug_camera_axis_thickness", type=float, default=0.006)
@@ -2304,15 +2305,22 @@ def create_gripper_candidate_actor(
     marker_side: str = "none",
     scale: float = 1.0,
     opening_width_m: float = 0.04,
+    forward_axis: str = "local_x",
 ) -> sapien.Entity:
     builder = scene.create_actor_builder()
     scale = float(scale)
-    body_half = [0.008 * scale, 0.026 * scale, 0.004 * scale]
-    finger_half = [0.018 * scale, 0.0035 * scale, 0.0035 * scale]
+    forward_is_z = str(forward_axis) == "local_z"
+    body_half = [0.004 * scale, 0.026 * scale, 0.008 * scale] if forward_is_z else [0.008 * scale, 0.026 * scale, 0.004 * scale]
+    finger_half = [0.0035 * scale, 0.0035 * scale, 0.018 * scale] if forward_is_z else [0.018 * scale, 0.0035 * scale, 0.0035 * scale]
     finger_gap = float(np.clip(opening_width_m, 0.0, 0.12)) * 0.5 + finger_half[1]
-    builder.add_box_visual(pose=sapien.Pose([-0.012 * scale, 0.0, 0.0]), half_size=body_half, material=list(color))
-    builder.add_box_visual(pose=sapien.Pose([0.012 * scale, finger_gap, 0.0]), half_size=finger_half, material=list(color))
-    builder.add_box_visual(pose=sapien.Pose([0.012 * scale, -finger_gap, 0.0]), half_size=finger_half, material=list(color))
+    if forward_is_z:
+        builder.add_box_visual(pose=sapien.Pose([0.0, 0.0, -0.012 * scale]), half_size=body_half, material=list(color))
+        builder.add_box_visual(pose=sapien.Pose([0.0, finger_gap, 0.012 * scale]), half_size=finger_half, material=list(color))
+        builder.add_box_visual(pose=sapien.Pose([0.0, -finger_gap, 0.012 * scale]), half_size=finger_half, material=list(color))
+    else:
+        builder.add_box_visual(pose=sapien.Pose([-0.012 * scale, 0.0, 0.0]), half_size=body_half, material=list(color))
+        builder.add_box_visual(pose=sapien.Pose([0.012 * scale, finger_gap, 0.0]), half_size=finger_half, material=list(color))
+        builder.add_box_visual(pose=sapien.Pose([0.012 * scale, -finger_gap, 0.0]), half_size=finger_half, material=list(color))
     marker_color = [0.05, 0.05, 0.05]
     if marker_side == "left":
         builder.add_box_visual(pose=sapien.Pose([0.0, 0.0, 0.012]), half_size=[0.004, 0.004, 0.002], material=marker_color)
@@ -2500,6 +2508,7 @@ def create_debug_visual_bundle(
                 marker_side="none",
                 scale=0.82,
                 opening_width_m=float(_cand.width_m),
+                forward_axis=str(args.debug_gripper_actor_forward_axis),
             )
             for rank, _cand in enumerate(common_candidates_per_frame.get(int(frame), []))
         ]
@@ -2525,6 +2534,7 @@ def create_debug_visual_bundle(
                         marker_side="none",
                         scale=1.65 if cand.candidate_idx == selected_idx else 1.0,
                         opening_width_m=float(cand.width_m),
+                        forward_axis=str(args.debug_gripper_actor_forward_axis),
                     )
                 )
                 axis_actors.append(
@@ -4438,6 +4448,7 @@ def export_rank_preview_images(
             color=[0.1, 0.45, 1.0],
             scale=1.35,
             opening_width_m=0.04,
+            forward_axis=str(args.debug_gripper_actor_forward_axis),
         ),
         "right": create_gripper_candidate_actor(
             renderer.scene,
@@ -4445,6 +4456,7 @@ def export_rank_preview_images(
             color=[1.0, 0.55, 0.0],
             scale=1.35,
             opening_width_m=0.04,
+            forward_axis=str(args.debug_gripper_actor_forward_axis),
         ),
     }
     selected_map = {int(item.source_frame): (item.arm, int(item.candidate.candidate_idx)) for item in selected_keyframes}
@@ -5913,6 +5925,7 @@ def main() -> None:
         "candidate_target_local_x_offset_m": float(args.candidate_target_local_x_offset_m),
         "candidate_target_local_z_offset_m": float(args.candidate_target_local_z_offset_m),
         "approach_axis": str(args.approach_axis),
+        "debug_gripper_actor_forward_axis": str(args.debug_gripper_actor_forward_axis),
         "enable_grasp_action_object_collision": int(args.enable_grasp_action_object_collision),
         "grasp_action_object_collision_start_stage": str(args.grasp_action_object_collision_start_stage),
         "disable_table": int(args.disable_table),

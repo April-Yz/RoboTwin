@@ -4344,3 +4344,79 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_pipe
 /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview_d435_robot_frame/
 /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_robot_frame/
 ```
+
+#### L15.19.1 已实现入口：robot-frame preview + viewer_gripper planner
+
+本轮已把 L15.19 的长期逻辑做成显式新路径，旧 L15.18 不变。
+
+新增代码入口：
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/run_render_anygrasp_ranked_preview_keyframes_d435_robot_frame_six_tasks.sh
+/home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh
+```
+
+实现含义：
+
+- preview 阶段新增 `--candidate_frame_mode robot_replay`。
+- robot-frame summary 中保存的 candidate rotation 满足：
+
+```text
+target local +Z = AnyGrasp raw local +X
+target local +Y = AnyGrasp raw local +Y
+target local +X = -AnyGrasp raw local +Z
+```
+
+- preview 阶段新增 `--candidate_target_local_z_offset_m`，可视化和 summary target 均按 local +Z 表示 robot approach。
+- planner viewer 的 C 形 gripper actor 新增 `--debug_gripper_actor_forward_axis local_z`，让 C 形 gripper 的指尖方向沿 target 蓝色 local +Z 画出来。
+- planner 阶段使用 `identity + local_z`，不再需要执行阶段 `swap_red_blue`：
+
+```text
+--candidate_orientation_remap_label identity
+--candidate_target_local_x_offset_m 0.0
+--candidate_target_local_z_offset_m -0.05
+--approach_axis local_z
+--debug_gripper_actor_forward_axis local_z
+```
+
+第一步：生成 robot-frame D435 AnyGrasp keyframe preview summary。先建议跑单任务/少量 id 检查：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_render_anygrasp_ranked_preview_keyframes_d435_robot_frame_six_tasks.sh --gpu 2 --tasks pick_diverse_bottles --ids 0
+```
+
+六任务生成 robot-frame preview summary：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_render_anygrasp_ranked_preview_keyframes_d435_robot_frame_six_tasks.sh --gpu 2
+```
+
+输出根目录：
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview_d435_robot_frame
+```
+
+第二步：使用 robot-frame summary 运行 viewer_gripper planner。单任务前 5 个：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --viewer --tasks pick_diverse_bottles --visualize_targets --disable_execution_collisions --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --viewer_wait_at_end 0 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer_gripper
+```
+
+六任务分别跑前 5 个 viewer_gripper：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --viewer --tasks pick_diverse_bottles --visualize_targets --disable_execution_collisions --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --viewer_wait_at_end 0 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer_gripper
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --viewer --tasks place_bread_basket --visualize_targets --disable_execution_collisions --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --viewer_wait_at_end 0 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer_gripper
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --viewer --tasks stack_cups --visualize_targets --disable_execution_collisions --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --viewer_wait_at_end 0 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer_gripper
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --viewer --tasks handover_bottle --visualize_targets --disable_execution_collisions --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --viewer_wait_at_end 0 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer_gripper
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --viewer --tasks pnp_bread --visualize_targets --disable_execution_collisions --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --viewer_wait_at_end 0 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer_gripper
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --viewer --tasks pnp_tray --visualize_targets --disable_execution_collisions --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --viewer_wait_at_end 0 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer_gripper
+```
+
+和 L15.18 的关键区别：
+
+- L15.18：preview summary 仍是 raw AnyGrasp frame，planner 执行阶段再 `swap_red_blue + local_z`。
+- L15.19.1：preview summary 生成时就写 robot/replay frame，planner 只做 `identity + local_z`。
+- L15.18 的 C gripper actor 仍可能按 local +X 画，容易和蓝轴解释不一致。
+- L15.19.1 的 planner actor 用 `--debug_gripper_actor_forward_axis local_z`，因此橙色/蓝色 C gripper 的指尖方向应与 viewer 蓝色 local +Z 轴对齐。

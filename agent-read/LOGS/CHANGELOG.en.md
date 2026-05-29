@@ -2340,3 +2340,23 @@
   - Records the long-term recommended frame: `robot local +Z = AnyGrasp raw local +X`, `robot local +Y = AnyGrasp raw local +Y`, and `robot local +X = -AnyGrasp raw local +Z`.
   - Adds the current runnable comparison command that writes to `/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer_gripper`.
 - Updated `agent-read/COMMANDS/piper_anygrasp_keyframes.zh.md` / `.en.md`.
+
+## 2026-05-29 (Implemented L15.19 Robot-Frame Preview And Planner Path)
+
+- Code changes:
+  - `render_anygrasp_ranked_preview.py` now supports `--candidate_frame_mode robot_replay` and `--candidate_target_local_z_offset_m`.
+  - Robot-frame candidate rotations are saved as `target local +Z = AnyGrasp raw local +X`, `target local +Y = AnyGrasp raw local +Y`, and `target local +X = -AnyGrasp raw local +Z`.
+  - 2D preview C-shaped gripper wireframes can use local Z as the fingertip direction.
+  - `plan_anygrasp_keyframes_r1.py` adds `--debug_gripper_actor_forward_axis local_z` so viewer/rank-preview C-gripper actors draw their fingertip direction along blue local +Z.
+  - `run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh` adds `--preview_root` and `--debug_gripper_actor_forward_axis` passthroughs.
+- New scripts:
+  - `code_painting/run_render_anygrasp_ranked_preview_keyframes_d435_robot_frame_six_tasks.sh`
+  - `code_painting/run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh`
+- Documentation:
+  - `COMMAND_LIBRARY.zh.md` now includes L15.19.1 with robot-frame preview generation and viewer_gripper planner commands.
+  - `agent-read/COMMANDS/piper_anygrasp_keyframes.zh.md` / `.en.md` were updated with the same command flow.
+- Validation:
+  - `python3 -m py_compile code_painting/render_anygrasp_ranked_preview.py code_painting/plan_anygrasp_keyframes_r1.py` passed.
+  - `bash -n code_painting/run_render_anygrasp_ranked_preview_keyframes_d435_robot_frame_six_tasks.sh`, `bash -n code_painting/run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh`, and `bash -n code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh` passed.
+  - `run_render_anygrasp_ranked_preview_keyframes_d435_robot_frame_six_tasks.sh --tasks pick_diverse_bottles --ids 0` generated a robot-frame summary; `summary.json` records `candidate_frame_mode=robot_replay` and `candidate_target_local_z_offset_m=-0.05`.
+  - A no-viewer `run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh --tasks pick_diverse_bottles --ids 0 --debug_stop_after_keyframe1 ...` smoke run generated `head_cam_plan.mp4` / `third_cam_plan.mp4`. The smoke run confirms the new path executes; the right arm still did not fully reach, so remaining work is IK/candidate reachability tuning rather than entrypoint or frame serialization failure.

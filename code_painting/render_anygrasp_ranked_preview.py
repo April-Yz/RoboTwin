@@ -114,7 +114,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--draw_hand_reference", type=int, default=1, help="If 1, overlay the reference human-hand gripper pose using a distinct color.")
     parser.add_argument("--debug_dump_object_distances", type=int, default=0, help="If 1, dump per-candidate distances to every visible object in staged mode.")
     parser.add_argument("--camera_cv_axis_mode", choices=sorted(CV_TO_WORLD_CAMERA_PRESETS.keys()), default="legacy_r1")
+    parser.add_argument(
+        "--candidate_frame_mode",
+        choices=["anygrasp_raw", "robot_replay"],
+        default="anygrasp_raw",
+        help="Frame convention saved into summary candidates. anygrasp_raw keeps legacy AnyGrasp local +X as C-gripper forward. robot_replay maps AnyGrasp raw +X to target local +Z so the blue axis is the robot/replay approach axis.",
+    )
     parser.add_argument("--candidate_target_local_x_offset_m", type=float, default=0.0)
+    parser.add_argument("--candidate_target_local_z_offset_m", type=float, default=0.0)
     parser.add_argument("--candidate_post_rot_xyz_deg", type=float, nargs=3, default=[0.0, 0.0, 0.0])
     parser.add_argument("--candidate_orientation_remap_label", type=str, default="identity")
     parser.add_argument(
@@ -424,6 +431,30 @@ def resolve_orientation_remap(label: str) -> np.ndarray:
     )
 
 
+def candidate_frame_matrix(frame_mode: str) -> np.ndarray:
+    mode = str(frame_mode)
+    if mode == "anygrasp_raw":
+        return np.eye(3, dtype=np.float64)
+    if mode == "robot_replay":
+        # Target robot/replay frame expressed in raw AnyGrasp local axes:
+        #   target +X = raw -Z
+        #   target +Y = raw +Y
+        #   target +Z = raw +X
+        return np.array(
+            [
+                [0.0, 0.0, 1.0],
+                [0.0, 1.0, 0.0],
+                [-1.0, 0.0, 0.0],
+            ],
+            dtype=np.float64,
+        )
+    raise ValueError(f"Unsupported candidate_frame_mode: {frame_mode}")
+
+
+def gripper_visual_forward_axis(frame_mode: str) -> str:
+    return "local_z" if str(frame_mode) == "robot_replay" else "local_x"
+
+
 def camera_cv_rotation(camera_cv_axis_mode: str) -> np.ndarray:
     return np.asarray(CV_TO_WORLD_CAMERA_PRESETS[str(camera_cv_axis_mode)], dtype=np.float64).reshape(3, 3)
 
@@ -442,7 +473,9 @@ def camera_pose_to_world_pose(
     camera_cv_axis_mode: str,
     candidate_post_rot_matrix: np.ndarray,
     candidate_orientation_remap_matrix: np.ndarray,
+    candidate_frame_matrix: np.ndarray,
     candidate_target_local_x_offset_m: float,
+    candidate_target_local_z_offset_m: float,
 ) -> Tuple[np.ndarray, np.ndarray]:
     translation_cam = np.asarray(translation_cam, dtype=np.float64).reshape(3)
     rotation_cam = np.asarray(rotation_cam, dtype=np.float64).reshape(3, 3)
@@ -450,12 +483,17 @@ def camera_pose_to_world_pose(
     rot_world_from_head = np.asarray(camera_world[:3, :3], dtype=np.float64)
     cam_cv_to_local = camera_cv_rotation(camera_cv_axis_mode)
     remapped_rotation = orthonormalize_rotation(
-        orthonormalize_rotation(rotation_cam) @ np.asarray(candidate_post_rot_matrix, dtype=np.float64).reshape(3, 3) @ np.asarray(candidate_orientation_remap_matrix, dtype=np.float64).reshape(3, 3)
+        orthonormalize_rotation(rotation_cam)
+        @ np.asarray(candidate_post_rot_matrix, dtype=np.float64).reshape(3, 3)
+        @ np.asarray(candidate_orientation_remap_matrix, dtype=np.float64).reshape(3, 3)
+        @ np.asarray(candidate_frame_matrix, dtype=np.float64).reshape(3, 3)
     )
     pos_world = np.asarray(camera_world[:3, 3], dtype=np.float64) + rot_world_from_head @ (cam_cv_to_local @ translation_cam)
     rot_world = orthonormalize_rotation(rot_world_from_head @ cam_cv_to_local @ remapped_rotation)
     if abs(float(candidate_target_local_x_offset_m)) > 1e-12:
         pos_world = pos_world + rot_world[:, 0] * float(candidate_target_local_x_offset_m)
+    if abs(float(candidate_target_local_z_offset_m)) > 1e-12:
+        pos_world = pos_world + rot_world[:, 2] * float(candidate_target_local_z_offset_m)
     return pos_world.astype(np.float64), rot_world.astype(np.float64)
 
 
@@ -464,7 +502,9 @@ def candidate_pose_to_preview_visual_pose(
     rotation_cam: np.ndarray,
     candidate_post_rot_matrix: np.ndarray,
     candidate_orientation_remap_matrix: np.ndarray,
+    candidate_frame_matrix: np.ndarray,
     candidate_target_local_x_offset_m: float,
+    candidate_target_local_z_offset_m: float,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Return the camera-frame pose that the planner actually targets."""
     translation_cam = np.asarray(translation_cam, dtype=np.float64).reshape(3)
@@ -473,10 +513,13 @@ def candidate_pose_to_preview_visual_pose(
         orthonormalize_rotation(rotation_cam)
         @ np.asarray(candidate_post_rot_matrix, dtype=np.float64).reshape(3, 3)
         @ np.asarray(candidate_orientation_remap_matrix, dtype=np.float64).reshape(3, 3)
+        @ np.asarray(candidate_frame_matrix, dtype=np.float64).reshape(3, 3)
     )
     visual_translation = np.array(translation_cam, dtype=np.float64)
     if abs(float(candidate_target_local_x_offset_m)) > 1e-12:
         visual_translation = visual_translation + visual_rotation[:, 0] * float(candidate_target_local_x_offset_m)
+    if abs(float(candidate_target_local_z_offset_m)) > 1e-12:
+        visual_translation = visual_translation + visual_rotation[:, 2] * float(candidate_target_local_z_offset_m)
     return visual_translation.astype(np.float64), visual_rotation.astype(np.float64)
 
 
@@ -594,11 +637,14 @@ def draw_grasp_wireframe(
     depth_m: float,
     color: Tuple[int, int, int],
     thickness: int,
+    forward_axis: str = "local_x",
 ) -> None:
     translation = np.asarray(translation, dtype=np.float64).reshape(3)
     rotation_matrix = np.asarray(rotation_matrix, dtype=np.float64).reshape(3, 3)
     x_axis = rotation_matrix[:, 0]
     y_axis = rotation_matrix[:, 1]
+    z_axis = rotation_matrix[:, 2]
+    forward = z_axis if str(forward_axis) == "local_z" else x_axis
 
     grip_width = float(np.clip(width_m, 0.01, 0.12))
     grip_depth = float(np.clip(depth_m, 0.01, 0.08))
@@ -606,13 +652,13 @@ def draw_grasp_wireframe(
     finger_len = float(max(0.018, grip_depth))
 
     center = translation
-    back_center = center - x_axis * palm_back
+    back_center = center - forward * palm_back
     left_base = center + y_axis * (grip_width * 0.5)
     right_base = center - y_axis * (grip_width * 0.5)
     left_back = back_center + y_axis * (grip_width * 0.5)
     right_back = back_center - y_axis * (grip_width * 0.5)
-    left_tip = left_base + x_axis * finger_len
-    right_tip = right_base + x_axis * finger_len
+    left_tip = left_base + forward * finger_len
+    right_tip = right_base + forward * finger_len
 
     segments = [
         (left_back, right_back),
@@ -643,7 +689,9 @@ def build_object_partitioned_candidates(
     camera_cv_axis_mode: str,
     candidate_post_rot_matrix: np.ndarray,
     candidate_orientation_remap_matrix: np.ndarray,
+    candidate_frame_matrix: np.ndarray,
     candidate_target_local_x_offset_m: float,
+    candidate_target_local_z_offset_m: float,
 ) -> Tuple[List[SharedCandidateRecord], List[Dict[str, object]], Dict[str, int]]:
     all_candidates: List[SharedCandidateRecord] = []
     debug_records: List[Dict[str, object]] = []
@@ -656,7 +704,9 @@ def build_object_partitioned_candidates(
             rotation_cam=rotation_matrix,
             candidate_post_rot_matrix=candidate_post_rot_matrix,
             candidate_orientation_remap_matrix=candidate_orientation_remap_matrix,
+            candidate_frame_matrix=candidate_frame_matrix,
             candidate_target_local_x_offset_m=candidate_target_local_x_offset_m,
+            candidate_target_local_z_offset_m=candidate_target_local_z_offset_m,
         )
         translation_world, rotation_world = camera_pose_to_world_pose(
             translation_cam=translation,
@@ -665,7 +715,9 @@ def build_object_partitioned_candidates(
             camera_cv_axis_mode=camera_cv_axis_mode,
             candidate_post_rot_matrix=candidate_post_rot_matrix,
             candidate_orientation_remap_matrix=candidate_orientation_remap_matrix,
+            candidate_frame_matrix=candidate_frame_matrix,
             candidate_target_local_x_offset_m=candidate_target_local_x_offset_m,
+            candidate_target_local_z_offset_m=candidate_target_local_z_offset_m,
         )
         nearest_object, nearest_dist, distances_world = object_distances_world(
             candidate_world_position=translation_world,
@@ -675,7 +727,7 @@ def build_object_partitioned_candidates(
             candidate_idx=int(candidate_idx),
             anygrasp_score=float(grasp["score"]),
             translation=translation,
-            rotation_matrix=rotation_matrix,
+            rotation_matrix=visual_rotation_matrix,
             visual_translation=visual_translation,
             visual_rotation_matrix=visual_rotation_matrix,
             width=float(grasp.get("width", 0.0)),
@@ -753,6 +805,7 @@ def build_score_ranked_candidates_for_arm(
     arm_name: str,
     hand_data: Dict[str, np.ndarray],
     frame: int,
+    candidate_frame_mode: str = "anygrasp_raw",
 ) -> Tuple[List[CandidateRecord], int]:
     hand_valid = np.asarray(hand_data[f"{arm_name}_gripper_valid"], dtype=bool)
     hand_rotations = np.asarray(hand_data[f"{arm_name}_gripper_rotation_matrix"], dtype=np.float64)
@@ -760,7 +813,7 @@ def build_score_ranked_candidates_for_arm(
     if ref_frame is None:
         raise RuntimeError(f"No valid {arm_name} hand rotation exists for frame {frame}.")
     ref_rot_raw = np.asarray(hand_rotations[ref_frame], dtype=np.float64)
-    ref_rot = align_hand_rotation_to_candidate_convention(ref_rot_raw)
+    ref_rot = align_hand_rotation_to_candidate_convention(ref_rot_raw, candidate_frame_mode)
     ranked: List[CandidateRecord] = []
     for candidate_idx, grasp in enumerate(grasps):
         translation = np.asarray(grasp["translation"], dtype=np.float64).reshape(3)
@@ -792,8 +845,10 @@ def build_score_ranked_candidates_for_arm(
     return ranked, int(ref_frame)
 
 
-def align_hand_rotation_to_candidate_convention(rotation_matrix: np.ndarray) -> np.ndarray:
+def align_hand_rotation_to_candidate_convention(rotation_matrix: np.ndarray, candidate_frame_mode: str = "anygrasp_raw") -> np.ndarray:
     hand_rotation = np.asarray(rotation_matrix, dtype=np.float64).reshape(3, 3)
+    if str(candidate_frame_mode) == "robot_replay":
+        return orthonormalize_rotation(hand_rotation)
     return orthonormalize_rotation(
         np.column_stack(
             [
@@ -809,6 +864,7 @@ def resolve_hand_reference(
     hand_data: Dict[str, np.ndarray],
     arm_name: str,
     frame: int,
+    candidate_frame_mode: str = "anygrasp_raw",
 ) -> HandReference:
     hand_valid = np.asarray(hand_data[f"{arm_name}_gripper_valid"], dtype=bool)
     ref_frame = int(frame) if frame < hand_valid.shape[0] and bool(hand_valid[frame]) else nearest_valid_hand_frame(int(frame), hand_valid)
@@ -822,7 +878,7 @@ def resolve_hand_reference(
         ref_frame=int(ref_frame),
         position=position,
         rotation_matrix=rotation_matrix,
-        aligned_rotation_matrix=align_hand_rotation_to_candidate_convention(rotation_matrix),
+        aligned_rotation_matrix=align_hand_rotation_to_candidate_convention(rotation_matrix, candidate_frame_mode),
         finger_distance=finger_distance,
     )
 
@@ -832,6 +888,7 @@ def draw_hand_reference(
     camera_info: Dict,
     hand_reference: HandReference,
     color: Tuple[int, int, int],
+    forward_axis: str = "local_x",
 ) -> None:
     draw_grasp_wireframe(
         image=image,
@@ -842,6 +899,7 @@ def draw_hand_reference(
         depth_m=0.035,
         color=color,
         thickness=2,
+        forward_axis=forward_axis,
     )
     center_px = project_camera_point(np.asarray(hand_reference.position, dtype=np.float64).reshape(3), camera_info)
     if center_px is None:
@@ -875,6 +933,7 @@ def annotate_arm_preview(
     formula_lines: Sequence[str],
     warning_text: Optional[str],
     line_builder,
+    gripper_forward_axis: str = "local_x",
 ) -> np.ndarray:
     title = "LEFT" if arm_name == "left" else "RIGHT"
     box_color = (255, 100, 0) if arm_name == "left" else (0, 140, 255)
@@ -886,6 +945,7 @@ def annotate_arm_preview(
             camera_info=camera_info,
             hand_reference=hand_reference,
             color=hand_color,
+            forward_axis=gripper_forward_axis,
         )
     if warning_text:
         draw_warning_banner(image, str(warning_text))
@@ -918,6 +978,7 @@ def annotate_arm_preview(
                 depth_m=float(item.depth),
                 color=box_color,
                 thickness=int(box_thickness),
+                forward_axis=gripper_forward_axis,
             )
         pixel = project_camera_point(item.visual_translation, camera_info)
         if pixel is None:
@@ -1036,6 +1097,8 @@ def main() -> None:
         R.from_euler("xyz", np.deg2rad(np.asarray(args.candidate_post_rot_xyz_deg, dtype=np.float64).reshape(3))).as_matrix()
     )
     candidate_orientation_remap_matrix = resolve_orientation_remap(args.candidate_orientation_remap_label)
+    candidate_frame_remap_matrix = candidate_frame_matrix(args.candidate_frame_mode)
+    preview_gripper_forward_axis = gripper_visual_forward_axis(args.candidate_frame_mode)
 
     hand_data = load_hand_data(args.hand_npz)
     available_frames = list_available_grasp_frames(args.anygrasp_dir)
@@ -1079,13 +1142,13 @@ def main() -> None:
             height=int(camera_info["height"]),
             image_mode=str(args.base_image_mode),
         )
-        left_hand_reference = resolve_hand_reference(hand_data, "left", frame)
-        right_hand_reference = resolve_hand_reference(hand_data, "right", frame)
+        left_hand_reference = resolve_hand_reference(hand_data, "left", frame, str(args.candidate_frame_mode))
+        right_hand_reference = resolve_hand_reference(hand_data, "right", frame, str(args.candidate_frame_mode))
         left_hand_reference_overlay = left_hand_reference if bool(args.draw_hand_reference) else None
         right_hand_reference_overlay = right_hand_reference if bool(args.draw_hand_reference) else None
         if args.replay_dir is None:
-            left_score_ranked, left_ref_frame = build_score_ranked_candidates_for_arm(grasps, "left", hand_data, frame)
-            right_score_ranked, right_ref_frame = build_score_ranked_candidates_for_arm(grasps, "right", hand_data, frame)
+            left_score_ranked, left_ref_frame = build_score_ranked_candidates_for_arm(grasps, "left", hand_data, frame, str(args.candidate_frame_mode))
+            right_score_ranked, right_ref_frame = build_score_ranked_candidates_for_arm(grasps, "right", hand_data, frame, str(args.candidate_frame_mode))
             score_image = build_combined_image(
                 annotate_arm_preview(
                 base_image=base_image,
@@ -1106,6 +1169,7 @@ def main() -> None:
                     formula_lines=["score rank only"],
                     warning_text=None,
                     line_builder=score_line,
+                    gripper_forward_axis=preview_gripper_forward_axis,
                 ),
                 annotate_arm_preview(
                 base_image=base_image,
@@ -1126,6 +1190,7 @@ def main() -> None:
                     formula_lines=["score rank only"],
                     warning_text=None,
                     line_builder=score_line,
+                    gripper_forward_axis=preview_gripper_forward_axis,
                 ),
             )
             score_path = args.output_dir / f"frame_{frame:06d}_left_right_score_rank.png"
@@ -1166,7 +1231,9 @@ def main() -> None:
             camera_cv_axis_mode=str(args.camera_cv_axis_mode),
             candidate_post_rot_matrix=candidate_post_rot_matrix,
             candidate_orientation_remap_matrix=candidate_orientation_remap_matrix,
+            candidate_frame_matrix=candidate_frame_remap_matrix,
             candidate_target_local_x_offset_m=float(args.candidate_target_local_x_offset_m),
+            candidate_target_local_z_offset_m=float(args.candidate_target_local_z_offset_m),
         )
         left_object_filtered, left_ref_frame, left_target_count = build_candidates_for_arm(
             shared_candidates=shared_candidates,
@@ -1229,7 +1296,9 @@ def main() -> None:
                 "camera_pose_world_wxyz": np.asarray(camera_pose_world_wxyz, dtype=np.float64).tolist(),
                 "camera_pose_source": str(camera_pose_source),
                 "camera_cv_axis_mode": str(args.camera_cv_axis_mode),
+                "candidate_frame_mode": str(args.candidate_frame_mode),
                 "candidate_target_local_x_offset_m": float(args.candidate_target_local_x_offset_m),
+                "candidate_target_local_z_offset_m": float(args.candidate_target_local_z_offset_m),
                 "candidate_post_rot_xyz_deg": np.asarray(args.candidate_post_rot_xyz_deg, dtype=np.float64).reshape(3).tolist(),
                 "candidate_orientation_remap_label": str(args.candidate_orientation_remap_label),
                 "object_world_positions": {
@@ -1335,6 +1404,7 @@ def main() -> None:
                 formula_lines=orientation_formula_lines(float(args.max_rotation_distance_deg)),
                 warning_text=None if len(left_object_filtered) > 0 else f"NO LEFT CANDIDATE ({args.left_target_object})",
                 line_builder=orientation_line,
+                gripper_forward_axis=preview_gripper_forward_axis,
             ),
             annotate_arm_preview(
                 base_image=base_image,
@@ -1355,6 +1425,7 @@ def main() -> None:
                 formula_lines=orientation_formula_lines(float(args.max_rotation_distance_deg)),
                 warning_text=None if len(right_object_filtered) > 0 else f"NO RIGHT CANDIDATE ({args.right_target_object})",
                 line_builder=orientation_line,
+                gripper_forward_axis=preview_gripper_forward_axis,
             ),
         )
         fused_line = make_fused_line_builder(
@@ -1381,6 +1452,7 @@ def main() -> None:
                 formula_lines=fused_formula_lines(float(args.anygrasp_score_weight), float(args.orientation_score_weight), float(args.max_rotation_distance_deg)),
                 warning_text=None if len(left_object_filtered) > 0 else f"NO LEFT CANDIDATE ({args.left_target_object})",
                 line_builder=fused_line,
+                gripper_forward_axis=preview_gripper_forward_axis,
             ),
             annotate_arm_preview(
                 base_image=base_image,
@@ -1401,6 +1473,7 @@ def main() -> None:
                 formula_lines=fused_formula_lines(float(args.anygrasp_score_weight), float(args.orientation_score_weight), float(args.max_rotation_distance_deg)),
                 warning_text=None if len(right_object_filtered) > 0 else f"NO RIGHT CANDIDATE ({args.right_target_object})",
                 line_builder=fused_line,
+                gripper_forward_axis=preview_gripper_forward_axis,
             ),
         )
         planner_selected_image = build_combined_image(
@@ -1423,6 +1496,7 @@ def main() -> None:
                 formula_lines=["planner = orientation rank1", "matches reuse_preview_candidate_group=orientation"],
                 warning_text=None if len(left_object_filtered) > 0 else f"NO LEFT CANDIDATE ({args.left_target_object})",
                 line_builder=orientation_line,
+                gripper_forward_axis=preview_gripper_forward_axis,
             ),
             annotate_arm_preview(
                 base_image=base_image,
@@ -1443,6 +1517,7 @@ def main() -> None:
                 formula_lines=["planner = orientation rank1", "matches reuse_preview_candidate_group=orientation"],
                 warning_text=None if len(right_object_filtered) > 0 else f"NO RIGHT CANDIDATE ({args.right_target_object})",
                 line_builder=orientation_line,
+                gripper_forward_axis=preview_gripper_forward_axis,
             ),
         )
 
@@ -1512,6 +1587,10 @@ def main() -> None:
                 "frame_selection": frame_selection_metadata,
                 "requested_frames": [int(v) for v in requested_frames],
                 "resolved_frames": [{"requested": int(req), "resolved": int(res)} for req, res in resolved_frame_pairs],
+                "candidate_frame_mode": str(args.candidate_frame_mode),
+                "candidate_target_local_x_offset_m": float(args.candidate_target_local_x_offset_m),
+                "candidate_target_local_z_offset_m": float(args.candidate_target_local_z_offset_m),
+                "candidate_orientation_remap_label": str(args.candidate_orientation_remap_label),
                 "frames": summary,
             },
             f,

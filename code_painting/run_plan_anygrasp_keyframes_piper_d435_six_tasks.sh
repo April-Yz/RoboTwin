@@ -12,6 +12,7 @@ VIEWER=0
 VIEWER_WAIT_AT_END=0
 DEBUG_STOP_AFTER_KEYFRAME1=0
 OUTPUT_ROOT=""
+PREVIEW_ROOT_BASE=/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview_d435
 TRAJECTORY_MODE=cartesian_interp_ik
 CARTESIAN_AUTO_STEP_M=0.01
 JOINT_INTERP_WAYPOINTS=40
@@ -35,6 +36,7 @@ CANDIDATE_TARGET_LOCAL_X_OFFSET_M=-0.05
 CANDIDATE_TARGET_LOCAL_Z_OFFSET_M=0.0
 APPROACH_AXIS=local_x
 APPROACH_OFFSET_M=0.12
+DEBUG_GRIPPER_ACTOR_FORWARD_AXIS=local_x
 ENABLE_EXECUTION_COLLISIONS=1
 DEBUG_CANDIDATE_TOP_K=5
 DEBUG_COMMON_CANDIDATE_TOP_K=0
@@ -77,6 +79,10 @@ while (($# > 0)); do
       ;;
     --output_root)
       OUTPUT_ROOT="$2"
+      shift 2
+      ;;
+    --preview_root)
+      PREVIEW_ROOT_BASE="$2"
       shift 2
       ;;
     --trajectory_mode)
@@ -194,6 +200,10 @@ while (($# > 0)); do
       APPROACH_OFFSET_M="$2"
       shift 2
       ;;
+    --debug_gripper_actor_forward_axis)
+      DEBUG_GRIPPER_ACTOR_FORWARD_AXIS="$2"
+      shift 2
+      ;;
     --ids)
       shift
       IDS_FILTER=()
@@ -291,7 +301,7 @@ for TASK in "${TASKS[@]}"; do
   else
     OUT_ROOT=/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_v1/${TASK}
   fi
-  PREVIEW_ROOT=/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview_d435/${TASK}
+  PREVIEW_ROOT=${PREVIEW_ROOT_BASE}/${TASK}
   mapfile -t IDS < <(
     find "$PREVIEW_ROOT" -maxdepth 2 -name summary.json 2>/dev/null \
       | sed -E 's#.*/foundation_input_([0-9]+)/summary.json#\1#' \
@@ -323,7 +333,7 @@ for TASK in "${TASKS[@]}"; do
     done
     IDS=("${FILTERED_IDS[@]}")
   fi
-  echo "===== run D435 planner task=${TASK} summaries=${#IDS[@]} max_per_task=${MAX_PER_TASK} dry_run=${DRY_RUN} viewer=${VIEWER} debug_stop_after_keyframe1=${DEBUG_STOP_AFTER_KEYFRAME1} trajectory_mode=${TRAJECTORY_MODE} dual_require_all=${DUAL_STAGE_REQUIRE_ALL_PLANS} reach_pose=${REACH_ERROR_POSE_SOURCE} visualize_targets=${VISUALIZE_TARGETS} target_axes_only=${TARGET_AXES_ONLY} collisions=${ENABLE_EXECUTION_COLLISIONS} pure_scene=${PURE_SCENE_OUTPUT} partial_cartesian=${EXECUTE_PARTIAL_CARTESIAN_PLAN} ik_max_pos=${IK_MAX_POSITION_THRESHOLD_M} ik_max_rot=${IK_MAX_ROTATION_THRESHOLD_RAD} piper_global_trans_ik=${PIPER_APPLY_GLOBAL_TRANS_TO_IK} remap=${CANDIDATE_ORIENTATION_REMAP_LABEL} local_x_offset=${CANDIDATE_TARGET_LOCAL_X_OFFSET_M} local_z_offset=${CANDIDATE_TARGET_LOCAL_Z_OFFSET_M} approach_axis=${APPROACH_AXIS} approach_offset=${APPROACH_OFFSET_M} exec_steps=${EXECUTE_INTERP_STEPS} scene_steps=${JOINT_COMMAND_SCENE_STEPS} ====="
+  echo "===== run D435 planner task=${TASK} summaries=${#IDS[@]} max_per_task=${MAX_PER_TASK} dry_run=${DRY_RUN} viewer=${VIEWER} debug_stop_after_keyframe1=${DEBUG_STOP_AFTER_KEYFRAME1} trajectory_mode=${TRAJECTORY_MODE} dual_require_all=${DUAL_STAGE_REQUIRE_ALL_PLANS} reach_pose=${REACH_ERROR_POSE_SOURCE} visualize_targets=${VISUALIZE_TARGETS} target_axes_only=${TARGET_AXES_ONLY} collisions=${ENABLE_EXECUTION_COLLISIONS} pure_scene=${PURE_SCENE_OUTPUT} partial_cartesian=${EXECUTE_PARTIAL_CARTESIAN_PLAN} ik_max_pos=${IK_MAX_POSITION_THRESHOLD_M} ik_max_rot=${IK_MAX_ROTATION_THRESHOLD_RAD} piper_global_trans_ik=${PIPER_APPLY_GLOBAL_TRANS_TO_IK} preview_root=${PREVIEW_ROOT_BASE} remap=${CANDIDATE_ORIENTATION_REMAP_LABEL} local_x_offset=${CANDIDATE_TARGET_LOCAL_X_OFFSET_M} local_z_offset=${CANDIDATE_TARGET_LOCAL_Z_OFFSET_M} approach_axis=${APPROACH_AXIS} approach_offset=${APPROACH_OFFSET_M} gripper_actor_forward=${DEBUG_GRIPPER_ACTOR_FORWARD_AXIS} exec_steps=${EXECUTE_INTERP_STEPS} scene_steps=${JOINT_COMMAND_SCENE_STEPS} ====="
   for ID in "${IDS[@]}"; do
     ANY=${ANY_ROOT}/foundation_input_${ID}
     REPLAY=/home/zaijia001/ssd/data/piper/hand/${TASK}/foundation_replay_d435/foundation_input_${ID}
@@ -395,6 +405,7 @@ for TASK in "${TASKS[@]}"; do
       --debug_common_candidate_top_k ${DEBUG_COMMON_CANDIDATE_TOP_K} \
       --debug_visualize_selected_keyframe_axes ${DEBUG_VISUALIZE_SELECTED_KEYFRAME_AXES} \
       --debug_visualize_ik_waypoints ${DEBUG_VISUALIZE_IK_WAYPOINTS} \
+      --debug_gripper_actor_forward_axis ${DEBUG_GRIPPER_ACTOR_FORWARD_AXIS} \
       --reach_pos_tol_m 0.03 \
       --reach_rot_tol_deg 180 \
       --enable_grasp_action_object_collision ${ENABLE_EXECUTION_COLLISIONS} \
