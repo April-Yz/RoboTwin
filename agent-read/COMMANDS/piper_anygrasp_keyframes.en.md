@@ -514,14 +514,16 @@ Implemented behavior:
 - Preview generation supports `--candidate_target_local_z_offset_m`.
 - Planner C-gripper actors support `--debug_gripper_actor_forward_axis local_z`, so the C-gripper fingertip direction is drawn along blue local +Z.
 - The robot-frame planner wrapper uses `identity + local_z` and no longer relies on planner-stage `swap_red_blue`.
+- `run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh` now auto-generates missing robot-frame preview summaries for the current `--tasks`, `--ids`, `--id_start/--id_end`, and `--max_per_task` range before running the planner.
+- Add `--skip_preview_generation` when the planner should use only existing summaries.
 
-Generate robot-frame preview first:
+Generate robot-frame preview explicitly:
 
 ```bash
 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_render_anygrasp_ranked_preview_keyframes_d435_robot_frame_six_tasks.sh --gpu 2 --tasks pick_diverse_bottles --ids 0
 ```
 
-Then run the viewer_gripper planner:
+Or run the viewer_gripper planner directly; the wrapper fills missing previews first:
 
 ```bash
 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --viewer --tasks pick_diverse_bottles --visualize_targets --disable_execution_collisions --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --viewer_wait_at_end 0 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer_gripper

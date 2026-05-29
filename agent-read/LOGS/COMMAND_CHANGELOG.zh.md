@@ -1742,3 +1742,16 @@
   - `--preview_root`
   - `--debug_gripper_actor_forward_axis local_z`
 - 输出：planner viewer 结果写入 `/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer_gripper`。
+
+## 2026-05-29（robot-frame planner 自动补 preview）
+
+- 修改入口：
+  - `code_painting/run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh`
+  - `code_painting/run_render_anygrasp_ranked_preview_keyframes_d435_robot_frame_six_tasks.sh`
+- 新行为：
+  - planner wrapper 会先自动生成缺失的 robot-frame preview summary，再运行 planner。
+  - 自动生成范围跟随 `--tasks`、`--ids`、`--id_start/--id_end`、`--max_per_task`。
+- 新参数：
+  - `--skip_preview_generation`：planner wrapper 不自动生成 summary。
+  - `--skip_existing`：preview wrapper 是否跳过已有 summary，默认 `1`。
+  - `--source_preview_root`：preview wrapper 用于确定可用 id 顺序的源 D435 preview root。

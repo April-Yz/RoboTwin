@@ -514,14 +514,16 @@ code_painting/run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh
 - preview 支持 `--candidate_target_local_z_offset_m`。
 - planner C gripper actor 支持 `--debug_gripper_actor_forward_axis local_z`，让 C gripper 指尖方向沿蓝色 local +Z 显示。
 - planner robot-frame wrapper 使用 `identity + local_z`，不再依赖执行阶段 `swap_red_blue`。
+- `run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh` 会自动按当前 `--tasks`、`--ids`、`--id_start/--id_end`、`--max_per_task` 范围补齐缺失的 robot-frame preview summary，然后再运行 planner。
+- 若只想使用已有 summary，不自动生成，可加 `--skip_preview_generation`。
 
-先生成 robot-frame preview：
+可单独生成 robot-frame preview：
 
 ```bash
 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_render_anygrasp_ranked_preview_keyframes_d435_robot_frame_six_tasks.sh --gpu 2 --tasks pick_diverse_bottles --ids 0
 ```
 
-再运行 viewer_gripper planner：
+也可以直接运行 viewer_gripper planner；wrapper 会先补缺失 preview：
 
 ```bash
 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --viewer --tasks pick_diverse_bottles --visualize_targets --disable_execution_collisions --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --viewer_wait_at_end 0 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer_gripper

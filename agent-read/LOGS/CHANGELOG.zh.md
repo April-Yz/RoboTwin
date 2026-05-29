@@ -2358,3 +2358,18 @@
   - `bash -n code_painting/run_render_anygrasp_ranked_preview_keyframes_d435_robot_frame_six_tasks.sh`、`bash -n code_painting/run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh`、`bash -n code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh` 均通过。
   - `run_render_anygrasp_ranked_preview_keyframes_d435_robot_frame_six_tasks.sh --tasks pick_diverse_bottles --ids 0` 实测生成 robot-frame summary，`summary.json` 记录 `candidate_frame_mode=robot_replay`、`candidate_target_local_z_offset_m=-0.05`。
   - `run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh --tasks pick_diverse_bottles --ids 0 --debug_stop_after_keyframe1 ...` 无 viewer smoke run 成功生成 `head_cam_plan.mp4` / `third_cam_plan.mp4`。该调试 run 验证新路径可执行；右手仍未完全 reach，说明后续仍需继续调 IK/候选可达性，而不是入口或 frame 写入失败。
+
+## 2026-05-29（修复 robot-frame planner 只跑 id0 的问题）
+
+- 问题原因：
+  - `run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh` 按 robot-frame preview summary 列表运行。
+  - 当时 `/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview_d435_robot_frame` 里只有 `pick_diverse_bottles/foundation_input_0/summary.json`，所以 planner 只能跑 id0。
+- 修复：
+  - robot-frame preview wrapper 新增 `--max_per_task`、`--id_start`、`--id_end`、`--skip_existing` 和 `--source_preview_root`。
+  - robot-frame planner wrapper 现在会在 planner 前按同样的 task/id/max 范围自动补齐缺失的 robot-frame summary。
+  - 新增 `--skip_preview_generation`，用于只使用已有 summary，不自动生成。
+- 验证：
+  - `bash -n code_painting/run_render_anygrasp_ranked_preview_keyframes_d435_robot_frame_six_tasks.sh` 通过。
+  - `bash -n code_painting/run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh` 通过。
+  - `run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh --max_per_task 2 --dry_run --tasks pick_diverse_bottles ...` 自动补齐 id1 summary，并在 planner dry-run 中列出 id0/id1。
+  - `run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh --max_per_task 1 --dry_run ...` 对六个任务均能进入 planner dry-run；部分任务首个可用 id 不是 0，这是由已有 D435 preview summary 可用 id 决定。

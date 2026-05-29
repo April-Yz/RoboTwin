@@ -1744,3 +1744,16 @@
   - `--preview_root`
   - `--debug_gripper_actor_forward_axis local_z`
 - Output: planner viewer results write to `/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer_gripper`.
+
+## 2026-05-29 (Robot-Frame Planner Auto-Fills Preview Summaries)
+
+- Updated entrypoints:
+  - `code_painting/run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh`
+  - `code_painting/run_render_anygrasp_ranked_preview_keyframes_d435_robot_frame_six_tasks.sh`
+- New behavior:
+  - The planner wrapper auto-generates missing robot-frame preview summaries before running the planner.
+  - The generation range follows `--tasks`, `--ids`, `--id_start/--id_end`, and `--max_per_task`.
+- New parameters:
+  - `--skip_preview_generation`: disables planner-wrapper summary generation.
+  - `--skip_existing`: controls whether the preview wrapper skips existing summaries; default is `1`.
+  - `--source_preview_root`: source D435 preview root used to determine available id ordering.

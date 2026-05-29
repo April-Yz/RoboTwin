@@ -2360,3 +2360,18 @@
   - `bash -n code_painting/run_render_anygrasp_ranked_preview_keyframes_d435_robot_frame_six_tasks.sh`, `bash -n code_painting/run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh`, and `bash -n code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh` passed.
   - `run_render_anygrasp_ranked_preview_keyframes_d435_robot_frame_six_tasks.sh --tasks pick_diverse_bottles --ids 0` generated a robot-frame summary; `summary.json` records `candidate_frame_mode=robot_replay` and `candidate_target_local_z_offset_m=-0.05`.
   - A no-viewer `run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh --tasks pick_diverse_bottles --ids 0 --debug_stop_after_keyframe1 ...` smoke run generated `head_cam_plan.mp4` / `third_cam_plan.mp4`. The smoke run confirms the new path executes; the right arm still did not fully reach, so remaining work is IK/candidate reachability tuning rather than entrypoint or frame serialization failure.
+
+## 2026-05-29 (Fixed Robot-Frame Planner Only Running id0)
+
+- Root cause:
+  - `run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh` runs over the available robot-frame preview summaries.
+  - At the time, `/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview_d435_robot_frame` contained only `pick_diverse_bottles/foundation_input_0/summary.json`, so the planner could only run id0.
+- Fix:
+  - The robot-frame preview wrapper now supports `--max_per_task`, `--id_start`, `--id_end`, `--skip_existing`, and `--source_preview_root`.
+  - The robot-frame planner wrapper now auto-generates missing robot-frame summaries for the same task/id/max range before invoking the planner.
+  - Added `--skip_preview_generation` for cases where only existing summaries should be used.
+- Validation:
+  - `bash -n code_painting/run_render_anygrasp_ranked_preview_keyframes_d435_robot_frame_six_tasks.sh` passed.
+  - `bash -n code_painting/run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh` passed.
+  - `run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh --max_per_task 2 --dry_run --tasks pick_diverse_bottles ...` auto-generated the id1 summary and listed id0/id1 in the planner dry-run.
+  - `run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh --max_per_task 1 --dry_run ...` reached planner dry-run for all six tasks; some tasks start from an id other than 0 because the available D435 preview summary ids determine the order.
