@@ -2373,3 +2373,15 @@
   - `bash -n code_painting/run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh` 通过。
   - `run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh --max_per_task 2 --dry_run --tasks pick_diverse_bottles ...` 自动补齐 id1 summary，并在 planner dry-run 中列出 id0/id1。
   - `run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh --max_per_task 1 --dry_run ...` 对六个任务均能进入 planner dry-run；部分任务首个可用 id 不是 0，这是由已有 D435 preview summary 可用 id 决定。
+
+## 2026-05-29（补充 robot-frame 指定 id viewer 命令）
+
+- `COMMAND_LIBRARY.zh.md` 新增 L15.19.2：
+  - `stack_cups id4` viewer 调试命令。
+  - 六任务分别指定 id 的 viewer 模板。
+  - 六任务同时指定同一组 id 的 viewer 命令。
+- `agent-read/COMMANDS/piper_anygrasp_keyframes.zh.md` / `.en.md` 同步指定 id 命令。
+- 验证：
+  - `bash -n code_painting/run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh` 通过。
+  - `bash -n code_painting/run_render_anygrasp_ranked_preview_keyframes_d435_robot_frame_six_tasks.sh` 通过。
+  - `run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh --ids 4 --dry_run --tasks stack_cups ...` 正确列出 `stack_cups/foundation_input_4/summary.json`。

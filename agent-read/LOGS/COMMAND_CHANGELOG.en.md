@@ -1757,3 +1757,13 @@
   - `--skip_preview_generation`: disables planner-wrapper summary generation.
   - `--skip_existing`: controls whether the preview wrapper skips existing summaries; default is `1`.
   - `--source_preview_root`: source D435 preview root used to determine available id ordering.
+
+## 2026-05-29 (L15.19.2 Robot-Frame Viewer Commands With Explicit ids)
+
+- Added to `COMMAND_LIBRARY.zh.md`:
+  - `stack_cups id4` robot-frame viewer command.
+  - Per-task viewer templates with explicit ids.
+  - One viewer command for all six tasks with `--ids 0 1 2 3 4`.
+- Important parameters:
+  - `--ids <ID>` selects exact episodes.
+  - The robot-frame wrapper auto-fills missing summaries; add `--skip_preview_generation` to disable that behavior.

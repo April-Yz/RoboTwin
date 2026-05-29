@@ -2375,3 +2375,15 @@
   - `bash -n code_painting/run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh` passed.
   - `run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh --max_per_task 2 --dry_run --tasks pick_diverse_bottles ...` auto-generated the id1 summary and listed id0/id1 in the planner dry-run.
   - `run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh --max_per_task 1 --dry_run ...` reached planner dry-run for all six tasks; some tasks start from an id other than 0 because the available D435 preview summary ids determine the order.
+
+## 2026-05-29 (Added Robot-Frame Viewer Commands With Explicit ids)
+
+- Added L15.19.2 to `COMMAND_LIBRARY.zh.md`:
+  - `stack_cups id4` viewer debug command.
+  - Per-task viewer templates with explicit ids.
+  - One command for all six tasks with the same explicit id set.
+- Updated `agent-read/COMMANDS/piper_anygrasp_keyframes.zh.md` / `.en.md` with the same explicit-id commands.
+- Validation:
+  - `bash -n code_painting/run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh` passed.
+  - `bash -n code_painting/run_render_anygrasp_ranked_preview_keyframes_d435_robot_frame_six_tasks.sh` passed.
+  - `run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh --ids 4 --dry_run --tasks stack_cups ...` correctly listed `stack_cups/foundation_input_4/summary.json`.

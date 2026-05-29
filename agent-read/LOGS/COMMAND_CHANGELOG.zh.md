@@ -1755,3 +1755,13 @@
   - `--skip_preview_generation`：planner wrapper 不自动生成 summary。
   - `--skip_existing`：preview wrapper 是否跳过已有 summary，默认 `1`。
   - `--source_preview_root`：preview wrapper 用于确定可用 id 顺序的源 D435 preview root。
+
+## 2026-05-29（L15.19.2 robot-frame 指定 id viewer 命令）
+
+- `COMMAND_LIBRARY.zh.md` 新增：
+  - `stack_cups id4` robot-frame viewer 命令。
+  - 六任务分别指定 id 的 viewer 模板。
+  - 六任务同时指定 `--ids 0 1 2 3 4` 的 viewer 命令。
+- 关键参数：
+  - `--ids <ID>` 精确指定 episode。
+  - robot-frame wrapper 会自动补缺失 summary；如需禁用可加 `--skip_preview_generation`。
