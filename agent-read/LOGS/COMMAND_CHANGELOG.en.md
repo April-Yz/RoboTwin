@@ -1720,3 +1720,6 @@
   - `--approach_axis local_z`
   - `--approach_offset_m 0.12`
 - L15.18 now contains six-task first-five no-viewer commands, viewer commands, and a `stack_cups id0-10` small-range viewer debug command.
+- 2026-05-29 correction:
+  - `swap_red_blue + local_z` rotates the target blue axis onto the AnyGrasp C-shaped gripper's side normal.
+  - The wrapper now uses `identity + local_x`, following the fingertip direction inside the AnyGrasp visualization C plane; this local +X already corresponds to direct-replay hand local +Z after candidate selection.

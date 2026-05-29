@@ -2329,3 +2329,14 @@
   - `bash -n code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh` passed.
   - `bash -n code_painting/run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh` passed.
   - A no-viewer `run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh --tasks stack_cups --ids 0 --debug_stop_after_keyframe1 ...` smoke run completed under `/tmp/stack_cups_id0_replay_axes_check/stack_cups/foundation_input_0`; `plan_summary.json` records `candidate_target_local_z_offset_m=-0.05` and `approach_axis=local_z`, and VSCode-compatible `head_cam_plan.mp4` / `third_cam_plan.mp4` were generated. In this debug run, both arms reached keyframe-1 grasp.
+
+## 2026-05-29 (Corrected AnyGrasp Replay-Axis Wrapper Frame Assumption)
+
+- The user confirmed in the viewer that the previous `swap_red_blue + local_z` wrapper made the robot follow the target blue axis, but that blue axis was aligned with the AnyGrasp C-shaped gripper visualization's side normal rather than the fingertip direction inside the C plane.
+- Code review confirmed:
+  - `render_anygrasp_ranked_preview.py::align_hand_rotation_to_candidate_convention()` already maps direct-replay hand `local +Z` onto AnyGrasp candidate `local +X`.
+  - `create_gripper_candidate_actor()` uses local `+X` as the C-shaped gripper's fingertip direction, local `+Y` as opening width, and local `+Z` as the side normal.
+  - Therefore execution should not apply another `swap_red_blue`, because that rotates the target blue axis onto the C-plane normal.
+- Fix:
+  - `run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh` now fixes `--candidate_orientation_remap_label identity`, `--candidate_target_local_x_offset_m -0.05`, `--candidate_target_local_z_offset_m 0.0`, and `--approach_axis local_x`.
+  - `COMMAND_LIBRARY.zh.md` L15.18 and `agent-read/COMMANDS/piper_anygrasp_keyframes.*.md` now document this axis relationship.

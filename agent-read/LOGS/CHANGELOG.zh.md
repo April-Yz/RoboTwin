@@ -2327,3 +2327,14 @@
   - `bash -n code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh` 通过。
   - `bash -n code_painting/run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh` 通过。
   - `run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh --tasks stack_cups --ids 0 --debug_stop_after_keyframe1 ...` 无 viewer 实测通过，输出到 `/tmp/stack_cups_id0_replay_axes_check/stack_cups/foundation_input_0`；`plan_summary.json` 记录 `candidate_target_local_z_offset_m=-0.05`、`approach_axis=local_z`，并生成 VSCode 兼容 `head_cam_plan.mp4` / `third_cam_plan.mp4`。该调试 run 中 keyframe1 grasp 左右手均 reached。
+
+## 2026-05-29（修正 AnyGrasp replay-axis wrapper 的轴误解）
+
+- 用户在 viewer 中确认上一版 `swap_red_blue + local_z` 会让机器人朝向跟目标蓝轴一致，但蓝轴实际对齐到 AnyGrasp C 形 gripper 可视化的侧面法线，而不是 C 平面内的指尖方向。
+- 复查代码后确认：
+  - `render_anygrasp_ranked_preview.py::align_hand_rotation_to_candidate_convention()` 已经把 direct replay hand `local +Z` 转成 AnyGrasp candidate `local +X`。
+  - `create_gripper_candidate_actor()` 中 C 形 gripper 的指尖方向是 local `+X`，开合宽度是 local `+Y`，侧面法线是 local `+Z`。
+  - 因此执行阶段不应该再 `swap_red_blue`，否则会把 target 蓝轴转到 C 平面法线。
+- 修正：
+  - `run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh` 改为固定 `--candidate_orientation_remap_label identity`、`--candidate_target_local_x_offset_m -0.05`、`--candidate_target_local_z_offset_m 0.0`、`--approach_axis local_x`。
+  - `COMMAND_LIBRARY.zh.md` L15.18 和 `agent-read/COMMANDS/piper_anygrasp_keyframes.*.md` 已同步说明该轴关系。

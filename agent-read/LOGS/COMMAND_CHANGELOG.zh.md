@@ -1718,3 +1718,6 @@
   - `--approach_axis local_z`
   - `--approach_offset_m 0.12`
 - L15.18 已写入六任务前 5 个 no-viewer 命令、viewer 命令，以及 `stack_cups id0-10` 小范围 viewer 调试命令。
+- 2026-05-29 修正：
+  - `swap_red_blue + local_z` 会把 target 蓝轴转到 AnyGrasp C 形 gripper 的侧面法线。
+  - wrapper 改为 `identity + local_x`，即沿 AnyGrasp 可视化 C 平面内指尖方向执行；该 local +X 在候选选择阶段已经对应 direct replay hand local +Z。

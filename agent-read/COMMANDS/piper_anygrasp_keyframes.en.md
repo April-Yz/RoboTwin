@@ -436,7 +436,7 @@ To test mapping AnyGrasp local +X onto the direct-replay local +Z convention, ad
 
 `COMMAND_LIBRARY.zh.md` L15.17 includes a full no-viewer `stack_cups id0` comparison command. Generate `pose_debug.jsonl` and videos first, then check whether the blue axis and execution error become closer to direct replay. If the direction is flipped, test `swap_red_blue_keep_green` or an explicit enumerated label.
 
-## L15.18 Replay-Axis AnyGrasp Keyframe Planner
+## L15.18 Direct-Replay-Compatible AnyGrasp Keyframe Planner
 
 This section adds a separate entrypoint without replacing the older AnyGrasp commands:
 
@@ -444,19 +444,19 @@ This section adds a separate entrypoint without replacing the older AnyGrasp com
 code_painting/run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh
 ```
 
-Why this exists: direct Piper hand replay uses the stored gripper frame where `local +Z` blue is the approach/forward axis. The raw AnyGrasp candidate wireframe uses `local +X` red as the palm-to-fingertip finger-depth axis. Therefore the old planner's `identity + local-X offset/pregrasp` path is not equivalent to the direct-replay blue-axis convention.
+Why this exists: direct Piper hand replay uses the stored gripper frame where `local +Z` blue is the approach/forward axis. The raw AnyGrasp candidate wireframe uses `local +X` red as the palm-to-fingertip finger-depth axis. Candidate selection already calls `align_hand_rotation_to_candidate_convention()` to align direct-replay hand `local +Z` onto AnyGrasp candidate `local +X`, so execution must keep the AnyGrasp/Piper `identity + local-X` frame.
 
 The new wrapper always enables:
 
 ```text
---candidate_orientation_remap_label swap_red_blue
---candidate_target_local_x_offset_m 0.0
---candidate_target_local_z_offset_m -0.05
---approach_axis local_z
+--candidate_orientation_remap_label identity
+--candidate_target_local_x_offset_m -0.05
+--candidate_target_local_z_offset_m 0.0
+--approach_axis local_x
 --approach_offset_m 0.12
 ```
 
-Meaning: remap the original AnyGrasp local +X onto the execution target local +Z, then apply both the 5 cm target compensation and the pregrasp retreat along local +Z. The old six-task wrapper still defaults to the local-X behavior.
+Meaning: make the robot target follow the C-plane fingertip direction shown by the AnyGrasp gripper visualization. The previous `swap_red_blue + local_z` version was confirmed to rotate the target blue axis onto the C-shaped gripper's side normal, making robot approach look inconsistent with the gripper visualization.
 
 The six-task no-viewer and viewer commands for the first five summaries are recorded in `COMMAND_LIBRARY.zh.md` L15.18. Common single-task id0-10 viewer debug command:
 
@@ -469,4 +469,4 @@ Validation record:
 - `python3 -m py_compile code_painting/plan_anygrasp_keyframes_r1.py` passed.
 - `bash -n code_painting/run_plan_anygrasp_keyframes_piper_d435_six_tasks.sh` passed.
 - `bash -n code_painting/run_plan_anygrasp_keyframes_piper_d435_replay_axes_six_tasks.sh` passed.
-- A no-viewer `stack_cups id0 --debug_stop_after_keyframe1` smoke run completed and generated `head_cam_plan.mp4` / `third_cam_plan.mp4`; `plan_summary.json` records `candidate_target_local_z_offset_m=-0.05` and `approach_axis=local_z`, with both arms reaching keyframe-1 grasp.
+- 2026-05-29 correction: `swap_red_blue + local_z` was confirmed to rotate blue onto the C-plane side normal; the wrapper now uses `identity + local_x`.
