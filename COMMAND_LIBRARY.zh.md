@@ -4414,7 +4414,7 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_pipe
 六任务分别跑前 5 个 viewer_gripper：
 
 ```bash
-bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh --gpu 2 --max_per_task 25 --continue_on_error --viewer --tasks pick_diverse_bottles --visualize_targets --disable_execution_collisions --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --viewer_wait_at_end 0 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer_gripper
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh --gpu 2 --max_per_task 100 --continue_on_error --viewer --tasks pick_diverse_bottles --visualize_targets --disable_execution_collisions --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --viewer_wait_at_end 0 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer_gripper
 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --viewer --tasks place_bread_basket --visualize_targets --disable_execution_collisions --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --viewer_wait_at_end 0 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer_gripper
 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --viewer --tasks stack_cups --visualize_targets --disable_execution_collisions --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --viewer_wait_at_end 0 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer_gripper
 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh --gpu 2 --max_per_task 5 --continue_on_error --viewer --tasks handover_bottle --visualize_targets --disable_execution_collisions --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --viewer_wait_at_end 0 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer_gripper
@@ -4569,7 +4569,7 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_pipe
 ```bash
 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh --gpu 2 --ids <ID> --continue_on_error --viewer --tasks pick_diverse_bottles --visualize_targets --disable_execution_collisions --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --viewer_wait_at_end 0 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer_gripper
 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh --gpu 2 --ids <ID> --continue_on_error --viewer --tasks place_bread_basket --visualize_targets --disable_execution_collisions --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --viewer_wait_at_end 0 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer_gripper
-bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh --gpu 2 --ids <ID> --continue_on_error --viewer --tasks stack_cups --visualize_targets --disable_execution_collisions --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --viewer_wait_at_end 0 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer_gripper
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh --gpu 2 --ids 4 --continue_on_error --viewer --tasks stack_cups --visualize_targets --disable_execution_collisions --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --viewer_wait_at_end 1 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer_gripper
 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh --gpu 2 --ids <ID> --continue_on_error --viewer --tasks handover_bottle --visualize_targets --disable_execution_collisions --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --viewer_wait_at_end 0 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer_gripper
 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh --gpu 2 --ids <ID> --continue_on_error --viewer --tasks pnp_bread --visualize_targets --disable_execution_collisions --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --viewer_wait_at_end 0 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer_gripper
 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh --gpu 2 --ids <ID> --continue_on_error --viewer --tasks pnp_tray --visualize_targets --disable_execution_collisions --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --viewer_wait_at_end 0 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer_gripper
@@ -4579,4 +4579,434 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_pipe
 
 ```bash
 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh --gpu 2 --ids 0 1 2 3 4 --continue_on_error --viewer --tasks pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray --visualize_targets --disable_execution_collisions --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --viewer_wait_at_end 0 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer_gripper
+```
+
+---
+
+## L15.20 异步独立关键帧执行设计 [规划中，脚本尚未实现]
+
+### 六任务关键帧结构分析
+
+通过解析 `h2o_manual_review/<TASK>/hand_keyframes_all.json`，六个任务分为四种模式：
+
+| 模式 | 任务 | 结构 | 帧顺序示例 |
+|---|---|---|---|
+| **A: 2全局** | pick_diverse_bottles, pnp_tray | G1→G2 | G38→G78 |
+| **B: L2+R2 独立** | place_bread_basket, stack_cups, pnp_bread(部分) | L1→L2→R1→R2 或 R1→R2→L1→L2 | L34→L64→R103→R119 (place_bread_basket) |
+| **C: L1+R1+G1 交接** | handover_bottle | R1→G(交接)→L1 | R39→G80→L103 |
+| **D: G1+L1+R1 混合** | pnp_bread(部分) | G(共享帧)→L1→R1 | G26→L52→R64 |
+
+**关键发现：**
+
+- place_bread_basket: 左手先操作（L1→L2），右手后操作（R1→R2），时间上不重叠
+- stack_cups: **右手先操作**（R1→R2→L1→L2），顺序相反
+- handover_bottle: 右手拾取→共享帧交接→左手接收，`effective_keyframes_by_arm` 中双手共享 frame 80
+- pnp_bread: 部分ID是 L2+R2 独立，部分是 G+L1+R1 混合
+
+当前 planner 的 `annotated_json_keyframes` 模式取 `effective_keyframes[:2]`，对所有模式都按两个全局关键帧处理。对于模式 B/C/D，需要独立解析每个 arm 的关键帧并按异步顺序执行。
+
+### 模式 B 异步执行设计（L=2+R=2 独立）
+
+#### 执行流水线
+
+```
+初始化：双手在初始位姿（joint replay frame 0 或默认位姿）
+
+Stage 1: L1  — 左手 pregrasp → grasp 到左关键帧1目标
+         右手：joint replay 对应帧的人手轨迹，或保持初始位姿
+
+Stage 2: R1  — 右手 pregrasp → grasp 到右关键帧1目标
+         左手：保持 L1 grasp 位姿（joint hold）
+
+Stage 3: L2  — 左手从 L1 位姿过渡到 L2 位姿（Cartesian IK 或 joint replay）
+         右手：保持 R1 grasp 位姿
+
+Stage 4: R2  — 右手从 R1 位姿过渡到 R2 位姿
+         左手：保持 L2 grasp 位姿
+
+结束：双手停留在最终位姿（L2 + R2）
+```
+
+#### 关键设计问题
+
+**Q1: 右手在 Stage 1 应该做什么？**
+
+选项：
+- `hold_initial`：保持在初始 joint 位姿不动（最安全）
+- `replay_human`：按人手 joint 轨迹 replay 对应帧（更接近原始运动，但可能和左手 IK 规划冲突）
+- `replay_human_cartesian`：按人手 TCP 轨迹做 Cartesian replay
+
+建议默认 `hold_initial`，避免双手交互区域的碰撞。
+
+**Q2: L1→L2 过渡（Stage 3）怎么执行？**
+
+选项：
+- `ik_plan`：L1 grasp 位姿 → L2 grasp 位姿，用 Cartesian IK 插值
+- `joint_replay`：从 L1 帧到 L2 帧的人手 joint 轨迹 replay
+
+建议默认 `ik_plan`，因为目标是精确到达 L2 AnyGrasp 候选位姿。
+
+**Q3: 右手从 L1 到达后到 R1 执行前，是否需要用碰撞规避？**
+
+L1 到达后左手在目标位姿，R1 执行时右手移动。如果左右手目标位姿在空间上接近，R1 pregrasp→grasp 的路径需要避开左手当前位姿。使用 `--enable_grasp_action_object_collision 1` 并将对侧手臂 link 加入碰撞检测。
+
+**Q4: L2/R2 最终位姿可能碰撞，如何避免？**
+
+选项：
+- L2/R2 执行前，加入 retreat（沿 gripper 前进轴后退）作为最终停留位姿
+- 或者在 R2 到达后，双手各自 retreat 到安全位姿
+
+建议：L2 到达后先不退，R2 到达后再决定是否 retreat。可以在 stage 4 之后增加可选的 `final_retreat` 阶段。
+
+#### 实现方案
+
+**方案：基于现有 `plan_anygrasp_keyframes_piper.py` 的 staged wrapper**
+
+新增脚本 `/home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_async_staged.sh`：
+
+工作流程：
+1. 读取 `hand_keyframes_all.json` 中指定 ID 的 per-arm 关键帧
+2. 从 robot_frame preview summary 读取每个关键帧的 top-1 AnyGrasp 候选
+3. 按 L1→R1→L2→R2 顺序，每个阶段调用 planner 单 arm 模式
+4. 非活跃 arm 在场景中保持当前 joint 位姿
+5. 每个阶段输出独立的 video/pose debug 文件
+
+核心参数设计：
+
+```
+--async_mode staged              # 启用异步分阶段执行
+--async_stage_order L1,R1,L2,R2  # 阶段顺序（默认，可按帧时间重排）
+--hold_arm_mode static           # 非活跃arm行为: static / replay / cartesian_replay
+--transition_mode ik_plan        # L1→L2 过渡方式: ik_plan / joint_replay
+--final_retreat_m 0.05           # 最终位姿沿前进轴后退距离（0=不退）
+```
+
+#### 命令模板（以下命令尚未可用，脚本待实现）
+
+> **注意：以下 `run_plan_anygrasp_keyframes_piper_d435_async_staged.sh` 和 `_six_tasks.sh` 尚未实现。**
+> 这些是设计命令模板，用作实现参考。当前请使用 L15.19.1 的 `run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh`。
+
+**Step 1: 预览生成（同 L15.19.1）**
+
+```bash
+# 生成 robot_frame D435 preview summary
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_render_anygrasp_ranked_preview_keyframes_d435_robot_frame_six_tasks.sh --gpu 2
+```
+
+**Step 2: 单任务异步执行（viewer 模式）**
+
+```bash
+# 以 stack_cups 为例（帧顺序 R1→R2→L1→L2，执行顺序 L1→R1→L2→R2）
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_async_staged.sh \
+  --gpu 2 \
+  --tasks stack_cups \
+  --ids 0 \
+  --viewer \
+  --continue_on_error \
+  --visualize_targets \
+  --disable_execution_collisions \
+  --trajectory_mode cartesian_interp_ik \
+  --cartesian_auto_step_m 0.03 \
+  --execute_partial_cartesian_plan \
+  --allow_partial_dual_stage \
+  --reach_error_pose_source ee \
+  --ik_max_rotation_threshold_rad 3.14 \
+  --viewer_wait_at_end 0 \
+  --async_stage_order L1,R1,L2,R2 \
+  --hold_arm_mode static \
+  --transition_mode ik_plan \
+  --final_retreat_m 0.0 \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer_gripper_async
+```
+
+**Step 3: 六任务批量异步执行**
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_async_staged_six_tasks.sh \
+  --gpu 2 \
+  --max_per_task 5 \
+  --continue_on_error \
+  --viewer \
+  --visualize_targets \
+  --disable_execution_collisions \
+  --trajectory_mode cartesian_interp_ik \
+  --cartesian_auto_step_m 0.03 \
+  --execute_partial_cartesian_plan \
+  --allow_partial_dual_stage \
+  --reach_error_pose_source ee \
+  --ik_max_rotation_threshold_rad 3.14 \
+  --viewer_wait_at_end 0 \
+  --async_stage_order default \
+  --hold_arm_mode static \
+  --transition_mode ik_plan \
+  --final_retreat_m 0.0 \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer_gripper_async
+```
+
+### 模式 C 异步执行设计（L1+R1+G1 交接：handover_bottle）
+
+handover_bottle 的执行逻辑本质不同：**右手拾取 → 双手交接 → 左手接收**。
+
+```
+Stage 1: R1 grasp (右手 pregrasp → grasp 关键帧 R[0])
+         左手保持初始位姿
+
+Stage 2: Handover approach (双手从当前位置 IK 到共享帧 G 的目标位姿)
+         右手持有物体，左手准备接收
+
+Stage 3: 交接执行 (右手打开夹爪，左手闭合夹爪)
+         此时双手在 G 帧位姿
+
+Stage 4: L1 final (左手 pregrasp → grasp 关键帧 L[0] 的后续位姿)
+         右手可 retreat 或保持在 G 帧位姿
+```
+
+handover 的特殊性在于：
+- 共享帧 G 是交接点，双手都在此帧有目标位姿
+- effective_keyframes_by_arm: L=[L1, G], R=[R1, G]
+- G 帧不是 grasp，而是 transfer pose
+- 需要一个明确的 gripper open/close 序列
+
+对于 handover 任务，建议先用手动标注的交接帧 + 现有 planner 做基础验证，异步逻辑稍后实现。
+
+### 模式 A/D 说明
+
+- **模式 A (2全局)**：当前 L15.19.1 逻辑已适用，无需异步
+- **模式 D (G+L1+R1)**：pnp_bread 的部分 ID。共享帧 G 通常是双手初始接近物体的帧，然后左右手各自有一个独立关键帧。可以按 G→L1→R1 顺序（或 G→R1→L1，取决于帧时间）类似模式 B 处理
+
+### 关于碰撞和 retreat 的建议
+
+当前 L15.19.1 执行时，部分 ID 出现 `grasp_not_reached_before_close` 或大范围摆动（如 stack_cups id=4 的 180 度旋转）。异步模式下这些问题可能加剧，建议：
+
+1. **降低 IK 旋转容忍度**：`--ik_max_rotation_threshold_rad 1.57`（90度）过滤掉旋转过大的候选
+2. **增加 pregrasp retreat 距离**：`--approach_offset_m 0.15` 给每个阶段更多的接近空间
+3. **最终 retreat**：Stage 4 结束后双手沿各自前进轴后退 `--final_retreat_m 0.05`，避免 L2/R2 位姿近距离碰撞
+4. **碰撞检测**：在 transition 阶段（L1→L2, R1→R2），将对方 arm 的 link 加入碰撞检测以避免运动中碰撞
+
+### 实现优先级
+
+| 优先级 | 内容 | 预计工作量 |
+|---|---|---|
+| P0 | 模式 B 的 staged wrapper 脚本（解析 per-arm 关键帧 + 分阶段调用 planner） | 新脚本 ~200 行 |
+| P1 | 模式 C handover 基础支持（G 帧交接 + 双手夹爪控制） | 修改 planner ~100 行 |
+| P2 | `--hold_arm_mode static/replay` 实现 | 修改 renderer ~50 行 |
+| P3 | `--transition_mode ik_plan`（L1→L2 Cartesian IK 过渡） | 可复用现有 `cartesian_interp_ik` |
+| P4 | `--final_retreat_m` 实现 | 在 stage 4 后加 `pose_with_offset_along_local_axis` |
+| P5 | 碰撞检测集成 | 使用现有 `--enable_grasp_action_object_collision` |
+
+### 现有代码复用分析
+
+实现模式 B 的 staged wrapper 可以大量复用现有代码：
+
+- **关键帧解析**：复用 `preview_frame_selection_keyframes_for_arm()` 从 summary 读取 per-arm keyframes
+- **候选读取**：复用 `load_reused_preview_summary()` 和 `preview_candidate_entry_to_pose()`
+- **单 arm 规划**：复用 `plan_anygrasp_keyframes_r1.py` 的 `--arm left/right` 模式
+- **Joint hold**：复用 `replay_piper_dual_h5.py` 的 joint replay，对非活跃 arm replay 固定帧
+- **Cartesian 过渡**：复用 `urdfik_trajectory_mode=cartesian_interp_ik`
+
+新增逻辑主要是：
+1. 解析 per-arm 关键帧并映射到执行顺序
+2. 分阶段调用 planner，每个阶段用上一个阶段的到达位姿作为起始位姿
+3. 非活跃 arm 的 joint hold 逻辑
+4. Stage 间的状态传递和 video 拼接
+
+
+---
+
+## L15.21 AnyGrasp 候选筛选逻辑详解
+
+### 筛选流水线
+
+对每个关键帧，AnyGrasp 候选经过以下 5 步筛选，最终选出 planner 使用的 top-1 候选：
+
+```
+原始 AnyGrasp (~20 candidates/frame)
+    │
+    ▼
+[1] 物体分区 (Object Partition)
+    计算每个候选最近的物体，按物体名分组
+    │
+    ▼
+[2] 物体过滤 (Object Filter)
+    仅保留 nearest_object == target_object 的候选
+    pick_diverse_bottles: left->left_bottle, right->right_bottle
+    │
+    ▼
+[3] 方向过滤 (Orientation Filter)
+    仅保留 rotation_distance_deg(hand_ref, candidate) < max_rotation_distance_deg 的候选
+    默认 max_rotation_distance_deg = 90
+    │
+    ▼
+[4] 分数排名 (Score Ranking)
+    fused_score = anygrasp_weight * norm(anygrasp_score) + orientation_weight * orientation_score
+    默认: anygrasp=0.25, orientation=0.75
+    输出两组排名: orientation_rank, fused_rank
+    │
+    ▼
+[5] Planner 读取
+    --reuse_preview_candidate_group orientation (默认)
+    --reuse_preview_top_rank 1 (默认)
+    从 orientation_rank 中取 rank=1 的候选作为 planner 目标
+```
+
+### 具体数据示例 (pick_diverse_bottles id=1, frame 46)
+
+```
+原始 AnyGrasp: 20 candidates
+  ├─ 物体分区: left_bottle=14, right_bottle=6
+  │
+  ├─ [left] 物体过滤(target=left_bottle): 14 -> 方向过滤(max_rot=90deg): 4
+  │   rank1: idx=9  anygrasp=0.251  orient=0.770  rot_dist=41.4deg  obj_dist=0.144m
+  │   rank2: idx=4  anygrasp=0.312  orient=0.696  rot_dist=54.7deg  obj_dist=0.208m
+  │   rank3: idx=14 anygrasp=0.239  orient=0.686  rot_dist=56.5deg  obj_dist=0.201m
+  │   rank4: idx=16 anygrasp=0.229  orient=0.576  rot_dist=76.3deg  obj_dist=0.212m
+  │
+  └─ [right] 物体过滤(target=right_bottle): 6 -> 方向过滤(max_rot=90deg): 1
+       rank1: idx=8  anygrasp=0.266  orient=0.657  rot_dist=61.7deg  obj_dist=0.154m
+       ⚠ 仅剩 1 个候选！如果该候选不可达，无 fallback
+
+Planner 选择: left=idx9, right=idx8 (均为 orientation_rank=1)
+```
+
+### 方向分数 (orientation_score) 计算
+
+```
+orientation_score = max(0, 1 - rotation_distance_deg / max_rotation_distance_deg)
+```
+
+其中 max_rotation_distance_deg = 90 (默认)。
+- rot_dist <= 0deg -> score = 1.0 (完美对齐)
+- rot_dist = 45deg -> score = 0.5
+- rot_dist >= 90deg -> score = 0 (被过滤)
+
+rotation_distance_deg 是 hand reference rotation 和候选 rotation 之间的角度差。hand reference 的 rotation 会根据 candidate_frame_mode 做对齐：
+- anygrasp_raw 模式: hand rotation remap 为 columns = [hand_Z, hand_Y, -hand_X]
+- robot_replay 模式: hand rotation 保持原样 (identity 对齐)
+
+注意: 两种模式下排名可能不同。例如 frame 46 left idx=9: old模式 raw_rot_dist=102.1deg vs rot_dist=41.4deg，robot模式 raw_rot_dist=rot_dist=41.4deg。
+
+### 融合分数 (fused_score) 计算
+
+```
+fused_score = anygrasp_weight * anygrasp_score_norm + orientation_weight * orientation_score
+```
+
+其中 anygrasp_score_norm 是 AnyGrasp 原始分数在全部候选中的归一化值。
+当前默认 anygrasp=0.25, orientation=0.75 —— 方向对齐主导排名。
+
+### 可视化文件路径
+
+对于每个关键帧，以下图片被生成 (以 pick_diverse_bottles id=1, frame 46 为例):
+
+| 文件 | 内容 | 路径 |
+|---|---|---|
+| 原始 AnyGrasp 密集结果 | 所有 ~20 个候选叠加在 D435 replay 图片上 | /home/zaijia001/ssd/data/piper/hand/pick_diverse_bottles/pick_diverse_bottles_output/foundation_input_1/vis/grasp_result_000046.png |
+| D435 replay 原图 | 无候选叠加的纯渲染图 | /home/zaijia001/ssd/data/piper/hand/pick_diverse_bottles/foundation_replay_d435/foundation_input_1/head_anygrasp_frames/color_000046.png |
+| Orientation 排名预览 | 左右手分别展示方向排名前N候选 + hand reference + 物体投影 | .../anygrasp_h2o_preview_d435/pick_diverse_bottles/foundation_input_1/frame_000046_left_right_orientation_rank.png |
+| Fused 排名预览 | 同上但用融合分数排名 | .../anygrasp_h2o_preview_d435/pick_diverse_bottles/foundation_input_1/frame_000046_left_right_fused_rank.png |
+| Planner 最终选择 | 仅高亮 rank1 候选 + 目标坐标轴 | .../anygrasp_h2o_preview_d435/pick_diverse_bottles/foundation_input_1/frame_000046_left_right_planner_selected_orientation_rank1.png |
+
+robot_frame 版本路径为 .../anygrasp_h2o_preview_d435_robot_frame/pick_diverse_bottles/foundation_input_1/...
+
+### 四图拼接可视化命令
+
+脚本已部署到 `/tmp/batch_montage.py`，支持单帧和批量两种模式。
+
+**单帧拼接 (指定任务/ID/帧):**
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda run -n RoboTwin_bw python3 /tmp/montage_script.py pick_diverse_bottles 1 46
+```
+输出: `.../foundation_input_1/frame_000046_montage_4panel.png`
+
+**批量拼接 (指定任务和ID范围):**
+```bash
+# 所有6个任务，ID 0-4 (pnp_bread 和 handover_bottle 的 ID 范围不同，见下方)
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda run -n RoboTwin_bw python3 /tmp/batch_montage.py --ids 0 1 2 3 4
+
+# pnp_bread ID 范围 (从10开始)
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda run -n RoboTwin_bw python3 /tmp/batch_montage.py --tasks pnp_bread --ids 10 11 12 13 14
+
+# handover_bottle ID 范围 (从1开始，无id=0)
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda run -n RoboTwin_bw python3 /tmp/batch_montage.py --tasks handover_bottle --ids 1 2 3 4
+
+# 仅处理 robot_frame preview (默认同时处理 old 和 robot_frame)
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda run -n RoboTwin_bw python3 /tmp/batch_montage.py --preview_base robot_frame --ids 0 1 2 3 4
+
+# 仅处理旧版 preview
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda run -n RoboTwin_bw python3 /tmp/batch_montage.py --preview_base old --ids 0 1 2 3 4
+```
+
+每个 montage 包含 4 列 (左→右):
+1. 原始 AnyGrasp 密集结果 (所有~20个候选)
+2. Orientation 排名预览 (方向分数排名，默认前20)
+3. Fused 排名预览 (融合分数排名)
+4. Planner 最终选择 (仅 rank1，带 coordinate axes)
+
+各任务 ID 范围:
+| 任务 | ID 范围 | 备注 |
+|---|---|---|
+| pick_diverse_bottles | 0-101 | id 连续 |
+| place_bread_basket | 0-N | id 连续 |
+| stack_cups | 0-N | id 连续 |
+| handover_bottle | 1-N | **无 id=0** |
+| pnp_bread | 10-N | **从 10 开始** |
+| pnp_tray | 0-N | id 连续 |
+
+### 当前策略的问题
+
+**问题 1: 右手候选太少**
+
+frame 46 右手仅剩 1 个候选通过过滤 (方向差=61.7deg)。如果该候选被 IK 判定不可达，planner 无 fallback。
+部分 ID (如 id=101 frame 0) 甚至出现 right_after=0 —— 右手无任何候选通过过滤。
+
+建议: 将 --max_rotation_distance_deg 从 90 提高到 120，或启用 --reuse_preview_top_rank 2 作为 fallback。
+
+**问题 2: anygrasp_score 权重过低**
+
+当前 anygrasp=0.25, orientation=0.75。AnyGrasp 自身的抓取质量分数对最终排名影响很小，方向对齐几乎决定了排名。
+
+建议: 尝试 --anygrasp_score_weight 0.5 --orientation_score_weight 0.5。
+
+**问题 3: 方向过滤以人手为参考，不以机械臂为参考**
+
+候选按与人手姿态的相似度排序，而非按机械臂从初始构型的可达性排序。导致某些"对人手自然"的姿态对机械臂需要大幅度重定向 (如 stack_cups id=4 的 180deg 旋转)。
+
+建议: 在 planner 阶段加入基于当前机械臂构型的二次过滤，拒绝 rot > 120deg 的候选。
+
+### 当前应使用的指令
+
+使用 L15.19.1 的 robot_frame 路径:
+
+**生成 robot_frame preview summary:**
+```bash
+# 单任务测试 (推荐先跑少量 id)
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_render_anygrasp_ranked_preview_keyframes_d435_robot_frame_six_tasks.sh --gpu 2 --tasks pick_diverse_bottles --ids 1
+
+# 六任务全量
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_render_anygrasp_ranked_preview_keyframes_d435_robot_frame_six_tasks.sh --gpu 2
+```
+
+**运行 planner (viewer 模式):**
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh \
+  --gpu 2 --max_per_task 5 --continue_on_error --viewer \
+  --tasks pick_diverse_bottles --visualize_targets --disable_execution_collisions \
+  --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 \
+  --execute_partial_cartesian_plan --allow_partial_dual_stage \
+  --print_pose_every 5 --reach_error_pose_source ee \
+  --ik_max_rotation_threshold_rad 3.14 --viewer_wait_at_end 0 \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer_gripper
+```
+
+**查看候选选择可视化:**
+```bash
+# 单独查看 (在远程服务器上，需要有 X11 forwarding 或 DISPLAY=:1.0)
+eog /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview_d435_robot_frame/pick_diverse_bottles/foundation_input_1/frame_000046_left_right_orientation_rank.png
+
+# 或拼接四图 (运行上面的 PYEOF2 块)
+```
+
+**查看原始 AnyGrasp 密集结果:**
+```bash
+eog /home/zaijia001/ssd/data/piper/hand/pick_diverse_bottles/pick_diverse_bottles_output/foundation_input_1/vis/grasp_result_000046.png
 ```

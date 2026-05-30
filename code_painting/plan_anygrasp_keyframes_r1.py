@@ -327,6 +327,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--camera_cv_axis_mode", choices=sorted(base.CV_TO_WORLD_CAMERA_PRESETS.keys()), default="legacy_r1")
     parser.add_argument("--head_camera_local_pos", type=float, nargs=3, default=base.DEFAULT_HEAD_CAMERA_LOCAL_POS.tolist())
     parser.add_argument("--head_camera_local_quat_wxyz", type=float, nargs=4, default=base.DEFAULT_HEAD_CAMERA_LOCAL_QUAT_WXYZ.tolist())
+    parser.add_argument("--init_left_arm_joints", type=float, nargs=6, default=None, metavar=("J0","J1","J2","J3","J4","J5"), help="Optional initial left arm joint positions for async staged execution.")
+    parser.add_argument("--init_right_arm_joints", type=float, nargs=6, default=None, metavar=("J0","J1","J2","J3","J4","J5"), help="Optional initial right arm joint positions for async staged execution.")
+    parser.add_argument("--save_final_joints_json", type=Path, default=None, help="Optional path to save final left/right arm joint positions after execution as JSON.")
+    parser.add_argument("--init_gripper_open_val", type=float, default=None, help="Optional initial gripper open value for both arms.")
     return parser.parse_args()
 
 
@@ -729,9 +733,9 @@ def build_renderer(args: argparse.Namespace) -> ReplayRenderer:
         base_occluder_color=args.base_occluder_color,
         camera_sweep_enable=False,
         camera_sweep_steps_deg=[0.0],
-        init_left_arm_joints=None,
-        init_right_arm_joints=None,
-        init_gripper_open=None,
+        init_left_arm_joints=(np.array(args.init_left_arm_joints, dtype=np.float64) if args.init_left_arm_joints is not None else None),
+        init_right_arm_joints=(np.array(args.init_right_arm_joints, dtype=np.float64) if args.init_right_arm_joints is not None else None),
+        init_gripper_open=(float(args.init_gripper_open_val) if args.init_gripper_open_val is not None else None),
         lighting_mode=args.lighting_mode,
         attach_planner=attach_planner,
         hide_robot=False,
@@ -6118,6 +6122,18 @@ def main() -> None:
     summary["execution_success"] = not bool(summary["execution_failed"])
     with (args.output_dir / "plan_summary.json").open("w", encoding="utf-8") as f:
         json.dump(summary, f, indent=2)
+
+    # Save final joint state for async staged chaining
+    if args.save_final_joints_json is not None:
+        try:
+            final_left = renderer.robot.get_left_arm_joints().tolist()
+            final_right = renderer.robot.get_right_arm_joints().tolist()
+            args.save_final_joints_json.parent.mkdir(parents=True, exist_ok=True)
+            with open(str(args.save_final_joints_json), "w") as jf:
+                json.dump({"left": final_left, "right": final_right}, jf, indent=2)
+            print(f"[save-final-joints] wrote {args.save_final_joints_json}")
+        except Exception as e:
+            print(f"[save-final-joints] ERROR: {e}")
 
     status_prefix = "[warn]" if bool(summary["execution_failed"]) else "[done]"
     sel0 = primary_exec_selected_keyframes[0]
