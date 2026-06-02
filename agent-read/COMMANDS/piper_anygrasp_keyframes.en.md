@@ -547,6 +547,49 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_pipe
 
 ## O. First-Frame FoundationPose Direct Strategy Baseline
 
+### O.0 Piper Data Generation With The Original demo_clean Logic
+
+O.0 does not use FoundationPose, AnyGrasp, manual keyframes, or replay target frames. It uses the original RoboTwin data-collection path:
+
+```text
+collect_data.sh -> script/collect_data.py -> envs/<task_name>.py -> Base_Task.grasp_actor/place_actor
+```
+
+New entrypoints:
+
+```text
+envs/pick_diverse_bottles_piper.py
+task_config/demo_clean_piper.yml
+description/task_instruction/pick_diverse_bottles_piper.json
+```
+
+Implementation:
+
+- `pick_diverse_bottles_piper` inherits the original `pick_diverse_bottles` task and does not modify the original task file.
+- Bottle random sampling, random rotation, left/right placement regions, `pre_grasp_dis=0.08`, lift `z=0.1`, and left/right placement targets all come from the original env.
+- `demo_clean_piper.yml` uses `embodiment: [piper]`; the other clean-demo settings stay aligned with `demo_clean.yml`.
+- The task-instruction template is copied from `pick_diverse_bottles.json` so instruction generation still works after data collection.
+
+Recommended command:
+
+```bash
+bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper 0
+```
+
+Output:
+
+```text
+data/pick_diverse_bottles_piper/demo_clean_piper/
+```
+
+The original ALOHA-AgileX baseline remains:
+
+```bash
+bash collect_data.sh pick_diverse_bottles demo_clean 0
+```
+
+If O.0 still shows systematic orientation issues, check `assets/embodiments/piper/config.yml` first: `delta_matrix`, `global_trans_matrix`, `gripper_scale`, `grasp_perfect_direction`, and the Piper URDF gripper geometry.
+
 `COMMAND_LIBRARY.zh.md` now ends with Mode O, a simpler `pick_diverse_bottles` comparison experiment. It does not use manual keyframes, human hand orientation, or AnyGrasp candidates. It reads the two bottle world positions from frame 0 of FoundationPose and generates grasp/place targets with the original env task logic.
 
 New entrypoints:

@@ -2445,3 +2445,23 @@
   - `bash -n code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh` passed.
   - The visualization script successfully generated PNG/JSON for `pick_diverse_bottles id0 frame0`; the result shows `piper_local_z` local Z is `0deg` from the physical approach direction, while both ALOHA-style local-X variants have local X at `0deg`.
   - `--plan_only --target_frame_convention aloha_local_x_z_up` successfully wrote a summary recording `target_frame_convention=aloha_local_x_z_up` and `planner_approach_axis=local_x`.
+
+## 2026-06-02 (O.0 Piper Data Generation Entry With Original demo_clean Logic)
+
+- Added `envs/pick_diverse_bottles_piper.py`:
+  - Inherits the original `pick_diverse_bottles`.
+  - Does not modify `envs/pick_diverse_bottles.py`.
+  - Preserves the original bottle random sampling, random rotation, left/right regions, `grasp_actor`, lift, and place logic.
+- Added `task_config/demo_clean_piper.yml`:
+  - Based on `demo_clean.yml`.
+  - Sets `embodiment` to `[piper]`.
+- Added `description/task_instruction/pick_diverse_bottles_piper.json`:
+  - Reuses the original `pick_diverse_bottles` instruction template so `collect_data.py` can generate episode instructions after collection.
+- Updated `.gitignore` to allow `task_config/demo_clean_piper.yml`.
+- Recommended command:
+  - `bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper 0`
+- Validation:
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile envs/pick_diverse_bottles_piper.py script/collect_data.py` passed.
+  - Dynamic import of `envs.pick_diverse_bottles_piper` in the conda environment passed, and the class MRO shows inheritance from `pick_diverse_bottles`.
+  - `task_config/demo_clean_piper.yml` parsed as `embodiment=['piper']` and `episode_num=50`.
+  - `description/task_instruction/pick_diverse_bottles_piper.json` parsed as `seen=50` and `unseen=10`.

@@ -12,7 +12,8 @@ envs/curobo
 *.zip
 viewer_show.*
 eval_video/
-task_config/
+task_config/*
+!task_config/demo_clean_piper.yml
 **/.DS_Store
 code_painting/*
 !code_painting/plan_first_frame_foundation_pick_diverse_bottles.py

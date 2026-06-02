@@ -1812,3 +1812,19 @@
   - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python /home/zaijia001/ssd/RoboTwin/code_painting/visualize_mode_o_gripper_frame_conventions.py --video_id 0 --foundation_frame 0 --output_dir /home/zaijia001/ssd/RoboTwin/code_painting/mode_o_frame_convention_debug`
 - ALOHA-style local-X plan-only comparison:
   - `bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh --gpu 2 --ids 0 --plan_only --target_frame_convention aloha_local_x_z_up --output_root /tmp/mode_o_aloha_local_x_plan_only`
+
+## 2026-06-02 (O.0 Original demo_clean Piper Data Generation Command)
+
+- Added task name:
+  - `pick_diverse_bottles_piper`
+- Added config:
+  - `demo_clean_piper`
+- Added command:
+  - `bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper 0`
+- Comparison command:
+  - `bash collect_data.sh pick_diverse_bottles demo_clean 0`
+- Code locations:
+  - `envs/pick_diverse_bottles_piper.py`
+  - `task_config/demo_clean_piper.yml`
+  - `description/task_instruction/pick_diverse_bottles_piper.json`
+- Note: O.0 uses the original RoboTwin demo data-generation path and does not use FoundationPose, AnyGrasp, or replay target frames.

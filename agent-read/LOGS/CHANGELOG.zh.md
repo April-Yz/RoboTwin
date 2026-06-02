@@ -2443,3 +2443,23 @@
   - `bash -n code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh` 通过。
   - 可视化脚本对 `pick_diverse_bottles id0 frame0` 成功输出 PNG/JSON；结果显示 `piper_local_z` 的 local Z 与物理接近方向夹角为 `0deg`，两个 ALOHA-style local-X 变体的 local X 与物理接近方向夹角为 `0deg`。
   - `--plan_only --target_frame_convention aloha_local_x_z_up` 成功写出 summary，记录 `target_frame_convention=aloha_local_x_z_up`、`planner_approach_axis=local_x`。
+
+## 2026-06-02（O.0 原始 demo_clean 逻辑 Piper 数据生成入口）
+
+- 新增 `envs/pick_diverse_bottles_piper.py`：
+  - 继承原始 `pick_diverse_bottles`。
+  - 不修改 `envs/pick_diverse_bottles.py`。
+  - 保留原始瓶子随机采样、随机旋转、左右区域、`grasp_actor`、lift 和 place 逻辑。
+- 新增 `task_config/demo_clean_piper.yml`：
+  - 基于 `demo_clean.yml`。
+  - `embodiment` 改为 `[piper]`。
+- 新增 `description/task_instruction/pick_diverse_bottles_piper.json`：
+  - 复用原始 `pick_diverse_bottles` 指令模板，保证 `collect_data.py` 结束后能生成 episode instructions。
+- `.gitignore` 放行 `task_config/demo_clean_piper.yml`。
+- 推荐命令：
+  - `bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper 0`
+- 验证：
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile envs/pick_diverse_bottles_piper.py script/collect_data.py` 通过。
+  - conda 环境中动态 import `envs.pick_diverse_bottles_piper` 成功，class MRO 显示继承 `pick_diverse_bottles`。
+  - `task_config/demo_clean_piper.yml` 解析得到 `embodiment=['piper']`、`episode_num=50`。
+  - `description/task_instruction/pick_diverse_bottles_piper.json` 解析得到 `seen=50`、`unseen=10`。

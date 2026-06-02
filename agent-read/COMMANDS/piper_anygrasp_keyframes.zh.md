@@ -547,6 +547,49 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_pipe
 
 ## O. 第一帧 FoundationPose 直接策略抓取对照
 
+### O.0 原始 demo_clean 逻辑的 Piper 数据生成对照
+
+O.0 不使用 FoundationPose、AnyGrasp、手工关键帧或 replay target frame，而是走 RoboTwin 原始数据采集链路：
+
+```text
+collect_data.sh -> script/collect_data.py -> envs/<task_name>.py -> Base_Task.grasp_actor/place_actor
+```
+
+新增入口：
+
+```text
+envs/pick_diverse_bottles_piper.py
+task_config/demo_clean_piper.yml
+description/task_instruction/pick_diverse_bottles_piper.json
+```
+
+实现逻辑：
+
+- `pick_diverse_bottles_piper` 继承原始 `pick_diverse_bottles`，不修改原任务文件。
+- 瓶子随机采样、随机旋转、左右瓶区域、`pre_grasp_dis=0.08`、lift `z=0.1`、左右放置 target 都沿用原始 env。
+- `demo_clean_piper.yml` 使用 `embodiment: [piper]`，其余 clean demo 设置与 `demo_clean.yml` 对齐。
+- 指令模板复制自 `pick_diverse_bottles.json`，用于 collect_data 结束后的 instruction 生成。
+
+推荐命令：
+
+```bash
+bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper 0
+```
+
+输出：
+
+```text
+data/pick_diverse_bottles_piper/demo_clean_piper/
+```
+
+ALOHA-AgileX 原始对照仍是：
+
+```bash
+bash collect_data.sh pick_diverse_bottles demo_clean 0
+```
+
+如果 O.0 也出现系统性朝向问题，优先检查 `assets/embodiments/piper/config.yml` 的 `delta_matrix`、`global_trans_matrix`、`gripper_scale`、`grasp_perfect_direction` 以及 Piper URDF 夹爪几何。
+
 `COMMAND_LIBRARY.zh.md` 末尾新增 Mode O，用于 `pick_diverse_bottles` 的更简单对照实验：不使用手工关键帧、不使用人手朝向、不使用 AnyGrasp candidate，只用第 0 帧 FoundationPose 的两个 bottle 世界位置，按 env 任务逻辑生成抓取和放置目标。
 
 新增入口：
