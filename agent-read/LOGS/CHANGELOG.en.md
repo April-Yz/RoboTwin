@@ -2426,3 +2426,22 @@
 - Updated `COMMAND_LIBRARY.zh.md` and `agent-read/COMMANDS/piper_anygrasp_keyframes.zh.md` / `.en.md` with the Mode O gripper-orientation audit.
 - Validation:
   - `python3 -m py_compile code_painting/plan_first_frame_foundation_pick_diverse_bottles.py` passed.
+
+## 2026-06-02 (Mode O Gripper Frame Visualization And ALOHA-Style Local-X Comparison)
+
+- Added `code_painting/visualize_mode_o_gripper_frame_conventions.py`:
+  - Does not run IK or open the SAPIEN viewer.
+  - Reads FoundationPose object positions for `pick_diverse_bottles`.
+  - Draws `piper_local_z`, `aloha_local_x_y_up`, and `aloha_local_x_z_up` frames at the same grasp target.
+  - Writes a PNG and JSON; the JSON records the angle between local X/Y/Z and the physical approach direction.
+- Added to `code_painting/plan_first_frame_foundation_pick_diverse_bottles.py`:
+  - `--target_frame_convention piper_local_z|aloha_local_x_y_up|aloha_local_x_z_up`
+  - `--plan_only`
+  - When `aloha_local_x_*` is selected, the planner automatically receives `--approach_axis local_x` and `--debug_gripper_actor_forward_axis local_x`.
+- Updated `code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh` to pass through `--target_frame_convention` and `--plan_only`.
+- Updated `.gitignore` to allow the new visualization script while still ignoring generated PNG/JSON debug outputs.
+- Validation:
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/plan_first_frame_foundation_pick_diverse_bottles.py code_painting/visualize_mode_o_gripper_frame_conventions.py` passed.
+  - `bash -n code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh` passed.
+  - The visualization script successfully generated PNG/JSON for `pick_diverse_bottles id0 frame0`; the result shows `piper_local_z` local Z is `0deg` from the physical approach direction, while both ALOHA-style local-X variants have local X at `0deg`.
+  - `--plan_only --target_frame_convention aloha_local_x_z_up` successfully wrote a summary recording `target_frame_convention=aloha_local_x_z_up` and `planner_approach_axis=local_x`.

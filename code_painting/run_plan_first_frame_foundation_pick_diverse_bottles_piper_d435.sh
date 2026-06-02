@@ -11,6 +11,7 @@ VIEWER=0
 VIEWER_WAIT_AT_END=0
 CONTINUE_ON_ERROR=0
 DRY_RUN=0
+PLAN_ONLY=0
 OUTPUT_ROOT=""
 IDS=()
 ID_START=""
@@ -20,6 +21,7 @@ GRASP_SURFACE_RETREAT_M=0.03
 APPROACH_OFFSET_M=0.08
 LIFT_M=0.10
 PLACE_Z_MODE=env_target
+TARGET_FRAME_CONVENTION=piper_local_z
 TRAJECTORY_MODE=cartesian_interp_ik
 CARTESIAN_AUTO_STEP_M=0.03
 IK_MAX_ROTATION_THRESHOLD_RAD=3.14
@@ -41,12 +43,14 @@ Options:
   --viewer_wait_at_end <0|1>        Keep viewer open at the end
   --continue_on_error               Continue after a failed id
   --dry_run                         Print only
+  --plan_only                       Write plan_summary only; skip planner execution
   --output_root <PATH>              Custom output root
   --foundation_frame <N>            FoundationPose frame used for target design (default: 0)
   --grasp_surface_retreat_m <M>     Offset from object center back to side grasp surface (default: 0.03)
   --approach_offset_m <M>           Planner pregrasp retreat (default: 0.08, matching env pre_grasp_dis)
   --lift_m <M>                      Used when --place_z_mode object_plus_lift (default: 0.10)
   --place_z_mode <env_target|object_plus_lift>
+  --target_frame_convention <piper_local_z|aloha_local_x_y_up|aloha_local_x_z_up>
   --trajectory_mode <MODE>          Planner trajectory mode (default: cartesian_interp_ik)
   --cartesian_auto_step_m <M>       Cartesian auto step (default: 0.03)
   --ik_max_rotation_threshold_rad <R>
@@ -61,12 +65,14 @@ while (($# > 0)); do
     --viewer_wait_at_end) VIEWER_WAIT_AT_END="$2"; shift 2 ;;
     --continue_on_error) CONTINUE_ON_ERROR=1; shift ;;
     --dry_run) DRY_RUN=1; shift ;;
+    --plan_only) PLAN_ONLY=1; shift ;;
     --output_root) OUTPUT_ROOT="$2"; shift 2 ;;
     --foundation_frame) FOUNDATION_FRAME="$2"; shift 2 ;;
     --grasp_surface_retreat_m) GRASP_SURFACE_RETREAT_M="$2"; shift 2 ;;
     --approach_offset_m) APPROACH_OFFSET_M="$2"; shift 2 ;;
     --lift_m) LIFT_M="$2"; shift 2 ;;
     --place_z_mode) PLACE_Z_MODE="$2"; shift 2 ;;
+    --target_frame_convention) TARGET_FRAME_CONVENTION="$2"; shift 2 ;;
     --trajectory_mode) TRAJECTORY_MODE="$2"; shift 2 ;;
     --cartesian_auto_step_m) CARTESIAN_AUTO_STEP_M="$2"; shift 2 ;;
     --ik_max_rotation_threshold_rad) IK_MAX_ROTATION_THRESHOLD_RAD="$2"; shift 2 ;;
@@ -153,6 +159,7 @@ for ID in "${IDS[@]}"; do
     --approach_offset_m "$APPROACH_OFFSET_M"
     --lift_m "$LIFT_M"
     --place_z_mode "$PLACE_Z_MODE"
+    --target_frame_convention "$TARGET_FRAME_CONVENTION"
     --urdfik_trajectory_mode "$TRAJECTORY_MODE"
     --urdfik_cartesian_interp_auto_step_m "$CARTESIAN_AUTO_STEP_M"
     --urdfik_max_rotation_threshold_rad "$IK_MAX_ROTATION_THRESHOLD_RAD"
@@ -162,6 +169,9 @@ for ID in "${IDS[@]}"; do
   fi
   if ((DISABLE_EXECUTION_COLLISIONS)); then
     ARGS+=(--enable_grasp_action_object_collision 0)
+  fi
+  if ((PLAN_ONLY)); then
+    ARGS+=(--plan_only 1)
   fi
 
   mkdir -p "$OUT"

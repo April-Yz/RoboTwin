@@ -573,6 +573,31 @@ code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh
 - 当前 Mode O 沿用已标定 Piper/replay 管线，保存给 planner 的 target frame 使用 local `+Z`（蓝轴）作为接近/前进轴；这和前面的 direct replay / robot-frame AnyGrasp 逻辑一致，但不是原始 ALOHA-style local `+X` 指尖深度约定。
 - 如果要做严格 ALOHA-style local-X 对比，需要新增 Mode O 分支，把接近轴写入 target local `+X`，并让 planner 使用 `--approach_axis local_x`。
 
+新增验证入口：
+
+```text
+code_painting/visualize_mode_o_gripper_frame_conventions.py
+```
+
+该脚本只读取 FoundationPose 物体位置，不跑 IK。它会在同一抓取点画出 `piper_local_z`、`aloha_local_x_y_up`、`aloha_local_x_z_up` 三套 frame，并输出每个局部轴与物理接近方向的夹角。
+
+静态可视化命令：
+
+```bash
+/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python /home/zaijia001/ssd/RoboTwin/code_painting/visualize_mode_o_gripper_frame_conventions.py --video_id 0 --foundation_frame 0 --output_dir /home/zaijia001/ssd/RoboTwin/code_painting/mode_o_frame_convention_debug
+```
+
+Mode O wrapper 新增：
+
+- `--target_frame_convention piper_local_z|aloha_local_x_y_up|aloha_local_x_z_up`
+- `--plan_only`：只写 `plan_summary_first_frame_foundation.json`，不调用 planner。
+
+ALOHA-style local-X plan-only 对照：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh --gpu 2 --ids 0 --plan_only --target_frame_convention aloha_local_x_z_up --output_root /tmp/mode_o_aloha_local_x_plan_only
+```
+
 注意：`multi_object_world_poses.npz` 的键名包含 `pose_world_wxyz`，但实际数组顺序与 planner 一致，是 `[x, y, z, qw, qx, qy, qz]`。
 
 推荐 smoke：

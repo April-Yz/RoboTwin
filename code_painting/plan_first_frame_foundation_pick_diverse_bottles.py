@@ -65,17 +65,47 @@ def normalize(vec: np.ndarray) -> np.ndarray:
     return vec / norm
 
 
-def fixed_side_grasp_rotation(approach_axis_world: np.ndarray) -> np.ndarray:
-    """Build a robot target frame with local +Z pointing along the approach axis."""
-    z_axis = normalize(approach_axis_world)
+def fixed_side_grasp_rotation(
+    approach_axis_world: np.ndarray,
+    *,
+    target_frame_convention: str = "piper_local_z",
+) -> np.ndarray:
+    """Build a fixed side-grasp target frame for the selected local-axis convention."""
+    approach_axis_world = normalize(approach_axis_world)
     y_hint = np.array([0.0, 0.0, 1.0], dtype=np.float64)
-    if abs(float(np.dot(z_axis, y_hint))) > 0.95:
+    if abs(float(np.dot(approach_axis_world, y_hint))) > 0.95:
         y_hint = np.array([0.0, 1.0, 0.0], dtype=np.float64)
-    # 返回矩阵列向量分别是 target local X/Y/Z 在世界系中的方向。
-    # Z 轴固定为接近方向；Y 轴尽量贴近世界向上，X 轴由右手系补齐。
-    x_axis = normalize(np.cross(y_hint, z_axis))
-    y_axis = normalize(np.cross(z_axis, x_axis))
+
+    if target_frame_convention == "piper_local_z":
+        z_axis = approach_axis_world
+        # 返回矩阵列向量分别是 target local X/Y/Z 在世界系中的方向。
+        # Z 轴固定为接近方向；Y 轴尽量贴近世界向上，X 轴由右手系补齐。
+        x_axis = normalize(np.cross(y_hint, z_axis))
+        y_axis = normalize(np.cross(z_axis, x_axis))
+    elif target_frame_convention == "aloha_local_x_y_up":
+        x_axis = approach_axis_world
+        # ALOHA-style 对照 1：local +X 是指尖/深度/接近方向，
+        # local +Y 尽量朝上，可用于检查“开合轴朝上”的可视化是否更合理。
+        z_axis = normalize(np.cross(x_axis, y_hint))
+        y_axis = normalize(np.cross(z_axis, x_axis))
+    elif target_frame_convention == "aloha_local_x_z_up":
+        x_axis = approach_axis_world
+        # ALOHA-style 对照 2：local +X 是指尖/深度/接近方向，
+        # local +Z 尽量朝上，则 local +Y 为水平侧向开合轴。
+        z_axis = y_hint
+        y_axis = normalize(np.cross(z_axis, x_axis))
+        z_axis = normalize(np.cross(x_axis, y_axis))
+    else:
+        raise ValueError(f"Unsupported target_frame_convention: {target_frame_convention}")
     return np.column_stack([x_axis, y_axis, z_axis])
+
+
+def planner_approach_axis_for_convention(target_frame_convention: str) -> str:
+    if target_frame_convention == "piper_local_z":
+        return "local_z"
+    if target_frame_convention in {"aloha_local_x_y_up", "aloha_local_x_z_up"}:
+        return "local_x"
+    raise ValueError(f"Unsupported target_frame_convention: {target_frame_convention}")
 
 
 def pose_from_pos_rot(pos_xyz: np.ndarray, rot_world: np.ndarray) -> np.ndarray:
@@ -148,7 +178,10 @@ def build_plan_summary(args: argparse.Namespace, obj_data: Dict[str, np.ndarray]
         object_name = OBJECT_BY_ARM[arm]
         obj_pos = object_position(obj_data, object_name, args.foundation_frame)
         approach_axis = APPROACH_AXIS_BY_ARM[arm]
-        rot_world = fixed_side_grasp_rotation(approach_axis)
+        rot_world = fixed_side_grasp_rotation(
+            approach_axis,
+            target_frame_convention=args.target_frame_convention,
+        )
 
         grasp_pos = obj_pos - float(args.grasp_surface_retreat_m) * approach_axis
         grasp_pose = pose_from_pos_rot(grasp_pos, rot_world)
@@ -204,6 +237,8 @@ def build_plan_summary(args: argparse.Namespace, obj_data: Dict[str, np.ndarray]
         "approach_offset_m": float(args.approach_offset_m),
         "lift_m": float(args.lift_m),
         "place_z_mode": str(args.place_z_mode),
+        "target_frame_convention": str(args.target_frame_convention),
+        "planner_approach_axis": planner_approach_axis_for_convention(args.target_frame_convention),
         "pose_storage_order": "[x, y, z, qw, qx, qy, qz]",
         "debug_targets": debug_targets,
         "source_task_logic": {
@@ -240,7 +275,7 @@ def run_planner(plan_summary_path: Path, args: argparse.Namespace, env: dict) ->
         "--candidate_orientation_remap_label", "identity",
         "--candidate_target_local_x_offset_m", "0.0",
         "--candidate_target_local_z_offset_m", "0.0",
-        "--approach_axis", "local_z",
+        "--approach_axis", planner_approach_axis_for_convention(args.target_frame_convention),
         "--approach_offset_m", str(args.approach_offset_m),
         "--reach_error_pose_source", args.reach_error_pose_source,
         "--reach_pos_tol_m", str(args.reach_pos_tol_m),
@@ -260,7 +295,7 @@ def run_planner(plan_summary_path: Path, args: argparse.Namespace, env: dict) ->
         "--debug_common_candidate_top_k", "0",
         "--debug_visualize_selected_keyframe_axes", str(args.debug_visualize_selected_keyframe_axes),
         "--debug_visualize_ik_waypoints", str(args.debug_visualize_ik_waypoints),
-        "--debug_gripper_actor_forward_axis", "local_z",
+        "--debug_gripper_actor_forward_axis", planner_approach_axis_for_convention(args.target_frame_convention),
         "--enable_grasp_action_object_collision", str(args.enable_grasp_action_object_collision),
         "--replay_objects_ignore_collision", str(args.replay_objects_ignore_collision),
         "--pure_scene_output", str(args.pure_scene_output),
@@ -303,6 +338,16 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--gpu", type=int, default=2)
     parser.add_argument("--foundation_frame", type=int, default=0)
     parser.add_argument("--grasp_surface_retreat_m", type=float, default=0.03)
+    parser.add_argument(
+        "--target_frame_convention",
+        choices=["piper_local_z", "aloha_local_x_y_up", "aloha_local_x_z_up"],
+        default="piper_local_z",
+        help=(
+            "Target frame convention. piper_local_z keeps the calibrated Piper/replay local +Z "
+            "approach axis; aloha_local_x_* writes the same physical approach direction into "
+            "target local +X and asks the planner to pregrasp along local X."
+        ),
+    )
     parser.add_argument("--lift_m", type=float, default=0.10)
     parser.add_argument("--place_z_mode", choices=["env_target", "object_plus_lift"], default="env_target")
     parser.add_argument("--left_place_xyz", type=float, nargs=3, default=DEFAULT_PLACE_XYZ["left"].tolist())
@@ -347,6 +392,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--pure_scene_output", type=int, default=1)
     parser.add_argument("--enable_grasp_action_object_collision", type=int, default=0)
     parser.add_argument("--replay_objects_ignore_collision", type=int, default=1)
+    parser.add_argument("--plan_only", type=int, default=0, help="Only write the Mode O plan_summary JSON; do not invoke the planner.")
     return parser.parse_args(argv)
 
 
@@ -374,6 +420,9 @@ def main() -> None:
     with open(plan_summary_path, "w", encoding="utf-8") as f:
         json.dump(plan_summary, f, indent=2)
     print(f"[mode-o] Wrote plan summary: {plan_summary_path}")
+    if bool(args.plan_only):
+        print("[mode-o] plan_only=1, skipping planner execution")
+        return
 
     env = os.environ.copy()
     if bool(args.enable_viewer):

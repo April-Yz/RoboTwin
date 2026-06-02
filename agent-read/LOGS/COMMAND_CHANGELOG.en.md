@@ -1800,3 +1800,15 @@
   - Mode O currently stores planner target frames with local `+Z` as the approach/forward axis.
   - This matches Piper direct replay and robot-frame AnyGrasp, but differs from the original ALOHA-AgileX local `+X` fingertip-depth convention.
   - A strict ALOHA-style comparison should add a local-X branch and invoke the planner with `--approach_axis local_x`.
+
+## 2026-06-02 (Mode O Gripper Frame Validation Commands)
+
+- Added visualization entrypoint:
+  - `code_painting/visualize_mode_o_gripper_frame_conventions.py`
+- Added wrapper parameters:
+  - `--target_frame_convention piper_local_z|aloha_local_x_y_up|aloha_local_x_z_up`
+  - `--plan_only`
+- Static visualization command:
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python /home/zaijia001/ssd/RoboTwin/code_painting/visualize_mode_o_gripper_frame_conventions.py --video_id 0 --foundation_frame 0 --output_dir /home/zaijia001/ssd/RoboTwin/code_painting/mode_o_frame_convention_debug`
+- ALOHA-style local-X plan-only comparison:
+  - `bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh --gpu 2 --ids 0 --plan_only --target_frame_convention aloha_local_x_z_up --output_root /tmp/mode_o_aloha_local_x_plan_only`

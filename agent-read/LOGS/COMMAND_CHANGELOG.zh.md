@@ -1798,3 +1798,15 @@
   - Mode O 当前保存给 planner 的 target frame 使用 local `+Z` 作为接近/前进轴。
   - 该约定与 Piper direct replay / robot-frame AnyGrasp 一致，但不同于原始 ALOHA-AgileX local `+X` 指尖深度约定。
   - 如需严格 ALOHA-style 对比，后续应新增 local-X 分支并配合 planner `--approach_axis local_x`。
+
+## 2026-06-02（Mode O gripper frame 验证命令）
+
+- 新增可视化入口：
+  - `code_painting/visualize_mode_o_gripper_frame_conventions.py`
+- 新增 wrapper 参数：
+  - `--target_frame_convention piper_local_z|aloha_local_x_y_up|aloha_local_x_z_up`
+  - `--plan_only`
+- 静态可视化命令：
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python /home/zaijia001/ssd/RoboTwin/code_painting/visualize_mode_o_gripper_frame_conventions.py --video_id 0 --foundation_frame 0 --output_dir /home/zaijia001/ssd/RoboTwin/code_painting/mode_o_frame_convention_debug`
+- ALOHA-style local-X plan-only 对照：
+  - `bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh --gpu 2 --ids 0 --plan_only --target_frame_convention aloha_local_x_z_up --output_root /tmp/mode_o_aloha_local_x_plan_only`

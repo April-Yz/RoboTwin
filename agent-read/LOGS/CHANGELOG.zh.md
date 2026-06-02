@@ -2424,3 +2424,22 @@
 - `COMMAND_LIBRARY.zh.md` 与 `agent-read/COMMANDS/piper_anygrasp_keyframes.zh.md` / `.en.md` 同步新增 Mode O 夹爪朝向检查说明。
 - 验证：
   - `python3 -m py_compile code_painting/plan_first_frame_foundation_pick_diverse_bottles.py` 通过。
+
+## 2026-06-02（Mode O gripper frame 可视化与 ALOHA-style local-X 对照）
+
+- 新增 `code_painting/visualize_mode_o_gripper_frame_conventions.py`：
+  - 不跑 IK，不启动 SAPIEN viewer。
+  - 读取 `pick_diverse_bottles` FoundationPose 物体位置。
+  - 在同一 grasp target 上画出 `piper_local_z`、`aloha_local_x_y_up`、`aloha_local_x_z_up` 三套 frame。
+  - 输出 PNG 与 JSON，JSON 记录 local X/Y/Z 与物理接近方向的夹角。
+- `code_painting/plan_first_frame_foundation_pick_diverse_bottles.py` 新增：
+  - `--target_frame_convention piper_local_z|aloha_local_x_y_up|aloha_local_x_z_up`
+  - `--plan_only`
+  - 当使用 `aloha_local_x_*` 时，planner 自动使用 `--approach_axis local_x` 和 `--debug_gripper_actor_forward_axis local_x`。
+- `code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh` 同步透传 `--target_frame_convention` 与 `--plan_only`。
+- `.gitignore` 放行新增可视化脚本，继续忽略生成的 PNG/JSON 调试输出。
+- 验证：
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/plan_first_frame_foundation_pick_diverse_bottles.py code_painting/visualize_mode_o_gripper_frame_conventions.py` 通过。
+  - `bash -n code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh` 通过。
+  - 可视化脚本对 `pick_diverse_bottles id0 frame0` 成功输出 PNG/JSON；结果显示 `piper_local_z` 的 local Z 与物理接近方向夹角为 `0deg`，两个 ALOHA-style local-X 变体的 local X 与物理接近方向夹角为 `0deg`。
+  - `--plan_only --target_frame_convention aloha_local_x_z_up` 成功写出 summary，记录 `target_frame_convention=aloha_local_x_z_up`、`planner_approach_axis=local_x`。

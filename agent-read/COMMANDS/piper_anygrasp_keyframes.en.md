@@ -573,6 +573,31 @@ Gripper orientation check:
 - Mode O currently follows the calibrated Piper/replay pipeline: the planner target frame uses local `+Z` blue as the approach/forward axis. This is consistent with the earlier direct-replay and robot-frame AnyGrasp paths, but it is not the original ALOHA-style local `+X` fingertip-depth convention.
 - A strict ALOHA-style local-X comparison would need a separate Mode O branch that writes the approach direction into target local `+X` and invokes the planner with `--approach_axis local_x`.
 
+New validation entrypoint:
+
+```text
+code_painting/visualize_mode_o_gripper_frame_conventions.py
+```
+
+This script only reads FoundationPose object positions and does not run IK. It draws `piper_local_z`, `aloha_local_x_y_up`, and `aloha_local_x_z_up` frames at the same grasp point, then writes the angle between each local axis and the physical approach direction.
+
+Static visualization command:
+
+```bash
+/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python /home/zaijia001/ssd/RoboTwin/code_painting/visualize_mode_o_gripper_frame_conventions.py --video_id 0 --foundation_frame 0 --output_dir /home/zaijia001/ssd/RoboTwin/code_painting/mode_o_frame_convention_debug
+```
+
+Mode O wrapper additions:
+
+- `--target_frame_convention piper_local_z|aloha_local_x_y_up|aloha_local_x_z_up`
+- `--plan_only`: write `plan_summary_first_frame_foundation.json` without invoking the planner.
+
+ALOHA-style local-X plan-only comparison:
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh --gpu 2 --ids 0 --plan_only --target_frame_convention aloha_local_x_z_up --output_root /tmp/mode_o_aloha_local_x_plan_only
+```
+
 Important note: keys in `multi_object_world_poses.npz` include `pose_world_wxyz`, but the actual array order used by the planner is `[x, y, z, qw, qx, qy, qz]`.
 
 Recommended smoke command:
