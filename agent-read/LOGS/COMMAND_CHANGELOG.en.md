@@ -1,3 +1,20 @@
+## 2026-06-02 00:00:00 +08
+
+- Added section O to `COMMAND_LIBRARY.zh.md`:
+  - First-frame FoundationPose direct-strategy `pick_diverse_bottles` comparison experiment.
+  - Recommended command: `bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh --gpu 2 --ids 0 --continue_on_error --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/first_frame_foundation_smoke`
+- Added command entrypoint:
+  - `code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh`
+  - Important parameters: `--foundation_frame`, `--grasp_surface_retreat_m`, `--approach_offset_m`, `--place_z_mode`, `--lift_m`, and `--viewer`.
+- Added core script:
+  - `code_painting/plan_first_frame_foundation_pick_diverse_bottles.py`
+  - It generates `plan_summary_first_frame_foundation.json` and invokes the existing Piper planner with `--reuse_plan_summary_json`.
+- Validation:
+  - Python `py_compile` passed.
+  - wrapper `bash -n` passed.
+  - `--ids 0 --dry_run` resolved paths.
+  - The no-viewer `pick_diverse_bottles id0` smoke run completed; pregrasp reached, grasp did not reach for both arms, and the default safety gate skipped close/action.
+
 ## 2026-05-28 23:30:00 +08
 
 - Updated `COMMAND_LIBRARY.zh.md` L15.11:

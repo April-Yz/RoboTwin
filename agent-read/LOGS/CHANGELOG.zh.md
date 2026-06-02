@@ -1,5 +1,28 @@
 # CHANGELOG.zh
 
+## 2026-06-02（Mode O 第一帧 FoundationPose 直接策略抓取）
+
+- 新增 `pick_diverse_bottles` 对比实验 Mode O：
+  - `code_painting/plan_first_frame_foundation_pick_diverse_bottles.py`
+  - `code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh`
+- 设计逻辑：
+  - 不使用手工关键帧、人手朝向或 AnyGrasp 候选。
+  - 从 `foundation_replay_d435/foundation_input_<ID>/multi_object_world_poses.npz` 读取第 0 帧两个 bottle 世界位置。
+  - 固定左瓶左臂、右瓶右臂，按外侧水平夹取生成 grasp target。
+  - 复用现有 Piper planner 的 `--reuse_plan_summary_json` 执行 pregrasp/grasp/close/action。
+  - 默认 pregrasp 距离 `0.08m`，对齐 `envs/pick_diverse_bottles.py` 的 `pre_grasp_dis=0.08`。
+  - 默认 action 目标沿用 env：left `[-0.06,-0.105,1.0]`，right `[0.06,-0.105,1.0]`。
+- 代码注意：
+  - `multi_object_world_poses.npz` 中 `pose_world_wxyz` 键名易误导；实际数组顺序为 `[x, y, z, qw, qx, qy, qz]`，新脚本按 planner 实际约定处理。
+- 文档更新：
+  - `COMMAND_LIBRARY.zh.md` 新增 O 节。
+  - `agent-read/COMMANDS/piper_anygrasp_keyframes.zh.md` / `.en.md` 同步 Mode O 说明。
+- 验证：
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_first_frame_foundation_pick_diverse_bottles.py` 通过。
+  - `bash -n /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh` 通过。
+  - `bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh --ids 0 --dry_run` 通过。
+  - `pick_diverse_bottles id0` 无 viewer smoke 完成，输出在 `code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/first_frame_foundation_smoke/pick_diverse_bottles/foundation_input_0`；pregrasp 左右臂均 reached，但 grasp 未双臂同时 reached，默认安全约束跳过 close/action。
+
 ## 2026-05-28（Piper AnyGrasp gripper 坐标轴修正与 IK 位置优先诊断）
 
 - 问题定位：

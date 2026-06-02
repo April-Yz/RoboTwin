@@ -1,3 +1,20 @@
+## 2026-06-02 00:00:00 +08
+
+- 新增 `COMMAND_LIBRARY.zh.md` O 节：
+  - 第一帧 FoundationPose 直接策略抓取 `pick_diverse_bottles` 对照实验。
+  - 推荐命令：`bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh --gpu 2 --ids 0 --continue_on_error --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/first_frame_foundation_smoke`
+- 新增命令入口：
+  - `code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh`
+  - 重要参数：`--foundation_frame`、`--grasp_surface_retreat_m`、`--approach_offset_m`、`--place_z_mode`、`--lift_m`、`--viewer`。
+- 新增核心脚本：
+  - `code_painting/plan_first_frame_foundation_pick_diverse_bottles.py`
+  - 生成 `plan_summary_first_frame_foundation.json` 后通过 `--reuse_plan_summary_json` 调用现有 Piper planner。
+- 验证：
+  - Python `py_compile` 通过。
+  - wrapper `bash -n` 通过。
+  - `--ids 0 --dry_run` 路径解析通过。
+  - `pick_diverse_bottles id0` 无 viewer smoke 完成；pregrasp reached，grasp 未双臂同时 reached，默认跳过 close/action。
+
 ## 2026-05-28 19:20:00 +08
 
 - 新增 `COMMAND_LIBRARY.zh.md` L15.6：

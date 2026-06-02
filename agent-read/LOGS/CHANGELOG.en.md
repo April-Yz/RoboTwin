@@ -1,5 +1,28 @@
 # CHANGELOG.en
 
+## 2026-06-02 (Mode O First-Frame FoundationPose Direct Strategy Grasp)
+
+- Added the Mode O comparison experiment for `pick_diverse_bottles`:
+  - `code_painting/plan_first_frame_foundation_pick_diverse_bottles.py`
+  - `code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh`
+- Design logic:
+  - Does not use manual keyframes, human hand orientation, or AnyGrasp candidates.
+  - Reads both bottle world positions from frame 0 of `foundation_replay_d435/foundation_input_<ID>/multi_object_world_poses.npz`.
+  - Assigns the left bottle to the left arm and the right bottle to the right arm, then builds fixed outside-in horizontal side-grasp targets.
+  - Reuses the existing Piper planner through `--reuse_plan_summary_json` for pregrasp/grasp/close/action.
+  - Defaults to a `0.08m` pregrasp distance, matching `envs/pick_diverse_bottles.py`'s `pre_grasp_dis=0.08`.
+  - Defaults to the env placement targets: left `[-0.06,-0.105,1.0]`, right `[0.06,-0.105,1.0]`.
+- Code note:
+  - The `pose_world_wxyz` key name in `multi_object_world_poses.npz` is misleading. The actual array order is `[x, y, z, qw, qx, qy, qz]`, and the new script follows the planner convention.
+- Documentation:
+  - Added section O to `COMMAND_LIBRARY.zh.md`.
+  - Synced Mode O notes into `agent-read/COMMANDS/piper_anygrasp_keyframes.zh.md` and `.en.md`.
+- Validation:
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_first_frame_foundation_pick_diverse_bottles.py` passed.
+  - `bash -n /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh` passed.
+  - `bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh --ids 0 --dry_run` passed.
+  - A no-viewer `pick_diverse_bottles id0` smoke run completed under `code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/first_frame_foundation_smoke/pick_diverse_bottles/foundation_input_0`; both arms reached pregrasp, but grasp did not reach for both arms, so the default safety gate skipped close/action.
+
 ## 2026-05-28 (Cartesian Partial Prefix Execution)
 
 - Added a Cartesian waypoint partial-prefix execution diagnostic:

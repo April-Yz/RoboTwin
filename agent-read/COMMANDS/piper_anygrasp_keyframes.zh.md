@@ -544,3 +544,39 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_pipe
 ```bash
 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh --gpu 2 --ids 0 1 2 3 4 --continue_on_error --viewer --tasks pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray --visualize_targets --disable_execution_collisions --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --viewer_wait_at_end 0 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer_gripper
 ```
+
+## O. 第一帧 FoundationPose 直接策略抓取对照
+
+`COMMAND_LIBRARY.zh.md` 末尾新增 Mode O，用于 `pick_diverse_bottles` 的更简单对照实验：不使用手工关键帧、不使用人手朝向、不使用 AnyGrasp candidate，只用第 0 帧 FoundationPose 的两个 bottle 世界位置，按 env 任务逻辑生成抓取和放置目标。
+
+新增入口：
+
+```text
+code_painting/plan_first_frame_foundation_pick_diverse_bottles.py
+code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh
+```
+
+核心逻辑：
+
+- 读取 `foundation_replay_d435/foundation_input_<ID>/multi_object_world_poses.npz`。
+- `left_bottle` 固定左臂，`right_bottle` 固定右臂。
+- 左臂 local `+Z` 设为世界 `[+1,0,0]`，右臂 local `+Z` 设为世界 `[-1,0,0]`，表示两臂从外侧水平夹取。
+- grasp target = bottle center 沿接近轴反方向退 `--grasp_surface_retreat_m`，默认 `0.03m`。
+- pregrasp 由 planner 沿 local `+Z` 后退 `--approach_offset_m`，默认 `0.08m`，对齐 `envs/pick_diverse_bottles.py` 的 `pre_grasp_dis=0.08`。
+- action target 默认是 env 的左右目标：left `[-0.06,-0.105,1.0]`，right `[0.06,-0.105,1.0]`。
+- 通过 `--reuse_plan_summary_json` 复用原有 Piper planner 的 pregrasp/grasp/close/action、IK、视频和 debug 逻辑。
+
+注意：`multi_object_world_poses.npz` 的键名包含 `pose_world_wxyz`，但实际数组顺序与 planner 一致，是 `[x, y, z, qw, qx, qy, qz]`。
+
+推荐 smoke：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh --gpu 2 --ids 0 --continue_on_error --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/first_frame_foundation_smoke
+```
+
+已验证：
+
+- `python -m py_compile code_painting/plan_first_frame_foundation_pick_diverse_bottles.py` 通过。
+- `bash -n code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh` 通过。
+- `--ids 0 --dry_run` 路径解析通过。
+- `pick_diverse_bottles id0` 无 viewer smoke 可生成 `plan_summary_first_frame_foundation.json`、`pose_debug.jsonl`、`head_cam_plan.mp4`、`third_cam_plan.mp4`。本次 pregrasp 左右臂均 reached，但 grasp 未双臂同时 reached，因此默认安全约束阻止 close/action。

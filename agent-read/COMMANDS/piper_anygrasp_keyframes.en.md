@@ -544,3 +544,39 @@ All six tasks with the same id set:
 ```bash
 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh --gpu 2 --ids 0 1 2 3 4 --continue_on_error --viewer --tasks pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray --visualize_targets --disable_execution_collisions --trajectory_mode cartesian_interp_ik --cartesian_auto_step_m 0.03 --execute_partial_cartesian_plan --allow_partial_dual_stage --print_pose_every 5 --reach_error_pose_source ee --ik_max_rotation_threshold_rad 3.14 --viewer_wait_at_end 0 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/viewer_gripper
 ```
+
+## O. First-Frame FoundationPose Direct Strategy Baseline
+
+`COMMAND_LIBRARY.zh.md` now ends with Mode O, a simpler `pick_diverse_bottles` comparison experiment. It does not use manual keyframes, human hand orientation, or AnyGrasp candidates. It reads the two bottle world positions from frame 0 of FoundationPose and generates grasp/place targets with the original env task logic.
+
+New entrypoints:
+
+```text
+code_painting/plan_first_frame_foundation_pick_diverse_bottles.py
+code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh
+```
+
+Core behavior:
+
+- Read `foundation_replay_d435/foundation_input_<ID>/multi_object_world_poses.npz`.
+- Assign `left_bottle` to the left arm and `right_bottle` to the right arm.
+- Set left-arm local `+Z` to world `[+1,0,0]` and right-arm local `+Z` to world `[-1,0,0]`, so both arms attempt an outside-in horizontal side grasp.
+- Set the grasp target to the bottle center retreated by `--grasp_surface_retreat_m`, default `0.03m`, opposite the approach axis.
+- Let the planner generate pregrasp by retreating along local `+Z` by `--approach_offset_m`, default `0.08m`, matching `envs/pick_diverse_bottles.py`'s `pre_grasp_dis=0.08`.
+- Set the action target to the env placement defaults: left `[-0.06,-0.105,1.0]`, right `[0.06,-0.105,1.0]`.
+- Reuse the existing Piper planner through `--reuse_plan_summary_json`, including pregrasp/grasp/close/action, IK, video output, and debug output.
+
+Important note: keys in `multi_object_world_poses.npz` include `pose_world_wxyz`, but the actual array order used by the planner is `[x, y, z, qw, qx, qy, qz]`.
+
+Recommended smoke command:
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh --gpu 2 --ids 0 --continue_on_error --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/first_frame_foundation_smoke
+```
+
+Validation:
+
+- `python -m py_compile code_painting/plan_first_frame_foundation_pick_diverse_bottles.py` passed.
+- `bash -n code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh` passed.
+- `--ids 0 --dry_run` resolved the expected paths.
+- The no-viewer `pick_diverse_bottles id0` smoke run generated `plan_summary_first_frame_foundation.json`, `pose_debug.jsonl`, `head_cam_plan.mp4`, and `third_cam_plan.mp4`. In that run both arms reached pregrasp, but grasp did not reach for both arms, so the default safety gate skipped close/action.
