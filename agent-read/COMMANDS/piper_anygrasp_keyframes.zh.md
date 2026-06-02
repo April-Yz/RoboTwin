@@ -566,6 +566,13 @@ code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh
 - action target 默认是 env 的左右目标：left `[-0.06,-0.105,1.0]`，right `[0.06,-0.105,1.0]`。
 - 通过 `--reuse_plan_summary_json` 复用原有 Piper planner 的 pregrasp/grasp/close/action、IK、视频和 debug 逻辑。
 
+夹爪朝向检查：
+
+- Piper/Pika 配置与原始 ALOHA-AgileX 在 `global_trans_matrix=diag(1,-1,-1)`、`delta_matrix=I`、`grasp_perfect_direction=["front_right","front_left"]` 上一致。
+- 差异在 URDF 夹爪结构轴和 target frame 约定：ALOHA-AgileX 的夹爪深度/指尖方向更自然对应 link6 local `+X`，开合沿 local `+/-Y`；Piper/Pika 夹爪开合轴在 gripper base local `Z/-Z`，结构轴不完全同构。
+- 当前 Mode O 沿用已标定 Piper/replay 管线，保存给 planner 的 target frame 使用 local `+Z`（蓝轴）作为接近/前进轴；这和前面的 direct replay / robot-frame AnyGrasp 逻辑一致，但不是原始 ALOHA-style local `+X` 指尖深度约定。
+- 如果要做严格 ALOHA-style local-X 对比，需要新增 Mode O 分支，把接近轴写入 target local `+X`，并让 planner 使用 `--approach_axis local_x`。
+
 注意：`multi_object_world_poses.npz` 的键名包含 `pose_world_wxyz`，但实际数组顺序与 planner 一致，是 `[x, y, z, qw, qx, qy, qz]`。
 
 推荐 smoke：

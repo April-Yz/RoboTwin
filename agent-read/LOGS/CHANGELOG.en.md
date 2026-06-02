@@ -2415,3 +2415,14 @@
   - `bash -n code_painting/run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh` passed.
   - `bash -n code_painting/run_render_anygrasp_ranked_preview_keyframes_d435_robot_frame_six_tasks.sh` passed.
   - `run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh --ids 4 --dry_run --tasks stack_cups ...` correctly listed `stack_cups/foundation_input_4/summary.json`.
+
+## 2026-06-02 (Mode O Piper Gripper Axis Audit And Chinese Comments)
+
+- Checked the Piper/Pika gripper orientation definition against the original ALOHA-AgileX setup:
+  - The high-level config values `global_trans_matrix=diag(1,-1,-1)`, `delta_matrix=I`, and `grasp_perfect_direction=["front_right","front_left"]` match.
+  - The URDF gripper structural axes differ: ALOHA-AgileX's finger-depth/fingertip direction is naturally link6 local `+X`, while Piper/Pika's gripper opening axis is gripper-base local `Z/-Z`.
+  - Mode O currently follows the Piper/replay target-frame convention and uses local `+Z` as the approach/forward axis. This matches direct replay and robot-frame AnyGrasp, but it is not the original ALOHA-style local `+X` convention.
+- Added Chinese comments to `code_painting/plan_first_frame_foundation_pick_diverse_bottles.py`, covering the file purpose, target generation logic, pose storage order, local `+Z` approach-axis convention, and the difference from ALOHA-style local `+X`.
+- Updated `COMMAND_LIBRARY.zh.md` and `agent-read/COMMANDS/piper_anygrasp_keyframes.zh.md` / `.en.md` with the Mode O gripper-orientation audit.
+- Validation:
+  - `python3 -m py_compile code_painting/plan_first_frame_foundation_pick_diverse_bottles.py` passed.

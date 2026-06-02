@@ -2413,3 +2413,14 @@
   - `bash -n code_painting/run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh` 通过。
   - `bash -n code_painting/run_render_anygrasp_ranked_preview_keyframes_d435_robot_frame_six_tasks.sh` 通过。
   - `run_plan_anygrasp_keyframes_piper_d435_robot_frame_six_tasks.sh --ids 4 --dry_run --tasks stack_cups ...` 正确列出 `stack_cups/foundation_input_4/summary.json`。
+
+## 2026-06-02（Mode O Piper gripper 轴约定检查与中文注释）
+
+- 检查 Piper/Pika 与 ALOHA-AgileX 的夹爪朝向定义：
+  - 高层配置 `global_trans_matrix=diag(1,-1,-1)`、`delta_matrix=I`、`grasp_perfect_direction=["front_right","front_left"]` 一致。
+  - URDF 夹爪结构轴不同：ALOHA-AgileX 的 finger depth/指尖方向更自然对应 link6 local `+X`，Piper/Pika 的夹爪开合轴在 gripper base local `Z/-Z`。
+  - 当前 Mode O 沿用 Piper/replay target frame，使用 local `+Z` 作为接近/前进轴；这和 direct replay / robot-frame AnyGrasp 一致，但不是原始 ALOHA-style local `+X` 约定。
+- `code_painting/plan_first_frame_foundation_pick_diverse_bottles.py` 增加中文注释，说明文件位置、目标生成逻辑、pose 存储顺序、local `+Z` 接近轴约定，以及和 ALOHA-style local `+X` 的差异。
+- `COMMAND_LIBRARY.zh.md` 与 `agent-read/COMMANDS/piper_anygrasp_keyframes.zh.md` / `.en.md` 同步新增 Mode O 夹爪朝向检查说明。
+- 验证：
+  - `python3 -m py_compile code_painting/plan_first_frame_foundation_pick_diverse_bottles.py` 通过。

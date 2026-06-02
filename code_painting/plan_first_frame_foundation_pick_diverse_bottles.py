@@ -11,6 +11,14 @@ keyframes per arm to the existing Piper planner:
 
 The generated plan_summary JSON uses the existing planner pose convention:
 [x, y, z, qw, qx, qy, qz].
+
+中文说明：
+这个文件就是 Mode O 的新增 Python 入口。它只用第一帧 FoundationPose
+中的两个 bottle 世界位置，构造一个固定侧向抓取和一个 lift/move 放置目标。
+这里保存给 Piper planner 的 target frame 采用现有 Piper/replay 约定：
+target local +Z 是接近/前进轴；这不同于 ALOHA-AgileX 原始夹爪几何中
+更自然的 local +X 指尖/深度方向。若后续要做 ALOHA-style local-X 对照，
+需要额外加显式轴映射或 `--approach_axis local_x` 分支。
 """
 
 from __future__ import annotations
@@ -40,6 +48,9 @@ DEFAULT_PLACE_XYZ = {
     "left": np.array([-0.06, -0.105, 1.0], dtype=np.float64),
     "right": np.array([0.06, -0.105, 1.0], dtype=np.float64),
 }
+# Piper/replay target 坐标约定：local +Z 是夹爪接近/前进轴。
+# 左臂从物体左侧向世界 +X 接近，右臂从物体右侧向世界 -X 接近。
+# 注意：这不是 ALOHA-AgileX URDF 夹爪的原始 local +X 指尖深度约定。
 APPROACH_AXIS_BY_ARM = {
     "left": np.array([1.0, 0.0, 0.0], dtype=np.float64),
     "right": np.array([-1.0, 0.0, 0.0], dtype=np.float64),
@@ -60,12 +71,16 @@ def fixed_side_grasp_rotation(approach_axis_world: np.ndarray) -> np.ndarray:
     y_hint = np.array([0.0, 0.0, 1.0], dtype=np.float64)
     if abs(float(np.dot(z_axis, y_hint))) > 0.95:
         y_hint = np.array([0.0, 1.0, 0.0], dtype=np.float64)
+    # 返回矩阵列向量分别是 target local X/Y/Z 在世界系中的方向。
+    # Z 轴固定为接近方向；Y 轴尽量贴近世界向上，X 轴由右手系补齐。
     x_axis = normalize(np.cross(y_hint, z_axis))
     y_axis = normalize(np.cross(z_axis, x_axis))
     return np.column_stack([x_axis, y_axis, z_axis])
 
 
 def pose_from_pos_rot(pos_xyz: np.ndarray, rot_world: np.ndarray) -> np.ndarray:
+    # planner 的 plan_summary 统一使用 [x, y, z, qw, qx, qy, qz]，
+    # scipy 输出是 xyzw，这里显式换成 wxyz，避免和文件名里的 wxyz 混淆。
     quat_xyzw = R.from_matrix(rot_world).as_quat()
     quat_wxyz = np.array([quat_xyzw[3], quat_xyzw[0], quat_xyzw[1], quat_xyzw[2]], dtype=np.float64)
     return np.concatenate([np.asarray(pos_xyz, dtype=np.float64).reshape(3), quat_wxyz])
@@ -119,6 +134,9 @@ def build_candidate_entry(
 
 
 def build_plan_summary(args: argparse.Namespace, obj_data: Dict[str, np.ndarray]) -> dict:
+    # 为左右 bottle 各生成两个 synthetic keyframes：
+    # 1. grasp：从 FoundationPose 物体中心沿接近轴反方向退到瓶身表面附近；
+    # 2. action：复用 pick_diverse_bottles env 的左右目标点执行 lift/move。
     selected_by_arm: Dict[str, list] = {}
     debug_targets: Dict[str, dict] = {}
     place_xyz = {

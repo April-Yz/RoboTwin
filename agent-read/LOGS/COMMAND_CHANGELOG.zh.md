@@ -1788,3 +1788,13 @@
 - 关键参数：
   - `--ids <ID>` 精确指定 episode。
   - robot-frame wrapper 会自动补缺失 summary；如需禁用可加 `--skip_preview_generation`。
+
+## 2026-06-02（Mode O gripper 轴约定说明）
+
+- 命令格式未变，仍使用：
+  - `code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh`
+  - `code_painting/plan_first_frame_foundation_pick_diverse_bottles.py`
+- 文档补充：
+  - Mode O 当前保存给 planner 的 target frame 使用 local `+Z` 作为接近/前进轴。
+  - 该约定与 Piper direct replay / robot-frame AnyGrasp 一致，但不同于原始 ALOHA-AgileX local `+X` 指尖深度约定。
+  - 如需严格 ALOHA-style 对比，后续应新增 local-X 分支并配合 planner `--approach_axis local_x`。

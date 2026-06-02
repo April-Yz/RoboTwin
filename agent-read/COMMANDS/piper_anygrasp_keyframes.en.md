@@ -566,6 +566,13 @@ Core behavior:
 - Set the action target to the env placement defaults: left `[-0.06,-0.105,1.0]`, right `[0.06,-0.105,1.0]`.
 - Reuse the existing Piper planner through `--reuse_plan_summary_json`, including pregrasp/grasp/close/action, IK, video output, and debug output.
 
+Gripper orientation check:
+
+- The Piper/Pika config matches the original ALOHA-AgileX config for `global_trans_matrix=diag(1,-1,-1)`, `delta_matrix=I`, and `grasp_perfect_direction=["front_right","front_left"]`.
+- The important difference is the URDF gripper geometry and target-frame convention. ALOHA-AgileX's gripper depth/fingertip direction is naturally link6 local `+X`, with finger opening along local `+/-Y`. Piper/Pika's gripper opening axis is gripper-base local `Z/-Z`, so the structural axes are not identical.
+- Mode O currently follows the calibrated Piper/replay pipeline: the planner target frame uses local `+Z` blue as the approach/forward axis. This is consistent with the earlier direct-replay and robot-frame AnyGrasp paths, but it is not the original ALOHA-style local `+X` fingertip-depth convention.
+- A strict ALOHA-style local-X comparison would need a separate Mode O branch that writes the approach direction into target local `+X` and invokes the planner with `--approach_axis local_x`.
+
 Important note: keys in `multi_object_world_poses.npz` include `pose_world_wxyz`, but the actual array order used by the planner is `[x, y, z, qw, qx, qy, qz]`.
 
 Recommended smoke command:

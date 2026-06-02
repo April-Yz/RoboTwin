@@ -1790,3 +1790,13 @@
 - Important parameters:
   - `--ids <ID>` selects exact episodes.
   - The robot-frame wrapper auto-fills missing summaries; add `--skip_preview_generation` to disable that behavior.
+
+## 2026-06-02 (Mode O Gripper Axis Convention Note)
+
+- Command formats are unchanged and still use:
+  - `code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh`
+  - `code_painting/plan_first_frame_foundation_pick_diverse_bottles.py`
+- Documentation added:
+  - Mode O currently stores planner target frames with local `+Z` as the approach/forward axis.
+  - This matches Piper direct replay and robot-frame AnyGrasp, but differs from the original ALOHA-AgileX local `+X` fingertip-depth convention.
+  - A strict ALOHA-style comparison should add a local-X branch and invoke the planner with `--approach_axis local_x`.
