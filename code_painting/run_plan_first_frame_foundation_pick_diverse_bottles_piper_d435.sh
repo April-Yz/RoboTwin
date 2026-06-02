@@ -133,9 +133,11 @@ for ID in "${IDS[@]}"; do
     continue
   fi
 
+  PY_GPU="$GPU"
   RUN_ENV=(env CUDA_VISIBLE_DEVICES=${GPU})
   if ((VIEWER)); then
     [[ -f /etc/vulkan/icd.d/nvidia_icd.json ]] && export VK_ICD_FILENAMES=/etc/vulkan/icd.d/nvidia_icd.json
+    PY_GPU=-1
     RUN_ENV=(env -u CUDA_VISIBLE_DEVICES)
   fi
 
@@ -145,7 +147,7 @@ for ID in "${IDS[@]}"; do
     --hand_npz "$HAND"
     --output_dir "$OUT"
     --video_id "$ID"
-    --gpu "$GPU"
+    --gpu "$PY_GPU"
     --foundation_frame "$FOUNDATION_FRAME"
     --grasp_surface_retreat_m "$GRASP_SURFACE_RETREAT_M"
     --approach_offset_m "$APPROACH_OFFSET_M"

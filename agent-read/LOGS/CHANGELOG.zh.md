@@ -2,6 +2,11 @@
 
 ## 2026-06-02（Mode O 第一帧 FoundationPose 直接策略抓取）
 
+- 后续 viewer 修复：
+  - 用户运行 Mode O viewer 时日志显示 `CUDA_VISIBLE_DEVICES=2`，随后 SAPIEN 报 `Renderer does not support display`。
+  - 原因：wrapper 在 viewer 模式下已用 `env -u CUDA_VISIBLE_DEVICES`，但 `plan_first_frame_foundation_pick_diverse_bottles.py` 调 planner 前又根据 `--gpu 2` 把 `CUDA_VISIBLE_DEVICES` 写回子进程环境。
+  - 修复：viewer 模式下 wrapper 传 `--gpu -1`，Python 入口在 `enable_viewer=1` 时显式移除 `CUDA_VISIBLE_DEVICES`。
+  - 验证：`DISPLAY=:1.0 bash code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh --gpu 2 --ids 0 --viewer --viewer_wait_at_end 0 --continue_on_error --output_root /tmp/mode_o_viewer_env_check` 中 viewer 创建日志变为 `CUDA_VISIBLE_DEVICES=None`，并成功打印 `[viewer] interactive viewer created`。
 - 新增 `pick_diverse_bottles` 对比实验 Mode O：
   - `code_painting/plan_first_frame_foundation_pick_diverse_bottles.py`
   - `code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh`

@@ -574,6 +574,19 @@ code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh
 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh --gpu 2 --ids 0 --continue_on_error --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/first_frame_foundation_smoke
 ```
 
+Viewer 注意事项：
+
+- 你遇到的 `Renderer does not support display` 不是目标生成失败，而是 SAPIEN interactive viewer 创建失败。
+- 这次日志中 viewer 创建时仍显示 `CUDA_VISIBLE_DEVICES=2`，原因是 Mode O Python 入口在调用 planner 前又把 wrapper 已经 unset 的环境变量写回去了。
+- 已修复：viewer 模式下 wrapper 传 `--gpu -1` 给 Python，Python 再调用 planner 时也会移除 `CUDA_VISIBLE_DEVICES`。
+- 修复后如果最小 viewer 探针仍失败，问题就是当前 `DISPLAY`/Vulkan 图形会话不可用，需要换到能打开 SAPIEN 的 VNC/图形终端。
+
+最小 viewer 探针：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && cd /home/zaijia001/ssd/RoboTwin && unset CUDA_VISIBLE_DEVICES; [[ -f /etc/vulkan/icd.d/nvidia_icd.json ]] && export VK_ICD_FILENAMES=/etc/vulkan/icd.d/nvidia_icd.json; echo "DISPLAY=$DISPLAY CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-unset} VK_ICD_FILENAMES=${VK_ICD_FILENAMES:-unset}" && conda run -n RoboTwin_bw python /home/zaijia001/ssd/RoboTwin/code_painting/probe_sapien_viewer.py
+```
+
 已验证：
 
 - `python -m py_compile code_painting/plan_first_frame_foundation_pick_diverse_bottles.py` 通过。

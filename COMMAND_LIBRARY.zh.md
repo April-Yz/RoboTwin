@@ -5402,6 +5402,20 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_first_frame_foundation_
 
 ### Viewer 调试
 
+如果日志出现：
+
+```text
+[viewer-warning] failed to create interactive viewer ... Renderer does not support display
+```
+
+先检查最小 viewer。SAPIEN viewer 需要能看到驱动当前 VNC/X display 的 GPU；如果设置了 `CUDA_VISIBLE_DEVICES=2`，可能把 display 对应 GPU mask 掉。Mode O wrapper 已修复为 viewer 模式下不再把 `CUDA_VISIBLE_DEVICES` 写回 Python/planner 子进程，正常日志应显示 `CUDA_VISIBLE_DEVICES=None` 或 `unset`。
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && cd /home/zaijia001/ssd/RoboTwin && unset CUDA_VISIBLE_DEVICES; [[ -f /etc/vulkan/icd.d/nvidia_icd.json ]] && export VK_ICD_FILENAMES=/etc/vulkan/icd.d/nvidia_icd.json; echo "DISPLAY=$DISPLAY CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-unset} VK_ICD_FILENAMES=${VK_ICD_FILENAMES:-unset}" && conda run -n RoboTwin_bw python /home/zaijia001/ssd/RoboTwin/code_painting/probe_sapien_viewer.py
+```
+
+如果这个最小探针仍报 `Renderer does not support display`，说明当前 shell 的 `DISPLAY`/Vulkan 图形会话不可用，需要切到能打开 SAPIEN viewer 的 VNC/图形终端，或修复 X11/Wayland forwarding；这时 Mode O 会自动 fallback 到 offscreen 并继续生成视频。
+
 ```bash
 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh --gpu 2 --ids 0 --viewer --viewer_wait_at_end 1 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/first_frame_foundation_viewer
 ```

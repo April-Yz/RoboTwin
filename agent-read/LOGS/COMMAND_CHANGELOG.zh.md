@@ -1,5 +1,11 @@
 ## 2026-06-02 00:00:00 +08
 
+- 修复 Mode O viewer 环境传递：
+  - `run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh` 在 `--viewer` 时传 `--gpu -1`。
+  - `plan_first_frame_foundation_pick_diverse_bottles.py` 在 `--enable_viewer 1` 时移除 `CUDA_VISIBLE_DEVICES`，避免覆盖 wrapper 的 unset。
+  - 新增/更新 O 节 viewer 探针说明。
+- 验证：
+  - `DISPLAY=:1.0 ... --viewer --viewer_wait_at_end 0 ...` 成功创建 SAPIEN viewer，日志显示 `CUDA_VISIBLE_DEVICES=None`。
 - 新增 `COMMAND_LIBRARY.zh.md` O 节：
   - 第一帧 FoundationPose 直接策略抓取 `pick_diverse_bottles` 对照实验。
   - 推荐命令：`bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh --gpu 2 --ids 0 --continue_on_error --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/first_frame_foundation_smoke`

@@ -574,6 +574,19 @@ Recommended smoke command:
 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh --gpu 2 --ids 0 --continue_on_error --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/first_frame_foundation_smoke
 ```
 
+Viewer notes:
+
+- The `Renderer does not support display` warning means the SAPIEN interactive viewer failed to create a window. It is not a target-generation failure.
+- In the failed run, viewer creation still printed `CUDA_VISIBLE_DEVICES=2` because the Mode O Python entrypoint restored the environment variable that the wrapper had already unset.
+- This is now fixed: in viewer mode the wrapper passes `--gpu -1` to Python, and Python removes `CUDA_VISIBLE_DEVICES` again before invoking the planner.
+- If the minimal viewer probe still fails after this fix, the remaining issue is the current `DISPLAY`/Vulkan graphical session. Run from a VNC/graphical terminal that can create a SAPIEN viewer.
+
+Minimal viewer probe:
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && cd /home/zaijia001/ssd/RoboTwin && unset CUDA_VISIBLE_DEVICES; [[ -f /etc/vulkan/icd.d/nvidia_icd.json ]] && export VK_ICD_FILENAMES=/etc/vulkan/icd.d/nvidia_icd.json; echo "DISPLAY=$DISPLAY CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-unset} VK_ICD_FILENAMES=${VK_ICD_FILENAMES:-unset}" && conda run -n RoboTwin_bw python /home/zaijia001/ssd/RoboTwin/code_painting/probe_sapien_viewer.py
+```
+
 Validation:
 
 - `python -m py_compile code_painting/plan_first_frame_foundation_pick_diverse_bottles.py` passed.

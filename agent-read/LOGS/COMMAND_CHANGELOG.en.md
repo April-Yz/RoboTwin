@@ -1,5 +1,11 @@
 ## 2026-06-02 00:00:00 +08
 
+- Fixed Mode O viewer environment forwarding:
+  - `run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh` now passes `--gpu -1` when `--viewer` is enabled.
+  - `plan_first_frame_foundation_pick_diverse_bottles.py` now removes `CUDA_VISIBLE_DEVICES` when `--enable_viewer 1`, so it does not undo the wrapper's unset.
+  - Added/updated section O viewer probe notes.
+- Validation:
+  - `DISPLAY=:1.0 ... --viewer --viewer_wait_at_end 0 ...` successfully created the SAPIEN viewer and logged `CUDA_VISIBLE_DEVICES=None`.
 - Added section O to `COMMAND_LIBRARY.zh.md`:
   - First-frame FoundationPose direct-strategy `pick_diverse_bottles` comparison experiment.
   - Recommended command: `bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh --gpu 2 --ids 0 --continue_on_error --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/first_frame_foundation_smoke`

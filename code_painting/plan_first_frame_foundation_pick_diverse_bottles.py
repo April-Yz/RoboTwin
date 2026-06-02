@@ -358,7 +358,9 @@ def main() -> None:
     print(f"[mode-o] Wrote plan summary: {plan_summary_path}")
 
     env = os.environ.copy()
-    if args.gpu >= 0:
+    if bool(args.enable_viewer):
+        env.pop("CUDA_VISIBLE_DEVICES", None)
+    elif args.gpu >= 0:
         env["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
     success = run_planner(plan_summary_path, args, env)
     print(f"\n[mode-o] {'SUCCESS' if success else 'FAILED'}")

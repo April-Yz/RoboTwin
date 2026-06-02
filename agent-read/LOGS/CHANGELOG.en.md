@@ -2,6 +2,11 @@
 
 ## 2026-06-02 (Mode O First-Frame FoundationPose Direct Strategy Grasp)
 
+- Follow-up viewer fix:
+  - The user's Mode O viewer run printed `CUDA_VISIBLE_DEVICES=2`, then SAPIEN reported `Renderer does not support display`.
+  - Cause: the wrapper used `env -u CUDA_VISIBLE_DEVICES` in viewer mode, but `plan_first_frame_foundation_pick_diverse_bottles.py` restored `CUDA_VISIBLE_DEVICES` from `--gpu 2` before invoking the planner.
+  - Fix: the wrapper now passes `--gpu -1` in viewer mode, and the Python entrypoint explicitly removes `CUDA_VISIBLE_DEVICES` when `enable_viewer=1`.
+  - Validation: `DISPLAY=:1.0 bash code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh --gpu 2 --ids 0 --viewer --viewer_wait_at_end 0 --continue_on_error --output_root /tmp/mode_o_viewer_env_check` now logs `CUDA_VISIBLE_DEVICES=None` and successfully prints `[viewer] interactive viewer created`.
 - Added the Mode O comparison experiment for `pick_diverse_bottles`:
   - `code_painting/plan_first_frame_foundation_pick_diverse_bottles.py`
   - `code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh`
