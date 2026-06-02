@@ -5364,13 +5364,13 @@ description/task_instruction/pick_diverse_bottles_piper.json
 
 - 不修改原始 `/home/zaijia001/ssd/RoboTwin/envs/pick_diverse_bottles.py`。
 - `pick_diverse_bottles_piper` 只继承原始 `pick_diverse_bottles`，因此瓶子随机采样、随机旋转、左/右瓶区域、`grasp_actor(... pre_grasp_dis=0.08)`、lift `z=0.1`、左右 target pose 都保持原逻辑。
-- `demo_clean_piper.yml` 只把 `demo_clean.yml` 的 `embodiment` 改为 `[piper]`，其余 clean demo 采集配置保持一致。
+- `demo_clean_piper.yml` 只把 `demo_clean.yml` 的 `embodiment` 改为 `[piper, piper, 0.60]`，其余 clean demo 采集配置保持一致。
 - 这一路使用 `assets/embodiments/piper/config.yml` 中的 Piper embodiment 配置和 RoboTwin 原始 planner/grasp frame 转换，不走前面 Mode O 的 FoundationPose target frame。
 
 推荐命令：
 
 ```bash
-bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper 0
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper 0
 ```
 
 输出路径：
@@ -5386,6 +5386,13 @@ bash collect_data.sh pick_diverse_bottles demo_clean 0
 ```
 
 注意：O.0 的目的不是修复前面 Mode O 运行时的夹爪朝向，而是建立一个“原始 RoboTwin demo 逻辑 + Piper embodiment”的基线。如果 O.0 仍出现大规模朝向问题，问题更可能在 `assets/embodiments/piper/config.yml` 的 `delta_matrix/global_trans_matrix/gripper_scale/grasp_perfect_direction` 或 Piper URDF 几何，而不是 Foundation/AnyGrasp target 设计。
+
+`gen-23` 错误记录：
+
+- 第一条命令在 `~` 下执行 `bash collect_data.sh ...`，报 `collect_data.sh: No such file or directory`；需要先 `cd /home/zaijia001/ssd/RoboTwin`。
+- 进入仓库后，旧 `demo_clean_piper.yml` 使用 `embodiment: [piper]`，RoboTwin 将其当作单个双臂 embodiment，自动寻找 `assets/embodiments/piper/curobo_left.yml` / `curobo_right.yml`。Piper 目录只有 `curobo.yml`，因此 seed 0 报 `No such file or directory: .../piper/curobo_left.yml`。
+- seed 1 之后反复出现 `'Robot' object has no attribute 'left_planner'` 是次生错误：第一次 planner 初始化失败后，task 复用残留的 `robot` 对象，下一轮 reset 直接访问未创建的 planner 属性。
+- 修正后 `demo_clean_piper.yml` 使用 `embodiment: [piper, piper, 0.60]`，即两只单臂 Piper，间距 `0.60m`，不会再寻找 `curobo_left.yml`。
 
 ## O. 对比实验：第一帧 FoundationPose 直接策略抓取 pick_diverse_bottles
 

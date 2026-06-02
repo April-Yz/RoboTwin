@@ -2452,14 +2452,28 @@
   - 保留原始瓶子随机采样、随机旋转、左右区域、`grasp_actor`、lift 和 place 逻辑。
 - 新增 `task_config/demo_clean_piper.yml`：
   - 基于 `demo_clean.yml`。
-  - `embodiment` 改为 `[piper]`。
+  - `embodiment` 改为 `[piper, piper, 0.60]`。
 - 新增 `description/task_instruction/pick_diverse_bottles_piper.json`：
   - 复用原始 `pick_diverse_bottles` 指令模板，保证 `collect_data.py` 结束后能生成 episode instructions。
 - `.gitignore` 放行 `task_config/demo_clean_piper.yml`。
 - 推荐命令：
-  - `bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper 0`
+  - `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper 0`
 - 验证：
   - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile envs/pick_diverse_bottles_piper.py script/collect_data.py` 通过。
   - conda 环境中动态 import `envs.pick_diverse_bottles_piper` 成功，class MRO 显示继承 `pick_diverse_bottles`。
-  - `task_config/demo_clean_piper.yml` 解析得到 `embodiment=['piper']`、`episode_num=50`。
+  - `task_config/demo_clean_piper.yml` 解析得到 `embodiment=['piper','piper',0.60]`、`episode_num=50`。
   - `description/task_instruction/pick_diverse_bottles_piper.json` 解析得到 `seen=50`、`unseen=10`。
+
+## 2026-06-02（修复 gen-23 O.0 collect_data 指令）
+
+- `gen-23` 原始错误：
+  - 在 `~` 目录执行 `bash collect_data.sh ...`，找不到脚本。
+  - 进入仓库后，旧 `demo_clean_piper.yml` 的 `embodiment: [piper]` 触发双臂 embodiment 路径，RoboTwin 试图加载不存在的 `assets/embodiments/piper/curobo_left.yml`。
+  - 后续 `'Robot' object has no attribute 'left_planner'` 是 planner 初始化失败后 task 复用残留 robot 的次生错误。
+- 修复：
+  - `task_config/demo_clean_piper.yml` 改为 `embodiment: [piper, piper, 0.60]`，使用两只单臂 Piper 与 `curobo.yml`。
+  - O.0 文档命令改为带 conda 激活和仓库路径的完整命令。
+- 验证：
+  - `task_config/demo_clean_piper.yml` 解析得到 `['piper', 'piper', 0.6]`。
+  - 带 conda 激活的 `timeout 35s bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper 0` 未再出现 `curobo_left.yml` 或 `left_planner` 错误。
+  - 清理了该 smoke test 产生的 `data/pick_diverse_bottles_piper/demo_clean_piper/` 临时轨迹输出，避免影响用户后续从 episode 0 开始采集。

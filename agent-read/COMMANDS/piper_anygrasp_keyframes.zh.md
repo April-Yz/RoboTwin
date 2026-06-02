@@ -567,13 +567,13 @@ description/task_instruction/pick_diverse_bottles_piper.json
 
 - `pick_diverse_bottles_piper` 继承原始 `pick_diverse_bottles`，不修改原任务文件。
 - 瓶子随机采样、随机旋转、左右瓶区域、`pre_grasp_dis=0.08`、lift `z=0.1`、左右放置 target 都沿用原始 env。
-- `demo_clean_piper.yml` 使用 `embodiment: [piper]`，其余 clean demo 设置与 `demo_clean.yml` 对齐。
+- `demo_clean_piper.yml` 使用 `embodiment: [piper, piper, 0.60]`，其余 clean demo 设置与 `demo_clean.yml` 对齐。
 - 指令模板复制自 `pick_diverse_bottles.json`，用于 collect_data 结束后的 instruction 生成。
 
 推荐命令：
 
 ```bash
-bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper 0
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper 0
 ```
 
 输出：
@@ -589,6 +589,13 @@ bash collect_data.sh pick_diverse_bottles demo_clean 0
 ```
 
 如果 O.0 也出现系统性朝向问题，优先检查 `assets/embodiments/piper/config.yml` 的 `delta_matrix`、`global_trans_matrix`、`gripper_scale`、`grasp_perfect_direction` 以及 Piper URDF 夹爪几何。
+
+`gen-23` 错误原因：
+
+- 在 `~` 下直接执行 `bash collect_data.sh ...` 会找不到脚本；需要先进入 `/home/zaijia001/ssd/RoboTwin`。
+- 旧 `demo_clean_piper.yml` 的 `embodiment: [piper]` 会触发双臂 embodiment 路径，RoboTwin 试图加载 `assets/embodiments/piper/curobo_left.yml`，但 Piper 目录只有 `curobo.yml`。
+- 后续 `'Robot' object has no attribute 'left_planner'` 是第一次 planner 初始化失败后的残留状态次生错误。
+- 现已改为 `embodiment: [piper, piper, 0.60]`，表示两只单臂 Piper，间距 `0.60m`。
 
 `COMMAND_LIBRARY.zh.md` 末尾新增 Mode O，用于 `pick_diverse_bottles` 的更简单对照实验：不使用手工关键帧、不使用人手朝向、不使用 AnyGrasp candidate，只用第 0 帧 FoundationPose 的两个 bottle 世界位置，按 env 任务逻辑生成抓取和放置目标。
 

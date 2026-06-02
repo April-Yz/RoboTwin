@@ -1820,7 +1820,7 @@
 - Added config:
   - `demo_clean_piper`
 - Added command:
-  - `bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper 0`
+  - `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper 0`
 - Comparison command:
   - `bash collect_data.sh pick_diverse_bottles demo_clean 0`
 - Code locations:
@@ -1828,3 +1828,14 @@
   - `task_config/demo_clean_piper.yml`
   - `description/task_instruction/pick_diverse_bottles_piper.json`
 - Note: O.0 uses the original RoboTwin demo data-generation path and does not use FoundationPose, AnyGrasp, or replay target frames.
+
+## 2026-06-02 (Corrected O.0 collect_data Full Command)
+
+- Fixed config:
+  - Changed `task_config/demo_clean_piper.yml` from `embodiment: [piper]` to `embodiment: [piper, piper, 0.60]`.
+  - Reason: `[piper]` makes RoboTwin look for missing `assets/embodiments/piper/curobo_left.yml`; the three-item config loads two single-arm Piper instances and uses `curobo.yml`.
+- Recommended full command:
+  - `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper 0`
+- Old errors:
+  - Running directly from `~` cannot find `collect_data.sh`.
+  - Without activating `RoboTwin_bw`, the `python` used inside `collect_data.sh` may not exist.

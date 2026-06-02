@@ -2454,14 +2454,28 @@
   - Preserves the original bottle random sampling, random rotation, left/right regions, `grasp_actor`, lift, and place logic.
 - Added `task_config/demo_clean_piper.yml`:
   - Based on `demo_clean.yml`.
-  - Sets `embodiment` to `[piper]`.
+  - Sets `embodiment` to `[piper, piper, 0.60]`.
 - Added `description/task_instruction/pick_diverse_bottles_piper.json`:
   - Reuses the original `pick_diverse_bottles` instruction template so `collect_data.py` can generate episode instructions after collection.
 - Updated `.gitignore` to allow `task_config/demo_clean_piper.yml`.
 - Recommended command:
-  - `bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper 0`
+  - `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper 0`
 - Validation:
   - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile envs/pick_diverse_bottles_piper.py script/collect_data.py` passed.
   - Dynamic import of `envs.pick_diverse_bottles_piper` in the conda environment passed, and the class MRO shows inheritance from `pick_diverse_bottles`.
-  - `task_config/demo_clean_piper.yml` parsed as `embodiment=['piper']` and `episode_num=50`.
+  - `task_config/demo_clean_piper.yml` parsed as `embodiment=['piper','piper',0.60]` and `episode_num=50`.
   - `description/task_instruction/pick_diverse_bottles_piper.json` parsed as `seen=50` and `unseen=10`.
+
+## 2026-06-02 (Fixed gen-23 O.0 collect_data Command)
+
+- Original `gen-23` errors:
+  - Running `bash collect_data.sh ...` from `~` could not find the script.
+  - After entering the repo, the old `demo_clean_piper.yml` used `embodiment: [piper]`, which triggered the dual-arm embodiment path and made RoboTwin look for missing `assets/embodiments/piper/curobo_left.yml`.
+  - Later `'Robot' object has no attribute 'left_planner'` messages were secondary errors after planner initialization failed and the task reused a partial `robot` object.
+- Fix:
+  - Changed `task_config/demo_clean_piper.yml` to `embodiment: [piper, piper, 0.60]`, using two single-arm Piper instances and `curobo.yml`.
+  - Updated the O.0 docs to use the full command with conda activation and repo path.
+- Validation:
+  - Parsed `task_config/demo_clean_piper.yml` as `['piper', 'piper', 0.6]`.
+  - A conda-activated `timeout 35s bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper 0` smoke run did not reproduce the `curobo_left.yml` or `left_planner` errors.
+  - Cleaned up the temporary `data/pick_diverse_bottles_piper/demo_clean_piper/` trajectory output from the smoke run so the user can start collection from episode 0.

@@ -567,13 +567,13 @@ Implementation:
 
 - `pick_diverse_bottles_piper` inherits the original `pick_diverse_bottles` task and does not modify the original task file.
 - Bottle random sampling, random rotation, left/right placement regions, `pre_grasp_dis=0.08`, lift `z=0.1`, and left/right placement targets all come from the original env.
-- `demo_clean_piper.yml` uses `embodiment: [piper]`; the other clean-demo settings stay aligned with `demo_clean.yml`.
+- `demo_clean_piper.yml` uses `embodiment: [piper, piper, 0.60]`; the other clean-demo settings stay aligned with `demo_clean.yml`.
 - The task-instruction template is copied from `pick_diverse_bottles.json` so instruction generation still works after data collection.
 
 Recommended command:
 
 ```bash
-bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper 0
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper 0
 ```
 
 Output:
@@ -589,6 +589,13 @@ bash collect_data.sh pick_diverse_bottles demo_clean 0
 ```
 
 If O.0 still shows systematic orientation issues, check `assets/embodiments/piper/config.yml` first: `delta_matrix`, `global_trans_matrix`, `gripper_scale`, `grasp_perfect_direction`, and the Piper URDF gripper geometry.
+
+`gen-23` error root cause:
+
+- Running `bash collect_data.sh ...` from `~` cannot find the script; run it from `/home/zaijia001/ssd/RoboTwin`.
+- The old `demo_clean_piper.yml` used `embodiment: [piper]`, which triggered the dual-arm embodiment path. RoboTwin then tried to load `assets/embodiments/piper/curobo_left.yml`, but the Piper folder only has `curobo.yml`.
+- The later `'Robot' object has no attribute 'left_planner'` messages are secondary errors after the first planner initialization failure left a partial `robot` object on the reused task instance.
+- The config now uses `embodiment: [piper, piper, 0.60]`, meaning two single-arm Piper instances separated by `0.60m`.
 
 `COMMAND_LIBRARY.zh.md` now ends with Mode O, a simpler `pick_diverse_bottles` comparison experiment. It does not use manual keyframes, human hand orientation, or AnyGrasp candidates. It reads the two bottle world positions from frame 0 of FoundationPose and generates grasp/place targets with the original env task logic.
 
