@@ -1854,3 +1854,18 @@
 - Notes:
   - The old `demo_clean_piper` output directory already contains data generated with RoboTwin's built-in `assets/embodiments/piper/piper.urdf`.
   - `demo_clean_piper_calibrated` writes to a new directory and uses the calibrated `piper_pika_agx.urdf` and left/right base poses.
+
+## 2026-06-03 (O.0 Head-Only And Viewer Debug Config)
+
+- Updated configs:
+  - `task_config/demo_clean_piper.yml`
+  - `task_config/demo_clean_piper_calibrated.yml`
+  - `task_config/demo_clean_piper_calibrated_viewer.yml`
+- Recommended collection command:
+  - `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_calibrated 0`
+- One-episode viewer/head-only debug command:
+  - `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash ./script/.update_path.sh > /dev/null 2>&1 && unset CUDA_VISIBLE_DEVICES && export SAPIEN_RT_DENOISER=none && PYTHONWARNINGS=ignore::UserWarning python script/collect_data.py pick_diverse_bottles_piper demo_clean_piper_calibrated_viewer`
+- Parameter changes:
+  - The collection and viewer configs both use `collect_head_camera: true` and `collect_wrist_camera: false`.
+  - The viewer config additionally sets `render_freq: 1`, `episode_num: 1`, and `collect_data: false`.
+  - The viewer config is for inspecting seed/premotion behavior and does not save hdf5 data.

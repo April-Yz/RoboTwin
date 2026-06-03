@@ -561,6 +561,7 @@ collect_data.sh -> script/collect_data.py -> envs/<task_name>.py -> Base_Task.gr
 envs/pick_diverse_bottles_piper.py
 task_config/demo_clean_piper.yml
 task_config/demo_clean_piper_calibrated.yml
+task_config/demo_clean_piper_calibrated_viewer.yml
 assets/embodiments/piper_pika_agx/config.yml
 description/task_instruction/pick_diverse_bottles_piper.json
 ```
@@ -570,6 +571,7 @@ description/task_instruction/pick_diverse_bottles_piper.json
 - `pick_diverse_bottles_piper` 继承原始 `pick_diverse_bottles`，不修改原任务文件。
 - 瓶子随机采样、随机旋转、左右瓶区域、`pre_grasp_dis=0.08`、lift `z=0.1`、左右放置 target 都沿用原始 env。
 - `demo_clean_piper.yml` 与 `demo_clean_piper_calibrated.yml` 使用 `embodiment: [piper_pika_agx_calibrated, piper_pika_agx_calibrated, 0.0]`，其余 clean demo 设置与 `demo_clean.yml` 对齐。
+- `demo_clean_piper.yml`、`demo_clean_piper_calibrated.yml` 和 viewer 配置现在都设置 `collect_head_camera: true`、`collect_wrist_camera: false`，只保存 head 视角，避免依赖当前 Piper/Pika URDF 中缺失的 wrist camera link。
 - `piper_pika_agx_calibrated` 指向 `assets/embodiments/piper_pika_agx/config.yml`，使用标定 `piper_pika_agx.urdf`、左右 base pose、Piper/Pika 夹爪 joint、`delta_matrix=I` 和 `global_trans_matrix=diag(1,-1,-1)`。
 - 指令模板复制自 `pick_diverse_bottles.json`，用于 collect_data 结束后的 instruction 生成。
 
@@ -584,6 +586,14 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate R
 ```text
 data/pick_diverse_bottles_piper/demo_clean_piper_calibrated/
 ```
+
+只开 head 视角的单 episode viewer 调试配置：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash ./script/.update_path.sh > /dev/null 2>&1 && unset CUDA_VISIBLE_DEVICES && export SAPIEN_RT_DENOISER=none && PYTHONWARNINGS=ignore::UserWarning python script/collect_data.py pick_diverse_bottles_piper demo_clean_piper_calibrated_viewer
+```
+
+`demo_clean_piper_calibrated_viewer.yml` 设置 `render_freq: 1`、`episode_num: 1`、`collect_data: false`、`collect_wrist_camera: false`，用于交互观察 seed/premotion 过程，不会保存 hdf5 数据。viewer 命令直接调用 `script/collect_data.py`，因为 `collect_data.sh` 会强制设置 `CUDA_VISIBLE_DEVICES=${gpu_id}`，可能把显示 GPU mask 掉。若当前 shell 无法创建 SAPIEN viewer，先运行 `code_painting/probe_sapien_viewer.py` 检查 `DISPLAY`/Vulkan 图形会话。
 
 如果旧 `data/pick_diverse_bottles_piper/demo_clean_piper/` 已经存在，它是旧自带 Piper URDF/base pose 生成的数据，不代表标定版。优先用 `demo_clean_piper_calibrated` 生成新目录做对比。
 
@@ -602,6 +612,13 @@ bash collect_data.sh pick_diverse_bottles demo_clean 0
 - 后续 `'Robot' object has no attribute 'left_planner'` 是第一次 planner 初始化失败后的残留状态次生错误。
 - 第一版修正 `embodiment: [piper, piper, 0.60]` 能避免 `curobo_left.yml`，但仍加载 RoboTwin 自带 `assets/embodiments/piper/piper.urdf`。
 - 当前标定版使用 `piper_pika_agx_calibrated`，加载 `assets/embodiments/piper_pika_agx/piper_pika_agx.urdf` 和标定 base pose。
+
+`gen1-2` 错误原因：
+
+- `No left camera link` / `No right camera link` 来自 `envs/robot/robot.py` 的 wrist camera link 查找；当前 `piper_pika_agx.urdf` 没有 `left_camera`、`right_camera` 或通用 `camera` link，所以代码打印警告并退回到第一个 link。这不是本次 seed 失败的直接异常。
+- 实际失败发生在 `[Start Seed and Pre Motion Data Collection]`，episode 0 从 seed 421 到 730 反复失败，没有找到可用 premotion seed。
+- 失败主要分两类：`Objects is unstable ... 001_bottle` 表示瓶子初始物理 settle 后不稳定；`target_pose cannot be None for move action` 表示原始 `pick_diverse_bottles.py` 的 scripted `grasp_actor`/move 逻辑没有为当前标定 Piper/Pika 生成可执行目标。
+- 因此，只关 wrist 保存可以避免 wrist 数据依赖和日志干扰，但如果仍然连续出现 `target_pose cannot be None`，下一步应新增 Piper/Pika 专用任务逻辑，重写抓取候选/物体采样区域或直接用固定 side-grasp target，而不是继续完全复用 ALOHA-AgileX 的原始 demo 规划。
 
 `COMMAND_LIBRARY.zh.md` 末尾新增 Mode O，用于 `pick_diverse_bottles` 的更简单对照实验：不使用手工关键帧、不使用人手朝向、不使用 AnyGrasp candidate，只用第 0 帧 FoundationPose 的两个 bottle 世界位置，按 env 任务逻辑生成抓取和放置目标。
 

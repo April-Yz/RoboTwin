@@ -561,6 +561,7 @@ New entrypoints:
 envs/pick_diverse_bottles_piper.py
 task_config/demo_clean_piper.yml
 task_config/demo_clean_piper_calibrated.yml
+task_config/demo_clean_piper_calibrated_viewer.yml
 assets/embodiments/piper_pika_agx/config.yml
 description/task_instruction/pick_diverse_bottles_piper.json
 ```
@@ -570,6 +571,7 @@ Implementation:
 - `pick_diverse_bottles_piper` inherits the original `pick_diverse_bottles` task and does not modify the original task file.
 - Bottle random sampling, random rotation, left/right placement regions, `pre_grasp_dis=0.08`, lift `z=0.1`, and left/right placement targets all come from the original env.
 - `demo_clean_piper.yml` and `demo_clean_piper_calibrated.yml` use `embodiment: [piper_pika_agx_calibrated, piper_pika_agx_calibrated, 0.0]`; the other clean-demo settings stay aligned with `demo_clean.yml`.
+- `demo_clean_piper.yml`, `demo_clean_piper_calibrated.yml`, and the viewer config now set `collect_head_camera: true` and `collect_wrist_camera: false`, so collection stores only the head view and does not depend on wrist camera links missing from the current Piper/Pika URDF.
 - `piper_pika_agx_calibrated` points to `assets/embodiments/piper_pika_agx/config.yml`, using the calibrated `piper_pika_agx.urdf`, left/right base poses, Piper/Pika gripper joints, `delta_matrix=I`, and `global_trans_matrix=diag(1,-1,-1)`.
 - The task-instruction template is copied from `pick_diverse_bottles.json` so instruction generation still works after data collection.
 
@@ -584,6 +586,14 @@ Output:
 ```text
 data/pick_diverse_bottles_piper/demo_clean_piper_calibrated/
 ```
+
+Head-only one-episode viewer debug config:
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash ./script/.update_path.sh > /dev/null 2>&1 && unset CUDA_VISIBLE_DEVICES && export SAPIEN_RT_DENOISER=none && PYTHONWARNINGS=ignore::UserWarning python script/collect_data.py pick_diverse_bottles_piper demo_clean_piper_calibrated_viewer
+```
+
+`demo_clean_piper_calibrated_viewer.yml` sets `render_freq: 1`, `episode_num: 1`, `collect_data: false`, and `collect_wrist_camera: false`. It is intended for interactively inspecting the seed/premotion process and does not save hdf5 data. The viewer command calls `script/collect_data.py` directly because `collect_data.sh` always sets `CUDA_VISIBLE_DEVICES=${gpu_id}`, which can mask the display GPU. If the current shell cannot create a SAPIEN viewer, run `code_painting/probe_sapien_viewer.py` first to check the `DISPLAY`/Vulkan graphics session.
 
 If the old `data/pick_diverse_bottles_piper/demo_clean_piper/` directory already exists, it was generated with the old built-in Piper URDF/base pose and does not represent the calibrated setup. Use `demo_clean_piper_calibrated` to write a separate comparison directory.
 
@@ -602,6 +612,13 @@ If O.0 still shows systematic orientation issues, check `assets/embodiments/pipe
 - The later `'Robot' object has no attribute 'left_planner'` messages are secondary errors after the first planner initialization failure left a partial `robot` object on the reused task instance.
 - The first fix, `embodiment: [piper, piper, 0.60]`, avoids `curobo_left.yml` but still loads the built-in `assets/embodiments/piper/piper.urdf`.
 - The calibrated path now uses `piper_pika_agx_calibrated`, loading `assets/embodiments/piper_pika_agx/piper_pika_agx.urdf` and the calibrated base poses.
+
+`gen1-2` error root cause:
+
+- `No left camera link` / `No right camera link` comes from wrist camera link lookup in `envs/robot/robot.py`. The current `piper_pika_agx.urdf` has no `left_camera`, `right_camera`, or generic `camera` link, so the code prints the warning and falls back to the first link. This is not the direct exception that made seed collection fail.
+- The actual failure happens during `[Start Seed and Pre Motion Data Collection]`: episode 0 repeatedly failed from seed 421 through seed 730 without finding a usable premotion seed.
+- The failures are mainly `Objects is unstable ... 001_bottle`, meaning the bottle fell or moved during initial settling, and `target_pose cannot be None for move action`, meaning the original `pick_diverse_bottles.py` scripted `grasp_actor`/move path did not produce an executable target for the calibrated Piper/Pika setup.
+- Disabling wrist saving removes wrist-data dependency and log noise, but if `target_pose cannot be None` continues, the next fix should be a Piper/Pika-specific task variant that changes grasp candidates/object sampling or uses a fixed side-grasp target instead of fully reusing the original ALOHA-AgileX demo planner.
 
 `COMMAND_LIBRARY.zh.md` now ends with Mode O, a simpler `pick_diverse_bottles` comparison experiment. It does not use manual keyframes, human hand orientation, or AnyGrasp candidates. It reads the two bottle world positions from frame 0 of FoundationPose and generates grasp/place targets with the original env task logic.
 

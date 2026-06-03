@@ -2493,3 +2493,17 @@
   - `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_calibrated 0`
 - 验证：
   - Python/YAML 检查确认 `demo_clean_piper` 和 `demo_clean_piper_calibrated` 都解析到 `assets/embodiments/piper_pika_agx/piper_pika_agx.urdf`，gripper base 为 `left_joint`，robot pose 为标定左右 base pose。
+
+## 2026-06-03（gen1-2 O.0 head-only 配置与错误定位）
+
+- 检查 `tmux gen1-2`：
+  - `No left camera link` / `No right camera link` 是 `envs/robot/robot.py` 找不到 wrist camera link 后的 fallback 警告，不是本次 seed 失败的直接异常。
+  - 真正失败发生在 seed/premotion 阶段；episode 0 从 seed 421 到 730 反复失败。
+  - 失败类型主要是瓶子物理不稳定 `Objects is unstable ... 001_bottle`，以及原始 scripted demo 逻辑生成不了可执行 move target 的 `target_pose cannot be None for move action`。
+- 修改：
+  - `task_config/demo_clean_piper.yml` 和 `task_config/demo_clean_piper_calibrated.yml` 改为 `collect_wrist_camera: false`，只保存 head 视角。
+  - 新增 `task_config/demo_clean_piper_calibrated_viewer.yml`：`render_freq: 1`、`episode_num: 1`、`collect_data: false`、`collect_wrist_camera: false`，用于单 episode viewer/head-only 调试。
+  - `.gitignore` 放行新增 viewer 配置。
+- 结论：
+  - 关闭 wrist 保存可以减少 wrist link 依赖和日志干扰。
+  - 如果仍连续出现 `target_pose cannot be None`，问题在原始 ALOHA-style `pick_diverse_bottles.py` demo 规划与标定 Piper/Pika 的几何/可达性不匹配，下一步应写 Piper/Pika 专用任务逻辑。

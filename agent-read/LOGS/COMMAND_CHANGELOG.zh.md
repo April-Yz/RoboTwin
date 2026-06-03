@@ -1852,3 +1852,18 @@
 - 说明：
   - 旧 `demo_clean_piper` 输出目录已经包含使用 RoboTwin 自带 `assets/embodiments/piper/piper.urdf` 生成的数据。
   - `demo_clean_piper_calibrated` 输出到新目录，使用标定 `piper_pika_agx.urdf` 和左右 base pose。
+
+## 2026-06-03（O.0 head-only 与 viewer 调试配置）
+
+- 修改配置：
+  - `task_config/demo_clean_piper.yml`
+  - `task_config/demo_clean_piper_calibrated.yml`
+  - `task_config/demo_clean_piper_calibrated_viewer.yml`
+- 推荐采集命令：
+  - `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_calibrated 0`
+- 单 episode viewer/head-only 调试命令：
+  - `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash ./script/.update_path.sh > /dev/null 2>&1 && unset CUDA_VISIBLE_DEVICES && export SAPIEN_RT_DENOISER=none && PYTHONWARNINGS=ignore::UserWarning python script/collect_data.py pick_diverse_bottles_piper demo_clean_piper_calibrated_viewer`
+- 参数变化：
+  - 正式采集与 viewer 配置均为 `collect_head_camera: true`、`collect_wrist_camera: false`。
+  - viewer 配置额外设置 `render_freq: 1`、`episode_num: 1`、`collect_data: false`。
+  - 该 viewer 配置只用于观察 seed/premotion，不保存 hdf5。

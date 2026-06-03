@@ -2495,3 +2495,17 @@
   - `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_calibrated 0`
 - Validation:
   - Python/YAML checks confirmed both `demo_clean_piper` and `demo_clean_piper_calibrated` resolve to `assets/embodiments/piper_pika_agx/piper_pika_agx.urdf`, with gripper base `left_joint` and the calibrated left/right base poses.
+
+## 2026-06-03 (gen1-2 O.0 Head-Only Config And Error Diagnosis)
+
+- Inspected `tmux gen1-2`:
+  - `No left camera link` / `No right camera link` is a fallback warning from `envs/robot/robot.py` when wrist camera links cannot be found. It is not the direct exception that caused seed collection to fail.
+  - The actual failure happens during seed/premotion collection; episode 0 repeatedly failed from seed 421 through seed 730.
+  - The main failure types are bottle instability, `Objects is unstable ... 001_bottle`, and `target_pose cannot be None for move action`, where the original scripted demo path cannot produce an executable move target.
+- Changes:
+  - Set `collect_wrist_camera: false` in `task_config/demo_clean_piper.yml` and `task_config/demo_clean_piper_calibrated.yml`, so collection stores only the head view.
+  - Added `task_config/demo_clean_piper_calibrated_viewer.yml` with `render_freq: 1`, `episode_num: 1`, `collect_data: false`, and `collect_wrist_camera: false` for one-episode viewer/head-only debugging.
+  - Updated `.gitignore` to allow the new viewer config.
+- Conclusion:
+  - Disabling wrist saving removes wrist-link data dependency and reduces log noise.
+  - If `target_pose cannot be None` continues, the root issue is a mismatch between the original ALOHA-style `pick_diverse_bottles.py` demo planner and the calibrated Piper/Pika geometry/reachability. The next fix should be a Piper/Pika-specific task variant.

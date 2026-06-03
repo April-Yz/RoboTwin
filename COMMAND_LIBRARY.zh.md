@@ -5569,3 +5569,27 @@ right_bottle center=( 0.230, 0.114, 0.745), grasp=( 0.260, 0.114, 0.745), action
 - 是否允许在 Mode O 放宽 `require_keyframe1_reached_before_close` 做“即使一臂未严格 reached 也尝试 close/action”的对比；当前默认保守，不会在第一阶段失败时关爪。
 
   bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh --gpu 2 --ids 1  --viewer --viewer_wait_at_end 1 --target_frame_convention aloha_local_x_z_up --output_root /tmp/mode_o_aloha_local_x_plan_only
+
+### O.0 head-only 标定 Piper/Pika 数据采集与 viewer 调试
+
+`tmux gen1-2` 的当前失败不是 wrist 图像保存异常。`No left camera link` / `No right camera link` 是 `piper_pika_agx.urdf` 没有 wrist camera link 后的 fallback 警告；真正失败在 seed/premotion 阶段，主要是瓶子初始不稳定，或原始 `pick_diverse_bottles.py` 的 scripted grasp/move 没有为标定 Piper/Pika 生成可执行 target。
+
+正式采集配置现在只保存 head camera：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_calibrated 0
+```
+
+单 episode viewer/head-only 调试；不保存 hdf5，只用于观察 seed/premotion。这里直接调用 `script/collect_data.py`，因为 `collect_data.sh` 会强制设置 `CUDA_VISIBLE_DEVICES=${gpu_id}`，可能把 display GPU mask 掉：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash ./script/.update_path.sh > /dev/null 2>&1 && unset CUDA_VISIBLE_DEVICES && export SAPIEN_RT_DENOISER=none && PYTHONWARNINGS=ignore::UserWarning python script/collect_data.py pick_diverse_bottles_piper demo_clean_piper_calibrated_viewer
+```
+
+如果 viewer 本身打不开，先跑最小 SAPIEN viewer 探针：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && cd /home/zaijia001/ssd/RoboTwin && unset CUDA_VISIBLE_DEVICES; [[ -f /etc/vulkan/icd.d/nvidia_icd.json ]] && export VK_ICD_FILENAMES=/etc/vulkan/icd.d/nvidia_icd.json; echo "DISPLAY=$DISPLAY CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-unset} VK_ICD_FILENAMES=${VK_ICD_FILENAMES:-unset}" && conda run -n RoboTwin_bw python /home/zaijia001/ssd/RoboTwin/code_painting/probe_sapien_viewer.py
+```
+
+若 head-only 后仍连续出现 `target_pose cannot be None for move action`，下一步应新写 Piper/Pika 专用 `pick_diverse_bottles` task 逻辑，调整瓶子采样/固定 side-grasp target，而不是继续完全复用 ALOHA-AgileX 原始 demo 规划。
