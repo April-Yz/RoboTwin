@@ -1897,3 +1897,23 @@
   - `code_painting/plan_keyframes_foundation_pose.py`
   - `code_painting/run_plan_keyframes_human_replay_piper_d435.sh`
   - `code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh`
+
+## 2026-06-03 (O.0 Motion Baseline Data Generation And Motion Viewer Commands)
+
+- Added task/config:
+  - `envs/pick_diverse_bottles_piper_motion.py`
+  - `task_config/demo_clean_piper_motion.yml`
+  - `task_config/demo_clean_piper_motion_viewer.yml`
+  - `description/task_instruction/pick_diverse_bottles_piper_motion.json`
+  - `run_pick_diverse_bottles_piper_motion_viewer.sh`
+- Tested no-viewer/head-only data-generation command:
+  - `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper_motion demo_clean_piper_motion 0`
+- Tested result:
+  - Seed 0/1 were skipped due to `Objects is unstable`; seed 2 succeeded.
+  - Outputs include `data/pick_diverse_bottles_piper_motion/demo_clean_piper_motion/data/episode0.hdf5`, `video/episode0.mp4`, `_traj_data/episode0.pkl`, and `instructions/episode0.json`.
+- Motion viewer command:
+  - `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash run_pick_diverse_bottles_piper_motion_viewer.sh`
+- Usage notes:
+  - This command enters `pick_diverse_bottles_piper_motion`; it is not the scene-only viewer. In `tmux gen1-1`, it successfully reached seed 2 premotion.
+  - The original `run_view_pick_diverse_bottles_piper_scene.sh --seed 0 --max_seed_tries 50` remains a stable-scene viewer and does not execute motion.
+  - The original `collect_data.sh pick_diverse_bottles_piper demo_clean_piper_calibrated 0` still fails in the original `grasp_actor` path and is not the currently recommended runnable O.0 motion-data command.

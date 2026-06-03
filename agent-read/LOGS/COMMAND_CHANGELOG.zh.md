@@ -1895,3 +1895,23 @@
   - `code_painting/plan_keyframes_foundation_pose.py`
   - `code_painting/run_plan_keyframes_human_replay_piper_d435.sh`
   - `code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh`
+
+## 2026-06-03（O.0 motion baseline 数据生成与带运动 viewer 命令）
+
+- 新增任务/配置：
+  - `envs/pick_diverse_bottles_piper_motion.py`
+  - `task_config/demo_clean_piper_motion.yml`
+  - `task_config/demo_clean_piper_motion_viewer.yml`
+  - `description/task_instruction/pick_diverse_bottles_piper_motion.json`
+  - `run_pick_diverse_bottles_piper_motion_viewer.sh`
+- 已跑通的无 viewer/head-only 数据生成命令：
+  - `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper_motion demo_clean_piper_motion 0`
+- 已跑通结果：
+  - seed 0/1 因 `Objects is unstable` 跳过，seed 2 成功。
+  - 输出 `data/pick_diverse_bottles_piper_motion/demo_clean_piper_motion/data/episode0.hdf5`、`video/episode0.mp4`、`_traj_data/episode0.pkl` 和 `instructions/episode0.json`。
+- 带运动 viewer 命令：
+  - `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash run_pick_diverse_bottles_piper_motion_viewer.sh`
+- 使用说明：
+  - 该命令进入 `pick_diverse_bottles_piper_motion`，不是纯 scene viewer；在 `tmux gen1-1` 已跑到 seed 2 premotion。
+  - 原 `run_view_pick_diverse_bottles_piper_scene.sh --seed 0 --max_seed_tries 50` 仍保留为只看稳定场景的 viewer，不会执行动作。
+  - 原 `collect_data.sh pick_diverse_bottles_piper demo_clean_piper_calibrated 0` 仍会失败于原始 `grasp_actor`，不是本次推荐的可跑通 O.0 运动数据命令。

@@ -2550,3 +2550,21 @@
 - Validation:
   - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_keyframes_foundation_pose.py /home/zaijia001/ssd/RoboTwin/code_painting/plan_keyframes_human_replay.py` passed.
   - `timeout 60s bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh --gpu 2 --ids 0 --viewer --viewer_wait_at_end 0 --tasks pnp_tray --foundation_pose_retreat_m 0.03 --output_root /tmp/robotwin_viewer_env_probe` passed. In this non-graphical shell `DISPLAY=None`, so the viewer still fell back to offscreen, but the key log changed to `CUDA_VISIBLE_DEVICES=None`.
+
+## 2026-06-03 (O.0 Motion Baseline Runs Calibrated Piper/Pika Follow-Up Motion)
+
+- Rechecked issues:
+  - `run_view_pick_diverse_bottles_piper_scene.sh --seed 0 --max_seed_tries 50` is a scene-only viewer. It only loads a stable seed and waits in the SAPIEN viewer; it does not run `play_once` or any follow-up motion.
+  - `collect_data.sh pick_diverse_bottles_piper demo_clean_piper_calibrated 0` still enters the original `pick_diverse_bottles.py` `grasp_actor` path. `tmux gen1-1/gen1-2` repeatedly showed `Objects is unstable` and `target_pose cannot be None for move action`, meaning the original ALOHA-style EE grasp target generation is not compatible with the calibrated Piper/Pika setup.
+- Changes:
+  - Added `envs/pick_diverse_bottles_piper_motion.py`, inheriting the original `pick_diverse_bottles` bottle random sampling, random rotation, left/right placement regions, and stability check, while bypassing the original `choose_grasp_pose/grasp_actor`.
+  - The task uses conservative joint-space stages around the calibrated Piper/Pika home pose: approach, lower, close gripper, lift/retract, move outward, and open gripper.
+  - Added `task_config/demo_clean_piper_motion.yml` for no-viewer/head-only data saving, plus `task_config/demo_clean_piper_motion_viewer.yml` and `run_pick_diverse_bottles_piper_motion_viewer.sh` for motion viewer checks.
+  - Added `description/task_instruction/pick_diverse_bottles_piper_motion.json` so `collect_data.py` can save instruction files.
+  - Added Chinese comments to `envs/pick_diverse_bottles_piper_motion.py` clarifying that this is a joint-space motion baseline and does not mean true bottle grasping is solved.
+- Validation:
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile envs/pick_diverse_bottles_piper_motion.py view_pick_diverse_bottles_piper_scene.py` passed.
+  - `bash -n run_pick_diverse_bottles_piper_motion_viewer.sh run_view_pick_diverse_bottles_piper_scene.sh run_collect_piper_calibrated_viewer.sh` passed.
+  - YAML/JSON parsing passed. Both `demo_clean_piper_motion` configs use `piper_pika_agx_calibrated+piper_pika_agx_calibrated` and `collect_wrist_camera: false`.
+  - The no-viewer command `timeout 180s bash collect_data.sh pick_diverse_bottles_piper_motion demo_clean_piper_motion 0` succeeded: seed 0/1 were skipped as unstable, seed 2 reached `simulate data episode 0 success`, and 64 head-camera frames plus `episode0.hdf5`, `episode0.mp4`, `episode0.pkl`, and instruction json were saved.
+  - In `tmux gen1-1`, `bash run_pick_diverse_bottles_piper_motion_viewer.sh` successfully ran through seed 2 premotion and returned to the shell.

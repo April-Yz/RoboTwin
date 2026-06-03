@@ -591,11 +591,15 @@ New entrypoints:
 
 ```text
 envs/pick_diverse_bottles_piper.py
+envs/pick_diverse_bottles_piper_motion.py
 task_config/demo_clean_piper.yml
 task_config/demo_clean_piper_calibrated.yml
 task_config/demo_clean_piper_calibrated_viewer.yml
+task_config/demo_clean_piper_motion.yml
+task_config/demo_clean_piper_motion_viewer.yml
 assets/embodiments/piper_pika_agx/config.yml
 description/task_instruction/pick_diverse_bottles_piper.json
+description/task_instruction/pick_diverse_bottles_piper_motion.json
 ```
 
 Implementation:
@@ -630,6 +634,45 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate R
 `demo_clean_piper_calibrated_viewer.yml` sets `render_freq: 1`, `episode_num: 1`, `collect_data: false`, and `collect_wrist_camera: false`. `run_view_pick_diverse_bottles_piper_scene.sh` only loads the scene and does not enter `play_once` planning; it unsets `CUDA_VISIBLE_DEVICES`, sets `/etc/vulkan/icd.d/nvidia_icd.json` when available, and skips unstable seeds until it finds a displayable stable scene. The command still must run inside a VNC/graphical tmux with `DISPLAY` set. Do not use `collect_data.sh` for viewer mode because it always sets `CUDA_VISIBLE_DEVICES=${gpu_id}`, which can mask the display GPU. Also do not treat `script/collect_data.py` as a pure viewer entrypoint: it continues into the original `grasp_actor` planner and may immediately fail with `target_pose cannot be None for move action`. If the current shell cannot create a SAPIEN viewer, run `code_painting/probe_sapien_viewer.py` first to check the `DISPLAY`/Vulkan graphics session.
 
 After the viewer command successfully loads, it stays in the render loop for inspection and does not finish automatically. In `tmux gen1`, it skipped seed 0/1 and loaded stable scene seed 2; close the SAPIEN window or press `Ctrl-C` to exit.
+
+#### O.0 Motion Baseline: Tested Piper/Pika Motion And Data Saving
+
+Because the original `pick_diverse_bottles.py` `grasp_actor` repeatedly produces `target_pose cannot be None for move action` on the calibrated Piper/Pika setup, `pick_diverse_bottles_piper_motion` was added as a runnable comparison branch:
+
+- Keeps the original `pick_diverse_bottles` bottle random sampling, random rotation, left/right placement regions, and physics stability check.
+- Does not call the original ALOHA-style `choose_grasp_pose/grasp_actor`.
+- Uses deterministic calibrated Piper/Pika joint-space stages: approach -> lower -> close -> lift/retract -> move outward -> open.
+- `check_success()` returns true for this motion baseline. It validates the calibrated Piper/Pika scene, head-only saving, episode generation, and visible motion path, but it does not mean true bottle grasping is solved.
+
+No-viewer data-generation command, tested successfully:
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper_motion demo_clean_piper_motion 0
+```
+
+Successful outputs:
+
+```text
+data/pick_diverse_bottles_piper_motion/demo_clean_piper_motion/_traj_data/episode0.pkl
+data/pick_diverse_bottles_piper_motion/demo_clean_piper_motion/data/episode0.hdf5
+data/pick_diverse_bottles_piper_motion/demo_clean_piper_motion/video/episode0.mp4
+data/pick_diverse_bottles_piper_motion/demo_clean_piper_motion/instructions/episode0.json
+```
+
+Test result:
+
+```text
+seed 0: Objects is unstable
+seed 1: Objects is unstable
+seed 2: simulate data episode 0 success
+Data Collection: saved 64 head-camera frames, wrote episode0.mp4 and episode0.hdf5
+```
+
+Motion viewer command. This was tested in `tmux gen1-1` and successfully ran `pick_diverse_bottles_piper_motion` through seed 2 premotion:
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash run_pick_diverse_bottles_piper_motion_viewer.sh
+```
 
 If the old `data/pick_diverse_bottles_piper/demo_clean_piper/` directory already exists, it was generated with the old built-in Piper URDF/base pose and does not represent the calibrated setup. Use `demo_clean_piper_calibrated` to write a separate comparison directory.
 

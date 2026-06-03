@@ -591,11 +591,15 @@ collect_data.sh -> script/collect_data.py -> envs/<task_name>.py -> Base_Task.gr
 
 ```text
 envs/pick_diverse_bottles_piper.py
+envs/pick_diverse_bottles_piper_motion.py
 task_config/demo_clean_piper.yml
 task_config/demo_clean_piper_calibrated.yml
 task_config/demo_clean_piper_calibrated_viewer.yml
+task_config/demo_clean_piper_motion.yml
+task_config/demo_clean_piper_motion_viewer.yml
 assets/embodiments/piper_pika_agx/config.yml
 description/task_instruction/pick_diverse_bottles_piper.json
+description/task_instruction/pick_diverse_bottles_piper_motion.json
 ```
 
 实现逻辑：
@@ -630,6 +634,45 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate R
 `demo_clean_piper_calibrated_viewer.yml` 设置 `render_freq: 1`、`episode_num: 1`、`collect_data: false`、`collect_wrist_camera: false`。`run_view_pick_diverse_bottles_piper_scene.sh` 只加载场景，不进入 `play_once` 规划；它会 `unset CUDA_VISIBLE_DEVICES`，自动设置 `/etc/vulkan/icd.d/nvidia_icd.json`，并自动跳过不稳定 seed，直到找到一个可显示的稳定场景。该命令仍需要在有 `DISPLAY` 的 VNC/图形 tmux 中运行。不要用 `collect_data.sh` 跑 viewer，因为它会强制设置 `CUDA_VISIBLE_DEVICES=${gpu_id}`，可能把显示 GPU mask 掉；也不要把 `script/collect_data.py` 当作纯 viewer 入口，因为它会继续执行原始 `grasp_actor` 规划并可能直接报 `target_pose cannot be None for move action`。若当前 shell 无法创建 SAPIEN viewer，先运行 `code_painting/probe_sapien_viewer.py` 检查 `DISPLAY`/Vulkan 图形会话。
 
 viewer 命令成功加载后会停在渲染循环里等待检查窗口，不会自动结束。`tmux gen1` 中它跳过 seed 0/1 后加载了稳定场景 seed 2；关闭 SAPIEN 窗口或按 `Ctrl-C` 才会退出。
+
+#### O.0 motion baseline：已跑通的 Piper/Pika 运动与数据保存
+
+由于原始 `pick_diverse_bottles.py` 的 `grasp_actor` 会在标定 Piper/Pika 上反复出现 `target_pose cannot be None for move action`，新增 `pick_diverse_bottles_piper_motion` 作为可运行对照：
+
+- 保留原始 `pick_diverse_bottles` 的瓶子随机采样、随机旋转、左右瓶区域和物理稳定性检查。
+- 不调用原始 ALOHA-style `choose_grasp_pose/grasp_actor`。
+- 使用标定 Piper/Pika 的确定性关节空间阶段：approach -> lower -> close -> lift/retract -> move outward -> open。
+- `check_success()` 对该 motion baseline 返回 true；它用于验证标定 Piper/Pika 场景、head-only 保存、episode 生成和可视化运动链路，不代表已经完成真实瓶子抓取。
+
+无 viewer 生成数据命令，已测试成功：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper_motion demo_clean_piper_motion 0
+```
+
+成功输出：
+
+```text
+data/pick_diverse_bottles_piper_motion/demo_clean_piper_motion/_traj_data/episode0.pkl
+data/pick_diverse_bottles_piper_motion/demo_clean_piper_motion/data/episode0.hdf5
+data/pick_diverse_bottles_piper_motion/demo_clean_piper_motion/video/episode0.mp4
+data/pick_diverse_bottles_piper_motion/demo_clean_piper_motion/instructions/episode0.json
+```
+
+本次测试结果：
+
+```text
+seed 0: Objects is unstable
+seed 1: Objects is unstable
+seed 2: simulate data episode 0 success
+Data Collection: saved 64 head-camera frames, wrote episode0.mp4 and episode0.hdf5
+```
+
+带运动的 viewer 命令，已在 `tmux gen1-1` 测试成功进入 `pick_diverse_bottles_piper_motion` 并完成 seed 2 premotion：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash run_pick_diverse_bottles_piper_motion_viewer.sh
+```
 
 如果旧 `data/pick_diverse_bottles_piper/demo_clean_piper/` 已经存在，它是旧自带 Piper URDF/base pose 生成的数据，不代表标定版。优先用 `demo_clean_piper_calibrated` 生成新目录做对比。
 

@@ -5611,3 +5611,39 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && cd /home/zaijia0
 ```
 
 若 head-only 后仍连续出现 `target_pose cannot be None for move action`，下一步应新写 Piper/Pika 专用 `pick_diverse_bottles` task 逻辑，调整瓶子采样/固定 side-grasp target，而不是继续完全复用 ALOHA-AgileX 原始 demo 规划。
+
+### O.0 motion baseline：已跑通的标定 Piper/Pika 后续运动与无 viewer 生成
+
+原始 `pick_diverse_bottles_piper + demo_clean_piper_calibrated` 会进入原始 `grasp_actor`，目前在标定 Piper/Pika 上无法完成 episode。为了先得到“原始随机瓶子场景 + 标定 Piper/Pika + head-only 数据保存 + 可见后续运动”的对照，新增：
+
+```text
+envs/pick_diverse_bottles_piper_motion.py
+task_config/demo_clean_piper_motion.yml
+task_config/demo_clean_piper_motion_viewer.yml
+description/task_instruction/pick_diverse_bottles_piper_motion.json
+run_pick_diverse_bottles_piper_motion_viewer.sh
+```
+
+无 viewer 生成数据，已测试成功：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper_motion demo_clean_piper_motion 0
+```
+
+成功结果：
+
+```text
+seed 0/1: Objects is unstable
+seed 2: simulate data episode 0 success
+saved 64 head-camera frames
+data/pick_diverse_bottles_piper_motion/demo_clean_piper_motion/data/episode0.hdf5
+data/pick_diverse_bottles_piper_motion/demo_clean_piper_motion/video/episode0.mp4
+```
+
+带运动 viewer，已在 `tmux gen1-1` 测试成功进入 seed 2 premotion：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash run_pick_diverse_bottles_piper_motion_viewer.sh
+```
+
+注意：`pick_diverse_bottles_piper_motion` 是 joint-space motion baseline。它保留原始随机瓶子和稳定性检查，但不调用原始 `grasp_actor`，`check_success()` 用于让该运动对照能保存数据；它不代表真实瓶子抓取已经解决。

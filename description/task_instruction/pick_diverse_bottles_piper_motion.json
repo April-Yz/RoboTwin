@@ -1,0 +1,17 @@
+{
+  "full_description": "move two randomly placed bottles with both calibrated Piper arms",
+  "schema": "{A} denotes the left bottle and {B} denotes the right bottle",
+  "preference": "short dual-arm motion instruction",
+  "seen": [
+    "Move {A} and {B} with both arms.",
+    "Use both arms to move {A} and {B}.",
+    "Reach toward {A} and {B}, then lift away.",
+    "Move the two bottles, {A} and {B}."
+  ],
+  "unseen": [
+    "Shift {A} and {B} using the robot arms.",
+    "Carry both bottles through a short motion.",
+    "Move each bottle with one Piper arm.",
+    "Perform a dual-arm bottle motion."
+  ]
+}

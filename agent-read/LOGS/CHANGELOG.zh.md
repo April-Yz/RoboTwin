@@ -2548,3 +2548,21 @@
 - 验证：
   - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_keyframes_foundation_pose.py /home/zaijia001/ssd/RoboTwin/code_painting/plan_keyframes_human_replay.py` 通过。
   - `timeout 60s bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh --gpu 2 --ids 0 --viewer --viewer_wait_at_end 0 --tasks pnp_tray --foundation_pose_retreat_m 0.03 --output_root /tmp/robotwin_viewer_env_probe` 通过；当前非图形 shell 中 `DISPLAY=None`，因此 viewer fallback 到 offscreen，但关键日志已变为 `CUDA_VISIBLE_DEVICES=None`。
+
+## 2026-06-03（O.0 motion baseline 跑通标定 Piper/Pika 后续运动）
+
+- 问题复查：
+  - `run_view_pick_diverse_bottles_piper_scene.sh --seed 0 --max_seed_tries 50` 是纯场景 viewer；它只加载稳定 seed 并停在 SAPIEN viewer，不会执行 `play_once` 或后续运动。
+  - `collect_data.sh pick_diverse_bottles_piper demo_clean_piper_calibrated 0` 仍会进入原始 `pick_diverse_bottles.py` 的 `grasp_actor`；`tmux gen1-1/gen1-2` 中反复出现 `Objects is unstable` 和 `target_pose cannot be None for move action`，根因是原始 ALOHA-style EE 抓取目标生成不适配标定 Piper/Pika。
+- 修改：
+  - 新增 `envs/pick_diverse_bottles_piper_motion.py`，继承原始 `pick_diverse_bottles` 的瓶子随机采样、旋转、左右摆放区域和稳定性检查，但不调用原始 `choose_grasp_pose/grasp_actor`。
+  - 该任务使用标定 Piper/Pika home pose 附近的保守关节空间阶段：approach、lower、close gripper、lift/retract、move outward、open gripper。
+  - 新增 `task_config/demo_clean_piper_motion.yml` 用于无 viewer/head-only 数据保存，新增 `task_config/demo_clean_piper_motion_viewer.yml` 和 `run_pick_diverse_bottles_piper_motion_viewer.sh` 用于带运动 viewer 检查。
+  - 新增 `description/task_instruction/pick_diverse_bottles_piper_motion.json`，让 `collect_data.py` 能保存 instruction 文件。
+  - 在 `envs/pick_diverse_bottles_piper_motion.py` 中加入中文注释，明确它是 joint-space motion baseline，不代表真实瓶子抓取已经解决。
+- 验证：
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile envs/pick_diverse_bottles_piper_motion.py view_pick_diverse_bottles_piper_scene.py` 通过。
+  - `bash -n run_pick_diverse_bottles_piper_motion_viewer.sh run_view_pick_diverse_bottles_piper_scene.sh run_collect_piper_calibrated_viewer.sh` 通过。
+  - YAML/JSON 解析检查通过，`demo_clean_piper_motion` 与 viewer 配置均使用 `piper_pika_agx_calibrated+piper_pika_agx_calibrated`，且 `collect_wrist_camera: false`。
+  - 无 viewer 命令 `timeout 180s bash collect_data.sh pick_diverse_bottles_piper_motion demo_clean_piper_motion 0` 已成功：seed 0/1 因瓶子不稳定跳过，seed 2 `simulate data episode 0 success`，保存 64 帧 head-camera 数据、`episode0.hdf5`、`episode0.mp4`、`episode0.pkl` 和 instruction json。
+  - `tmux gen1-1` 中执行 `bash run_pick_diverse_bottles_piper_motion_viewer.sh` 已成功跑到 seed 2 premotion 并返回 shell。
