@@ -613,6 +613,8 @@ Recommended command:
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_calibrated 0
 ```
 
+This is the no-viewer data-generation entrypoint and enters `collect_data.py -> play_once -> grasp_actor`. The current `tmux gen1` run shows that it loads the calibrated Piper/Pika and head-only config, but repeatedly fails from seed 0 onward: seed 0/1 fail due to bottle instability, while seed 2/5 and others fail with `target_pose cannot be None for move action`. The command format is correct, but the original `pick_diverse_bottles.py` demo logic still cannot reliably generate episodes for the calibrated Piper/Pika setup. Actual data generation requires a Piper/Pika-specific grasp logic variant.
+
 Output:
 
 ```text
@@ -626,6 +628,8 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate R
 ```
 
 `demo_clean_piper_calibrated_viewer.yml` sets `render_freq: 1`, `episode_num: 1`, `collect_data: false`, and `collect_wrist_camera: false`. `run_view_pick_diverse_bottles_piper_scene.sh` only loads the scene and does not enter `play_once` planning; it unsets `CUDA_VISIBLE_DEVICES`, sets `/etc/vulkan/icd.d/nvidia_icd.json` when available, and skips unstable seeds until it finds a displayable stable scene. The command still must run inside a VNC/graphical tmux with `DISPLAY` set. Do not use `collect_data.sh` for viewer mode because it always sets `CUDA_VISIBLE_DEVICES=${gpu_id}`, which can mask the display GPU. Also do not treat `script/collect_data.py` as a pure viewer entrypoint: it continues into the original `grasp_actor` planner and may immediately fail with `target_pose cannot be None for move action`. If the current shell cannot create a SAPIEN viewer, run `code_painting/probe_sapien_viewer.py` first to check the `DISPLAY`/Vulkan graphics session.
+
+After the viewer command successfully loads, it stays in the render loop for inspection and does not finish automatically. In `tmux gen1`, it skipped seed 0/1 and loaded stable scene seed 2; close the SAPIEN window or press `Ctrl-C` to exit.
 
 If the old `data/pick_diverse_bottles_piper/demo_clean_piper/` directory already exists, it was generated with the old built-in Piper URDF/base pose and does not represent the calibrated setup. Use `demo_clean_piper_calibrated` to write a separate comparison directory.
 

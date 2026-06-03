@@ -88,12 +88,25 @@ def main() -> None:
     try:
         while True:
             task._update_render()
-            task.viewer.render()
+            viewer = getattr(task, "viewer", None)
+            if viewer is None or getattr(viewer, "window", None) is None:
+                print("[viewer-scene] viewer window closed")
+                break
+            try:
+                viewer.render()
+            except AttributeError as exc:
+                if "should_close" not in str(exc):
+                    raise
+                print("[viewer-scene] viewer window closed")
+                break
             time.sleep(0.02)
     except KeyboardInterrupt:
         pass
     finally:
-        task.close_env()
+        try:
+            task.close_env()
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":

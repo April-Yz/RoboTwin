@@ -5592,11 +5592,15 @@ right_bottle center=( 0.230, 0.114, 0.745), grasp=( 0.260, 0.114, 0.745), action
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_calibrated 0
 ```
 
+这是无 viewer 生成数据入口，会进入 `collect_data.py -> play_once -> grasp_actor`。`tmux gen1` 当前显示它能加载标定 Piper/Pika 和 head-only 配置，但 seed 0 起反复失败：seed 0/1 是 `Objects is unstable`，seed 2/5 等是 `target_pose cannot be None for move action`。因此这条命令格式正确，但当前原始 `pick_diverse_bottles.py` demo 逻辑还不能稳定给标定 Piper/Pika 生成数据；需要后续写 Piper/Pika 专用 grasp 逻辑才能真正完成 episode 采集。
+
 场景 viewer 调试；不保存 hdf5，不进入 `play_once` 规划，只加载机器人、桌面和随机瓶子并停在 viewer。这里用短 wrapper，避免 tmux/zsh 换行拆坏长命令；wrapper 会 `unset CUDA_VISIBLE_DEVICES`、自动设置 `/etc/vulkan/icd.d/nvidia_icd.json`，并自动跳过不稳定 seed。需要在有 `DISPLAY` 的 VNC/图形 tmux 里运行：
 
 ```bash
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash run_view_pick_diverse_bottles_piper_scene.sh --seed 0 --max_seed_tries 50
 ```
+
+这条 viewer 命令成功加载后会停在循环里等待你看窗口，不会像采集任务一样自动“执行完成”。`tmux gen1` 中它跳过 seed 0/1 后加载了稳定场景 seed 2；关闭 SAPIEN 窗口或按 `Ctrl-C` 才会退出。
 
 不要用 `collect_data.sh` 跑 viewer：它会强制设置 `CUDA_VISIBLE_DEVICES=${gpu_id}`，可能把 display GPU mask 掉。也不要把 `collect_data.py` 当作纯 viewer 入口；它会继续执行原始 `grasp_actor` 规划，因此当前标定 Piper/Pika 下仍可能直接报 `target_pose cannot be None for move action`。
 

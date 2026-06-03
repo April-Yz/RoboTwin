@@ -1870,6 +1870,15 @@
   - `run_view_pick_diverse_bottles_piper_scene.sh` 不进入 `play_once` 规划，会自动跳过不稳定 seed，用于纯场景 viewer 检查。
   - `run_collect_piper_calibrated_viewer.sh` 不再调用不存在的 `script/.update_path.sh`，但它仍会进入原始 demo 规划，不作为首选 viewer 命令。
 
+## 2026-06-03（O.0 viewer 完成语义与 no-viewer 生成命令补充）
+
+- viewer 命令说明更新：
+  - `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash run_view_pick_diverse_bottles_piper_scene.sh --seed 0 --max_seed_tries 50`
+  - 该命令只查看场景，会停在窗口循环，关闭窗口或 `Ctrl-C` 才退出。
+- no-viewer 生成命令说明更新：
+  - `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_calibrated 0`
+  - 该命令当前会进入原始 `play_once/grasp_actor`，但 `tmux gen1` 显示仍因瓶子不稳定和 `target_pose cannot be None for move action` 无法完成 episode。
+
 ## 2026-06-03（Mode M/N viewer 命令 CUDA mask 语义）
 
 - 相关命令：

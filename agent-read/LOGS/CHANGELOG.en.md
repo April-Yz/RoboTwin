@@ -2521,6 +2521,17 @@
   - Added `view_pick_diverse_bottles_piper_scene.py` and `run_view_pick_diverse_bottles_piper_scene.sh`; this loads the `pick_diverse_bottles_piper` scene only, skips `play_once` planning, skips unstable seeds automatically, and stops in the SAPIEN viewer.
   - Updated the preferred viewer command to `bash run_view_pick_diverse_bottles_piper_scene.sh --seed 0 --max_seed_tries 50`.
 
+## 2026-06-03 (gen1 Viewer Completion Semantics And No-Viewer Generation Notes)
+
+- Rechecked `tmux gen1`:
+  - The scene-only viewer successfully loaded the calibrated Piper/Pika setup; seed 0/1 were skipped due to bottle instability and seed 2 loaded successfully.
+  - This viewer entrypoint is for interactive inspection. It stays in the render loop until the user closes the window or presses `Ctrl-C`; it does not run the full demo or generate data automatically.
+  - Closing the SAPIEN window previously raised `AttributeError: 'NoneType' object has no attribute 'should_close'`.
+  - The no-viewer generation command, `bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_calibrated 0`, starts the calibrated head-only config but still fails during seed search with `Objects is unstable` and `target_pose cannot be None for move action`.
+- Changes:
+  - Updated `view_pick_diverse_bottles_piper_scene.py` to exit cleanly when the viewer window is closed or becomes `None`.
+  - Updated `COMMAND_LIBRARY.zh.md` and the O.0 command docs with the viewer completion semantics, the no-viewer generation command, and the current failure cause.
+
 ## 2026-06-03 (Fixed Mode M/N Viewer CUDA Mask Restoration)
 
 - After inspecting `tmux modeln-4`:

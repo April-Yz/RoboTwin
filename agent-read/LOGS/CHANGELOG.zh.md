@@ -2519,6 +2519,17 @@
   - 新增 `view_pick_diverse_bottles_piper_scene.py` 和 `run_view_pick_diverse_bottles_piper_scene.sh`，只加载 `pick_diverse_bottles_piper` 场景，不进入 `play_once` 规划，自动跳过不稳定 seed 后停在 SAPIEN viewer。
   - 文档中的首选 viewer 命令改为 `bash run_view_pick_diverse_bottles_piper_scene.sh --seed 0 --max_seed_tries 50`。
 
+## 2026-06-03（gen1 viewer 完成语义与 no-viewer 生成说明）
+
+- 重新检查 `tmux gen1`：
+  - 纯场景 viewer 已成功加载标定 Piper/Pika；seed 0/1 因瓶子不稳定被跳过，seed 2 加载成功。
+  - 该 viewer 入口用于交互检查，会停在渲染循环等待用户关闭窗口或 `Ctrl-C`，不会自动执行完整 demo 或生成数据。
+  - 关闭 SAPIEN 窗口时曾出现 `AttributeError: 'NoneType' object has no attribute 'should_close'`。
+  - 无 viewer 生成命令 `bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_calibrated 0` 能启动 head-only 标定配置，但仍在 seed 搜索阶段失败：`Objects is unstable` 和 `target_pose cannot be None for move action`。
+- 修改：
+  - `view_pick_diverse_bottles_piper_scene.py` 在 viewer window 关闭或 `window=None` 时优雅退出，避免关闭窗口后的 traceback。
+  - `COMMAND_LIBRARY.zh.md` 与 O.0 命令文档补充 viewer 不自动结束的语义，以及 no-viewer 生成命令和当前失败原因。
+
 ## 2026-06-03（修复 Mode M/N viewer CUDA mask 回写）
 
 - 检查 `tmux modeln-4` 后确认：

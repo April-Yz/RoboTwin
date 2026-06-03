@@ -1872,6 +1872,15 @@
   - `run_view_pick_diverse_bottles_piper_scene.sh` does not enter `play_once` planning and skips unstable seeds automatically, so it is the preferred pure scene viewer check.
   - `run_collect_piper_calibrated_viewer.sh` no longer calls the missing `script/.update_path.sh`, but it still enters the original demo planner and is not the preferred viewer command.
 
+## 2026-06-03 (O.0 Viewer Completion Semantics And No-Viewer Generation Command)
+
+- Updated viewer command notes:
+  - `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash run_view_pick_diverse_bottles_piper_scene.sh --seed 0 --max_seed_tries 50`
+  - This command only displays the scene and stays in the viewer loop until the window is closed or `Ctrl-C` is pressed.
+- Updated no-viewer generation notes:
+  - `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_calibrated 0`
+  - This command currently enters the original `play_once/grasp_actor` path, but `tmux gen1` shows it still cannot complete an episode because of bottle instability and `target_pose cannot be None for move action`.
+
 ## 2026-06-03 (Mode M/N Viewer Command CUDA Mask Semantics)
 
 - Related commands:

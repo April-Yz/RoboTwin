@@ -613,6 +613,8 @@ description/task_instruction/pick_diverse_bottles_piper.json
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_calibrated 0
 ```
 
+这是无 viewer 生成数据入口，会进入 `collect_data.py -> play_once -> grasp_actor`。`tmux gen1` 当前显示该命令能加载标定 Piper/Pika 和 head-only 配置，但 seed 0 起反复失败：seed 0/1 是瓶子不稳定，seed 2/5 等是 `target_pose cannot be None for move action`。所以这条命令格式正确，但当前原始 `pick_diverse_bottles.py` demo 逻辑还不能稳定给标定 Piper/Pika 生成 episode；要真正生成数据，需要下一步写 Piper/Pika 专用 grasp 逻辑。
+
 输出：
 
 ```text
@@ -626,6 +628,8 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate R
 ```
 
 `demo_clean_piper_calibrated_viewer.yml` 设置 `render_freq: 1`、`episode_num: 1`、`collect_data: false`、`collect_wrist_camera: false`。`run_view_pick_diverse_bottles_piper_scene.sh` 只加载场景，不进入 `play_once` 规划；它会 `unset CUDA_VISIBLE_DEVICES`，自动设置 `/etc/vulkan/icd.d/nvidia_icd.json`，并自动跳过不稳定 seed，直到找到一个可显示的稳定场景。该命令仍需要在有 `DISPLAY` 的 VNC/图形 tmux 中运行。不要用 `collect_data.sh` 跑 viewer，因为它会强制设置 `CUDA_VISIBLE_DEVICES=${gpu_id}`，可能把显示 GPU mask 掉；也不要把 `script/collect_data.py` 当作纯 viewer 入口，因为它会继续执行原始 `grasp_actor` 规划并可能直接报 `target_pose cannot be None for move action`。若当前 shell 无法创建 SAPIEN viewer，先运行 `code_painting/probe_sapien_viewer.py` 检查 `DISPLAY`/Vulkan 图形会话。
+
+viewer 命令成功加载后会停在渲染循环里等待检查窗口，不会自动结束。`tmux gen1` 中它跳过 seed 0/1 后加载了稳定场景 seed 2；关闭 SAPIEN 窗口或按 `Ctrl-C` 才会退出。
 
 如果旧 `data/pick_diverse_bottles_piper/demo_clean_piper/` 已经存在，它是旧自带 Piper URDF/base pose 生成的数据，不代表标定版。优先用 `demo_clean_piper_calibrated` 生成新目录做对比。
 
