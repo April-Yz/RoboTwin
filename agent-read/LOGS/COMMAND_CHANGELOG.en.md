@@ -1864,8 +1864,10 @@
 - Recommended collection command:
   - `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_calibrated 0`
 - One-episode viewer/head-only debug command:
-  - `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash ./script/.update_path.sh > /dev/null 2>&1 && unset CUDA_VISIBLE_DEVICES && export SAPIEN_RT_DENOISER=none && PYTHONWARNINGS=ignore::UserWarning python script/collect_data.py pick_diverse_bottles_piper demo_clean_piper_calibrated_viewer`
+  - `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash run_view_pick_diverse_bottles_piper_scene.sh --seed 0 --max_seed_tries 50`
 - Parameter changes:
   - The collection and viewer configs both use `collect_head_camera: true` and `collect_wrist_camera: false`.
   - The viewer config additionally sets `render_freq: 1`, `episode_num: 1`, and `collect_data: false`.
   - The viewer config is for inspecting seed/premotion behavior and does not save hdf5 data.
+  - `run_view_pick_diverse_bottles_piper_scene.sh` does not enter `play_once` planning and skips unstable seeds automatically, so it is the preferred pure scene viewer check.
+  - `run_collect_piper_calibrated_viewer.sh` no longer calls the missing `script/.update_path.sh`, but it still enters the original demo planner and is not the preferred viewer command.

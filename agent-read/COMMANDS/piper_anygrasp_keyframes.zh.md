@@ -587,13 +587,13 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate R
 data/pick_diverse_bottles_piper/demo_clean_piper_calibrated/
 ```
 
-只开 head 视角的单 episode viewer 调试配置：
+只开 head 视角的场景 viewer 调试命令：
 
 ```bash
-source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash ./script/.update_path.sh > /dev/null 2>&1 && unset CUDA_VISIBLE_DEVICES && export SAPIEN_RT_DENOISER=none && PYTHONWARNINGS=ignore::UserWarning python script/collect_data.py pick_diverse_bottles_piper demo_clean_piper_calibrated_viewer
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash run_view_pick_diverse_bottles_piper_scene.sh --seed 0 --max_seed_tries 50
 ```
 
-`demo_clean_piper_calibrated_viewer.yml` 设置 `render_freq: 1`、`episode_num: 1`、`collect_data: false`、`collect_wrist_camera: false`，用于交互观察 seed/premotion 过程，不会保存 hdf5 数据。viewer 命令直接调用 `script/collect_data.py`，因为 `collect_data.sh` 会强制设置 `CUDA_VISIBLE_DEVICES=${gpu_id}`，可能把显示 GPU mask 掉。若当前 shell 无法创建 SAPIEN viewer，先运行 `code_painting/probe_sapien_viewer.py` 检查 `DISPLAY`/Vulkan 图形会话。
+`demo_clean_piper_calibrated_viewer.yml` 设置 `render_freq: 1`、`episode_num: 1`、`collect_data: false`、`collect_wrist_camera: false`。`run_view_pick_diverse_bottles_piper_scene.sh` 只加载场景，不进入 `play_once` 规划；它会 `unset CUDA_VISIBLE_DEVICES`，自动设置 `/etc/vulkan/icd.d/nvidia_icd.json`，并自动跳过不稳定 seed，直到找到一个可显示的稳定场景。该命令仍需要在有 `DISPLAY` 的 VNC/图形 tmux 中运行。不要用 `collect_data.sh` 跑 viewer，因为它会强制设置 `CUDA_VISIBLE_DEVICES=${gpu_id}`，可能把显示 GPU mask 掉；也不要把 `script/collect_data.py` 当作纯 viewer 入口，因为它会继续执行原始 `grasp_actor` 规划并可能直接报 `target_pose cannot be None for move action`。若当前 shell 无法创建 SAPIEN viewer，先运行 `code_painting/probe_sapien_viewer.py` 检查 `DISPLAY`/Vulkan 图形会话。
 
 如果旧 `data/pick_diverse_bottles_piper/demo_clean_piper/` 已经存在，它是旧自带 Piper URDF/base pose 生成的数据，不代表标定版。优先用 `demo_clean_piper_calibrated` 生成新目录做对比。
 

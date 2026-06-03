@@ -1862,8 +1862,10 @@
 - 推荐采集命令：
   - `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_calibrated 0`
 - 单 episode viewer/head-only 调试命令：
-  - `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash ./script/.update_path.sh > /dev/null 2>&1 && unset CUDA_VISIBLE_DEVICES && export SAPIEN_RT_DENOISER=none && PYTHONWARNINGS=ignore::UserWarning python script/collect_data.py pick_diverse_bottles_piper demo_clean_piper_calibrated_viewer`
+  - `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash run_view_pick_diverse_bottles_piper_scene.sh --seed 0 --max_seed_tries 50`
 - 参数变化：
   - 正式采集与 viewer 配置均为 `collect_head_camera: true`、`collect_wrist_camera: false`。
   - viewer 配置额外设置 `render_freq: 1`、`episode_num: 1`、`collect_data: false`。
   - 该 viewer 配置只用于观察 seed/premotion，不保存 hdf5。
+  - `run_view_pick_diverse_bottles_piper_scene.sh` 不进入 `play_once` 规划，会自动跳过不稳定 seed，用于纯场景 viewer 检查。
+  - `run_collect_piper_calibrated_viewer.sh` 不再调用不存在的 `script/.update_path.sh`，但它仍会进入原始 demo 规划，不作为首选 viewer 命令。

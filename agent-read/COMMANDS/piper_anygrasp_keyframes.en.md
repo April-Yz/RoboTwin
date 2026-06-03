@@ -587,13 +587,13 @@ Output:
 data/pick_diverse_bottles_piper/demo_clean_piper_calibrated/
 ```
 
-Head-only one-episode viewer debug config:
+Head-only scene viewer debug command:
 
 ```bash
-source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash ./script/.update_path.sh > /dev/null 2>&1 && unset CUDA_VISIBLE_DEVICES && export SAPIEN_RT_DENOISER=none && PYTHONWARNINGS=ignore::UserWarning python script/collect_data.py pick_diverse_bottles_piper demo_clean_piper_calibrated_viewer
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash run_view_pick_diverse_bottles_piper_scene.sh --seed 0 --max_seed_tries 50
 ```
 
-`demo_clean_piper_calibrated_viewer.yml` sets `render_freq: 1`, `episode_num: 1`, `collect_data: false`, and `collect_wrist_camera: false`. It is intended for interactively inspecting the seed/premotion process and does not save hdf5 data. The viewer command calls `script/collect_data.py` directly because `collect_data.sh` always sets `CUDA_VISIBLE_DEVICES=${gpu_id}`, which can mask the display GPU. If the current shell cannot create a SAPIEN viewer, run `code_painting/probe_sapien_viewer.py` first to check the `DISPLAY`/Vulkan graphics session.
+`demo_clean_piper_calibrated_viewer.yml` sets `render_freq: 1`, `episode_num: 1`, `collect_data: false`, and `collect_wrist_camera: false`. `run_view_pick_diverse_bottles_piper_scene.sh` only loads the scene and does not enter `play_once` planning; it unsets `CUDA_VISIBLE_DEVICES`, sets `/etc/vulkan/icd.d/nvidia_icd.json` when available, and skips unstable seeds until it finds a displayable stable scene. The command still must run inside a VNC/graphical tmux with `DISPLAY` set. Do not use `collect_data.sh` for viewer mode because it always sets `CUDA_VISIBLE_DEVICES=${gpu_id}`, which can mask the display GPU. Also do not treat `script/collect_data.py` as a pure viewer entrypoint: it continues into the original `grasp_actor` planner and may immediately fail with `target_pose cannot be None for move action`. If the current shell cannot create a SAPIEN viewer, run `code_painting/probe_sapien_viewer.py` first to check the `DISPLAY`/Vulkan graphics session.
 
 If the old `data/pick_diverse_bottles_piper/demo_clean_piper/` directory already exists, it was generated with the old built-in Piper URDF/base pose and does not represent the calibrated setup. Use `demo_clean_piper_calibrated` to write a separate comparison directory.
 

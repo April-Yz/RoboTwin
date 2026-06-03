@@ -45,6 +45,7 @@ envs/curobo/*
 
 .vscode
 /config.json
+!run_collect_piper_calibrated_viewer.sh
 *.bak
 *.bak2
 

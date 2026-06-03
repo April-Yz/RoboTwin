@@ -2507,3 +2507,14 @@
 - 结论：
   - 关闭 wrist 保存可以减少 wrist link 依赖和日志干扰。
   - 如果仍连续出现 `target_pose cannot be None`，问题在原始 ALOHA-style `pick_diverse_bottles.py` demo 规划与标定 Piper/Pika 的几何/可达性不匹配，下一步应写 Piper/Pika 专用任务逻辑。
+
+## 2026-06-03（修复 O.0 viewer 命令无输出与纯场景查看）
+
+- 重新检查 `tmux gen1-2`：
+  - 最小 `probe_sapien_viewer.py` 已能创建 viewer，说明当前 VNC/显示环境本身可用。
+  - 之前文档中的 viewer 命令包含 `bash ./script/.update_path.sh ... && python ...`，但仓库没有 `script/.update_path.sh`；该命令被重定向吞掉错误后直接返回，所以看起来“无反应”。
+  - 直接用 `script/collect_data.py` 作为 viewer 入口也不合适，因为它会继续进入原始 `play_once` / `grasp_actor` 规划，当前标定 Piper/Pika 下仍会出现 `target_pose cannot be None for move action`。
+- 修改：
+  - 新增 `run_collect_piper_calibrated_viewer.sh`，去掉不存在的 `.update_path.sh`，并在 viewer 模式下 `unset CUDA_VISIBLE_DEVICES`、自动设置 NVIDIA Vulkan ICD。
+  - 新增 `view_pick_diverse_bottles_piper_scene.py` 和 `run_view_pick_diverse_bottles_piper_scene.sh`，只加载 `pick_diverse_bottles_piper` 场景，不进入 `play_once` 规划，自动跳过不稳定 seed 后停在 SAPIEN viewer。
+  - 文档中的首选 viewer 命令改为 `bash run_view_pick_diverse_bottles_piper_scene.sh --seed 0 --max_seed_tries 50`。

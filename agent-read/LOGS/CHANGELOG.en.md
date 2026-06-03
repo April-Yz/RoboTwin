@@ -2509,3 +2509,14 @@
 - Conclusion:
   - Disabling wrist saving removes wrist-link data dependency and reduces log noise.
   - If `target_pose cannot be None` continues, the root issue is a mismatch between the original ALOHA-style `pick_diverse_bottles.py` demo planner and the calibrated Piper/Pika geometry/reachability. The next fix should be a Piper/Pika-specific task variant.
+
+## 2026-06-03 (Fixed O.0 Viewer No-Output Command And Added Scene-Only Viewer)
+
+- Rechecked `tmux gen1-2`:
+  - The minimal `probe_sapien_viewer.py` can create a viewer, so the current VNC/display session is usable.
+  - The previous documented viewer command contained `bash ./script/.update_path.sh ... && python ...`, but this repo has no `script/.update_path.sh`; the redirected failure stopped the `&&` chain, making the command return with no output.
+  - Using `script/collect_data.py` directly as a viewer entrypoint is also not appropriate because it continues into the original `play_once` / `grasp_actor` planner, which can still fail with `target_pose cannot be None for move action` on the calibrated Piper/Pika setup.
+- Changes:
+  - Added `run_collect_piper_calibrated_viewer.sh`, removing the missing `.update_path.sh` dependency, unsetting `CUDA_VISIBLE_DEVICES` for viewer mode, and setting the NVIDIA Vulkan ICD automatically when available.
+  - Added `view_pick_diverse_bottles_piper_scene.py` and `run_view_pick_diverse_bottles_piper_scene.sh`; this loads the `pick_diverse_bottles_piper` scene only, skips `play_once` planning, skips unstable seeds automatically, and stops in the SAPIEN viewer.
+  - Updated the preferred viewer command to `bash run_view_pick_diverse_bottles_piper_scene.sh --seed 0 --max_seed_tries 50`.

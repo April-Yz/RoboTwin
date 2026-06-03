@@ -5580,11 +5580,13 @@ right_bottle center=( 0.230, 0.114, 0.745), grasp=( 0.260, 0.114, 0.745), action
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_calibrated 0
 ```
 
-单 episode viewer/head-only 调试；不保存 hdf5，只用于观察 seed/premotion。这里直接调用 `script/collect_data.py`，因为 `collect_data.sh` 会强制设置 `CUDA_VISIBLE_DEVICES=${gpu_id}`，可能把 display GPU mask 掉：
+场景 viewer 调试；不保存 hdf5，不进入 `play_once` 规划，只加载机器人、桌面和随机瓶子并停在 viewer。这里用短 wrapper，避免 tmux/zsh 换行拆坏长命令；wrapper 会 `unset CUDA_VISIBLE_DEVICES`、自动设置 `/etc/vulkan/icd.d/nvidia_icd.json`，并自动跳过不稳定 seed。需要在有 `DISPLAY` 的 VNC/图形 tmux 里运行：
 
 ```bash
-source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash ./script/.update_path.sh > /dev/null 2>&1 && unset CUDA_VISIBLE_DEVICES && export SAPIEN_RT_DENOISER=none && PYTHONWARNINGS=ignore::UserWarning python script/collect_data.py pick_diverse_bottles_piper demo_clean_piper_calibrated_viewer
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash run_view_pick_diverse_bottles_piper_scene.sh --seed 0 --max_seed_tries 50
 ```
+
+不要用 `collect_data.sh` 跑 viewer：它会强制设置 `CUDA_VISIBLE_DEVICES=${gpu_id}`，可能把 display GPU mask 掉。也不要把 `collect_data.py` 当作纯 viewer 入口；它会继续执行原始 `grasp_actor` 规划，因此当前标定 Piper/Pika 下仍可能直接报 `target_pose cannot be None for move action`。
 
 如果 viewer 本身打不开，先跑最小 SAPIEN viewer 探针：
 
