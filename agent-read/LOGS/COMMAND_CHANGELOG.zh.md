@@ -1934,3 +1934,17 @@
   - `timeout 120s ... demo_clean_piper_ik_orig_tcp 0` 已确认进入新 embodiment 和原始 task，但没有完成 episode。
   - 主要失败仍为 `Objects is unstable` 和 `target_pose cannot be None for move action`。
   - 因此该命令用于验证原始 IK 链路，不是当前推荐的已跑通数据生成命令；已跑通数据生成仍使用 `pick_diverse_bottles_piper_motion demo_clean_piper_motion`。
+
+## 2026-06-04（O.0 命令清单收敛）
+
+- 保留命令：
+  - `O.0-1 已跑通：无 viewer 生成 head-only 数据`
+    `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper_motion demo_clean_piper_motion 0`
+  - `O.0-2 已跑通：带运动 viewer 检查 motion baseline`
+    `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash run_pick_diverse_bottles_piper_motion_viewer.sh`
+  - `O.0-3 只看场景：纯 scene viewer，不执行动作`
+    `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash run_view_pick_diverse_bottles_piper_scene.sh --seed 0 --max_seed_tries 50`
+  - `O.0-4 诊断用：原始 IK/规划链路`
+    `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && timeout 120s bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_ik_orig_tcp 0`
+- 移除/降级：
+  - `pick_diverse_bottles_piper demo_clean_piper_calibrated` 不再作为推荐采集命令；`tmux gen1-1/gen1-2` 显示它持续失败于 `Objects is unstable` 和 `target_pose cannot be None for move action`。

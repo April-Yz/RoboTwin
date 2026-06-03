@@ -5356,87 +5356,71 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && cd /home/zaijia0
 
 ---
 
-## O.0 对比实验：原始 pick_diverse_bottles demo_clean 逻辑的 Piper 数据生成
+## O.0 对比实验：Piper/Pika 数据生成与 IK 诊断命令
 
-O.0 用来排除前面 Foundation/AnyGrasp/手工关键帧/replay 目标朝向带来的影响，直接回到 RoboTwin 原始 demo 数据生成链路：
+O.0 当前只保留 4 条有明确用途的命令。`pick_diverse_bottles_piper demo_clean_piper_calibrated` 已不再作为推荐命令保留，因为它会进入原始 `grasp_actor`，在 `tmux gen1-1/gen1-2` 中持续失败。
 
-```text
-collect_data.sh -> script/collect_data.py -> envs/<task_name>.py -> Base_Task.grasp_actor/place_actor
-```
-
-新增任务入口：
+最新 `tmux gen1-1/gen1-2` 结论：
 
 ```text
-envs/pick_diverse_bottles_piper.py
-task_config/demo_clean_piper.yml
-task_config/demo_clean_piper_calibrated.yml
-assets/embodiments/piper_pika_agx/config.yml
-assets/embodiments/piper_pika_agx_ik_orig_tcp/config.yml
-assets/embodiments/piper_pika_agx_ik_orig_tcp/curobo.yml
-assets/embodiments/piper_pika_agx_ik_orig_tcp/collision_piper_pika.yml
-description/task_instruction/pick_diverse_bottles_piper.json
+seed 72-115: Objects is unstable / target_pose cannot be None for move action
+final: Ctrl-C interrupted
 ```
 
-实现原则：
+#### O.0-1 已跑通：无 viewer 生成 head-only 数据
 
-- 不修改原始 `/home/zaijia001/ssd/RoboTwin/envs/pick_diverse_bottles.py`。
-- `pick_diverse_bottles_piper` 只继承原始 `pick_diverse_bottles`，因此瓶子随机采样、随机旋转、左/右瓶区域、`grasp_actor(... pre_grasp_dis=0.08)`、lift `z=0.1`、左右 target pose 都保持原逻辑。
-- `demo_clean_piper.yml` 与 `demo_clean_piper_calibrated.yml` 都使用 `embodiment: [piper_pika_agx_calibrated, piper_pika_agx_calibrated, 0.0]`，其余 clean demo 采集配置保持一致。
-- `piper_pika_agx_calibrated` 使用 `assets/embodiments/piper_pika_agx/config.yml`，该配置来自 `robot_config_PiperPika_agx_dual_table_0515.json` 的标定 base pose、`piper_pika_agx.urdf`、Piper/Pika 夹爪 joint、`delta_matrix=I` 和 `global_trans_matrix=diag(1,-1,-1)`。
-- 这一路使用标定 Piper/Pika embodiment 和 RoboTwin 原始 planner/grasp frame 转换，不走前面 Mode O 的 FoundationPose target frame。
-- 注意：已跑通能保存数据的 `pick_diverse_bottles_piper_motion` 不走原始 IK，它是关节空间插值 baseline。原始 `pick_diverse_bottles.py` 的 IK/规划链路是 `grasp_actor/place_actor -> Action(move target_pose) -> Base_Task.move -> robot.left/right_plan_path -> envs/robot/robot.py::_trans_from_gripper_to_endlink -> CuroboPlanner.plan_path`。
-
-推荐命令：
+用途：生成可保存的 O.0 对照数据。该命令走 `pick_diverse_bottles_piper_motion`，保留原始瓶子随机采样和稳定性检查，但不调用原始 IK；动作为标定 Piper/Pika 的关节空间 motion baseline。
 
 ```bash
-source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_calibrated 0
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper_motion demo_clean_piper_motion 0
 ```
 
-输出路径：
+输出示例：
 
 ```text
-data/pick_diverse_bottles_piper/demo_clean_piper_calibrated/
+data/pick_diverse_bottles_piper_motion/demo_clean_piper_motion/data/episode0.hdf5
+data/pick_diverse_bottles_piper_motion/demo_clean_piper_motion/video/episode0.mp4
+data/pick_diverse_bottles_piper_motion/demo_clean_piper_motion/_traj_data/episode0.pkl
+data/pick_diverse_bottles_piper_motion/demo_clean_piper_motion/instructions/episode0.json
 ```
 
-如果之前已经用旧 `demo_clean_piper` 生成过数据，不建议继续复用同一个输出目录判断标定版效果；旧数据是用 `assets/embodiments/piper/config.yml` 生成的自带 Piper URDF/base pose，不是标定 `piper_pika_agx`。使用 `demo_clean_piper_calibrated` 会写到新目录，便于对比。
+#### O.0-2 已跑通：带运动 viewer 检查 motion baseline
 
-### O.0 原始 IK/规划链路实验：标定 Piper/Pika URDF + 原始 Piper TCP 转换
-
-如果要测试“在保持当前标定 Piper/Pika URDF 的前提下，是否能复用 `/home/zaijia001/ssd/RoboTwin/envs/pick_diverse_bottles.py` 的原始 IK/规划逻辑”，使用：
+用途：在 SAPIEN viewer 中看 O.0 motion baseline 的后续运动。该命令会执行运动，但 `collect_data: false`，不保存 hdf5。
 
 ```bash
-source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_ik_orig_tcp 0
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash run_pick_diverse_bottles_piper_motion_viewer.sh
 ```
 
-该命令仍使用 `pick_diverse_bottles_piper`，因此会进入原始 `play_once -> grasp_actor -> move/place_actor -> robot.left/right_plan_path` 链路。不同点是配置改为：
+#### O.0-3 只看场景：纯 scene viewer，不执行动作
 
-```text
-task_config/demo_clean_piper_ik_orig_tcp.yml
-embodiment: [piper_pika_agx_ik_orig_tcp, piper_pika_agx_ik_orig_tcp, 0.0]
+用途：只检查标定 Piper/Pika、桌面、瓶子随机摆放和 viewer 是否能打开。该命令不进入 `play_once`，不会执行运动，也不会保存数据。
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash run_view_pick_diverse_bottles_piper_scene.sh --seed 0 --max_seed_tries 50
 ```
 
-`piper_pika_agx_ik_orig_tcp` 的含义：
+#### O.0-4 诊断用：原始 IK/规划链路，不作为当前采集命令
 
-- SAPIEN 加载标定 `assets/embodiments/piper_pika_agx/piper_pika_agx.urdf` 和标定左右 base pose。
-- Curobo 也加载同一个 `piper_pika_agx.urdf`，并使用 Pika URDF 中真实存在的 `gripper_base_link/gripper_left_link/gripper_right_link` 与 `left_joint/right_joint`。
-- `delta_matrix/global_trans_matrix` 改用 RoboTwin 自带 Piper 的 TCP 转换：`delta_matrix=[[0,0,-1],[0,1,0],[1,0,0]]`，`global_trans_matrix=[[0,0,1],[0,1,0],[-1,0,0]]`。
-- 这样可以隔离验证：问题是否只是标定 Piper/Pika 的 gripper 局部坐标和原始 RoboTwin Piper TCP 约定不一致。
-
-已执行 smoke：
+用途：验证“标定 Piper/Pika URDF + 原始 `pick_diverse_bottles.py` 的 IK/规划逻辑”。该命令使用 `pick_diverse_bottles_piper`，会进入原始 `grasp_actor/place_actor -> robot.left/right_plan_path -> CuroboPlanner.plan_path` 链路；embodiment 使用 `piper_pika_agx_ik_orig_tcp`。
 
 ```bash
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && timeout 120s bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_ik_orig_tcp 0
 ```
 
-结果：命令已进入 `Embodiment Config: piper_pika_agx_ik_orig_tcp+piper_pika_agx_ik_orig_tcp` 和原始 `pick_diverse_bottles_piper` task，但 120 秒内没有完成 episode。失败仍主要是 `Objects is unstable` 与 `target_pose cannot be None for move action`。因此，使用标定 URDF + 原始 Piper TCP 转换可以保证走原始 IK/规划链路，但还不能单独解决原始 ALOHA-style 抓取候选在 Piper/Pika 上不可用的问题。
+状态：已确认能进入 `Embodiment Config: piper_pika_agx_ik_orig_tcp+piper_pika_agx_ik_orig_tcp` 和原始 task/IK 链路，但没有完成 episode。最新 `tmux gen1-1/gen1-2` 仍显示大量 `Objects is unstable` 和 `target_pose cannot be None for move action`。因此它只用于定位 IK/抓取候选问题，不是当前推荐的数据生成命令。
 
-如果要对照原始 ALOHA-AgileX clean demo，仍使用：
+原始 IK 链路：
 
-```bash
-bash collect_data.sh pick_diverse_bottles demo_clean 0
+```text
+pick_diverse_bottles.py
+-> grasp_actor/place_actor
+-> Action(move target_pose)
+-> Base_Task.move
+-> robot.left_plan_path / robot.right_plan_path
+-> robot._trans_from_gripper_to_endlink
+-> CuroboPlanner.plan_path
 ```
-
-注意：O.0 的目的不是修复前面 Mode O 运行时的夹爪朝向，而是建立一个“原始 RoboTwin demo 逻辑 + Piper embodiment”的基线。如果 O.0 仍出现大规模朝向问题，问题更可能在 `assets/embodiments/piper/config.yml` 的 `delta_matrix/global_trans_matrix/gripper_scale/grasp_perfect_direction` 或 Piper URDF 几何，而不是 Foundation/AnyGrasp target 设计。
 
 `gen-23` 错误记录：
 
@@ -5615,69 +5599,3 @@ right_bottle center=( 0.230, 0.114, 0.745), grasp=( 0.260, 0.114, 0.745), action
 - 是否允许在 Mode O 放宽 `require_keyframe1_reached_before_close` 做“即使一臂未严格 reached 也尝试 close/action”的对比；当前默认保守，不会在第一阶段失败时关爪。
 
   bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh --gpu 2 --ids 1  --viewer --viewer_wait_at_end 1 --target_frame_convention aloha_local_x_z_up --output_root /tmp/mode_o_aloha_local_x_plan_only
-
-### O.0 head-only 标定 Piper/Pika 数据采集与 viewer 调试
-
-`tmux gen1-2` 的当前失败不是 wrist 图像保存异常。`No left camera link` / `No right camera link` 是 `piper_pika_agx.urdf` 没有 wrist camera link 后的 fallback 警告；真正失败在 seed/premotion 阶段，主要是瓶子初始不稳定，或原始 `pick_diverse_bottles.py` 的 scripted grasp/move 没有为标定 Piper/Pika 生成可执行 target。
-
-正式采集配置现在只保存 head camera：
-
-```bash
-source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_calibrated 0
-```
-
-这是无 viewer 生成数据入口，会进入 `collect_data.py -> play_once -> grasp_actor`。`tmux gen1` 当前显示它能加载标定 Piper/Pika 和 head-only 配置，但 seed 0 起反复失败：seed 0/1 是 `Objects is unstable`，seed 2/5 等是 `target_pose cannot be None for move action`。因此这条命令格式正确，但当前原始 `pick_diverse_bottles.py` demo 逻辑还不能稳定给标定 Piper/Pika 生成数据；需要后续写 Piper/Pika 专用 grasp 逻辑才能真正完成 episode 采集。
-
-场景 viewer 调试；不保存 hdf5，不进入 `play_once` 规划，只加载机器人、桌面和随机瓶子并停在 viewer。这里用短 wrapper，避免 tmux/zsh 换行拆坏长命令；wrapper 会 `unset CUDA_VISIBLE_DEVICES`、自动设置 `/etc/vulkan/icd.d/nvidia_icd.json`，并自动跳过不稳定 seed。需要在有 `DISPLAY` 的 VNC/图形 tmux 里运行：
-
-```bash
-source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash run_view_pick_diverse_bottles_piper_scene.sh --seed 0 --max_seed_tries 50
-```
-
-这条 viewer 命令成功加载后会停在循环里等待你看窗口，不会像采集任务一样自动“执行完成”。`tmux gen1` 中它跳过 seed 0/1 后加载了稳定场景 seed 2；关闭 SAPIEN 窗口或按 `Ctrl-C` 才会退出。
-
-不要用 `collect_data.sh` 跑 viewer：它会强制设置 `CUDA_VISIBLE_DEVICES=${gpu_id}`，可能把 display GPU mask 掉。也不要把 `collect_data.py` 当作纯 viewer 入口；它会继续执行原始 `grasp_actor` 规划，因此当前标定 Piper/Pika 下仍可能直接报 `target_pose cannot be None for move action`。
-
-如果 viewer 本身打不开，先跑最小 SAPIEN viewer 探针：
-
-```bash
-source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && cd /home/zaijia001/ssd/RoboTwin && unset CUDA_VISIBLE_DEVICES; [[ -f /etc/vulkan/icd.d/nvidia_icd.json ]] && export VK_ICD_FILENAMES=/etc/vulkan/icd.d/nvidia_icd.json; echo "DISPLAY=$DISPLAY CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-unset} VK_ICD_FILENAMES=${VK_ICD_FILENAMES:-unset}" && conda run -n RoboTwin_bw python /home/zaijia001/ssd/RoboTwin/code_painting/probe_sapien_viewer.py
-```
-
-若 head-only 后仍连续出现 `target_pose cannot be None for move action`，下一步应新写 Piper/Pika 专用 `pick_diverse_bottles` task 逻辑，调整瓶子采样/固定 side-grasp target，而不是继续完全复用 ALOHA-AgileX 原始 demo 规划。
-
-### O.0 motion baseline：已跑通的标定 Piper/Pika 后续运动与无 viewer 生成
-
-原始 `pick_diverse_bottles_piper + demo_clean_piper_calibrated` 会进入原始 `grasp_actor`，目前在标定 Piper/Pika 上无法完成 episode。为了先得到“原始随机瓶子场景 + 标定 Piper/Pika + head-only 数据保存 + 可见后续运动”的对照，新增：
-
-```text
-envs/pick_diverse_bottles_piper_motion.py
-task_config/demo_clean_piper_motion.yml
-task_config/demo_clean_piper_motion_viewer.yml
-description/task_instruction/pick_diverse_bottles_piper_motion.json
-run_pick_diverse_bottles_piper_motion_viewer.sh
-```
-
-无 viewer 生成数据，已测试成功：
-
-```bash
-source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper_motion demo_clean_piper_motion 0
-```
-
-成功结果：
-
-```text
-seed 0/1: Objects is unstable
-seed 2: simulate data episode 0 success
-saved 64 head-camera frames
-data/pick_diverse_bottles_piper_motion/demo_clean_piper_motion/data/episode0.hdf5
-data/pick_diverse_bottles_piper_motion/demo_clean_piper_motion/video/episode0.mp4
-```
-
-带运动 viewer，已在 `tmux gen1-1` 测试成功进入 seed 2 premotion：
-
-```bash
-source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash run_pick_diverse_bottles_piper_motion_viewer.sh
-```
-
-注意：`pick_diverse_bottles_piper_motion` 是 joint-space motion baseline。它保留原始随机瓶子和稳定性检查，但不调用原始 `grasp_actor`，`check_success()` 用于让该运动对照能保存数据；它不代表真实瓶子抓取已经解决。

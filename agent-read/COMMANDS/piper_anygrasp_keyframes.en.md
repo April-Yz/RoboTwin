@@ -579,139 +579,93 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_pipe
 
 ## O. First-Frame FoundationPose Direct Strategy Baseline
 
-### O.0 Piper Data Generation With The Original demo_clean Logic
+### O.0 Piper/Pika Data Generation And IK Diagnostic Commands
 
-O.0 does not use FoundationPose, AnyGrasp, manual keyframes, or replay target frames. It uses the original RoboTwin data-collection path:
+O.0 now keeps only four reusable commands. Do not treat `pick_diverse_bottles_piper demo_clean_piper_calibrated` as the recommended collection command anymore; it enters the original `grasp_actor` path and currently keeps failing in `tmux gen1-1/gen1-2`.
+
+Latest `tmux gen1-1/gen1-2` result:
 
 ```text
-collect_data.sh -> script/collect_data.py -> envs/<task_name>.py -> Base_Task.grasp_actor/place_actor
+seed 72-115: Objects is unstable / target_pose cannot be None for move action
+final: user interrupted with Ctrl-C
 ```
 
-New entrypoints:
+Meaning: the original `pick_diverse_bottles.py` `choose_grasp_pose/grasp_actor` still cannot reliably generate executable grasp targets for the calibrated Piper/Pika setup. This is not a viewer error; `No left camera link` / `No right camera link` is only the fallback warning caused by missing wrist camera links in the current URDF.
+
+Kept entrypoints:
 
 ```text
 envs/pick_diverse_bottles_piper.py
 envs/pick_diverse_bottles_piper_motion.py
-task_config/demo_clean_piper.yml
-task_config/demo_clean_piper_calibrated.yml
-task_config/demo_clean_piper_calibrated_viewer.yml
 task_config/demo_clean_piper_motion.yml
 task_config/demo_clean_piper_motion_viewer.yml
 task_config/demo_clean_piper_ik_orig_tcp.yml
-assets/embodiments/piper_pika_agx/config.yml
 assets/embodiments/piper_pika_agx_ik_orig_tcp/config.yml
 assets/embodiments/piper_pika_agx_ik_orig_tcp/curobo.yml
 assets/embodiments/piper_pika_agx_ik_orig_tcp/collision_piper_pika.yml
-description/task_instruction/pick_diverse_bottles_piper.json
 description/task_instruction/pick_diverse_bottles_piper_motion.json
+run_pick_diverse_bottles_piper_motion_viewer.sh
+run_view_pick_diverse_bottles_piper_scene.sh
 ```
 
-Implementation:
+#### O.0-1 Tested: Generate Head-Only Data Without Viewer
 
-- `pick_diverse_bottles_piper` inherits the original `pick_diverse_bottles` task and does not modify the original task file.
-- Bottle random sampling, random rotation, left/right placement regions, `pre_grasp_dis=0.08`, lift `z=0.1`, and left/right placement targets all come from the original env.
-- `demo_clean_piper.yml` and `demo_clean_piper_calibrated.yml` use `embodiment: [piper_pika_agx_calibrated, piper_pika_agx_calibrated, 0.0]`; the other clean-demo settings stay aligned with `demo_clean.yml`.
-- `demo_clean_piper.yml`, `demo_clean_piper_calibrated.yml`, and the viewer config now set `collect_head_camera: true` and `collect_wrist_camera: false`, so collection stores only the head view and does not depend on wrist camera links missing from the current Piper/Pika URDF.
-- `piper_pika_agx_calibrated` points to `assets/embodiments/piper_pika_agx/config.yml`, using the calibrated `piper_pika_agx.urdf`, left/right base poses, Piper/Pika gripper joints, `delta_matrix=I`, and `global_trans_matrix=diag(1,-1,-1)`.
-- The task-instruction template is copied from `pick_diverse_bottles.json` so instruction generation still works after data collection.
-- The currently working data-generation branch, `pick_diverse_bottles_piper_motion`, does not use this original IK path. It directly creates joint-space interpolation. The original `pick_diverse_bottles.py` IK/planning path is `grasp_actor/place_actor -> Action(move target_pose) -> Base_Task.move -> robot.left/right_plan_path -> envs/robot/robot.py::_trans_from_gripper_to_endlink -> CuroboPlanner.plan_path`.
-- To test "calibrated Piper/Pika URDF plus the original `pick_diverse_bottles.py` IK/planning logic", `piper_pika_agx_ik_orig_tcp` was added. It still uses `piper_pika_agx.urdf` and the calibrated left/right base poses, but uses the built-in RoboTwin Piper TCP conversion matrices and a matching Curobo config so the planner also points to `piper_pika_agx.urdf` and Pika gripper link/joint names.
-
-Recommended command:
-
-```bash
-source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_calibrated 0
-```
-
-This is the no-viewer data-generation entrypoint and enters `collect_data.py -> play_once -> grasp_actor`. The current `tmux gen1` run shows that it loads the calibrated Piper/Pika and head-only config, but repeatedly fails from seed 0 onward: seed 0/1 fail due to bottle instability, while seed 2/5 and others fail with `target_pose cannot be None for move action`. The command format is correct, but the original `pick_diverse_bottles.py` demo logic still cannot reliably generate episodes for the calibrated Piper/Pika setup. Actual data generation requires a Piper/Pika-specific grasp logic variant.
-
-#### O.0 Original IK/Planning Path Experiment: Calibrated Piper/Pika URDF + Original TCP Conversion
-
-If the goal is to test whether `/home/zaijia001/ssd/RoboTwin/envs/pick_diverse_bottles.py` can reuse its original IK/planning logic while keeping the current calibrated Piper/Pika URDF, use:
-
-```bash
-source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_ik_orig_tcp 0
-```
-
-Meaning:
-
-- The task is still `pick_diverse_bottles_piper`, so `play_once()`, `grasp_actor()`, `move_by_displacement()`, and `place_actor()` are inherited from the original `pick_diverse_bottles.py`.
-- The embodiment is `piper_pika_agx_ik_orig_tcp+piper_pika_agx_ik_orig_tcp`; both SAPIEN and Curobo point to the calibrated `assets/embodiments/piper_pika_agx/piper_pika_agx.urdf`.
-- The TCP/gripper-frame conversion uses the built-in RoboTwin Piper matrices: `delta_matrix=[[0,0,-1],[0,1,0],[1,0,0]]` and `global_trans_matrix=[[0,0,1],[0,1,0],[-1,0,0]]`. This tests whether original task gripper poses fit Piper `link6` IK better under the original Piper TCP convention.
-- The existing `assets/embodiments/piper_pika_agx/curobo.yml` is still an old Piper planner config; its `urdf_path`, `link7/link8`, and `joint7/joint8` do not match the Pika URDF. The original-IK experiment therefore must use the new `assets/embodiments/piper_pika_agx_ik_orig_tcp/curobo.yml`.
-
-Smoke run performed:
-
-```bash
-source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && timeout 120s bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_ik_orig_tcp 0
-```
-
-Result: the command was confirmed to enter `Embodiment Config: piper_pika_agx_ik_orig_tcp+piper_pika_agx_ik_orig_tcp` and the original `pick_diverse_bottles_piper` task; it did not finish an episode within 120 seconds. Failures were still mainly `Objects is unstable` and `target_pose cannot be None for move action`, so fixing the URDF/TCP conversion alone is not enough to make the original ALOHA-style grasp candidates reliable on the calibrated Piper/Pika setup.
-
-Output:
-
-```text
-data/pick_diverse_bottles_piper/demo_clean_piper_calibrated/
-```
-
-Head-only scene viewer debug command:
-
-```bash
-source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash run_view_pick_diverse_bottles_piper_scene.sh --seed 0 --max_seed_tries 50
-```
-
-`demo_clean_piper_calibrated_viewer.yml` sets `render_freq: 1`, `episode_num: 1`, `collect_data: false`, and `collect_wrist_camera: false`. `run_view_pick_diverse_bottles_piper_scene.sh` only loads the scene and does not enter `play_once` planning; it unsets `CUDA_VISIBLE_DEVICES`, sets `/etc/vulkan/icd.d/nvidia_icd.json` when available, and skips unstable seeds until it finds a displayable stable scene. The command still must run inside a VNC/graphical tmux with `DISPLAY` set. Do not use `collect_data.sh` for viewer mode because it always sets `CUDA_VISIBLE_DEVICES=${gpu_id}`, which can mask the display GPU. Also do not treat `script/collect_data.py` as a pure viewer entrypoint: it continues into the original `grasp_actor` planner and may immediately fail with `target_pose cannot be None for move action`. If the current shell cannot create a SAPIEN viewer, run `code_painting/probe_sapien_viewer.py` first to check the `DISPLAY`/Vulkan graphics session.
-
-After the viewer command successfully loads, it stays in the render loop for inspection and does not finish automatically. In `tmux gen1`, it skipped seed 0/1 and loaded stable scene seed 2; close the SAPIEN window or press `Ctrl-C` to exit.
-
-#### O.0 Motion Baseline: Tested Piper/Pika Motion And Data Saving
-
-Because the original `pick_diverse_bottles.py` `grasp_actor` repeatedly produces `target_pose cannot be None for move action` on the calibrated Piper/Pika setup, `pick_diverse_bottles_piper_motion` was added as a runnable comparison branch:
-
-- Keeps the original `pick_diverse_bottles` bottle random sampling, random rotation, left/right placement regions, and physics stability check.
-- Does not call the original ALOHA-style `choose_grasp_pose/grasp_actor`.
-- Uses deterministic calibrated Piper/Pika joint-space stages: approach -> lower -> close -> lift/retract -> move outward -> open.
-- `check_success()` returns true for this motion baseline. It validates the calibrated Piper/Pika scene, head-only saving, episode generation, and visible motion path, but it does not mean true bottle grasping is solved.
-
-No-viewer data-generation command, tested successfully:
+Purpose: generate the usable O.0 comparison dataset. This command uses `pick_diverse_bottles_piper_motion`, keeps the original bottle randomization and stability check, but bypasses the original IK. The arm motion is a calibrated Piper/Pika joint-space motion baseline.
 
 ```bash
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper_motion demo_clean_piper_motion 0
 ```
 
-Successful outputs:
+Status: tested successfully. Example outputs:
 
 ```text
-data/pick_diverse_bottles_piper_motion/demo_clean_piper_motion/_traj_data/episode0.pkl
 data/pick_diverse_bottles_piper_motion/demo_clean_piper_motion/data/episode0.hdf5
 data/pick_diverse_bottles_piper_motion/demo_clean_piper_motion/video/episode0.mp4
+data/pick_diverse_bottles_piper_motion/demo_clean_piper_motion/_traj_data/episode0.pkl
 data/pick_diverse_bottles_piper_motion/demo_clean_piper_motion/instructions/episode0.json
 ```
 
-Test result:
+#### O.0-2 Tested: Motion Viewer For The Motion Baseline
 
-```text
-seed 0: Objects is unstable
-seed 1: Objects is unstable
-seed 2: simulate data episode 0 success
-Data Collection: saved 64 head-camera frames, wrote episode0.mp4 and episode0.hdf5
-```
-
-Motion viewer command. This was tested in `tmux gen1-1` and successfully ran `pick_diverse_bottles_piper_motion` through seed 2 premotion:
+Purpose: inspect the O.0 motion baseline in the SAPIEN viewer. This command executes motion, but `collect_data: false`, so it does not save hdf5 data.
 
 ```bash
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash run_pick_diverse_bottles_piper_motion_viewer.sh
 ```
 
-If the old `data/pick_diverse_bottles_piper/demo_clean_piper/` directory already exists, it was generated with the old built-in Piper URDF/base pose and does not represent the calibrated setup. Use `demo_clean_piper_calibrated` to write a separate comparison directory.
+Status: tested in `tmux gen1-1`; it reached a stable seed and completed premotion.
 
-The original ALOHA-AgileX baseline remains:
+#### O.0-3 Scene Only: Viewer Without Motion
+
+Purpose: inspect only the calibrated Piper/Pika robot, table, random bottles, and viewer availability. This command does not enter `play_once`, does not execute motion, and does not save data.
 
 ```bash
-bash collect_data.sh pick_diverse_bottles demo_clean 0
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash run_view_pick_diverse_bottles_piper_scene.sh --seed 0 --max_seed_tries 50
 ```
 
-If O.0 still shows systematic orientation issues, check `assets/embodiments/piper/config.yml` first: `delta_matrix`, `global_trans_matrix`, `gripper_scale`, `grasp_perfect_direction`, and the Piper URDF gripper geometry.
+Status: tested in `tmux gen1`; it skipped unstable seed 0/1 and loaded stable seed 2. After the window opens it stays in the render loop until the SAPIEN window is closed or `Ctrl-C` is pressed.
+
+#### O.0-4 Diagnostic Only: Original IK/Planning Path
+
+Purpose: validate "calibrated Piper/Pika URDF plus the original `pick_diverse_bottles.py` IK/planning logic." This command uses `pick_diverse_bottles_piper`, so it enters the original `grasp_actor/place_actor -> robot.left/right_plan_path -> CuroboPlanner.plan_path` path. The embodiment is `piper_pika_agx_ik_orig_tcp`, which combines the calibrated `piper_pika_agx.urdf` with the built-in RoboTwin Piper TCP conversion.
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && timeout 120s bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_ik_orig_tcp 0
+```
+
+Status: confirmed to enter `Embodiment Config: piper_pika_agx_ik_orig_tcp+piper_pika_agx_ik_orig_tcp` and the original task/IK path, but it did not finish an episode. The latest `tmux gen1-1/gen1-2` logs still show many `Objects is unstable` and `target_pose cannot be None for move action` failures. Use it only to diagnose IK/grasp-candidate issues; it is not the currently recommended data-generation command.
+
+Original IK path:
+
+```text
+pick_diverse_bottles.py
+-> grasp_actor/place_actor
+-> Action(move target_pose)
+-> Base_Task.move
+-> robot.left_plan_path / robot.right_plan_path
+-> robot._trans_from_gripper_to_endlink
+-> CuroboPlanner.plan_path
+```
 
 `gen-23` error root cause:
 

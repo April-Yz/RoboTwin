@@ -2584,3 +2584,14 @@
   - `py_compile envs/pick_diverse_bottles_piper.py envs/pick_diverse_bottles_piper_motion.py` passed.
   - `git diff --check` passed.
   - `timeout 120s bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_ik_orig_tcp 0` confirmed `Embodiment Config: piper_pika_agx_ik_orig_tcp+piper_pika_agx_ik_orig_tcp` and the original `pick_diverse_bottles_piper` task, but did not finish an episode within 120 seconds. Failures remained mainly `Objects is unstable` and `target_pose cannot be None for move action`.
+
+## 2026-06-04 (O.0 Command Cleanup And gen1 Error Recheck)
+
+- Rechecked tmux:
+  - There is no standalone pane named `gen1`; the actual sessions are `gen1-1` and `gen1-2`.
+  - Both panes show the same latest behavior: from seed 72 through 115, failures alternated between `Objects is unstable` and `target_pose cannot be None for move action`, then the user interrupted with `Ctrl-C`.
+  - Conclusion: the command was running the original task/IK path, not the tested `pick_diverse_bottles_piper_motion` path. The remaining failure is still that the original `choose_grasp_pose/grasp_actor` cannot reliably generate executable targets for the calibrated Piper/Pika setup.
+- Documentation cleanup:
+  - Rewrote the O.0 section in `agent-read/COMMANDS/piper_anygrasp_keyframes.zh.md` / `.en.md`, keeping only four titled commands: no-viewer data generation, motion viewer, scene-only viewer, and original-IK diagnostic.
+  - Rewrote the O.0 section in `COMMAND_LIBRARY.zh.md` and removed the duplicate old O.0 head-only/motion section at the file end.
+  - `pick_diverse_bottles_piper demo_clean_piper_calibrated` is no longer kept as a recommended command; it is only mentioned as a failing original-`grasp_actor` path.

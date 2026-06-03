@@ -1936,3 +1936,17 @@
   - `timeout 120s ... demo_clean_piper_ik_orig_tcp 0` confirmed the new embodiment and original task path, but did not finish an episode.
   - Main failures remained `Objects is unstable` and `target_pose cannot be None for move action`.
   - This command is for validating the original IK path; it is not the currently recommended successful data-generation command. The successful data-generation path remains `pick_diverse_bottles_piper_motion demo_clean_piper_motion`.
+
+## 2026-06-04 (O.0 Command List Consolidation)
+
+- Kept commands:
+  - `O.0-1 Tested: Generate head-only data without viewer`
+    `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper_motion demo_clean_piper_motion 0`
+  - `O.0-2 Tested: Motion viewer for the motion baseline`
+    `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash run_pick_diverse_bottles_piper_motion_viewer.sh`
+  - `O.0-3 Scene only: viewer without motion`
+    `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash run_view_pick_diverse_bottles_piper_scene.sh --seed 0 --max_seed_tries 50`
+  - `O.0-4 Diagnostic only: original IK/planning path`
+    `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && timeout 120s bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_ik_orig_tcp 0`
+- Removed/downgraded:
+  - `pick_diverse_bottles_piper demo_clean_piper_calibrated` is no longer recommended as a collection command; `tmux gen1-1/gen1-2` shows it keeps failing with `Objects is unstable` and `target_pose cannot be None for move action`.

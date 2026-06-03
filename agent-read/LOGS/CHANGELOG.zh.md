@@ -2582,3 +2582,14 @@
   - `py_compile envs/pick_diverse_bottles_piper.py envs/pick_diverse_bottles_piper_motion.py` 通过。
   - `git diff --check` 通过。
   - `timeout 120s bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_ik_orig_tcp 0` 已确认进入 `Embodiment Config: piper_pika_agx_ik_orig_tcp+piper_pika_agx_ik_orig_tcp` 和原始 `pick_diverse_bottles_piper` task，但 120 秒内没有完成 episode；失败仍主要是 `Objects is unstable` 与 `target_pose cannot be None for move action`。
+
+## 2026-06-04（O.0 命令整理与 gen1 错误复查）
+
+- 复查 tmux：
+  - 当前没有名为 `gen1` 的单独 pane；实际 session 为 `gen1-1` 与 `gen1-2`。
+  - 两个 pane 的最新输出一致：seed 72 到 115 之间持续出现 `Objects is unstable` 和 `target_pose cannot be None for move action`，最后用户 `Ctrl-C` 中断。
+  - 结论：运行的是原始 task/IK 链路，不是已跑通的 `pick_diverse_bottles_piper_motion`；失败点仍在原始 `choose_grasp_pose/grasp_actor` 不能为标定 Piper/Pika 稳定生成可执行 target。
+- 文档整理：
+  - 重写 `agent-read/COMMANDS/piper_anygrasp_keyframes.zh.md` / `.en.md` 的 O.0 小节，只保留 4 条带用途标题的命令：无 viewer 数据生成、带运动 viewer、纯场景 viewer、原始 IK 诊断。
+  - 重写 `COMMAND_LIBRARY.zh.md` 的 O.0 小节，并删除文件末尾重复的旧 O.0 head-only/motion 段落。
+  - `pick_diverse_bottles_piper demo_clean_piper_calibrated` 不再作为推荐命令保留，只说明其会进入原始 `grasp_actor` 并持续失败。
