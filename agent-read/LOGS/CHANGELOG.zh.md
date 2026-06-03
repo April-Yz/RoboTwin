@@ -2566,3 +2566,19 @@
   - YAML/JSON 解析检查通过，`demo_clean_piper_motion` 与 viewer 配置均使用 `piper_pika_agx_calibrated+piper_pika_agx_calibrated`，且 `collect_wrist_camera: false`。
   - 无 viewer 命令 `timeout 180s bash collect_data.sh pick_diverse_bottles_piper_motion demo_clean_piper_motion 0` 已成功：seed 0/1 因瓶子不稳定跳过，seed 2 `simulate data episode 0 success`，保存 64 帧 head-camera 数据、`episode0.hdf5`、`episode0.mp4`、`episode0.pkl` 和 instruction json。
   - `tmux gen1-1` 中执行 `bash run_pick_diverse_bottles_piper_motion_viewer.sh` 已成功跑到 seed 2 premotion 并返回 shell。
+
+## 2026-06-03（O.0 原始 IK/规划链路与 Piper/Pika TCP 实验）
+
+- 问题复查：
+  - 当前能生成数据的 `pick_diverse_bottles_piper_motion` 没有调用原始 `pick_diverse_bottles.py` 的 IK/规划链路，而是直接生成关节空间插值。
+  - 原始任务链路为 `grasp_actor/place_actor -> Action(move target_pose) -> Base_Task.move -> robot.left/right_plan_path -> _trans_from_gripper_to_endlink -> CuroboPlanner.plan_path`。
+  - 检查发现现有 `assets/embodiments/piper_pika_agx/curobo.yml` 仍指向旧 `/assets/embodiments/piper/piper.urdf`，并使用旧 Piper 的 `link7/link8/joint7/joint8`，与 `piper_pika_agx.urdf` 的 Pika gripper link/joint 不一致。
+- 修改：
+  - 新增 `piper_pika_agx_ik_orig_tcp` embodiment，保持标定 `piper_pika_agx.urdf` 和左右 base pose，但把 `delta_matrix/global_trans_matrix` 改为 RoboTwin 自带 Piper TCP 转换。
+  - 新增配套 `curobo.yml` 和 `collision_piper_pika.yml`，让 Curobo planner 也使用 `piper_pika_agx.urdf`、`gripper_base_link/gripper_left_link/gripper_right_link` 和 `left_joint/right_joint`。
+  - 新增 `task_config/demo_clean_piper_ik_orig_tcp.yml`，命令仍使用 `pick_diverse_bottles_piper`，从而真正进入原始 `pick_diverse_bottles.py` 的 `grasp_actor/place_actor` IK/规划链路。
+- 验证：
+  - YAML 解析检查通过：新 task config、embodiment config、Curobo config、collision config 均可解析，`_embodiment_config.yml` 能找到 `piper_pika_agx_ik_orig_tcp`。
+  - `py_compile envs/pick_diverse_bottles_piper.py envs/pick_diverse_bottles_piper_motion.py` 通过。
+  - `git diff --check` 通过。
+  - `timeout 120s bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_ik_orig_tcp 0` 已确认进入 `Embodiment Config: piper_pika_agx_ik_orig_tcp+piper_pika_agx_ik_orig_tcp` 和原始 `pick_diverse_bottles_piper` task，但 120 秒内没有完成 episode；失败仍主要是 `Objects is unstable` 与 `target_pose cannot be None for move action`。

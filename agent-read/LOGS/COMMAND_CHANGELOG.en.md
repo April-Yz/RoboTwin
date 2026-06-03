@@ -1917,3 +1917,22 @@
   - This command enters `pick_diverse_bottles_piper_motion`; it is not the scene-only viewer. In `tmux gen1-1`, it successfully reached seed 2 premotion.
   - The original `run_view_pick_diverse_bottles_piper_scene.sh --seed 0 --max_seed_tries 50` remains a stable-scene viewer and does not execute motion.
   - The original `collect_data.sh pick_diverse_bottles_piper demo_clean_piper_calibrated 0` still fails in the original `grasp_actor` path and is not the currently recommended runnable O.0 motion-data command.
+
+## 2026-06-03 (O.0 Original IK/Planning Path Experiment Command)
+
+- Added embodiment/config:
+  - `piper_pika_agx_ik_orig_tcp`
+  - `assets/embodiments/piper_pika_agx_ik_orig_tcp/config.yml`
+  - `assets/embodiments/piper_pika_agx_ik_orig_tcp/curobo.yml`
+  - `assets/embodiments/piper_pika_agx_ik_orig_tcp/collision_piper_pika.yml`
+  - `task_config/demo_clean_piper_ik_orig_tcp.yml`
+- Experiment command:
+  - `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_ik_orig_tcp 0`
+- Meaning:
+  - The task still uses `pick_diverse_bottles_piper`, so it enters the original `pick_diverse_bottles.py` `grasp_actor/place_actor` IK/planning path.
+  - The embodiment uses the calibrated `piper_pika_agx.urdf` and left/right base poses, but uses the built-in RoboTwin Piper TCP conversion matrices.
+  - The Curobo config was adjusted to match the Pika URDF gripper link/joint names.
+- Smoke result:
+  - `timeout 120s ... demo_clean_piper_ik_orig_tcp 0` confirmed the new embodiment and original task path, but did not finish an episode.
+  - Main failures remained `Objects is unstable` and `target_pose cannot be None for move action`.
+  - This command is for validating the original IK path; it is not the currently recommended successful data-generation command. The successful data-generation path remains `pick_diverse_bottles_piper_motion demo_clean_piper_motion`.

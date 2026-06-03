@@ -5371,6 +5371,9 @@ envs/pick_diverse_bottles_piper.py
 task_config/demo_clean_piper.yml
 task_config/demo_clean_piper_calibrated.yml
 assets/embodiments/piper_pika_agx/config.yml
+assets/embodiments/piper_pika_agx_ik_orig_tcp/config.yml
+assets/embodiments/piper_pika_agx_ik_orig_tcp/curobo.yml
+assets/embodiments/piper_pika_agx_ik_orig_tcp/collision_piper_pika.yml
 description/task_instruction/pick_diverse_bottles_piper.json
 ```
 
@@ -5381,6 +5384,7 @@ description/task_instruction/pick_diverse_bottles_piper.json
 - `demo_clean_piper.yml` 与 `demo_clean_piper_calibrated.yml` 都使用 `embodiment: [piper_pika_agx_calibrated, piper_pika_agx_calibrated, 0.0]`，其余 clean demo 采集配置保持一致。
 - `piper_pika_agx_calibrated` 使用 `assets/embodiments/piper_pika_agx/config.yml`，该配置来自 `robot_config_PiperPika_agx_dual_table_0515.json` 的标定 base pose、`piper_pika_agx.urdf`、Piper/Pika 夹爪 joint、`delta_matrix=I` 和 `global_trans_matrix=diag(1,-1,-1)`。
 - 这一路使用标定 Piper/Pika embodiment 和 RoboTwin 原始 planner/grasp frame 转换，不走前面 Mode O 的 FoundationPose target frame。
+- 注意：已跑通能保存数据的 `pick_diverse_bottles_piper_motion` 不走原始 IK，它是关节空间插值 baseline。原始 `pick_diverse_bottles.py` 的 IK/规划链路是 `grasp_actor/place_actor -> Action(move target_pose) -> Base_Task.move -> robot.left/right_plan_path -> envs/robot/robot.py::_trans_from_gripper_to_endlink -> CuroboPlanner.plan_path`。
 
 推荐命令：
 
@@ -5395,6 +5399,36 @@ data/pick_diverse_bottles_piper/demo_clean_piper_calibrated/
 ```
 
 如果之前已经用旧 `demo_clean_piper` 生成过数据，不建议继续复用同一个输出目录判断标定版效果；旧数据是用 `assets/embodiments/piper/config.yml` 生成的自带 Piper URDF/base pose，不是标定 `piper_pika_agx`。使用 `demo_clean_piper_calibrated` 会写到新目录，便于对比。
+
+### O.0 原始 IK/规划链路实验：标定 Piper/Pika URDF + 原始 Piper TCP 转换
+
+如果要测试“在保持当前标定 Piper/Pika URDF 的前提下，是否能复用 `/home/zaijia001/ssd/RoboTwin/envs/pick_diverse_bottles.py` 的原始 IK/规划逻辑”，使用：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_ik_orig_tcp 0
+```
+
+该命令仍使用 `pick_diverse_bottles_piper`，因此会进入原始 `play_once -> grasp_actor -> move/place_actor -> robot.left/right_plan_path` 链路。不同点是配置改为：
+
+```text
+task_config/demo_clean_piper_ik_orig_tcp.yml
+embodiment: [piper_pika_agx_ik_orig_tcp, piper_pika_agx_ik_orig_tcp, 0.0]
+```
+
+`piper_pika_agx_ik_orig_tcp` 的含义：
+
+- SAPIEN 加载标定 `assets/embodiments/piper_pika_agx/piper_pika_agx.urdf` 和标定左右 base pose。
+- Curobo 也加载同一个 `piper_pika_agx.urdf`，并使用 Pika URDF 中真实存在的 `gripper_base_link/gripper_left_link/gripper_right_link` 与 `left_joint/right_joint`。
+- `delta_matrix/global_trans_matrix` 改用 RoboTwin 自带 Piper 的 TCP 转换：`delta_matrix=[[0,0,-1],[0,1,0],[1,0,0]]`，`global_trans_matrix=[[0,0,1],[0,1,0],[-1,0,0]]`。
+- 这样可以隔离验证：问题是否只是标定 Piper/Pika 的 gripper 局部坐标和原始 RoboTwin Piper TCP 约定不一致。
+
+已执行 smoke：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && timeout 120s bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_ik_orig_tcp 0
+```
+
+结果：命令已进入 `Embodiment Config: piper_pika_agx_ik_orig_tcp+piper_pika_agx_ik_orig_tcp` 和原始 `pick_diverse_bottles_piper` task，但 120 秒内没有完成 episode。失败仍主要是 `Objects is unstable` 与 `target_pose cannot be None for move action`。因此，使用标定 URDF + 原始 Piper TCP 转换可以保证走原始 IK/规划链路，但还不能单独解决原始 ALOHA-style 抓取候选在 Piper/Pika 上不可用的问题。
 
 如果要对照原始 ALOHA-AgileX clean demo，仍使用：
 

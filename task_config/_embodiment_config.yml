@@ -7,6 +7,9 @@ piper:
 piper_pika_agx_calibrated:
   file_path: "./assets/embodiments/piper_pika_agx"
 
+piper_pika_agx_ik_orig_tcp:
+  file_path: "./assets/embodiments/piper_pika_agx_ik_orig_tcp"
+
 franka-panda:
   file_path: "./assets/embodiments/franka-panda/"
 

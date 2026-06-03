@@ -2568,3 +2568,19 @@
   - YAML/JSON parsing passed. Both `demo_clean_piper_motion` configs use `piper_pika_agx_calibrated+piper_pika_agx_calibrated` and `collect_wrist_camera: false`.
   - The no-viewer command `timeout 180s bash collect_data.sh pick_diverse_bottles_piper_motion demo_clean_piper_motion 0` succeeded: seed 0/1 were skipped as unstable, seed 2 reached `simulate data episode 0 success`, and 64 head-camera frames plus `episode0.hdf5`, `episode0.mp4`, `episode0.pkl`, and instruction json were saved.
   - In `tmux gen1-1`, `bash run_pick_diverse_bottles_piper_motion_viewer.sh` successfully ran through seed 2 premotion and returned to the shell.
+
+## 2026-06-03 (O.0 Original IK/Planning Path And Piper/Pika TCP Experiment)
+
+- Rechecked issues:
+  - The currently working `pick_diverse_bottles_piper_motion` data-generation path does not call the original `pick_diverse_bottles.py` IK/planning path; it directly creates joint-space interpolation.
+  - The original task path is `grasp_actor/place_actor -> Action(move target_pose) -> Base_Task.move -> robot.left/right_plan_path -> _trans_from_gripper_to_endlink -> CuroboPlanner.plan_path`.
+  - The existing `assets/embodiments/piper_pika_agx/curobo.yml` still points to the old `/assets/embodiments/piper/piper.urdf` and uses the old Piper `link7/link8/joint7/joint8`, which do not match the Pika gripper links and joints in `piper_pika_agx.urdf`.
+- Changes:
+  - Added the `piper_pika_agx_ik_orig_tcp` embodiment. It keeps the calibrated `piper_pika_agx.urdf` and left/right base poses, but uses the built-in RoboTwin Piper TCP conversion matrices for `delta_matrix/global_trans_matrix`.
+  - Added matching `curobo.yml` and `collision_piper_pika.yml` so Curobo also uses `piper_pika_agx.urdf`, `gripper_base_link/gripper_left_link/gripper_right_link`, and `left_joint/right_joint`.
+  - Added `task_config/demo_clean_piper_ik_orig_tcp.yml`. The command still uses `pick_diverse_bottles_piper`, so it genuinely enters the original `pick_diverse_bottles.py` `grasp_actor/place_actor` IK/planning path.
+- Validation:
+  - YAML parsing passed for the new task config, embodiment config, Curobo config, and collision config; `_embodiment_config.yml` resolves `piper_pika_agx_ik_orig_tcp`.
+  - `py_compile envs/pick_diverse_bottles_piper.py envs/pick_diverse_bottles_piper_motion.py` passed.
+  - `git diff --check` passed.
+  - `timeout 120s bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_ik_orig_tcp 0` confirmed `Embodiment Config: piper_pika_agx_ik_orig_tcp+piper_pika_agx_ik_orig_tcp` and the original `pick_diverse_bottles_piper` task, but did not finish an episode within 120 seconds. Failures remained mainly `Objects is unstable` and `target_pose cannot be None for move action`.

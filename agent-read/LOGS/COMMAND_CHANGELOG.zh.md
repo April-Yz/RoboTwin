@@ -1915,3 +1915,22 @@
   - 该命令进入 `pick_diverse_bottles_piper_motion`，不是纯 scene viewer；在 `tmux gen1-1` 已跑到 seed 2 premotion。
   - 原 `run_view_pick_diverse_bottles_piper_scene.sh --seed 0 --max_seed_tries 50` 仍保留为只看稳定场景的 viewer，不会执行动作。
   - 原 `collect_data.sh pick_diverse_bottles_piper demo_clean_piper_calibrated 0` 仍会失败于原始 `grasp_actor`，不是本次推荐的可跑通 O.0 运动数据命令。
+
+## 2026-06-03（O.0 原始 IK/规划链路实验命令）
+
+- 新增 embodiment/config：
+  - `piper_pika_agx_ik_orig_tcp`
+  - `assets/embodiments/piper_pika_agx_ik_orig_tcp/config.yml`
+  - `assets/embodiments/piper_pika_agx_ik_orig_tcp/curobo.yml`
+  - `assets/embodiments/piper_pika_agx_ik_orig_tcp/collision_piper_pika.yml`
+  - `task_config/demo_clean_piper_ik_orig_tcp.yml`
+- 实验命令：
+  - `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_ik_orig_tcp 0`
+- 命令含义：
+  - task 仍使用 `pick_diverse_bottles_piper`，因此走原始 `pick_diverse_bottles.py` 的 `grasp_actor/place_actor` IK/规划链路。
+  - embodiment 使用标定 `piper_pika_agx.urdf` 和左右 base pose，但用 RoboTwin 自带 Piper TCP 转换矩阵。
+  - Curobo 配置已改为匹配 Pika URDF 的 gripper link/joint 名称。
+- smoke 结果：
+  - `timeout 120s ... demo_clean_piper_ik_orig_tcp 0` 已确认进入新 embodiment 和原始 task，但没有完成 episode。
+  - 主要失败仍为 `Objects is unstable` 和 `target_pose cannot be None for move action`。
+  - 因此该命令用于验证原始 IK 链路，不是当前推荐的已跑通数据生成命令；已跑通数据生成仍使用 `pick_diverse_bottles_piper_motion demo_clean_piper_motion`。

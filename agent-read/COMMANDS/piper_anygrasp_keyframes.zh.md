@@ -597,7 +597,11 @@ task_config/demo_clean_piper_calibrated.yml
 task_config/demo_clean_piper_calibrated_viewer.yml
 task_config/demo_clean_piper_motion.yml
 task_config/demo_clean_piper_motion_viewer.yml
+task_config/demo_clean_piper_ik_orig_tcp.yml
 assets/embodiments/piper_pika_agx/config.yml
+assets/embodiments/piper_pika_agx_ik_orig_tcp/config.yml
+assets/embodiments/piper_pika_agx_ik_orig_tcp/curobo.yml
+assets/embodiments/piper_pika_agx_ik_orig_tcp/collision_piper_pika.yml
 description/task_instruction/pick_diverse_bottles_piper.json
 description/task_instruction/pick_diverse_bottles_piper_motion.json
 ```
@@ -610,6 +614,8 @@ description/task_instruction/pick_diverse_bottles_piper_motion.json
 - `demo_clean_piper.yml`、`demo_clean_piper_calibrated.yml` 和 viewer 配置现在都设置 `collect_head_camera: true`、`collect_wrist_camera: false`，只保存 head 视角，避免依赖当前 Piper/Pika URDF 中缺失的 wrist camera link。
 - `piper_pika_agx_calibrated` 指向 `assets/embodiments/piper_pika_agx/config.yml`，使用标定 `piper_pika_agx.urdf`、左右 base pose、Piper/Pika 夹爪 joint、`delta_matrix=I` 和 `global_trans_matrix=diag(1,-1,-1)`。
 - 指令模板复制自 `pick_diverse_bottles.json`，用于 collect_data 结束后的 instruction 生成。
+- 当前已跑通能生成数据的 `pick_diverse_bottles_piper_motion` 不走这里的原始 IK；它直接生成关节空间插值。原始 `pick_diverse_bottles.py` 的 IK/规划链路是 `grasp_actor/place_actor -> Action(move target_pose) -> Base_Task.move -> robot.left/right_plan_path -> envs/robot/robot.py::_trans_from_gripper_to_endlink -> CuroboPlanner.plan_path`。
+- 为了测试“标定 Piper/Pika URDF + 原始 `pick_diverse_bottles.py` IK/规划逻辑”，新增 `piper_pika_agx_ik_orig_tcp`。它仍使用 `piper_pika_agx.urdf` 和标定左右 base pose，但把 `delta_matrix/global_trans_matrix` 调成 RoboTwin 自带 Piper 的 TCP 转换，并配套一个 Curobo 配置，确保 planner 层也指向 `piper_pika_agx.urdf` 和 Pika gripper link/joint 名称。
 
 推荐命令：
 
@@ -618,6 +624,29 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate R
 ```
 
 这是无 viewer 生成数据入口，会进入 `collect_data.py -> play_once -> grasp_actor`。`tmux gen1` 当前显示该命令能加载标定 Piper/Pika 和 head-only 配置，但 seed 0 起反复失败：seed 0/1 是瓶子不稳定，seed 2/5 等是 `target_pose cannot be None for move action`。所以这条命令格式正确，但当前原始 `pick_diverse_bottles.py` demo 逻辑还不能稳定给标定 Piper/Pika 生成 episode；要真正生成数据，需要下一步写 Piper/Pika 专用 grasp 逻辑。
+
+#### O.0 原始 IK/规划链路实验：标定 Piper/Pika URDF + 原始 TCP 转换
+
+如果目标是验证“能否在保持当前标定 Piper/Pika URDF 的前提下，复用 `/home/zaijia001/ssd/RoboTwin/envs/pick_diverse_bottles.py` 的原始 IK/规划逻辑”，使用这个命令：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_ik_orig_tcp 0
+```
+
+这条命令的含义：
+
+- task 仍是 `pick_diverse_bottles_piper`，所以 `play_once()`、`grasp_actor()`、`move_by_displacement()`、`place_actor()` 都继承原始 `pick_diverse_bottles.py`。
+- embodiment 是 `piper_pika_agx_ik_orig_tcp+piper_pika_agx_ik_orig_tcp`，SAPIEN 和 Curobo 都指向标定 `assets/embodiments/piper_pika_agx/piper_pika_agx.urdf`。
+- TCP/夹爪坐标转换使用 RoboTwin 自带 Piper 的 `delta_matrix=[[0,0,-1],[0,1,0],[1,0,0]]` 和 `global_trans_matrix=[[0,0,1],[0,1,0],[-1,0,0]]`，用于测试原始任务给出的 gripper pose 是否更适配 Piper 的 `link6` IK。
+- `assets/embodiments/piper_pika_agx/curobo.yml` 当前仍是旧 Piper planner 配置，里面的 `urdf_path`、`link7/link8`、`joint7/joint8` 和 Pika URDF 不一致；因此原始 IK 实验必须使用新 `assets/embodiments/piper_pika_agx_ik_orig_tcp/curobo.yml`。
+
+已执行 smoke：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && timeout 120s bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_ik_orig_tcp 0
+```
+
+结果：命令已确认进入 `Embodiment Config: piper_pika_agx_ik_orig_tcp+piper_pika_agx_ik_orig_tcp` 和原始 `pick_diverse_bottles_piper` task；120 秒内没有完成 episode。失败仍主要是 `Objects is unstable` 和 `target_pose cannot be None for move action`，说明仅修正 URDF/TCP 转换还不足以让原始 ALOHA-style 抓取候选在标定 Piper/Pika 上稳定通过。
 
 输出：
 

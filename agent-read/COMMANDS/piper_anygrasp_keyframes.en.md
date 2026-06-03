@@ -597,7 +597,11 @@ task_config/demo_clean_piper_calibrated.yml
 task_config/demo_clean_piper_calibrated_viewer.yml
 task_config/demo_clean_piper_motion.yml
 task_config/demo_clean_piper_motion_viewer.yml
+task_config/demo_clean_piper_ik_orig_tcp.yml
 assets/embodiments/piper_pika_agx/config.yml
+assets/embodiments/piper_pika_agx_ik_orig_tcp/config.yml
+assets/embodiments/piper_pika_agx_ik_orig_tcp/curobo.yml
+assets/embodiments/piper_pika_agx_ik_orig_tcp/collision_piper_pika.yml
 description/task_instruction/pick_diverse_bottles_piper.json
 description/task_instruction/pick_diverse_bottles_piper_motion.json
 ```
@@ -610,6 +614,8 @@ Implementation:
 - `demo_clean_piper.yml`, `demo_clean_piper_calibrated.yml`, and the viewer config now set `collect_head_camera: true` and `collect_wrist_camera: false`, so collection stores only the head view and does not depend on wrist camera links missing from the current Piper/Pika URDF.
 - `piper_pika_agx_calibrated` points to `assets/embodiments/piper_pika_agx/config.yml`, using the calibrated `piper_pika_agx.urdf`, left/right base poses, Piper/Pika gripper joints, `delta_matrix=I`, and `global_trans_matrix=diag(1,-1,-1)`.
 - The task-instruction template is copied from `pick_diverse_bottles.json` so instruction generation still works after data collection.
+- The currently working data-generation branch, `pick_diverse_bottles_piper_motion`, does not use this original IK path. It directly creates joint-space interpolation. The original `pick_diverse_bottles.py` IK/planning path is `grasp_actor/place_actor -> Action(move target_pose) -> Base_Task.move -> robot.left/right_plan_path -> envs/robot/robot.py::_trans_from_gripper_to_endlink -> CuroboPlanner.plan_path`.
+- To test "calibrated Piper/Pika URDF plus the original `pick_diverse_bottles.py` IK/planning logic", `piper_pika_agx_ik_orig_tcp` was added. It still uses `piper_pika_agx.urdf` and the calibrated left/right base poses, but uses the built-in RoboTwin Piper TCP conversion matrices and a matching Curobo config so the planner also points to `piper_pika_agx.urdf` and Pika gripper link/joint names.
 
 Recommended command:
 
@@ -618,6 +624,29 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate R
 ```
 
 This is the no-viewer data-generation entrypoint and enters `collect_data.py -> play_once -> grasp_actor`. The current `tmux gen1` run shows that it loads the calibrated Piper/Pika and head-only config, but repeatedly fails from seed 0 onward: seed 0/1 fail due to bottle instability, while seed 2/5 and others fail with `target_pose cannot be None for move action`. The command format is correct, but the original `pick_diverse_bottles.py` demo logic still cannot reliably generate episodes for the calibrated Piper/Pika setup. Actual data generation requires a Piper/Pika-specific grasp logic variant.
+
+#### O.0 Original IK/Planning Path Experiment: Calibrated Piper/Pika URDF + Original TCP Conversion
+
+If the goal is to test whether `/home/zaijia001/ssd/RoboTwin/envs/pick_diverse_bottles.py` can reuse its original IK/planning logic while keeping the current calibrated Piper/Pika URDF, use:
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_ik_orig_tcp 0
+```
+
+Meaning:
+
+- The task is still `pick_diverse_bottles_piper`, so `play_once()`, `grasp_actor()`, `move_by_displacement()`, and `place_actor()` are inherited from the original `pick_diverse_bottles.py`.
+- The embodiment is `piper_pika_agx_ik_orig_tcp+piper_pika_agx_ik_orig_tcp`; both SAPIEN and Curobo point to the calibrated `assets/embodiments/piper_pika_agx/piper_pika_agx.urdf`.
+- The TCP/gripper-frame conversion uses the built-in RoboTwin Piper matrices: `delta_matrix=[[0,0,-1],[0,1,0],[1,0,0]]` and `global_trans_matrix=[[0,0,1],[0,1,0],[-1,0,0]]`. This tests whether original task gripper poses fit Piper `link6` IK better under the original Piper TCP convention.
+- The existing `assets/embodiments/piper_pika_agx/curobo.yml` is still an old Piper planner config; its `urdf_path`, `link7/link8`, and `joint7/joint8` do not match the Pika URDF. The original-IK experiment therefore must use the new `assets/embodiments/piper_pika_agx_ik_orig_tcp/curobo.yml`.
+
+Smoke run performed:
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && timeout 120s bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_ik_orig_tcp 0
+```
+
+Result: the command was confirmed to enter `Embodiment Config: piper_pika_agx_ik_orig_tcp+piper_pika_agx_ik_orig_tcp` and the original `pick_diverse_bottles_piper` task; it did not finish an episode within 120 seconds. Failures were still mainly `Objects is unstable` and `target_pose cannot be None for move action`, so fixing the URDF/TCP conversion alone is not enough to make the original ALOHA-style grasp candidates reliable on the calibrated Piper/Pika setup.
 
 Output:
 

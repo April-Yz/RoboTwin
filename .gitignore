@@ -18,6 +18,7 @@ task_config/*
 !task_config/demo_clean_piper_calibrated_viewer.yml
 !task_config/demo_clean_piper_motion.yml
 !task_config/demo_clean_piper_motion_viewer.yml
+!task_config/demo_clean_piper_ik_orig_tcp.yml
 **/.DS_Store
 code_painting/*
 !code_painting/plan_first_frame_foundation_pick_diverse_bottles.py
@@ -39,6 +40,11 @@ assets/embodiments/*
 !assets/embodiments/piper_pika_agx/
 assets/embodiments/piper_pika_agx/*
 !assets/embodiments/piper_pika_agx/config.yml
+!assets/embodiments/piper_pika_agx_ik_orig_tcp/
+assets/embodiments/piper_pika_agx_ik_orig_tcp/*
+!assets/embodiments/piper_pika_agx_ik_orig_tcp/config.yml
+!assets/embodiments/piper_pika_agx_ik_orig_tcp/curobo.yml
+!assets/embodiments/piper_pika_agx_ik_orig_tcp/collision_piper_pika.yml
 !assets/_download.py
 !assets/files
 
