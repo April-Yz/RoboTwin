@@ -1820,7 +1820,7 @@
 - Added config:
   - `demo_clean_piper`
 - Added command:
-  - `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper 0`
+  - `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_calibrated 0`
 - Comparison command:
   - `bash collect_data.sh pick_diverse_bottles demo_clean 0`
 - Code locations:
@@ -1835,7 +1835,22 @@
   - Changed `task_config/demo_clean_piper.yml` from `embodiment: [piper]` to `embodiment: [piper, piper, 0.60]`.
   - Reason: `[piper]` makes RoboTwin look for missing `assets/embodiments/piper/curobo_left.yml`; the three-item config loads two single-arm Piper instances and uses `curobo.yml`.
 - Recommended full command:
-  - `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper 0`
+  - `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_calibrated 0`
 - Old errors:
   - Running directly from `~` cannot find `collect_data.sh`.
   - Without activating `RoboTwin_bw`, the `python` used inside `collect_data.sh` may not exist.
+
+## 2026-06-03 (O.0 Calibrated Piper/Pika Data Generation Command)
+
+- Added embodiment:
+  - `piper_pika_agx_calibrated`
+- Added/updated configs:
+  - `assets/embodiments/piper_pika_agx/config.yml`
+  - `task_config/demo_clean_piper.yml`
+  - `task_config/demo_clean_piper_calibrated.yml`
+  - `task_config/_embodiment_config.yml`
+- Recommended command:
+  - `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_calibrated 0`
+- Notes:
+  - The old `demo_clean_piper` output directory already contains data generated with RoboTwin's built-in `assets/embodiments/piper/piper.urdf`.
+  - `demo_clean_piper_calibrated` writes to a new directory and uses the calibrated `piper_pika_agx.urdf` and left/right base poses.

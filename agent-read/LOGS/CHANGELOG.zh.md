@@ -2477,3 +2477,19 @@
   - `task_config/demo_clean_piper.yml` 解析得到 `['piper', 'piper', 0.6]`。
   - 带 conda 激活的 `timeout 35s bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper 0` 未再出现 `curobo_left.yml` 或 `left_planner` 错误。
   - 清理了该 smoke test 产生的 `data/pick_diverse_bottles_piper/demo_clean_piper/` 临时轨迹输出，避免影响用户后续从 episode 0 开始采集。
+
+## 2026-06-03（O.0 切换到标定 Piper/Pika embodiment）
+
+- 问题：
+  - 用户成功生成了 `data/pick_diverse_bottles_piper/demo_clean_piper/`，但画面不像标定 Piper。
+  - 检查发现旧 `demo_clean_piper.yml` 虽然不再使用 ALOHA-AgileX，但加载的是 RoboTwin 自带 `assets/embodiments/piper/config.yml` 和 `piper.urdf`，不是标定 `robot_config_PiperPika_agx_dual_table_0515.json` 对应的 `piper_pika_agx`。
+- 修复：
+  - 新增 `assets/embodiments/piper_pika_agx/config.yml`，使用标定 `piper_pika_agx.urdf`、Piper/Pika 夹爪 joint、左右 base pose、`delta_matrix=I`、`global_trans_matrix=diag(1,-1,-1)`。
+  - `task_config/_embodiment_config.yml` 新增 `piper_pika_agx_calibrated`。
+  - `task_config/demo_clean_piper.yml` 改为 `embodiment: [piper_pika_agx_calibrated, piper_pika_agx_calibrated, 0.0]`。
+  - 新增 `task_config/demo_clean_piper_calibrated.yml`，建议用它生成新的独立输出目录，避免和旧 `demo_clean_piper` 数据混淆。
+  - `.gitignore` 放行 `assets/embodiments/piper_pika_agx/config.yml` 和 `task_config/demo_clean_piper_calibrated.yml`，但继续忽略生成数据。
+- 新推荐命令：
+  - `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_calibrated 0`
+- 验证：
+  - Python/YAML 检查确认 `demo_clean_piper` 和 `demo_clean_piper_calibrated` 都解析到 `assets/embodiments/piper_pika_agx/piper_pika_agx.urdf`，gripper base 为 `left_joint`，robot pose 为标定左右 base pose。

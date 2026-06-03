@@ -560,6 +560,8 @@ collect_data.sh -> script/collect_data.py -> envs/<task_name>.py -> Base_Task.gr
 ```text
 envs/pick_diverse_bottles_piper.py
 task_config/demo_clean_piper.yml
+task_config/demo_clean_piper_calibrated.yml
+assets/embodiments/piper_pika_agx/config.yml
 description/task_instruction/pick_diverse_bottles_piper.json
 ```
 
@@ -567,20 +569,23 @@ description/task_instruction/pick_diverse_bottles_piper.json
 
 - `pick_diverse_bottles_piper` 继承原始 `pick_diverse_bottles`，不修改原任务文件。
 - 瓶子随机采样、随机旋转、左右瓶区域、`pre_grasp_dis=0.08`、lift `z=0.1`、左右放置 target 都沿用原始 env。
-- `demo_clean_piper.yml` 使用 `embodiment: [piper, piper, 0.60]`，其余 clean demo 设置与 `demo_clean.yml` 对齐。
+- `demo_clean_piper.yml` 与 `demo_clean_piper_calibrated.yml` 使用 `embodiment: [piper_pika_agx_calibrated, piper_pika_agx_calibrated, 0.0]`，其余 clean demo 设置与 `demo_clean.yml` 对齐。
+- `piper_pika_agx_calibrated` 指向 `assets/embodiments/piper_pika_agx/config.yml`，使用标定 `piper_pika_agx.urdf`、左右 base pose、Piper/Pika 夹爪 joint、`delta_matrix=I` 和 `global_trans_matrix=diag(1,-1,-1)`。
 - 指令模板复制自 `pick_diverse_bottles.json`，用于 collect_data 结束后的 instruction 生成。
 
 推荐命令：
 
 ```bash
-source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper 0
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_calibrated 0
 ```
 
 输出：
 
 ```text
-data/pick_diverse_bottles_piper/demo_clean_piper/
+data/pick_diverse_bottles_piper/demo_clean_piper_calibrated/
 ```
+
+如果旧 `data/pick_diverse_bottles_piper/demo_clean_piper/` 已经存在，它是旧自带 Piper URDF/base pose 生成的数据，不代表标定版。优先用 `demo_clean_piper_calibrated` 生成新目录做对比。
 
 ALOHA-AgileX 原始对照仍是：
 
@@ -595,7 +600,8 @@ bash collect_data.sh pick_diverse_bottles demo_clean 0
 - 在 `~` 下直接执行 `bash collect_data.sh ...` 会找不到脚本；需要先进入 `/home/zaijia001/ssd/RoboTwin`。
 - 旧 `demo_clean_piper.yml` 的 `embodiment: [piper]` 会触发双臂 embodiment 路径，RoboTwin 试图加载 `assets/embodiments/piper/curobo_left.yml`，但 Piper 目录只有 `curobo.yml`。
 - 后续 `'Robot' object has no attribute 'left_planner'` 是第一次 planner 初始化失败后的残留状态次生错误。
-- 现已改为 `embodiment: [piper, piper, 0.60]`，表示两只单臂 Piper，间距 `0.60m`。
+- 第一版修正 `embodiment: [piper, piper, 0.60]` 能避免 `curobo_left.yml`，但仍加载 RoboTwin 自带 `assets/embodiments/piper/piper.urdf`。
+- 当前标定版使用 `piper_pika_agx_calibrated`，加载 `assets/embodiments/piper_pika_agx/piper_pika_agx.urdf` 和标定 base pose。
 
 `COMMAND_LIBRARY.zh.md` 末尾新增 Mode O，用于 `pick_diverse_bottles` 的更简单对照实验：不使用手工关键帧、不使用人手朝向、不使用 AnyGrasp candidate，只用第 0 帧 FoundationPose 的两个 bottle 世界位置，按 env 任务逻辑生成抓取和放置目标。
 

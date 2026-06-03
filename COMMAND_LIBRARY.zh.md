@@ -5357,6 +5357,8 @@ collect_data.sh -> script/collect_data.py -> envs/<task_name>.py -> Base_Task.gr
 ```text
 envs/pick_diverse_bottles_piper.py
 task_config/demo_clean_piper.yml
+task_config/demo_clean_piper_calibrated.yml
+assets/embodiments/piper_pika_agx/config.yml
 description/task_instruction/pick_diverse_bottles_piper.json
 ```
 
@@ -5364,20 +5366,23 @@ description/task_instruction/pick_diverse_bottles_piper.json
 
 - 不修改原始 `/home/zaijia001/ssd/RoboTwin/envs/pick_diverse_bottles.py`。
 - `pick_diverse_bottles_piper` 只继承原始 `pick_diverse_bottles`，因此瓶子随机采样、随机旋转、左/右瓶区域、`grasp_actor(... pre_grasp_dis=0.08)`、lift `z=0.1`、左右 target pose 都保持原逻辑。
-- `demo_clean_piper.yml` 只把 `demo_clean.yml` 的 `embodiment` 改为 `[piper, piper, 0.60]`，其余 clean demo 采集配置保持一致。
-- 这一路使用 `assets/embodiments/piper/config.yml` 中的 Piper embodiment 配置和 RoboTwin 原始 planner/grasp frame 转换，不走前面 Mode O 的 FoundationPose target frame。
+- `demo_clean_piper.yml` 与 `demo_clean_piper_calibrated.yml` 都使用 `embodiment: [piper_pika_agx_calibrated, piper_pika_agx_calibrated, 0.0]`，其余 clean demo 采集配置保持一致。
+- `piper_pika_agx_calibrated` 使用 `assets/embodiments/piper_pika_agx/config.yml`，该配置来自 `robot_config_PiperPika_agx_dual_table_0515.json` 的标定 base pose、`piper_pika_agx.urdf`、Piper/Pika 夹爪 joint、`delta_matrix=I` 和 `global_trans_matrix=diag(1,-1,-1)`。
+- 这一路使用标定 Piper/Pika embodiment 和 RoboTwin 原始 planner/grasp frame 转换，不走前面 Mode O 的 FoundationPose target frame。
 
 推荐命令：
 
 ```bash
-source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper 0
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_calibrated 0
 ```
 
 输出路径：
 
 ```text
-data/pick_diverse_bottles_piper/demo_clean_piper/
+data/pick_diverse_bottles_piper/demo_clean_piper_calibrated/
 ```
+
+如果之前已经用旧 `demo_clean_piper` 生成过数据，不建议继续复用同一个输出目录判断标定版效果；旧数据是用 `assets/embodiments/piper/config.yml` 生成的自带 Piper URDF/base pose，不是标定 `piper_pika_agx`。使用 `demo_clean_piper_calibrated` 会写到新目录，便于对比。
 
 如果要对照原始 ALOHA-AgileX clean demo，仍使用：
 
@@ -5392,7 +5397,8 @@ bash collect_data.sh pick_diverse_bottles demo_clean 0
 - 第一条命令在 `~` 下执行 `bash collect_data.sh ...`，报 `collect_data.sh: No such file or directory`；需要先 `cd /home/zaijia001/ssd/RoboTwin`。
 - 进入仓库后，旧 `demo_clean_piper.yml` 使用 `embodiment: [piper]`，RoboTwin 将其当作单个双臂 embodiment，自动寻找 `assets/embodiments/piper/curobo_left.yml` / `curobo_right.yml`。Piper 目录只有 `curobo.yml`，因此 seed 0 报 `No such file or directory: .../piper/curobo_left.yml`。
 - seed 1 之后反复出现 `'Robot' object has no attribute 'left_planner'` 是次生错误：第一次 planner 初始化失败后，task 复用残留的 `robot` 对象，下一轮 reset 直接访问未创建的 planner 属性。
-- 修正后 `demo_clean_piper.yml` 使用 `embodiment: [piper, piper, 0.60]`，即两只单臂 Piper，间距 `0.60m`，不会再寻找 `curobo_left.yml`。
+- 第一版修正把 `demo_clean_piper.yml` 改成 `embodiment: [piper, piper, 0.60]`，可以避免 `curobo_left.yml`，但它仍加载 RoboTwin 自带 `assets/embodiments/piper/piper.urdf`，不是标定版。
+- 当前标定版修正使用 `piper_pika_agx_calibrated`，加载 `assets/embodiments/piper_pika_agx/piper_pika_agx.urdf` 和标定 base pose。
 
 ## O. 对比实验：第一帧 FoundationPose 直接策略抓取 pick_diverse_bottles
 
@@ -5516,13 +5522,13 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && cd /home/zaijia0
 如果这个最小探针仍报 `Renderer does not support display`，说明当前 shell 的 `DISPLAY`/Vulkan 图形会话不可用，需要切到能打开 SAPIEN viewer 的 VNC/图形终端，或修复 X11/Wayland forwarding；这时 Mode O 会自动 fallback 到 offscreen 并继续生成视频。
 
 ```bash
-bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh --gpu 2 --ids 0 --viewer --viewer_wait_at_end 1 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/first_frame_foundation_viewer
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh --gpu 2 --ids 2 --viewer --viewer_wait_at_end 1 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/first_frame_foundation_viewer
 ```
 
 ### 批量命令
 
 ```bash
-bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh --gpu 2 --ids 0-10 --continue_on_error --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/first_frame_foundation
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh --gpu 2 --ids 0-10 --continue_on_error --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/3_first_frame_foundation
 ```
 
 ### 已执行情况
@@ -5561,3 +5567,5 @@ right_bottle center=( 0.230, 0.114, 0.745), grasp=( 0.260, 0.114, 0.745), action
 - `--grasp_surface_retreat_m=0.03` 是否适合当前瓶子 mesh；如果 grasp 偏深/偏浅，优先扫 `0.01/0.03/0.05`。
 - action z 是否使用 env 目标 `1.0`，还是改成 `object_z + 0.1` 只做严格 lift。
 - 是否允许在 Mode O 放宽 `require_keyframe1_reached_before_close` 做“即使一臂未严格 reached 也尝试 close/action”的对比；当前默认保守，不会在第一阶段失败时关爪。
+
+  bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh --gpu 2 --ids 1  --viewer --viewer_wait_at_end 1 --target_frame_convention aloha_local_x_z_up --output_root /tmp/mode_o_aloha_local_x_plan_only

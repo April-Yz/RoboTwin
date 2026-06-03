@@ -2479,3 +2479,19 @@
   - Parsed `task_config/demo_clean_piper.yml` as `['piper', 'piper', 0.6]`.
   - A conda-activated `timeout 35s bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper 0` smoke run did not reproduce the `curobo_left.yml` or `left_planner` errors.
   - Cleaned up the temporary `data/pick_diverse_bottles_piper/demo_clean_piper/` trajectory output from the smoke run so the user can start collection from episode 0.
+
+## 2026-06-03 (Switched O.0 To The Calibrated Piper/Pika Embodiment)
+
+- Problem:
+  - The user successfully generated `data/pick_diverse_bottles_piper/demo_clean_piper/`, but the rendered robot did not look like the calibrated Piper setup.
+  - Inspection showed that the old `demo_clean_piper.yml` no longer used ALOHA-AgileX, but it still loaded RoboTwin's built-in `assets/embodiments/piper/config.yml` and `piper.urdf`, not the calibrated `piper_pika_agx` setup corresponding to `robot_config_PiperPika_agx_dual_table_0515.json`.
+- Fix:
+  - Added `assets/embodiments/piper_pika_agx/config.yml`, using the calibrated `piper_pika_agx.urdf`, Piper/Pika gripper joints, left/right base poses, `delta_matrix=I`, and `global_trans_matrix=diag(1,-1,-1)`.
+  - Added `piper_pika_agx_calibrated` to `task_config/_embodiment_config.yml`.
+  - Changed `task_config/demo_clean_piper.yml` to `embodiment: [piper_pika_agx_calibrated, piper_pika_agx_calibrated, 0.0]`.
+  - Added `task_config/demo_clean_piper_calibrated.yml`; this is the recommended config for a separate output directory so the old `demo_clean_piper` data is not mixed with calibrated data.
+  - Updated `.gitignore` to allow `assets/embodiments/piper_pika_agx/config.yml` and `task_config/demo_clean_piper_calibrated.yml`, while generated data remains ignored.
+- New recommended command:
+  - `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_calibrated 0`
+- Validation:
+  - Python/YAML checks confirmed both `demo_clean_piper` and `demo_clean_piper_calibrated` resolve to `assets/embodiments/piper_pika_agx/piper_pika_agx.urdf`, with gripper base `left_joint` and the calibrated left/right base poses.

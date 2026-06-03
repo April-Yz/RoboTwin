@@ -14,6 +14,7 @@ viewer_show.*
 eval_video/
 task_config/*
 !task_config/demo_clean_piper.yml
+!task_config/demo_clean_piper_calibrated.yml
 **/.DS_Store
 code_painting/*
 !code_painting/plan_first_frame_foundation_pick_diverse_bottles.py
@@ -28,6 +29,11 @@ eval_result/
 
 # Code Generation
 assets/*
+!assets/embodiments/
+assets/embodiments/*
+!assets/embodiments/piper_pika_agx/
+assets/embodiments/piper_pika_agx/*
+!assets/embodiments/piper_pika_agx/config.yml
 !assets/_download.py
 !assets/files
 

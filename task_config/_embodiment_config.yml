@@ -4,6 +4,9 @@ aloha-agilex:
 piper:
   file_path: "./assets/embodiments/piper"
 
+piper_pika_agx_calibrated:
+  file_path: "./assets/embodiments/piper_pika_agx"
+
 franka-panda:
   file_path: "./assets/embodiments/franka-panda/"
 

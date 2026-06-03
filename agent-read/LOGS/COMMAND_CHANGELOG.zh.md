@@ -1818,7 +1818,7 @@
 - 新增配置：
   - `demo_clean_piper`
 - 新增命令：
-  - `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper 0`
+  - `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_calibrated 0`
 - 对照命令：
   - `bash collect_data.sh pick_diverse_bottles demo_clean 0`
 - 代码位置：
@@ -1833,7 +1833,22 @@
   - `task_config/demo_clean_piper.yml` 从 `embodiment: [piper]` 改为 `embodiment: [piper, piper, 0.60]`。
   - 原因：`[piper]` 会让 RoboTwin 查找不存在的 `assets/embodiments/piper/curobo_left.yml`；三元配置会加载两只单臂 Piper 并使用 `curobo.yml`。
 - 推荐完整命令：
-  - `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper 0`
+  - `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_calibrated 0`
 - 旧错误：
   - 在 `~` 下直接执行会找不到 `collect_data.sh`。
   - 不激活 `RoboTwin_bw` 时，`collect_data.sh` 内部的 `python` 可能找不到。
+
+## 2026-06-03（O.0 标定 Piper/Pika 数据生成命令）
+
+- 新增 embodiment：
+  - `piper_pika_agx_calibrated`
+- 新增/修改配置：
+  - `assets/embodiments/piper_pika_agx/config.yml`
+  - `task_config/demo_clean_piper.yml`
+  - `task_config/demo_clean_piper_calibrated.yml`
+  - `task_config/_embodiment_config.yml`
+- 推荐命令：
+  - `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_calibrated 0`
+- 说明：
+  - 旧 `demo_clean_piper` 输出目录已经包含使用 RoboTwin 自带 `assets/embodiments/piper/piper.urdf` 生成的数据。
+  - `demo_clean_piper_calibrated` 输出到新目录，使用标定 `piper_pika_agx.urdf` 和左右 base pose。
