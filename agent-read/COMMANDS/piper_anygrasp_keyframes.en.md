@@ -239,6 +239,38 @@ The planner writes `<OUT>/source_preview_compare/selected_candidate_mapping.json
 
 `COMMAND_LIBRARY.zh.md` now ends with L15.9, which provides three copy-safe command blocks to run in order:
 
+## Mode M/N Viewer CUDA Mask Fix
+
+Mode M `run_plan_keyframes_human_replay_piper_d435.sh` and Mode N `run_plan_keyframes_foundation_pose_piper_d435.sh` viewer commands require both:
+
+- A graphical terminal with a usable display, for example `DISPLAY=:1.0`.
+- No `CUDA_VISIBLE_DEVICES=<compute_gpu>` mask while SAPIEN creates the interactive viewer, otherwise the display-driving GPU can be hidden from the renderer.
+
+The failure was caused by the second condition. The bash wrappers already used `env -u CUDA_VISIBLE_DEVICES` in `--viewer` mode, but the Python middle layers `plan_keyframes_human_replay.py` and `plan_keyframes_foundation_pose.py` set `CUDA_VISIBLE_DEVICES=2` again before invoking the planner. The resulting log was:
+
+```text
+[viewer] creating interactive viewer ... CUDA_VISIBLE_DEVICES=2
+[viewer-warning] failed to create interactive viewer ... Renderer does not support display.
+```
+
+The current fix removes `CUDA_VISIBLE_DEVICES` from the planner environment when `--enable_viewer 1` is active. Non-viewer mode still uses `--gpu` to set the compute GPU.
+
+The minimal viewer probe remains:
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && cd /home/zaijia001/ssd/RoboTwin && unset CUDA_VISIBLE_DEVICES; [[ -f /etc/vulkan/icd.d/nvidia_icd.json ]] && export VK_ICD_FILENAMES=/etc/vulkan/icd.d/nvidia_icd.json; echo "DISPLAY=$DISPLAY CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-unset} VK_ICD_FILENAMES=${VK_ICD_FILENAMES:-unset}" && conda run -n RoboTwin_bw python /home/zaijia001/ssd/RoboTwin/code_painting/probe_sapien_viewer.py
+```
+
+Validation commands:
+
+```bash
+/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_keyframes_foundation_pose.py /home/zaijia001/ssd/RoboTwin/code_painting/plan_keyframes_human_replay.py
+
+timeout 60s bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh --gpu 2 --ids 0 --viewer --viewer_wait_at_end 0 --tasks pnp_tray --foundation_pose_retreat_m 0.03 --output_root /tmp/robotwin_viewer_env_probe
+```
+
+In a non-graphical shell the second command is still expected to fall back to offscreen because `DISPLAY=None`, but the important log should now show `CUDA_VISIBLE_DEVICES=None`, proving the Python middle layer no longer restores the CUDA mask.
+
 1. Regenerate the six-task D435 AnyGrasp no-offset previews/summaries into the main `anygrasp_h2o_preview_d435` directory with `bash <<'BASH'`, avoiding zsh line-wrap argument loss.
 2. Run the six-task D435 planner/replay without viewer, outputting to `anygrasp_plan_keyframes_piper_d435_v2/strict-ee-offsetfix`.
 3. Run the six-task D435 planner/replay with viewer and `--visualize_targets` to display the gripper target.

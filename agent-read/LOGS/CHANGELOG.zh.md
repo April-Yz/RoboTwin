@@ -2518,3 +2518,22 @@
   - 新增 `run_collect_piper_calibrated_viewer.sh`，去掉不存在的 `.update_path.sh`，并在 viewer 模式下 `unset CUDA_VISIBLE_DEVICES`、自动设置 NVIDIA Vulkan ICD。
   - 新增 `view_pick_diverse_bottles_piper_scene.py` 和 `run_view_pick_diverse_bottles_piper_scene.sh`，只加载 `pick_diverse_bottles_piper` 场景，不进入 `play_once` 规划，自动跳过不稳定 seed 后停在 SAPIEN viewer。
   - 文档中的首选 viewer 命令改为 `bash run_view_pick_diverse_bottles_piper_scene.sh --seed 0 --max_seed_tries 50`。
+
+## 2026-06-03（修复 Mode M/N viewer CUDA mask 回写）
+
+- 检查 `tmux modeln-4` 后确认：
+  - Mode N `pnp_tray` 命令确实传入了 `--viewer`，planner 也尝试创建 interactive viewer。
+  - 失败日志为 `[viewer] creating interactive viewer ... CUDA_VISIBLE_DEVICES=2` 后接 `Renderer does not support display`。
+  - 用户的最小探针在同一类图形环境中 `unset CUDA_VISIBLE_DEVICES` 后可以打开 SAPIEN viewer。
+- 根因：
+  - bash wrapper 在 viewer 模式已经 `env -u CUDA_VISIBLE_DEVICES`。
+  - 但 `plan_keyframes_human_replay.py` 和 `plan_keyframes_foundation_pose.py` 调 planner 前又根据 `--gpu` 写回 `CUDA_VISIBLE_DEVICES=2`。
+- 修复：
+  - 两个 Python 中间层在 `--enable_viewer 1` 时从传给 planner 的环境中移除 `CUDA_VISIBLE_DEVICES`。
+  - 非 viewer 模式仍按 `--gpu` 设置计算 GPU。
+- 文档：
+  - `COMMAND_LIBRARY.zh.md` 的 Mode M/N viewer 段落补充 viewer 需要 `DISPLAY` 和 unset CUDA mask。
+  - `agent-read/COMMANDS/piper_anygrasp_keyframes.zh.md` / `.en.md` 补充排查依据、最小探针和验证命令。
+- 验证：
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_keyframes_foundation_pose.py /home/zaijia001/ssd/RoboTwin/code_painting/plan_keyframes_human_replay.py` 通过。
+  - `timeout 60s bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh --gpu 2 --ids 0 --viewer --viewer_wait_at_end 0 --tasks pnp_tray --foundation_pose_retreat_m 0.03 --output_root /tmp/robotwin_viewer_env_probe` 通过；当前非图形 shell 中 `DISPLAY=None`，因此 viewer fallback 到 offscreen，但关键日志已变为 `CUDA_VISIBLE_DEVICES=None`。

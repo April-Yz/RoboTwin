@@ -2520,3 +2520,22 @@
   - Added `run_collect_piper_calibrated_viewer.sh`, removing the missing `.update_path.sh` dependency, unsetting `CUDA_VISIBLE_DEVICES` for viewer mode, and setting the NVIDIA Vulkan ICD automatically when available.
   - Added `view_pick_diverse_bottles_piper_scene.py` and `run_view_pick_diverse_bottles_piper_scene.sh`; this loads the `pick_diverse_bottles_piper` scene only, skips `play_once` planning, skips unstable seeds automatically, and stops in the SAPIEN viewer.
   - Updated the preferred viewer command to `bash run_view_pick_diverse_bottles_piper_scene.sh --seed 0 --max_seed_tries 50`.
+
+## 2026-06-03 (Fixed Mode M/N Viewer CUDA Mask Restoration)
+
+- After inspecting `tmux modeln-4`:
+  - The Mode N `pnp_tray` command did pass `--viewer`, and the planner attempted to create an interactive viewer.
+  - The failure log showed `[viewer] creating interactive viewer ... CUDA_VISIBLE_DEVICES=2`, followed by `Renderer does not support display`.
+  - The user's minimal probe can create a SAPIEN viewer in the graphical session after `unset CUDA_VISIBLE_DEVICES`.
+- Root cause:
+  - The bash wrappers already used `env -u CUDA_VISIBLE_DEVICES` in viewer mode.
+  - `plan_keyframes_human_replay.py` and `plan_keyframes_foundation_pose.py` then restored `CUDA_VISIBLE_DEVICES=2` from `--gpu` before invoking the planner.
+- Fix:
+  - Both Python middle layers now remove `CUDA_VISIBLE_DEVICES` from the planner environment when `--enable_viewer 1` is active.
+  - Non-viewer mode still uses `--gpu` for compute GPU selection.
+- Documentation:
+  - Added Mode M/N viewer notes to `COMMAND_LIBRARY.zh.md`, covering the required `DISPLAY` and unset CUDA mask.
+  - Updated `agent-read/COMMANDS/piper_anygrasp_keyframes.zh.md` / `.en.md` with the diagnosis, minimal probe, and validation commands.
+- Validation:
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_keyframes_foundation_pose.py /home/zaijia001/ssd/RoboTwin/code_painting/plan_keyframes_human_replay.py` passed.
+  - `timeout 60s bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh --gpu 2 --ids 0 --viewer --viewer_wait_at_end 0 --tasks pnp_tray --foundation_pose_retreat_m 0.03 --output_root /tmp/robotwin_viewer_env_probe` passed. In this non-graphical shell `DISPLAY=None`, so the viewer still fell back to offscreen, but the key log changed to `CUDA_VISIBLE_DEVICES=None`.

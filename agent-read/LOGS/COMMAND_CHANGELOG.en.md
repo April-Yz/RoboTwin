@@ -1871,3 +1871,20 @@
   - The viewer config is for inspecting seed/premotion behavior and does not save hdf5 data.
   - `run_view_pick_diverse_bottles_piper_scene.sh` does not enter `play_once` planning and skips unstable seeds automatically, so it is the preferred pure scene viewer check.
   - `run_collect_piper_calibrated_viewer.sh` no longer calls the missing `script/.update_path.sh`, but it still enters the original demo planner and is not the preferred viewer command.
+
+## 2026-06-03 (Mode M/N Viewer Command CUDA Mask Semantics)
+
+- Related commands:
+  - `bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_piper_d435.sh --gpu 2 --ids <ID> --viewer --tasks <TASK> ...`
+  - `bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh --gpu 2 --ids <ID> --viewer --tasks <TASK> ...`
+- Change:
+  - In viewer mode, both the bash wrapper and the Python middle layer remove `CUDA_VISIBLE_DEVICES` from the planner environment.
+  - Non-viewer mode is unchanged and still uses `--gpu` for compute GPU selection.
+- Usage notes:
+  - If the minimal `probe_sapien_viewer.py` opens a viewer after `unset CUDA_VISIBLE_DEVICES`, the Mode M/N viewer commands should also open the viewer from the same graphical terminal.
+  - If they still fail, inspect the `[viewer] creating interactive viewer ...` log for `DISPLAY` and `CUDA_VISIBLE_DEVICES`.
+- Related code:
+  - `code_painting/plan_keyframes_human_replay.py`
+  - `code_painting/plan_keyframes_foundation_pose.py`
+  - `code_painting/run_plan_keyframes_human_replay_piper_d435.sh`
+  - `code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh`

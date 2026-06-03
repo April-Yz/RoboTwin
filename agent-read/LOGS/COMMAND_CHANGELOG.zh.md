@@ -1869,3 +1869,20 @@
   - 该 viewer 配置只用于观察 seed/premotion，不保存 hdf5。
   - `run_view_pick_diverse_bottles_piper_scene.sh` 不进入 `play_once` 规划，会自动跳过不稳定 seed，用于纯场景 viewer 检查。
   - `run_collect_piper_calibrated_viewer.sh` 不再调用不存在的 `script/.update_path.sh`，但它仍会进入原始 demo 规划，不作为首选 viewer 命令。
+
+## 2026-06-03（Mode M/N viewer 命令 CUDA mask 语义）
+
+- 相关命令：
+  - `bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_piper_d435.sh --gpu 2 --ids <ID> --viewer --tasks <TASK> ...`
+  - `bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh --gpu 2 --ids <ID> --viewer --tasks <TASK> ...`
+- 变更：
+  - viewer 模式下，bash wrapper 和 Python 中间层都会移除传给 planner 的 `CUDA_VISIBLE_DEVICES`。
+  - 非 viewer 模式不变，仍按 `--gpu` 设置计算 GPU。
+- 使用说明：
+  - 如果最小 `probe_sapien_viewer.py` 在 `unset CUDA_VISIBLE_DEVICES` 后能打开 viewer，Mode M/N viewer 命令也应在同一图形终端中打开 viewer。
+  - 若仍失败，先检查日志 `[viewer] creating interactive viewer ...` 中的 `DISPLAY` 与 `CUDA_VISIBLE_DEVICES`。
+- 相关代码：
+  - `code_painting/plan_keyframes_human_replay.py`
+  - `code_painting/plan_keyframes_foundation_pose.py`
+  - `code_painting/run_plan_keyframes_human_replay_piper_d435.sh`
+  - `code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh`
