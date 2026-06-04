@@ -1950,3 +1950,24 @@
     `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && timeout 120s bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_ik_orig_tcp 0`
 - Removed/downgraded:
   - `pick_diverse_bottles_piper demo_clean_piper_calibrated` is no longer recommended as a collection command; `tmux gen1-1/gen1-2` shows it keeps failing with `Objects is unstable` and `target_pose cannot be None for move action`.
+
+## 2026-06-04 (O.0 Viewer Command Fix And Axes Smoke Checks)
+
+- Changed command:
+  - `run_pick_diverse_bottles_piper_motion_viewer.sh` now calls `view_pick_diverse_bottles_piper_motion.py "$@"` instead of `script/collect_data.py`.
+- Added/updated entrypoints:
+  - `view_pick_diverse_bottles_piper_motion.py`
+  - `view_pick_diverse_bottles_piper_scene.py --show_axes --hold`
+- Recommended commands:
+  - Motion viewer:
+    `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash run_pick_diverse_bottles_piper_motion_viewer.sh`
+  - Motion viewer smoke:
+    `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && DISPLAY=:1.0 timeout 120s bash run_pick_diverse_bottles_piper_motion_viewer.sh --seed 0 --max_seed_tries 3 --hold 0`
+  - Scene viewer:
+    `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash run_view_pick_diverse_bottles_piper_scene.sh --seed 0 --max_seed_tries 50`
+  - Scene viewer smoke:
+    `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && DISPLAY=:1.0 timeout 90s python view_pick_diverse_bottles_piper_scene.py --seed 0 --max_seed_tries 3 --hold 0`
+- Notes:
+  - The scene viewer uses `skip_planner=True`, so it does not enter Curobo warmup.
+  - The motion viewer searches for a stable seed and executes `play_once()` once on every run, so it is not short-circuited by old `seed.txt` progress.
+  - Debug axes are shown by default on the two bottle centers and the left/right place targets. Red/green/blue are local +X/+Y/+Z, and the small white cube is the origin.

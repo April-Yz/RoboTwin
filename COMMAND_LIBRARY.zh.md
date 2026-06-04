@@ -5367,6 +5367,11 @@ seed 72-115: Objects is unstable / target_pose cannot be None for move action
 final: Ctrl-C interrupted
 ```
 
+含义：
+- `Objects is unstable` 是原始瓶子随机摆放后的物理稳定性检查失败。
+- `target_pose cannot be None for move action` 来自原始 `pick_diverse_bottles.py -> grasp_actor -> choose_grasp_pose` 没有为标定 Piper/Pika 找到可执行抓取目标。
+- `No left camera link` / `No right camera link` 不是本次失败原因；当前 `piper_pika_agx.urdf` 没有 `left_camera`、`right_camera` 或 `camera` link，所以 O.0 配置保持 `collect_wrist_camera: false`，只保存 head 视角。
+
 #### O.0-1 已跑通：无 viewer 生成 head-only 数据
 
 用途：生成可保存的 O.0 对照数据。该命令走 `pick_diverse_bottles_piper_motion`，保留原始瓶子随机采样和稳定性检查，但不调用原始 IK；动作为标定 Piper/Pika 的关节空间 motion baseline。
@@ -5386,19 +5391,35 @@ data/pick_diverse_bottles_piper_motion/demo_clean_piper_motion/instructions/epis
 
 #### O.0-2 已跑通：带运动 viewer 检查 motion baseline
 
-用途：在 SAPIEN viewer 中看 O.0 motion baseline 的后续运动。该命令会执行运动，但 `collect_data: false`，不保存 hdf5。
+用途：在 SAPIEN viewer 中看 O.0 motion baseline 的后续运动。该命令现在调用 `view_pick_diverse_bottles_piper_motion.py`，每次都会重新找稳定 seed 并执行一次 `play_once()`，不会被 `collect_data.py` 的旧 `seed.txt` 进度短路；`collect_data: false`，不保存 hdf5。
 
 ```bash
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash run_pick_diverse_bottles_piper_motion_viewer.sh
 ```
 
+无窗口 smoke 验证：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && DISPLAY=:1.0 timeout 120s bash run_pick_diverse_bottles_piper_motion_viewer.sh --seed 0 --max_seed_tries 3 --hold 0
+```
+
+状态：2026-06-04 已验证通过；seed 0/1 因瓶子不稳定被跳过，seed 2 加载后完成 `play_once()`。默认会显示 debug 坐标轴：红/绿/蓝分别是局部 +X/+Y/+Z，白色小方块是原点；当前标在两个瓶子中心和左右放置目标上，不是抓取候选轴。
+
 #### O.0-3 只看场景：纯 scene viewer，不执行动作
 
-用途：只检查标定 Piper/Pika、桌面、瓶子随机摆放和 viewer 是否能打开。该命令不进入 `play_once`，不会执行运动，也不会保存数据。
+用途：只检查标定 Piper/Pika、桌面、瓶子随机摆放、目标坐标轴和 viewer 是否能打开。该命令不进入 `play_once`，不会执行运动，也不会保存数据；现在会通过 `skip_planner=True` 跳过 Curobo planner 初始化，避免 scene-only viewer 卡在 Curobo warmup。
 
 ```bash
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash run_view_pick_diverse_bottles_piper_scene.sh --seed 0 --max_seed_tries 50
 ```
+
+无窗口 smoke 验证：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && DISPLAY=:1.0 timeout 90s python view_pick_diverse_bottles_piper_scene.py --seed 0 --max_seed_tries 3 --hold 0
+```
+
+状态：2026-06-04 已验证通过；seed 0/1 因瓶子不稳定被跳过，seed 2 加载稳定场景，添加坐标轴后渲染一帧退出。
 
 #### O.0-4 诊断用：原始 IK/规划链路，不作为当前采集命令
 
@@ -5421,14 +5442,6 @@ pick_diverse_bottles.py
 -> robot._trans_from_gripper_to_endlink
 -> CuroboPlanner.plan_path
 ```
-
-`gen-23` 错误记录：
-
-- 第一条命令在 `~` 下执行 `bash collect_data.sh ...`，报 `collect_data.sh: No such file or directory`；需要先 `cd /home/zaijia001/ssd/RoboTwin`。
-- 进入仓库后，旧 `demo_clean_piper.yml` 使用 `embodiment: [piper]`，RoboTwin 将其当作单个双臂 embodiment，自动寻找 `assets/embodiments/piper/curobo_left.yml` / `curobo_right.yml`。Piper 目录只有 `curobo.yml`，因此 seed 0 报 `No such file or directory: .../piper/curobo_left.yml`。
-- seed 1 之后反复出现 `'Robot' object has no attribute 'left_planner'` 是次生错误：第一次 planner 初始化失败后，task 复用残留的 `robot` 对象，下一轮 reset 直接访问未创建的 planner 属性。
-- 第一版修正把 `demo_clean_piper.yml` 改成 `embodiment: [piper, piper, 0.60]`，可以避免 `curobo_left.yml`，但它仍加载 RoboTwin 自带 `assets/embodiments/piper/piper.urdf`，不是标定版。
-- 当前标定版修正使用 `piper_pika_agx_calibrated`，加载 `assets/embodiments/piper_pika_agx/piper_pika_agx.urdf` 和标定 base pose。
 
 ## O. 对比实验：第一帧 FoundationPose 直接策略抓取 pick_diverse_bottles
 

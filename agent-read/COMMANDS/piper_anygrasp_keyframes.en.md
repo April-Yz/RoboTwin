@@ -590,7 +590,7 @@ seed 72-115: Objects is unstable / target_pose cannot be None for move action
 final: user interrupted with Ctrl-C
 ```
 
-Meaning: the original `pick_diverse_bottles.py` `choose_grasp_pose/grasp_actor` still cannot reliably generate executable grasp targets for the calibrated Piper/Pika setup. This is not a viewer error; `No left camera link` / `No right camera link` is only the fallback warning caused by missing wrist camera links in the current URDF.
+Meaning: the original `pick_diverse_bottles.py` `choose_grasp_pose/grasp_actor` still cannot reliably generate executable grasp targets for the calibrated Piper/Pika setup. This is not a viewer error; `No left camera link` / `No right camera link` is only the fallback warning caused by missing wrist camera links in the current URDF. The current `piper_pika_agx.urdf` has no `left_camera`, `right_camera`, or `camera` link, so O.0 keeps `collect_wrist_camera: false` and saves only the head view.
 
 Kept entrypoints:
 
@@ -627,23 +627,35 @@ data/pick_diverse_bottles_piper_motion/demo_clean_piper_motion/instructions/epis
 
 #### O.0-2 Tested: Motion Viewer For The Motion Baseline
 
-Purpose: inspect the O.0 motion baseline in the SAPIEN viewer. This command executes motion, but `collect_data: false`, so it does not save hdf5 data.
+Purpose: inspect the O.0 motion baseline in the SAPIEN viewer. This command calls `view_pick_diverse_bottles_piper_motion.py`; each run searches for a stable seed and executes `play_once()` once, so it is not short-circuited by the old `collect_data.py` `seed.txt` progress. `collect_data: false`, so it does not save hdf5 data.
 
 ```bash
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash run_pick_diverse_bottles_piper_motion_viewer.sh
 ```
 
-Status: tested in `tmux gen1-1`; it reached a stable seed and completed premotion.
+Headless smoke check:
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && DISPLAY=:1.0 timeout 120s bash run_pick_diverse_bottles_piper_motion_viewer.sh --seed 0 --max_seed_tries 3 --hold 0
+```
+
+Status: verified on 2026-06-04. Seed 0/1 were skipped as unstable, seed 2 loaded, and `play_once()` finished. Debug axes are shown by default: red/green/blue are local +X/+Y/+Z and the small white cube is the origin. They are currently attached to the two bottle centers and the left/right place targets, not to grasp candidates.
 
 #### O.0-3 Scene Only: Viewer Without Motion
 
-Purpose: inspect only the calibrated Piper/Pika robot, table, random bottles, and viewer availability. This command does not enter `play_once`, does not execute motion, and does not save data.
+Purpose: inspect only the calibrated Piper/Pika robot, table, random bottles, target axes, and viewer availability. This command does not enter `play_once`, does not execute motion, and does not save data. It now passes `skip_planner=True` to skip Curobo planner initialization, avoiding scene-only viewer stalls in Curobo warmup.
 
 ```bash
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash run_view_pick_diverse_bottles_piper_scene.sh --seed 0 --max_seed_tries 50
 ```
 
-Status: tested in `tmux gen1`; it skipped unstable seed 0/1 and loaded stable seed 2. After the window opens it stays in the render loop until the SAPIEN window is closed or `Ctrl-C` is pressed.
+Headless smoke check:
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && DISPLAY=:1.0 timeout 90s python view_pick_diverse_bottles_piper_scene.py --seed 0 --max_seed_tries 3 --hold 0
+```
+
+Status: verified on 2026-06-04. Seed 0/1 were skipped as unstable, seed 2 loaded as a stable scene, axes were added, and one frame rendered before exit. After the full viewer command opens the window it stays in the render loop until the SAPIEN window is closed or `Ctrl-C` is pressed.
 
 #### O.0-4 Diagnostic Only: Original IK/Planning Path
 

@@ -1948,3 +1948,24 @@
     `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && timeout 120s bash collect_data.sh pick_diverse_bottles_piper demo_clean_piper_ik_orig_tcp 0`
 - 移除/降级：
   - `pick_diverse_bottles_piper demo_clean_piper_calibrated` 不再作为推荐采集命令；`tmux gen1-1/gen1-2` 显示它持续失败于 `Objects is unstable` 和 `target_pose cannot be None for move action`。
+
+## 2026-06-04（O.0 viewer 命令修复与坐标轴 smoke）
+
+- 修改命令：
+  - `run_pick_diverse_bottles_piper_motion_viewer.sh` 现在调用 `view_pick_diverse_bottles_piper_motion.py "$@"`，不再调用 `script/collect_data.py`。
+- 新增/更新入口：
+  - `view_pick_diverse_bottles_piper_motion.py`
+  - `view_pick_diverse_bottles_piper_scene.py --show_axes --hold`
+- 推荐命令：
+  - motion viewer：
+    `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash run_pick_diverse_bottles_piper_motion_viewer.sh`
+  - motion viewer smoke：
+    `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && DISPLAY=:1.0 timeout 120s bash run_pick_diverse_bottles_piper_motion_viewer.sh --seed 0 --max_seed_tries 3 --hold 0`
+  - scene viewer：
+    `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash run_view_pick_diverse_bottles_piper_scene.sh --seed 0 --max_seed_tries 50`
+  - scene viewer smoke：
+    `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && DISPLAY=:1.0 timeout 90s python view_pick_diverse_bottles_piper_scene.py --seed 0 --max_seed_tries 3 --hold 0`
+- 说明：
+  - scene viewer 使用 `skip_planner=True`，不会进入 Curobo warmup。
+  - motion viewer 每次重新找稳定 seed 并执行一次 `play_once()`，不会被旧 `seed.txt` 短路。
+  - debug 坐标轴默认显示在两个瓶子中心与左右放置目标上，红/绿/蓝为局部 +X/+Y/+Z，白色小方块为原点。

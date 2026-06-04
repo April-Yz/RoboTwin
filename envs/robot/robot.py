@@ -15,6 +15,17 @@ from envs.utils import transforms
 import torch.multiprocessing as mp
 
 
+class _GripperOnlyPlanner:
+    def plan_grippers(self, now_val, target_val):
+        num_step = 200
+        per_step = (target_val - now_val) / num_step
+        return {
+            "num_step": num_step,
+            "per_step": per_step,
+            "result": np.linspace(now_val, target_val, num_step),
+        }
+
+
 class Robot:
 
     def __init__(self, scene, need_topp=False, **kwargs):
@@ -28,6 +39,9 @@ class Robot:
 
         self.left_js = None
         self.right_js = None
+        self.communication_flag = False
+        self.left_planner = _GripperOnlyPlanner()
+        self.right_planner = _GripperOnlyPlanner()
 
         left_embodiment_args = kwargs["left_embodiment_config"]
         right_embodiment_args = kwargs["right_embodiment_config"]

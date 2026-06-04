@@ -9,4 +9,4 @@ if [[ -f /etc/vulkan/icd.d/nvidia_icd.json && -z "${VK_ICD_FILENAMES:-}" ]]; the
   export VK_ICD_FILENAMES=/etc/vulkan/icd.d/nvidia_icd.json
 fi
 
-python script/collect_data.py pick_diverse_bottles_piper_motion demo_clean_piper_motion_viewer
+python view_pick_diverse_bottles_piper_motion.py "$@"

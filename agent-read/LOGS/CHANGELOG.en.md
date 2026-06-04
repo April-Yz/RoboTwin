@@ -2595,3 +2595,21 @@
   - Rewrote the O.0 section in `agent-read/COMMANDS/piper_anygrasp_keyframes.zh.md` / `.en.md`, keeping only four titled commands: no-viewer data generation, motion viewer, scene-only viewer, and original-IK diagnostic.
   - Rewrote the O.0 section in `COMMAND_LIBRARY.zh.md` and removed the duplicate old O.0 head-only/motion section at the file end.
   - `pick_diverse_bottles_piper demo_clean_piper_calibrated` is no longer kept as a recommended command; it is only mentioned as a failing original-`grasp_actor` path.
+
+## 2026-06-04 (O.0 Viewer-Only Planner Skip And Motion Viewer Fix)
+
+- tmux recheck:
+  - The original-IK diagnostic command in `gen1-1` / `gen1-2` does enter `envs/pick_diverse_bottles.py -> grasp_actor -> choose_grasp_pose -> CuroboPlanner.plan_batch`.
+  - The failures have two causes: `Objects is unstable` is the bottle-settling stability check after random placement; `target_pose cannot be None for move action` means the original grasp-candidate path did not produce an executable target for the calibrated Piper/Pika setup.
+  - `No left camera link` / `No right camera link` is only the fallback warning from the current `piper_pika_agx.urdf` lacking wrist camera links. It is not the IK failure root cause; O.0 remains head-only.
+- Changes:
+  - Added `skip_planner=True` support to `Base_Task.load_robot()` so viewer-only scene loading can avoid Curobo planner initialization.
+  - Added a default gripper-only planner placeholder in `Robot` initialization. It only supports initial gripper interpolation, and the normal IK/data-collection path still replaces it with Curobo via `set_planner()`.
+  - Added `--show_axes` and `--hold` to `view_pick_diverse_bottles_piper_scene.py`. It now shows RGB axes on the two bottle centers and the left/right place targets by default, and scene-only loading skips both planner and `play_once`.
+  - Added `view_pick_diverse_bottles_piper_motion.py`, bypassing `collect_data.py` `seed.txt` progress so each viewer debug run searches for a stable seed and executes `play_once()` once.
+  - Updated `run_pick_diverse_bottles_piper_motion_viewer.sh` to call the new motion viewer entrypoint.
+- Validation:
+  - `python -m py_compile envs/_base_task.py envs/robot/robot.py view_pick_diverse_bottles_piper_scene.py view_pick_diverse_bottles_piper_motion.py` passed.
+  - `bash -n run_pick_diverse_bottles_piper_motion_viewer.sh run_view_pick_diverse_bottles_piper_scene.sh` passed.
+  - `DISPLAY=:1.0 timeout 90s python view_pick_diverse_bottles_piper_scene.py --seed 0 --max_seed_tries 3 --hold 0` passed: seed 0/1 were skipped as unstable, seed 2 loaded, axes were added, and one frame rendered before exit.
+  - `DISPLAY=:1.0 timeout 120s bash run_pick_diverse_bottles_piper_motion_viewer.sh --seed 0 --max_seed_tries 3 --hold 0` passed: seed 0/1 were skipped as unstable, seed 2 loaded, and one `play_once()` finished.

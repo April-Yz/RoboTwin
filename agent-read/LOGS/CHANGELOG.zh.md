@@ -2593,3 +2593,21 @@
   - 重写 `agent-read/COMMANDS/piper_anygrasp_keyframes.zh.md` / `.en.md` 的 O.0 小节，只保留 4 条带用途标题的命令：无 viewer 数据生成、带运动 viewer、纯场景 viewer、原始 IK 诊断。
   - 重写 `COMMAND_LIBRARY.zh.md` 的 O.0 小节，并删除文件末尾重复的旧 O.0 head-only/motion 段落。
   - `pick_diverse_bottles_piper demo_clean_piper_calibrated` 不再作为推荐命令保留，只说明其会进入原始 `grasp_actor` 并持续失败。
+
+## 2026-06-04（O.0 viewer-only 跳过 planner 与 motion viewer 修复）
+
+- tmux 复查：
+  - `gen1-1` / `gen1-2` 的原始 IK 诊断命令确实进入 `envs/pick_diverse_bottles.py -> grasp_actor -> choose_grasp_pose -> CuroboPlanner.plan_batch`。
+  - 失败原因分两类：`Objects is unstable` 是瓶子初始随机摆放后的稳定性检查失败；`target_pose cannot be None for move action` 是原始抓取候选没有为标定 Piper/Pika 生成可执行抓取 target。
+  - `No left camera link` / `No right camera link` 只是当前 `piper_pika_agx.urdf` 没有 wrist camera link 的 fallback 警告，不是 IK 失败根因；O.0 继续使用 head-only 配置。
+- 修改：
+  - `Base_Task.load_robot()` 新增 `skip_planner=True` 支持，viewer-only 场景可以不初始化 Curobo planner。
+  - `Robot` 初始化默认提供 gripper-only planner 占位，只支持初始开合夹爪插值，正常 IK/采集链路仍会被 `set_planner()` 覆盖为 Curobo planner。
+  - `view_pick_diverse_bottles_piper_scene.py` 新增 `--show_axes` 和 `--hold`；默认显示两个瓶子中心与左右放置目标的 RGB 坐标轴，并且 scene-only 跳过 planner/play_once。
+  - 新增 `view_pick_diverse_bottles_piper_motion.py`，绕开 `collect_data.py` 的 `seed.txt` 续跑逻辑，每次 viewer 调试都会重新找稳定 seed 并执行一次 `play_once()`。
+  - `run_pick_diverse_bottles_piper_motion_viewer.sh` 改为调用新的 motion viewer 入口。
+- 验证：
+  - `python -m py_compile envs/_base_task.py envs/robot/robot.py view_pick_diverse_bottles_piper_scene.py view_pick_diverse_bottles_piper_motion.py` 通过。
+  - `bash -n run_pick_diverse_bottles_piper_motion_viewer.sh run_view_pick_diverse_bottles_piper_scene.sh` 通过。
+  - `DISPLAY=:1.0 timeout 90s python view_pick_diverse_bottles_piper_scene.py --seed 0 --max_seed_tries 3 --hold 0` 通过：seed 0/1 不稳定跳过，seed 2 加载稳定场景，添加坐标轴并渲染一帧退出。
+  - `DISPLAY=:1.0 timeout 120s bash run_pick_diverse_bottles_piper_motion_viewer.sh --seed 0 --max_seed_tries 3 --hold 0` 通过：seed 0/1 不稳定跳过，seed 2 加载后完成一次 `play_once()`。
