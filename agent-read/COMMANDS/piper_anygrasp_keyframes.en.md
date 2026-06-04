@@ -639,7 +639,22 @@ Headless smoke check:
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && DISPLAY=:1.0 timeout 120s bash run_pick_diverse_bottles_piper_motion_viewer.sh --seed 0 --max_seed_tries 3 --hold 0
 ```
 
-Status: verified on 2026-06-04. Seed 0/1 were skipped as unstable, seed 2 loaded, and `play_once()` finished. Debug axes are shown by default: red/green/blue are local +X/+Y/+Z and the small white cube is the origin. They are currently attached to the two bottle centers and the left/right place targets, not to grasp candidates.
+Status: verified on 2026-06-04. Seed 0/1 were skipped as unstable, seed 2 loaded, and `play_once()` finished. Debug axes are shown by default: red/green/blue are local +X/+Y/+Z, and the small white cube is only the origin of each axis marker, not the Piper base. The viewer now shows the two bottle centers, the left/right place targets, the current left/right `link6` EE poses, and the left/right EE target axes for `pregrasp/grasp_lower/lift/move_out`.
+
+Terminal stage logs:
+
+```text
+[piper-motion][setup] bottle ranges left=x[-0.30,-0.18],y[-0.20,-0.10] right=x[0.30,0.46],y[-0.20,-0.10]
+[piper-motion][target-axis] pregrasp left_pos=... right_pos=...
+[piper-motion][stage] pregrasp: planning joint interpolation
+[piper-motion][stage] grasp_lower: planning joint interpolation
+[piper-motion][stage] close_gripper: start/finished
+[piper-motion][stage] lift: planning joint interpolation
+[piper-motion][stage] move_out: planning joint interpolation
+[piper-motion][stage] open_gripper: start/finished
+```
+
+Note: the O.0 motion baseline no longer uses the original ALOHA/AgileX bottle range `y=[0.03,0.23]`; `envs/pick_diverse_bottles_piper_motion.py` overrides it with a range closer to the current calibrated Piper/Pika FK workspace. Current FK logs still put the staged EE targets around `y≈-0.40~-0.47`, so this remains a joint-space visualization baseline, not the final bottle-aligned grasping strategy.
 
 #### O.0-3 Scene Only: Viewer Without Motion
 
@@ -656,6 +671,12 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate R
 ```
 
 Status: verified on 2026-06-04. Seed 0/1 were skipped as unstable, seed 2 loaded as a stable scene, axes were added, and one frame rendered before exit. After the full viewer command opens the window it stays in the render loop until the SAPIEN window is closed or `Ctrl-C` is pressed.
+
+To inspect only the O.0 motion-baseline scene and all staged target axes without executing motion, use:
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_scene.py --task_name pick_diverse_bottles_piper_motion --task_config demo_clean_piper_motion_viewer --seed 0 --max_seed_tries 50
+```
 
 #### O.0-4 Diagnostic Only: Original IK/Planning Path
 

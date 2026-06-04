@@ -639,7 +639,22 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate R
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && DISPLAY=:1.0 timeout 120s bash run_pick_diverse_bottles_piper_motion_viewer.sh --seed 0 --max_seed_tries 3 --hold 0
 ```
 
-状态：2026-06-04 已验证通过；seed 0/1 因瓶子不稳定被跳过，seed 2 加载后完成 `play_once()`。默认会显示 debug 坐标轴：红/绿/蓝分别是局部 +X/+Y/+Z，白色小方块是原点；当前标在两个瓶子中心和左右放置目标上，不是抓取候选轴。
+状态：2026-06-04 已验证通过；seed 0/1 因瓶子不稳定被跳过，seed 2 加载后完成 `play_once()`。默认会显示 debug 坐标轴：红/绿/蓝分别是局部 +X/+Y/+Z，白色小方块只是每个坐标轴 marker 的原点，不代表 Piper base。当前会显示两个瓶子中心、左右放置目标、当前左右 `link6` EE，以及 `pregrasp/grasp_lower/lift/move_out` 的左右 EE 目标轴。
+
+终端阶段日志：
+
+```text
+[piper-motion][setup] bottle ranges left=x[-0.30,-0.18],y[-0.20,-0.10] right=x[0.30,0.46],y[-0.20,-0.10]
+[piper-motion][target-axis] pregrasp left_pos=... right_pos=...
+[piper-motion][stage] pregrasp: planning joint interpolation
+[piper-motion][stage] grasp_lower: planning joint interpolation
+[piper-motion][stage] close_gripper: start/finished
+[piper-motion][stage] lift: planning joint interpolation
+[piper-motion][stage] move_out: planning joint interpolation
+[piper-motion][stage] open_gripper: start/finished
+```
+
+说明：O.0 motion baseline 不再使用原始 ALOHA/AgileX 的瓶子范围 `y=[0.03,0.23]`，而是在 `envs/pick_diverse_bottles_piper_motion.py` 中覆盖为更靠近当前标定 Piper/Pika FK 工作区的范围。当前 FK 打印显示阶段 EE 目标仍在 `y≈-0.40~-0.47`，所以它仍是关节空间可视化 baseline，不是最终贴瓶抓取策略。
 
 #### O.0-3 只看场景：纯 scene viewer，不执行动作
 
@@ -656,6 +671,12 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate R
 ```
 
 状态：2026-06-04 已验证通过；seed 0/1 因瓶子不稳定被跳过，seed 2 加载稳定场景，添加坐标轴后渲染一帧退出。窗口打开后会停在渲染循环，关闭 SAPIEN 窗口或 `Ctrl-C` 才退出。
+
+如果要只看 O.0 motion baseline 的场景和所有阶段目标轴，但不执行动作，用这个命令：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_scene.py --task_name pick_diverse_bottles_piper_motion --task_config demo_clean_piper_motion_viewer --seed 0 --max_seed_tries 50
+```
 
 #### O.0-4 诊断用：原始 IK/规划链路，不作为当前采集命令
 

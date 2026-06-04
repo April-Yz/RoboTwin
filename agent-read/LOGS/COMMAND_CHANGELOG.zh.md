@@ -1969,3 +1969,16 @@
   - scene viewer 使用 `skip_planner=True`，不会进入 Curobo warmup。
   - motion viewer 每次重新找稳定 seed 并执行一次 `play_once()`，不会被旧 `seed.txt` 短路。
   - debug 坐标轴默认显示在两个瓶子中心与左右放置目标上，红/绿/蓝为局部 +X/+Y/+Z，白色小方块为原点。
+
+## 2026-06-04（O.0 motion 阶段轴与阶段日志命令说明）
+
+- 更新命令说明：
+  - `bash run_pick_diverse_bottles_piper_motion_viewer.sh` 现在会打印 `[piper-motion][stage]` 阶段日志和 `[piper-motion][target-axis]` EE 目标轴位置。
+  - 白色小方块只是坐标轴原点，不是 Piper base。
+- 新增只看 motion-baseline 场景与阶段目标轴、不执行动作的命令：
+  - `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_scene.py --task_name pick_diverse_bottles_piper_motion --task_config demo_clean_piper_motion_viewer --seed 0 --max_seed_tries 50`
+- 验证命令：
+  - `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && DISPLAY=:1.0 timeout 120s bash run_pick_diverse_bottles_piper_motion_viewer.sh --seed 0 --max_seed_tries 10 --hold 0`
+- 说明：
+  - O.0 motion baseline 的瓶子范围现在由 `envs/pick_diverse_bottles_piper_motion.py` 覆盖为 `left=x[-0.30,-0.18],y[-0.20,-0.10]` 与 `right=x[0.30,0.46],y[-0.20,-0.10]`。
+  - 该范围比原始 ALOHA/AgileX 的 `y=[0.03,0.23]` 更靠近当前标定 Piper/Pika FK 工作区，但仍不是最终贴瓶抓取策略。

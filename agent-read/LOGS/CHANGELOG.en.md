@@ -2613,3 +2613,20 @@
   - `bash -n run_pick_diverse_bottles_piper_motion_viewer.sh run_view_pick_diverse_bottles_piper_scene.sh` passed.
   - `DISPLAY=:1.0 timeout 90s python view_pick_diverse_bottles_piper_scene.py --seed 0 --max_seed_tries 3 --hold 0` passed: seed 0/1 were skipped as unstable, seed 2 loaded, axes were added, and one frame rendered before exit.
   - `DISPLAY=:1.0 timeout 120s bash run_pick_diverse_bottles_piper_motion_viewer.sh --seed 0 --max_seed_tries 3 --hold 0` passed: seed 0/1 were skipped as unstable, seed 2 loaded, and one `play_once()` finished.
+
+## 2026-06-04 (O.0 Piper Motion Stage Logs And EE Target Axes)
+
+- Rechecked issues:
+  - The small white cube in the viewer is only the origin of each axis marker; it is not the Piper base or initial pose.
+  - The previous viewer only showed bottle-center and left/right place-target axes; it did not show the staged gripper motion targets.
+  - The calibrated Piper/Pika home FK is approximately left `(-0.30,-0.48,0.77)` and right `(0.56,-0.50,0.80)`, which does not match the original ALOHA/AgileX bottle range `y=[0.03,0.23]`.
+- Changes:
+  - `envs/pick_diverse_bottles_piper_motion.py` now overrides `load_actors()` and uses an O.0 motion-baseline bottle range closer to the current Piper/Pika FK workspace: `left=x[-0.30,-0.18],y[-0.20,-0.10]` and `right=x[0.30,0.46],y[-0.20,-0.10]`.
+  - Added `[piper-motion][stage]` logs for `play_once/pregrasp/grasp_lower/close_gripper/lift/move_out/open_gripper`.
+  - Added `get_debug_axis_poses()`, computing the current left/right `link6` EE poses and the left/right EE target axes for `pregrasp/grasp_lower/lift/move_out` using the current URDF/SAPIEN FK.
+  - `view_pick_diverse_bottles_piper_scene.py` now calls the task's `get_debug_axis_poses()` and adds those EE target axes to the viewer.
+- Validation:
+  - `python -m py_compile envs/pick_diverse_bottles_piper_motion.py view_pick_diverse_bottles_piper_scene.py view_pick_diverse_bottles_piper_motion.py` passed.
+  - `DISPLAY=:1.0 timeout 120s bash run_pick_diverse_bottles_piper_motion_viewer.sh --seed 0 --max_seed_tries 10 --hold 0` passed: seed 0/1 were skipped as unstable, seed 2 loaded, all `[target-axis]` and `[stage]` logs printed, and `play_once()` finished.
+- Remaining fact:
+  - The current staged EE target FK is still around `y=-0.40~-0.47`, so O.0 motion remains a joint-space visualization baseline. A true bottle-aligned grasp requires a later Piper EE target redesign or a Piper/Pika-compatible IK/grasping strategy.

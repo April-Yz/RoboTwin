@@ -2611,3 +2611,20 @@
   - `bash -n run_pick_diverse_bottles_piper_motion_viewer.sh run_view_pick_diverse_bottles_piper_scene.sh` 通过。
   - `DISPLAY=:1.0 timeout 90s python view_pick_diverse_bottles_piper_scene.py --seed 0 --max_seed_tries 3 --hold 0` 通过：seed 0/1 不稳定跳过，seed 2 加载稳定场景，添加坐标轴并渲染一帧退出。
   - `DISPLAY=:1.0 timeout 120s bash run_pick_diverse_bottles_piper_motion_viewer.sh --seed 0 --max_seed_tries 3 --hold 0` 通过：seed 0/1 不稳定跳过，seed 2 加载后完成一次 `play_once()`。
+
+## 2026-06-04（O.0 Piper motion 阶段日志与 EE 目标轴）
+
+- 问题复查：
+  - viewer 中白色小方块只是每个坐标轴 marker 的原点，不是 Piper base 或初始位姿。
+  - 之前只显示瓶子中心和左右放置目标，没有显示夹爪运动阶段目标。
+  - 当前标定 Piper/Pika 的 home FK 约为左 `(-0.30,-0.48,0.77)`、右 `(0.56,-0.50,0.80)`；这和原始 ALOHA/AgileX 的瓶子范围 `y=[0.03,0.23]` 不一致。
+- 修改：
+  - `envs/pick_diverse_bottles_piper_motion.py` 覆盖 `load_actors()`，把 O.0 motion baseline 的瓶子范围改为更靠近当前 Piper/Pika FK 工作区的 `left=x[-0.30,-0.18],y[-0.20,-0.10]` 与 `right=x[0.30,0.46],y[-0.20,-0.10]`。
+  - 新增 `[piper-motion][stage]` 阶段日志，覆盖 `play_once/pregrasp/grasp_lower/close_gripper/lift/move_out/open_gripper`。
+  - 新增 `get_debug_axis_poses()`，用当前 URDF/SAPIEN FK 计算当前左右 `link6` EE，以及 `pregrasp/grasp_lower/lift/move_out` 的左右 EE 目标轴。
+  - `view_pick_diverse_bottles_piper_scene.py` 会调用任务的 `get_debug_axis_poses()` 并把这些 EE 目标轴加入 viewer。
+- 验证：
+  - `python -m py_compile envs/pick_diverse_bottles_piper_motion.py view_pick_diverse_bottles_piper_scene.py view_pick_diverse_bottles_piper_motion.py` 通过。
+  - `DISPLAY=:1.0 timeout 120s bash run_pick_diverse_bottles_piper_motion_viewer.sh --seed 0 --max_seed_tries 10 --hold 0` 通过：seed 0/1 不稳定跳过，seed 2 稳定加载，输出所有 `[target-axis]` 与 `[stage]` 日志，并完成 `play_once()`。
+- 剩余事实：
+  - 当前阶段 EE 目标 FK 仍约在 `y=-0.40~-0.47`，所以 O.0 motion 仍是关节空间可视化 baseline；若要真正贴瓶抓取，需要后续重新设计 Piper EE 目标或使用适配 Piper/Pika 的 IK/抓取策略。

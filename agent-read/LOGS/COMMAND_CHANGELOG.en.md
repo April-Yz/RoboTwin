@@ -1971,3 +1971,16 @@
   - The scene viewer uses `skip_planner=True`, so it does not enter Curobo warmup.
   - The motion viewer searches for a stable seed and executes `play_once()` once on every run, so it is not short-circuited by old `seed.txt` progress.
   - Debug axes are shown by default on the two bottle centers and the left/right place targets. Red/green/blue are local +X/+Y/+Z, and the small white cube is the origin.
+
+## 2026-06-04 (O.0 Motion Stage Axes And Stage Log Commands)
+
+- Updated command notes:
+  - `bash run_pick_diverse_bottles_piper_motion_viewer.sh` now prints `[piper-motion][stage]` stage logs and `[piper-motion][target-axis]` EE target-axis positions.
+  - The small white cube is only the axis-marker origin, not the Piper base.
+- Added a scene-only command for inspecting the motion-baseline scene and staged target axes without executing motion:
+  - `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_scene.py --task_name pick_diverse_bottles_piper_motion --task_config demo_clean_piper_motion_viewer --seed 0 --max_seed_tries 50`
+- Validation command:
+  - `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && DISPLAY=:1.0 timeout 120s bash run_pick_diverse_bottles_piper_motion_viewer.sh --seed 0 --max_seed_tries 10 --hold 0`
+- Notes:
+  - The O.0 motion-baseline bottle range is now overridden in `envs/pick_diverse_bottles_piper_motion.py` as `left=x[-0.30,-0.18],y[-0.20,-0.10]` and `right=x[0.30,0.46],y[-0.20,-0.10]`.
+  - This range is closer to the current calibrated Piper/Pika FK workspace than the original ALOHA/AgileX `y=[0.03,0.23]`, but it is still not the final bottle-aligned grasping strategy.

@@ -179,6 +179,9 @@ def add_scene_debug_axes(task):
         add_axis_marker(task.scene, pose_from_list(task.left_target_pose), "left_place_target", length=0.10)
     if hasattr(task, "right_target_pose"):
         add_axis_marker(task.scene, pose_from_list(task.right_target_pose), "right_place_target", length=0.10)
+    if hasattr(task, "get_debug_axis_poses"):
+        for name, pose, length in task.get_debug_axis_poses():
+            add_axis_marker(task.scene, pose, name, length=length, thickness=0.004)
 
 
 if __name__ == "__main__":
