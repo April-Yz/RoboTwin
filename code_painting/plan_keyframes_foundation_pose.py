@@ -175,7 +175,7 @@ def compute_foundation_pose_target(
 ) -> Optional[np.ndarray]:
     """Compute world-space target pose combining object position + hand orientation.
 
-    Returns [qw, qx, qy, qz, px, py, pz] world-space pose, with retreat applied along
+    Returns planner-order [px, py, pz, qw, qx, qy, qz] world-space pose, with retreat applied along
     the approach axis (local +Z = blue axis, gripper forward direction).
     """
     # Get object world position
@@ -194,7 +194,7 @@ def compute_foundation_pose_target(
     approach_axis_world = rot_world[:, 2]  # local +Z in world frame
     retreated_pos = obj_pos - retreat_m * approach_axis_world
 
-    target_pose = np.concatenate([quat_wxyz, retreated_pos]).astype(np.float64)
+    target_pose = np.concatenate([retreated_pos, quat_wxyz]).astype(np.float64)
     return target_pose
 
 
@@ -210,8 +210,8 @@ def build_candidate_entry(
     target_object: str,
     candidate_idx: int = 0,
 ) -> dict:
-    qw, qx, qy, qz = float(pose_world_wxyz[0]), float(pose_world_wxyz[1]), float(pose_world_wxyz[2]), float(pose_world_wxyz[3])
-    px, py, pz = float(pose_world_wxyz[4]), float(pose_world_wxyz[5]), float(pose_world_wxyz[6])
+    px, py, pz = float(pose_world_wxyz[0]), float(pose_world_wxyz[1]), float(pose_world_wxyz[2])
+    qw, qx, qy, qz = float(pose_world_wxyz[3]), float(pose_world_wxyz[4]), float(pose_world_wxyz[5]), float(pose_world_wxyz[6])
     return {
         "source_frame": int(frame),
         "arm": str(arm),
@@ -227,8 +227,8 @@ def build_candidate_entry(
         "camera_up_flip_applied": 0,
         "forward_axis_change_deg": 0.0,
         "camera_up_selection_mode": "none",
-        "raw_pose_world_wxyz": [qw, qx, qy, qz, px, py, pz],
-        "pose_world_wxyz": [qw, qx, qy, qz, px, py, pz],
+        "raw_pose_world_wxyz": [px, py, pz, qw, qx, qy, qz],
+        "pose_world_wxyz": [px, py, pz, qw, qx, qy, qz],
         "translation_cam": [0.0, 0.0, 0.0],
         "rotation_cam": np.eye(3, dtype=np.float64).tolist(),
         "hand_rotation_cam": np.asarray(hand_rotation_cam, dtype=np.float64).tolist(),
@@ -278,9 +278,7 @@ def build_plan_summary(
             )
             candidates_by_arm[arm].append(entry)
 
-            # Debug: print approach axis direction
-            approach_dir = np.array([pose_wxyz[4], pose_wxyz[5], pose_wxyz[6]]) + retreat_m * np.eye(3)[:, 2]  # approximation
-            print(f"  [{arm}] keyframe[{idx}] frame={kf_frame} obj={target_obj} retreat={retreat_m:.3f}m pos=({pose_wxyz[4]:.3f},{pose_wxyz[5]:.3f},{pose_wxyz[6]:.3f})")
+            print(f"  [{arm}] keyframe[{idx}] frame={kf_frame} obj={target_obj} retreat={retreat_m:.3f}m pos=({pose_wxyz[0]:.3f},{pose_wxyz[1]:.3f},{pose_wxyz[2]:.3f})")
 
     primary_arm = "left"
     if not candidates_by_arm["left"] and candidates_by_arm["right"]:

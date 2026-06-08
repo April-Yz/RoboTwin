@@ -1984,3 +1984,16 @@
 - Notes:
   - The O.0 motion-baseline bottle range is now overridden in `envs/pick_diverse_bottles_piper_motion.py` as `left=x[-0.30,-0.18],y[-0.20,-0.10]` and `right=x[0.30,0.46],y[-0.20,-0.10]`.
   - This range is closer to the current calibrated Piper/Pika FK workspace than the original ALOHA/AgileX `y=[0.03,0.23]`, but it is still not the final bottle-aligned grasping strategy.
+
+## 2026-06-08 (Mode N-1 FoundationPose Target Preview Command)
+
+- Changed command:
+  - The `# 0608` Mode N batch command in `COMMAND_LIBRARY.zh.md` now writes `--output_root` to `/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-1_foundation_pose_viewer`.
+- Recommended command:
+  - `for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh --gpu 1 --ids 0 1 2 3 4 --continue_on_error --tasks $TASK --foundation_pose_retreat_m 0.03 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-1_foundation_pose_viewer; done`
+- Meaning:
+  - Mode N uses the FoundationPose object world position plus the human gripper rotation matrix.
+  - `rank_previews/*.png` shows the 2D C-shaped gripper and local axes: left arm blue, right arm orange, X=red, Y=green, Z=blue.
+  - The `pose_world_wxyz` field name is historical; the wrapper and planner use `[x, y, z, qw, qx, qy, qz]`.
+- Validation command:
+  - `bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh --gpu 1 --ids 2 --continue_on_error --tasks pick_diverse_bottles --foundation_pose_retreat_m 0.03 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-1_foundation_pose_viewer`

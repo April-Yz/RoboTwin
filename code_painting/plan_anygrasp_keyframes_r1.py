@@ -2349,19 +2349,26 @@ def project_world_point_to_image(
     image_height: int,
 ) -> Optional[Tuple[int, int]]:
     try:
-        extrinsic = np.asarray(camera.get_extrinsic_matrix(), dtype=np.float64)
+        camera_to_world = np.asarray(camera.get_model_matrix(), dtype=np.float64)
     except Exception:
+        try:
+            camera_to_world = np.linalg.inv(np.asarray(camera.get_extrinsic_matrix(), dtype=np.float64))
+        except Exception:
+            return None
+    if camera_to_world.shape == (3, 4):
+        camera_to_world_4x4 = np.eye(4, dtype=np.float64)
+        camera_to_world_4x4[:3, :4] = camera_to_world
+        camera_to_world = camera_to_world_4x4
+    if camera_to_world.shape != (4, 4):
         return None
-    if extrinsic.shape == (3, 4):
-        extrinsic_4x4 = np.eye(4, dtype=np.float64)
-        extrinsic_4x4[:3, :4] = extrinsic
-        extrinsic = extrinsic_4x4
-    if extrinsic.shape != (4, 4):
+    try:
+        world_to_camera = np.linalg.inv(camera_to_world)
+    except np.linalg.LinAlgError:
         return None
 
     point_h = np.ones(4, dtype=np.float64)
     point_h[:3] = np.asarray(point_world, dtype=np.float64).reshape(3)
-    point_cam = extrinsic @ point_h
+    point_cam = world_to_camera @ point_h
     z = float(point_cam[2])
     if not np.isfinite(z) or z <= 1e-6:
         return None
@@ -2374,6 +2381,74 @@ def project_world_point_to_image(
     if u < -32 or u >= image_width + 32 or v < -32 or v >= image_height + 32:
         return None
     return u, v
+
+
+def draw_projected_gripper_wireframe(
+    image_bgr: np.ndarray,
+    camera,
+    intrinsic: np.ndarray,
+    candidate: CandidatePose,
+    color_bgr: Tuple[int, int, int],
+    forward_axis: str,
+    label: str,
+) -> None:
+    pose_world = np.asarray(candidate.pose_world_matrix, dtype=np.float64).reshape(4, 4)
+    rot = pose_world[:3, :3]
+    center = pose_world[:3, 3]
+    x_axis = rot[:, 0]
+    y_axis = rot[:, 1]
+    z_axis = rot[:, 2]
+    forward = z_axis if str(forward_axis) == "local_z" else x_axis
+
+    grip_width = float(np.clip(candidate.width_m, 0.01, 0.12))
+    grip_depth = float(np.clip(candidate.depth_m, 0.01, 0.08))
+    palm_back = float(min(0.018, grip_depth * 0.7))
+    finger_len = float(max(0.018, grip_depth))
+
+    back_center = center - forward * palm_back
+    left_base = center + y_axis * (grip_width * 0.5)
+    right_base = center - y_axis * (grip_width * 0.5)
+    left_back = back_center + y_axis * (grip_width * 0.5)
+    right_back = back_center - y_axis * (grip_width * 0.5)
+    left_tip = left_base + forward * finger_len
+    right_tip = right_base + forward * finger_len
+
+    width = int(image_bgr.shape[1])
+    height = int(image_bgr.shape[0])
+
+    def project(point: np.ndarray) -> Optional[Tuple[int, int]]:
+        return project_world_point_to_image(camera, intrinsic, point, width, height)
+
+    for start, end in (
+        (left_back, right_back),
+        (left_back, left_base),
+        (right_back, right_base),
+        (left_base, left_tip),
+        (right_base, right_tip),
+    ):
+        start_px = project(start)
+        end_px = project(end)
+        if start_px is None or end_px is None:
+            continue
+        cv2.line(image_bgr, start_px, end_px, color_bgr, 2, cv2.LINE_AA)
+
+    center_px = project(center)
+    if center_px is None:
+        return
+    cv2.circle(image_bgr, center_px, 4, color_bgr, -1, cv2.LINE_AA)
+    draw_small_candidate_label(image_bgr, label, (center_px[0] + 5, center_px[1] - 5), color_bgr, font_scale=0.32)
+
+    axis_len = 0.065
+    for axis, axis_color, axis_label in (
+        (x_axis, (0, 0, 255), "X"),
+        (y_axis, (0, 190, 0), "Y"),
+        (z_axis, (255, 0, 0), "Z"),
+    ):
+        end_px = project(center + axis * axis_len)
+        if end_px is None:
+            continue
+        cv2.arrowedLine(image_bgr, center_px, end_px, axis_color, 2, cv2.LINE_AA, tipLength=0.25)
+        draw_small_candidate_label(image_bgr, axis_label, (end_px[0] + 2, end_px[1] + 2), axis_color, font_scale=0.28)
 
 
 def draw_small_candidate_label(
@@ -4463,7 +4538,12 @@ def export_rank_preview_images(
             forward_axis=str(args.debug_gripper_actor_forward_axis),
         ),
     }
-    selected_map = {int(item.source_frame): (item.arm, int(item.candidate.candidate_idx)) for item in selected_keyframes}
+    selected_map = {(int(item.source_frame), item.arm): int(item.candidate.candidate_idx) for item in selected_keyframes}
+    arm_debug_frames = {
+        int(frame)
+        for arm_info in arm_debugs.values()
+        for frame in arm_info.ranked_candidates_per_frame.keys()
+    }
     preview_frames = sorted(
         {
             int(frame)
@@ -4473,6 +4553,7 @@ def export_rank_preview_images(
             int(item.source_frame)
             for item in selected_keyframes
         }
+        | arm_debug_frames
     )
     records: List[RankPreviewRecord] = []
 
@@ -4481,7 +4562,18 @@ def export_rank_preview_images(
             frame = int(frame)
             object_states = object_states_per_frame.get(frame)
             if object_states is None:
-                continue
+                try:
+                    object_states = load_object_states(
+                        args.replay_dir,
+                        frame,
+                        args.object_mesh_overrides,
+                        args.execution_object_visual_scale_overrides,
+                        args.execution_object_collision_scale_overrides,
+                    )
+                    object_states_per_frame[frame] = object_states
+                except Exception as exc:
+                    print(f"[rank-preview-warning] skip frame={frame}: failed to load object states: {type(exc).__name__}: {exc}")
+                    continue
             for state in object_states.values():
                 if state.actor is None:
                     continue
@@ -4516,20 +4608,41 @@ def export_rank_preview_images(
                     f"rank={rank_idx + 1}",
                     (
                         f"left_candidate={left_cand.candidate_idx}"
-                        + (" selected" if selected_map.get(frame) == ("left", int(left_cand.candidate_idx)) else "")
+                        + (" selected" if selected_map.get((frame, "left")) == int(left_cand.candidate_idx) else "")
                         if left_cand is not None
                         else "left_candidate=none"
                     ),
                     (
                         f"right_candidate={right_cand.candidate_idx}"
-                        + (" selected" if selected_map.get(frame) == ("right", int(right_cand.candidate_idx)) else "")
+                        + (" selected" if selected_map.get((frame, "right")) == int(right_cand.candidate_idx) else "")
                         if right_cand is not None
                         else "right_candidate=none"
                     ),
-                    "color=blue:left orange:right",
+                    "2D C-gripper overlay: left=blue right=orange",
+                    "axes: X=red Y=green Z=blue(+Z approach)",
                 ]
                 head_rgb, _ = renderer.capture_camera(renderer.zed_camera)
                 image_bgr = base.overlay_text(head_rgb, overlay_lines)
+                if left_cand is not None:
+                    draw_projected_gripper_wireframe(
+                        image_bgr=image_bgr,
+                        camera=renderer.zed_camera,
+                        intrinsic=head_intrinsic,
+                        candidate=left_cand,
+                        color_bgr=(255, 100, 0),
+                        forward_axis=str(args.debug_gripper_actor_forward_axis),
+                        label=f"L{int(left_cand.candidate_idx)}",
+                    )
+                if right_cand is not None:
+                    draw_projected_gripper_wireframe(
+                        image_bgr=image_bgr,
+                        camera=renderer.zed_camera,
+                        intrinsic=head_intrinsic,
+                        candidate=right_cand,
+                        color_bgr=(0, 140, 255),
+                        forward_axis=str(args.debug_gripper_actor_forward_axis),
+                        label=f"R{int(right_cand.candidate_idx)}",
+                    )
                 annotate_candidate_labels(
                     image_bgr,
                     renderer.zed_camera,

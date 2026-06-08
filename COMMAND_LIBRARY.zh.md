@@ -5288,6 +5288,16 @@ for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle p
     --foundation_pose_retreat_m 0.03 \
     --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay/keyframe/N_founposePhumanrot/foundation_pose
 done
+
+# 0608
+# rank_previews/*.png 会叠加 Mode N 合成目标的 2D C 型夹爪和 RGB 局部轴：
+# C 型夹爪左臂蓝色、右臂橙色；X=红、Y=绿、Z=蓝，其中 +Z 是 foundation_pose_retreat_m 使用的夹爪前进/后退轴。
+for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do
+  bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh \
+    --gpu 1 --ids 0 1 2 3 4 --continue_on_error --tasks $TASK \
+    --foundation_pose_retreat_m 0.03 \
+    --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-1_foundation_pose_viewer
+done
 ```
 
 ### retreat 参数调试

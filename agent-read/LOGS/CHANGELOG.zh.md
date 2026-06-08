@@ -2628,3 +2628,19 @@
   - `DISPLAY=:1.0 timeout 120s bash run_pick_diverse_bottles_piper_motion_viewer.sh --seed 0 --max_seed_tries 10 --hold 0` 通过：seed 0/1 不稳定跳过，seed 2 稳定加载，输出所有 `[target-axis]` 与 `[stage]` 日志，并完成 `play_once()`。
 - 剩余事实：
   - 当前阶段 EE 目标 FK 仍约在 `y=-0.40~-0.47`，所以 O.0 motion 仍是关节空间可视化 baseline；若要真正贴瓶抓取，需要后续重新设计 Piper EE 目标或使用适配 Piper/Pika 的 IK/抓取策略。
+
+## 2026-06-08（Mode N-1 Foundation 目标 pose 顺序与 C 型夹爪预览）
+
+- 问题复查：
+  - Mode N 的目标定义应为 Foundation 物体世界位置 + 人手 gripper 旋转矩阵，但 wrapper 写入的 `pose_world_wxyz` 顺序与 planner 实际解析顺序不一致。
+  - planner 内部实际按 `[x, y, z, qw, qx, qy, qz]` 解析 pose；历史字段名仍叫 `pose_world_wxyz`。
+  - 修复前 `plan_keyframes_foundation_pose.py` / `plan_keyframes_human_replay.py` 写成 `[qw, qx, qy, qz, x, y, z]`，会让 planner 把 quaternion 当作位置。
+- 修改：
+  - 修正 Mode N 和 Mode M wrapper 输出的 `raw_pose_world_wxyz` / `pose_world_wxyz` 为 `[x, y, z, qw, qx, qy, qz]`。
+  - `rank_previews/*.png` 增加 2D C 型夹爪投影和 RGB 局部轴；左臂蓝色、右臂橙色，X=红、Y=绿、Z=蓝，蓝色 local `+Z` 是 Mode N 的前进/后退轴。
+  - rank preview 的 selected 标记改为按 `(frame, arm)` 判断，并补齐各 arm 的 debug frames。
+  - `COMMAND_LIBRARY.zh.md` 的 `# 0608` Mode N 命令输出目录改为 `N-1_foundation_pose_viewer`。
+- 验证：
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_keyframes_foundation_pose.py code_painting/plan_keyframes_human_replay.py` 通过。
+  - `bash -n code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh` 通过。
+  - `pick_diverse_bottles id2` smoke 已生成 `N-1_foundation_pose_viewer/pick_diverse_bottles/foundation_input_2/plan_summary_foundation_pose.json` 和 `rank_previews/keyframe_000036_rank_1.png`、`rank_previews/keyframe_000053_rank_1.png`。

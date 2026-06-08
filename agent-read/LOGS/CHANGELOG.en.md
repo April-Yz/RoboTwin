@@ -2630,3 +2630,19 @@
   - `DISPLAY=:1.0 timeout 120s bash run_pick_diverse_bottles_piper_motion_viewer.sh --seed 0 --max_seed_tries 10 --hold 0` passed: seed 0/1 were skipped as unstable, seed 2 loaded, all `[target-axis]` and `[stage]` logs printed, and `play_once()` finished.
 - Remaining fact:
   - The current staged EE target FK is still around `y=-0.40~-0.47`, so O.0 motion remains a joint-space visualization baseline. A true bottle-aligned grasp requires a later Piper EE target redesign or a Piper/Pika-compatible IK/grasping strategy.
+
+## 2026-06-08 (Mode N-1 Foundation Target Pose Order And C-Gripper Preview)
+
+- Rechecked issue:
+  - Mode N should compose a target from the FoundationPose object world position and the human gripper rotation matrix, but the wrapper wrote `pose_world_wxyz` in an order that did not match the planner's actual parser.
+  - The planner consumes poses as `[x, y, z, qw, qx, qy, qz]`; the historical field name still says `pose_world_wxyz`.
+  - Before this fix, `plan_keyframes_foundation_pose.py` / `plan_keyframes_human_replay.py` wrote `[qw, qx, qy, qz, x, y, z]`, causing the planner to treat quaternion values as position.
+- Changes:
+  - Fixed Mode N and Mode M wrapper output for `raw_pose_world_wxyz` / `pose_world_wxyz` to `[x, y, z, qw, qx, qy, qz]`.
+  - Added 2D C-shaped gripper projection and RGB local axes to `rank_previews/*.png`; left arm is blue, right arm is orange, X=red, Y=green, Z=blue, and blue local `+Z` is the Mode N forward/retreat axis.
+  - Rank preview selected marking now uses `(frame, arm)`, and preview frames include each arm's debug frames.
+  - Updated the `# 0608` Mode N command in `COMMAND_LIBRARY.zh.md` to write into `N-1_foundation_pose_viewer`.
+- Validation:
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_keyframes_foundation_pose.py code_painting/plan_keyframes_human_replay.py` passed.
+  - `bash -n code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh` passed.
+  - The `pick_diverse_bottles id2` smoke run generated `N-1_foundation_pose_viewer/pick_diverse_bottles/foundation_input_2/plan_summary_foundation_pose.json` plus `rank_previews/keyframe_000036_rank_1.png` and `rank_previews/keyframe_000053_rank_1.png`.

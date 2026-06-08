@@ -1982,3 +1982,16 @@
 - 说明：
   - O.0 motion baseline 的瓶子范围现在由 `envs/pick_diverse_bottles_piper_motion.py` 覆盖为 `left=x[-0.30,-0.18],y[-0.20,-0.10]` 与 `right=x[0.30,0.46],y[-0.20,-0.10]`。
   - 该范围比原始 ALOHA/AgileX 的 `y=[0.03,0.23]` 更靠近当前标定 Piper/Pika FK 工作区，但仍不是最终贴瓶抓取策略。
+
+## 2026-06-08（Mode N-1 FoundationPose 目标预览命令）
+
+- 修改命令：
+  - `COMMAND_LIBRARY.zh.md` 中 `# 0608` Mode N 批量命令的 `--output_root` 改为 `/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-1_foundation_pose_viewer`。
+- 推荐命令：
+  - `for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh --gpu 1 --ids 0 1 2 3 4 --continue_on_error --tasks $TASK --foundation_pose_retreat_m 0.03 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-1_foundation_pose_viewer; done`
+- 命令含义：
+  - Mode N 使用 FoundationPose 物体世界位置 + 人手 gripper 旋转矩阵。
+  - `rank_previews/*.png` 会显示 2D C 型夹爪和局部轴：左臂蓝、右臂橙，X=红、Y=绿、Z=蓝。
+  - `pose_world_wxyz` 字段名沿用历史命名，但 wrapper 与 planner 均按 `[x, y, z, qw, qx, qy, qz]` 使用。
+- 验证命令：
+  - `bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh --gpu 1 --ids 2 --continue_on_error --tasks pick_diverse_bottles --foundation_pose_retreat_m 0.03 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-1_foundation_pose_viewer`

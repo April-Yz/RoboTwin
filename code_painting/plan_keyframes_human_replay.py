@@ -101,7 +101,7 @@ def compute_hand_world_pose(
     frame: int,
     cv_axis_mode: str = "legacy_r1",
 ) -> Optional[np.ndarray]:
-    """Compute world-space hand gripper pose [qw,qx,qy,qz,px,py,pz] at a given frame."""
+    """Compute planner-order world-space hand gripper pose [px,py,pz,qw,qx,qy,qz]."""
     pos_key = f"{arm}_gripper_position"
     rot_key = f"{arm}_gripper_rotation_matrix"
     valid_key = f"{arm}_gripper_valid"
@@ -154,7 +154,7 @@ def compute_hand_world_pose(
     quat_xyzw = R.from_matrix(rot_world).as_quat()  # scipy returns xyzw
     quat_wxyz = np.array([quat_xyzw[3], quat_xyzw[0], quat_xyzw[1], quat_xyzw[2]], dtype=np.float64)
 
-    return np.concatenate([quat_wxyz, pos_world]).astype(np.float64)
+    return np.concatenate([pos_world, quat_wxyz]).astype(np.float64)
 
 
 # ──────────────────────────────────────────────
@@ -170,8 +170,8 @@ def build_candidate_entry(
     candidate_idx: int = 0,
 ) -> dict:
     """Build a single candidate entry in plan_summary.json format."""
-    qw, qx, qy, qz = float(pose_world_wxyz[0]), float(pose_world_wxyz[1]), float(pose_world_wxyz[2]), float(pose_world_wxyz[3])
-    px, py, pz = float(pose_world_wxyz[4]), float(pose_world_wxyz[5]), float(pose_world_wxyz[6])
+    px, py, pz = float(pose_world_wxyz[0]), float(pose_world_wxyz[1]), float(pose_world_wxyz[2])
+    qw, qx, qy, qz = float(pose_world_wxyz[3]), float(pose_world_wxyz[4]), float(pose_world_wxyz[5]), float(pose_world_wxyz[6])
     return {
         "source_frame": int(frame),
         "arm": str(arm),
@@ -187,8 +187,8 @@ def build_candidate_entry(
         "camera_up_flip_applied": 0,
         "forward_axis_change_deg": 0.0,
         "camera_up_selection_mode": "none",
-        "raw_pose_world_wxyz": [qw, qx, qy, qz, px, py, pz],
-        "pose_world_wxyz": [qw, qx, qy, qz, px, py, pz],
+        "raw_pose_world_wxyz": [px, py, pz, qw, qx, qy, qz],
+        "pose_world_wxyz": [px, py, pz, qw, qx, qy, qz],
         "translation_cam": [0.0, 0.0, 0.0],
         "rotation_cam": np.eye(3, dtype=np.float64).tolist(),
         "hand_rotation_cam": np.asarray(hand_rotation_cam, dtype=np.float64).tolist(),
@@ -237,7 +237,7 @@ def build_plan_summary(
                 candidate_idx=idx,
             )
             candidates_by_arm[arm].append(entry)
-            print(f"  [{arm}] keyframe[{idx}] frame={kf_frame} pos=({pose_wxyz[4]:.3f},{pose_wxyz[5]:.3f},{pose_wxyz[6]:.3f})")
+            print(f"  [{arm}] keyframe[{idx}] frame={kf_frame} pos=({pose_wxyz[0]:.3f},{pose_wxyz[1]:.3f},{pose_wxyz[2]:.3f})")
 
     # Determine primary arm
     primary_arm = "left"
