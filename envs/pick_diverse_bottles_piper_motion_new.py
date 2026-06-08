@@ -33,6 +33,7 @@ class pick_diverse_bottles_piper_motion(pick_diverse_bottles):
         # 中文：瓶子 y 范围沿用原始 ALOHA/AgileX 的 y=[0.03, 0.23]。
         # 经核实 Piper base 位于 y≈-0.25（左）/ y≈-0.27（右），
         # 瓶子距 base 在 y 方向约 0.28~0.50m，在 Piper 桌面臂展范围内。
+        # 这只影响 O.0 piper motion baseline，不修改原始 pick_diverse_bottles.py。
         self.bottle1 = rand_create_actor(
             self,
             xlim=[-0.30, -0.18],
@@ -70,6 +71,7 @@ class pick_diverse_bottles_piper_motion(pick_diverse_bottles):
         )
 
     def _joint_result(self, start, target, steps=35):
+        # 直接生成关节空间插值结果，接口形状保持和 planner 输出一致。
         start = np.asarray(start, dtype=np.float64)
         target = np.asarray(target, dtype=np.float64)
         position = np.linspace(start, target, steps)
@@ -84,6 +86,7 @@ class pick_diverse_bottles_piper_motion(pick_diverse_bottles):
         print(f"  left_joints={np.round(left_target, 4).tolist()}")
         print(f"  right_joints={np.round(right_target, 4).tolist()}")
         if self.need_plan:
+            # 第一次 premotion 阶段记录路径；collect_data 的执行阶段会复用这些路径。
             left_start = np.asarray(self.robot.get_left_arm_jointState()[:-1], dtype=np.float64)
             right_start = np.asarray(self.robot.get_right_arm_jointState()[:-1], dtype=np.float64)
             left_result = self._joint_result(left_start, left_target, steps=steps)
@@ -153,33 +156,47 @@ class pick_diverse_bottles_piper_motion(pick_diverse_bottles):
         """将位姿沿其局部 +Z（夹爪前进方向）向前偏移。
 
         Piper/Pika URDF 中 link6 的局部 +Z 轴从腕部指向夹爪指尖方向。
-        此方法用于将腕部 (joint6) 位姿转换为夹爪尖端的大致位置（前方 ~10 cm）。
+        此方法用于可视化夹爪尖端的大致位置（腕部 joint6 前方 ~10 cm）。
         """
         R = pose.to_transformation_matrix()[:3, :3]
-        forward = R[:, 2]
+        forward = R[:, 2]  # 局部 Z 轴在世界坐标系中的方向
         return sapien.Pose(pose.p + forward * distance, pose.q)
 
     # ------------------------------------------------------------------
-    # 阶段原点色 — 全部使用中文常用颜色名
+    # 颜色图例（终端 + viewer 原点色块）
     # ------------------------------------------------------------------
+    # 类别                原点颜色       含义
+    # ─────────────────────────────────────────────────────────────────
+    # bottle              white  (1,1,1)   瓶子几何中心
+    # place_target        yellow (1,1,0)   放置目标位姿
+    # ee_wrist (current)  cyan   (0,1,1)   当前 link6 腕部 (joint6)
+    # ee_tip   (current)  magenta(1,0,1)   当前夹爪尖端 (腕部+10cm)
+    # stage_pregrasp      blue   (0.3,0.5,1.0)   预抓取阶段
+    # stage_grasp_lower   green  (0.3,1.0,0.5)   下降抓取阶段
+    # stage_lift          gold   (1.0,1.0,0.3)   抬升阶段
+    # stage_move_out      coral  (1.0,0.4,0.4)   移出阶段
+    #
+    # 每个阶段同时显示：
+    #   _wrist → 腕部 link6 位置（FK 直接结果）
+    #   _tip   → 腕部 +10cm 沿前进轴（近似夹爪尖端）
+    # ------------------------------------------------------------------
+
+    # 阶段原点色
     _STAGE_COLORS = {
-        "pregrasp":    (0.3, 0.5, 1.0),   # 浅蓝色
-        "grasp_lower": (0.3, 1.0, 0.5),   # 浅绿色
-        "lift":        (1.0, 1.0, 0.3),   # 金黄色
-        "move_out":    (1.0, 0.4, 0.4),   # 橙红色
+        "pregrasp":    (0.3, 0.5, 1.0),   # blue
+        "grasp_lower": (0.3, 1.0, 0.5),   # green
+        "lift":        (1.0, 1.0, 0.3),   # gold
+        "move_out":    (1.0, 0.4, 0.4),   # coral
     }
 
     def get_debug_axis_poses(self):
-        """返回所有 debug 坐标轴。
+        """返回所有 debug 坐标轴，每个元素为 (name, pose, length, origin_color)。
 
-        所有 EE / 阶段目标轴均为夹爪尖端位置（腕部 link6 FK + 10cm 前进偏移），
-        不再同时显示腕部位置，避免混淆。
-
-        返回: list of (name, sapien.Pose, length, origin_color)
+        viewer 可通过 origin_color 区分不同类别；终端也会打印完整图例。
         """
         axes = []
 
-        # ── 当前 EE 尖端 ──
+        # ── 当前 EE：腕部 (wrist) + 尖端 (tip) ──
         left_wrist = sapien.Pose(
             self.robot.left_ee.child_link.get_pose().p,
             self.robot.left_ee.child_link.get_pose().q,
@@ -191,36 +208,57 @@ class pick_diverse_bottles_piper_motion(pick_diverse_bottles):
         left_tip = self._forward_offset_pose(left_wrist, 0.10)
         right_tip = self._forward_offset_pose(right_wrist, 0.10)
 
-        axes.append(("ee_current_left",  left_tip,  0.09, (0.0, 1.0, 1.0)))   # 亮青色
-        axes.append(("ee_current_right", right_tip, 0.09, (0.0, 1.0, 1.0)))
+        axes.append(("ee_wrist_left",  left_wrist,  0.06, (0.0, 1.0, 1.0)))   # cyan
+        axes.append(("ee_wrist_right", right_wrist, 0.06, (0.0, 1.0, 1.0)))
+        axes.append(("ee_tip_left",    left_tip,    0.07, (1.0, 0.0, 1.0)))   # magenta
+        axes.append(("ee_tip_right",   right_tip,   0.07, (1.0, 0.0, 1.0)))
 
         print(
-            "[piper-motion][target-axis] ee_current (tip +10cm) "
+            "[piper-motion][target-axis] ee_wrist "
+            f"left_pos={np.round(left_wrist.p, 4).tolist()} "
+            f"right_pos={np.round(right_wrist.p, 4).tolist()}"
+        )
+        print(
+            "[piper-motion][target-axis] ee_tip (+10cm fwd) "
             f"left_pos={np.round(left_tip.p, 4).tolist()} "
             f"right_pos={np.round(right_tip.p, 4).tolist()}"
         )
 
-        # ── 阶段目标（全部为尖端位置）──
+        # ── 阶段目标：腕部 + 尖端 ──
         for stage_name, left_target, right_target in self._motion_joint_targets():
             stage_color = self._STAGE_COLORS.get(stage_name, (0.6, 0.6, 0.6))
+            # 稍暗一点的 tip 色
+            tip_color = tuple(max(0, c - 0.15) for c in stage_color)
 
             left_wrist_pose = self._ee_pose_at_joints("left", left_target)
             right_wrist_pose = self._ee_pose_at_joints("right", right_target)
             left_tip_pose = self._forward_offset_pose(left_wrist_pose, 0.10)
             right_tip_pose = self._forward_offset_pose(right_wrist_pose, 0.10)
 
-            axes.append((f"stage_{stage_name}_left",  left_tip_pose,  0.08, stage_color))
-            axes.append((f"stage_{stage_name}_right", right_tip_pose, 0.08, stage_color))
+            axes.append((f"stage_{stage_name}_wrist_left",  left_wrist_pose,  0.045, stage_color))
+            axes.append((f"stage_{stage_name}_wrist_right", right_wrist_pose, 0.045, stage_color))
+            axes.append((f"stage_{stage_name}_tip_left",    left_tip_pose,    0.055, tip_color))
+            axes.append((f"stage_{stage_name}_tip_right",   right_tip_pose,   0.055, tip_color))
 
             print(
-                f"[piper-motion][target-axis] stage_{stage_name} (tip) "
-                f"left_pos={np.round(left_tip_pose.p, 4).tolist()} "
-                f"right_pos={np.round(right_tip_pose.p, 4).tolist()}"
+                f"[piper-motion][target-axis] stage_{stage_name} "
+                f"wrist_left={np.round(left_wrist_pose.p, 4).tolist()} "
+                f"wrist_right={np.round(right_wrist_pose.p, 4).tolist()}"
+            )
+            print(
+                f"[piper-motion][target-axis] stage_{stage_name} "
+                f"tip_left={np.round(left_tip_pose.p, 4).tolist()} "
+                f"tip_right={np.round(right_tip_pose.p, 4).tolist()}"
             )
 
         return axes
 
     def play_once(self):
+        # Four visible stages: approach, close, lift/retract, move outward, open.
+        # The numbers are conservative joint-space offsets around the calibrated
+        # Piper home pose; they intentionally avoid the failing EE grasp solver.
+        # 中文：这些数值是围绕标定 Piper/Pika home pose 的保守关节偏移，只用于
+        # 生成可见的 approach/lower/lift/move 动作，不依赖夹爪朝向关键帧求解。
         print("[piper-motion][stage] play_once: start")
         targets = dict((name, (left, right)) for name, left, right in self._motion_joint_targets())
         self._script_joint_stage("pregrasp", *targets["pregrasp"])
@@ -242,4 +280,6 @@ class pick_diverse_bottles_piper_motion(pick_diverse_bottles):
         return self.info
 
     def check_success(self):
+        # O.0 motion baseline 只验证链路能保存 episode；真实抓取成功需要后续
+        # 针对 Piper/Pika 的 EE grasp convention 单独解决。
         return True

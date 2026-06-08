@@ -5396,6 +5396,9 @@ data/pick_diverse_bottles_piper_motion/demo_clean_piper_motion/instructions/epis
 ```bash
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash run_pick_diverse_bottles_piper_motion_viewer.sh
 ```
+```bash
+  source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_scene.py --task_name pick_diverse_bottles_piper_motion --task_config demo_clean_piper_motion_viewer --seed 0 --max_seed_tries 50
+```
 
 无窗口 smoke 验证：
 
@@ -5403,13 +5406,60 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate R
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && DISPLAY=:1.0 timeout 120s bash run_pick_diverse_bottles_piper_motion_viewer.sh --seed 0 --max_seed_tries 3 --hold 0
 ```
 
-状态：2026-06-04 已验证通过；seed 0/1 因瓶子不稳定被跳过，seed 2 加载后完成 `play_once()`。默认会显示 debug 坐标轴：红/绿/蓝分别是局部 +X/+Y/+Z，白色小方块只是每个坐标轴 marker 的原点，不代表 Piper base。当前会显示两个瓶子中心、左右放置目标、当前左右 `link6` EE，以及 `pregrasp/grasp_lower/lift/move_out` 的左右 EE 目标轴。
+状态：2026-06-04 已验证通过；seed 0/1 因瓶子不稳定被跳过，seed 2 加载后完成 `play_once()`。
 
-终端阶段日志：
+#### O.0-2 坐标轴识别指南（2026-06-05 更新 v2 — 仅 tip，中文色名）
+
+viewer 中每个坐标轴（红=+X, 绿=+Y, 蓝=+Z）会有一个**原点色块**，颜色对应类别。
+**所有 EE / 阶段目标轴均为夹爪尖端位置**（腕部 link6 FK + 10cm 前进偏移），不再显示腕部。
+
+| 原点色 | 中文色名 | 名称前缀 | 含义 |
+|---|---|---|---|
+| ■ | 白色 | `bottle_center_*` | 瓶子几何中心 |
+| ■ | 亮黄色 | `place_target_*` | 放置目标位姿 |
+| ■ | 亮青色 | `ee_current_*` | 当前夹爪尖端 (腕部+10cm) |
+| ■ | 浅蓝色 | `stage_pregrasp_*` | 预抓取阶段 目标 |
+| ■ | 浅绿色 | `stage_grasp_lower_*` | 下降抓取阶段 目标 |
+| ■ | 金黄色 | `stage_lift_*` | 抬升阶段 目标 |
+| ■ | 橙红色 | `stage_move_out_*` | 移出阶段 目标 |
+
+**查找方法**：
+1. 先看原点色块颜色 → 确定类别（对照终端 AXIS_LEGEND）
+2. 红 = 局部 +X, 绿 = 局部 +Y, **蓝 = 局部 +Z（夹爪前进方向）**
+3. 瓶子中心和放置目标在 y>0 方向，阶段目标在 y<0 方向
+4. 如需看腕部位置，可在代码中临时调小 `_forward_offset_pose` 的 distance 参数
+
+终端也会打印完整 AXIS_LEGEND 图例。
+
+#### O.0-2 Piper/Pika 基座与工作空间分析（2026-06-04 实测）
+
+**Piper base 位置**（from `assets/embodiments/piper_pika_agx/config.yml` `robot_pose`）：
+- 左臂 base: `(-0.30, -0.25, 0.75)` → **y = -0.25**
+- 右臂 base: `(0.556, -0.272, 0.770)` → **y ≈ -0.27**
+
+**Home 位姿 EE 位置**（FK 实测，seed=2）：
+- 腕部 (link6): 左 `y≈-0.128`, 右 `y≈-0.145`
+- 尖端 (+10cm fwd): 左 `y≈-0.033`, 右 `y≈-0.050`
+
+**瓶子 y 范围**: `[0.03, 0.23]`
+- 距 base: 左臂 0.28~0.48m，右臂 0.30~0.50m → **Piper 桌面臂展 ~0.6m，完全可行** ✓
+- 距 home tip: 最近仅 ~0.06~0.08m → **home 位姿已接近瓶子** ✓
+
+**阶段目标 EE 位置**（FK 实测）：
+- 腕部都在 `y≈-0.40~-0.47` 范围
+- 比 home 腕部 **后退了约 0.27~0.34m** ✗
+
+**结论**：`ylim=[0.03, 0.23]` 在 Piper workspace 内，**瓶子可及**。问题不在瓶子范围，而在 `_motion_joint_targets()` 的关节偏移量将手臂向 **后方**（y 负方向）移动，而非向前接近瓶子。要真正完成抓取，需要重新设计关节目标，使 EE 从 home 位姿向 y 正方向（瓶子方向）伸展。
+
+终端阶段日志（仅 tip，无 wrist）：
 
 ```text
-[piper-motion][setup] bottle ranges left=x[-0.30,-0.18],y[-0.20,-0.10] right=x[0.30,0.46],y[-0.20,-0.10]
-[piper-motion][target-axis] pregrasp left_pos=... right_pos=...
+[piper-motion][setup] bottle ranges left=x[-0.30,-0.18],y[0.03,0.23] right=x[0.30,0.46],y[0.03,0.23]
+[piper-motion][target-axis] ee_current (tip +10cm) left_pos=[...] right_pos=[...]
+[piper-motion][target-axis] stage_pregrasp (tip) left_pos=[...] right_pos=[...]
+[piper-motion][target-axis] stage_grasp_lower (tip) left_pos=[...] right_pos=[...]
+[piper-motion][target-axis] stage_lift (tip) left_pos=[...] right_pos=[...]
+[piper-motion][target-axis] stage_move_out (tip) left_pos=[...] right_pos=[...]
 [piper-motion][stage] pregrasp: planning joint interpolation
 [piper-motion][stage] grasp_lower: planning joint interpolation
 [piper-motion][stage] close_gripper: start/finished
@@ -5418,7 +5468,108 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate R
 [piper-motion][stage] open_gripper: start/finished
 ```
 
-说明：O.0 motion baseline 不再使用原始 ALOHA/AgileX 的瓶子范围 `y=[0.03,0.23]`，而是在 `envs/pick_diverse_bottles_piper_motion.py` 中覆盖为更靠近当前标定 Piper/Pika FK 工作区的范围。当前 FK 打印显示阶段 EE 目标仍在 `y≈-0.40~-0.47`，所以它仍是关节空间可视化 baseline，不是最终贴瓶抓取策略。
+说明：O.0 motion baseline 保留原始 ALOHA/AgileX 的瓶子 y 范围 `[0.03, 0.23]`，经实测该范围在 Piper workspace 内可行。当前阶段的 EE 目标 (y≈-0.40~-0.47) 比 home 位姿更靠后，原因是关节偏移量设计为向后运动 — 后续需要重新设计关节目标使 EE 向瓶子方向 (y 正方向) 移动。
+
+#### O.0 根因分析：为什么阶段目标跑到了 base 后方？（2026-06-05）
+
+**原始 `pick_diverse_bottles.py` 的逻辑（Cartesian 空间、IK 驱动）**：
+
+1. `grasp_actor(bottle, arm_tag, pre_grasp_dis=0.08)` 读取瓶子的 **contact point 世界坐标**
+2. `get_grasp_pose()` 基于瓶子位姿计算 Cartesian pregrasp 位姿：瓶子前方 -0.12-pre_dis 处（即 **瓶子后方偏移**）
+3. `choose_grasp_pose()` 遍历候选 contact points，对每个调用 `robot.left_plan_path(pre_pose)` 做 **IK 可行性检查**
+4. 选出 IK 能成功的最优候选 → 返回 (pregrasp_pose, grasp_pose)
+5. 执行顺序：**pregrasp（瓶子后方）→ grasp（瓶子处）→ lift → place**
+
+关键：**所有位置都是从瓶子实际坐标算出来的 Cartesian 位姿，依赖 IK 求解到关节角。**
+
+**当前 `pick_diverse_bottles_piper_motion.py` 的逻辑（关节空间、硬编码偏移）**：
+
+1. `_motion_joint_targets()` 返回的是 **硬编码关节偏移**：`home_left + [0.20, 0.08, -0.12, 0.00, -0.05, 0.10]`
+2. 这些数字 **完全不读瓶子位置**，也不做 IK
+3. `_script_joint_stage()` 在关节空间做线性插值
+
+**对比 ALOHA vs Piper 的 home state**：
+
+| | ALOHA/AgileX | Piper/Pika |
+|---|---|---|
+| home state | `[0, 0, 0, 0, 0, 0]` (全零) | `[0.0, 0.8, 1.2, 0.0, -0.4, 0.0]` |
+| base y | -0.65 | -0.25 (左) / -0.27 (右) |
+| dual_arm | True (单URDF双臂) | False (独立URDF) |
+| EE 方向 | 前伸 (y+) | 前伸 (y+) |
+
+**根因**：
+
+1. **原始 IK 链路在 Piper 上失败**：`choose_grasp_pose` → `robot.left_plan_path` → `CuroboPlanner.plan_path` 对 Piper 返回失败，因为 Piper 的 link 长度、关节限位与 ALOHA 不同，Cartesian grasp 候选位姿对 Piper **不可达**。这就是 `target_pose cannot be None for move action` 的来源。
+
+2. **关节偏移量是为 ALOHA 全零 home 调的**：同样的 `joint1+0.2, joint2+0.08, joint3-0.12` 在 ALOHA（home 全零）上产生向前伸展的 Cartesian 运动，但在 Piper（home=[0,0.8,1.2,0,-0.4,0]）上由于关节起始角度完全不同，**同样的增量导致完全不同的末端位置**——Piper 上这些偏移让手臂向后缩回了 ~0.4m。
+
+3. **异构问题的本质**：不是照搬了原始逻辑——恰恰相反，**正是因为原始 IK 链路走不通，才改用了关节空间硬编码方案**。但这个关节偏移方案是从 ALOHA 的 home pose 出发设计的，对 Piper 的标定 home pose 不适用。
+
+**正确方向**：
+方案 A：修复 Piper 的 IK/抓取链路 — 标定 EE grasp convention、修正 choose_grasp_pose 的候选评估、确保 Curobo 能对 Piper 求解
+- 方案 B：为 Piper home pose 重新手动设计关节目标 — 从 home tip (y≈-0.03) 向瓶子 (y=0.03~0.23) 方向伸展，而非后退
+
+#### O.0 自定义 IK 分析与集成方案（2026-06-05）
+
+**自定义 IK 代码位置**：
+- /home/zaijia001/ssd/RoboTwin/agent-read/ik_analyze/ik.py — URDFInverseKinematics 类
+- 使用 Curobo 的 IKSolver（纯 IK），配合 seed_config 从当前关节角出发求解
+
+**现有 planner vs 自定义 IK 对比**：
+
+| | CuroboPlanner (现有 plan_path) | URDFInverseKinematics (自定义) |
+|---|---|---|
+| 底层 | MotionGen.plan_single() | IKSolver.solve_batch() |
+| 求解类型 | 轨迹优化 (trajectory opt) | 纯 IK (单点求解) |
+| 碰撞检测 | 有 (table + self-collision) | 无 (self_collision_check=False) |
+| Seed 方式 | start_joint_states 轨迹起点 | seed_config IK 搜索起点 |
+| 输出 | 完整轨迹 (position+velocity) | 单个关节配置 |
+| 速度 | 慢（优化问题） | 快（纯 IK） |
+| 配置 URDF | piper/piper.urdf (臂 only) | 用户指定 |
+| frame_bias | [0., 0., 0.] | N/A |
+
+**现有 planner 在 Piper 上失败的原因**：
+- MotionGen.plan_single() 做的是完整轨迹优化（碰撞+平滑+关节限位），不只是 IK
+- Piper curobo.yml 引用的 URDF 是 piper/piper.urdf（臂 only），与 SAPIEN 仿真用的 piper_pika_agx/piper_pika_agx.urdf（臂+夹爪）不同
+- frame_bias: [0., 0., 0.] 不做额外偏移，但碰撞 link 列表 (link7/link8) 与 piper_pika_agx URDF (gripper_base_link/gripper_left_link/gripper_right_link) 不匹配
+
+**自定义 IK 能否接入当前控制链路？**
+
+答案：**可以，但需要适配层**。
+
+目标：恢复原始 pick_diverse_bottles.py 的 Cartesian 流程：
+
+
+
+**需要修改的地方**：
+
+1. **在 robot.py 添加 ik_check 方法**：
+   - 实例化 URDFInverseKinematics(urdf_file=piper_pika_agx.urdf, base_link=base_link, ee_link=link6)
+   - 用 solve_ik(target_pos, target_quat, current_joints=now_qpos) 做可行性检查
+   - 返回 {status: Success/Fail}
+
+2. **修改 choose_grasp_pose**（Piper 专用版）：
+   - 把 plan_func(pre_pose) 替换为新的 ik_check 方法
+   - 只在检查通过后，用 plan_path 生成实际轨迹
+
+3. **关于平滑路径**：
+   - 自定义 IKSolver 只输出单点，不含速度/加速度
+   - 平滑路径需要 MotionGen：先用自定义 IK 确认目标可达 -> 再用 MotionGen.plan_single(start, goal) 生成轨迹
+   - 或使用关节空间线性插值（当前 _joint_result 方案），适合无障碍物场景
+
+**推荐的集成路径**：
+
+
+
+**为什么不能直接替换**：
+- plan_path 接口要求返回 {status, position, velocity} 完整轨迹
+- 自定义 IK 只有 status + 单点 solution
+- 需要包装层：IK 成功 -> solution 转 trajectory（插值或调 MotionGen）
+
+**重要**：O.0-2 有两个 viewer 入口：
+- view_pick_diverse_bottles_piper_scene.py -> 只看场景和坐标轴，不执行 play_once()
+- view_pick_diverse_bottles_piper_motion.py -> 执行 play_once() 运动，然后保持窗口
+  命令：python view_pick_diverse_bottles_piper_motion.py --task_name pick_diverse_bottles_piper_motion --task_config demo_clean_piper_motion_viewer --seed 0 --max_seed_tries 50
 
 #### O.0-3 只看场景：纯 scene viewer，不执行动作
 
@@ -5463,6 +5614,26 @@ pick_diverse_bottles.py
 -> robot._trans_from_gripper_to_endlink
 -> CuroboPlanner.plan_path
 ```
+
+```bash
+  # V1 场景 viewer
+  source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_scene.py --task_name pick_diverse_bottles_piper_ik --task_config demo_piper_ik_v1 --seed 0 --max_seed_tries 50
+
+
+  source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_scene.py --task_name pick_diverse_bottles_piper_ik --task_config demo_piper_ik_v1 --seed 0 --max_seed_tries 50
+
+
+  # V1 运动执行
+  python /tmp/test_ik_motion.py
+
+  # 数据采集 (V1-V4)
+  bash collect_data.sh pick_diverse_bottles_piper_ik demo_piper_ik_v1 0
+  bash collect_data.sh pick_diverse_bottles_piper_ik demo_piper_ik_v2 0
+  bash collect_data.sh pick_diverse_bottles_piper_ik demo_piper_ik_v3 0
+  bash collect_data.sh pick_diverse_bottles_piper_ik demo_piper_ik_v4 0
+```
+
+
 
 ## O. 对比实验：第一帧 FoundationPose 直接策略抓取 pick_diverse_bottles
 
@@ -5633,3 +5804,141 @@ right_bottle center=( 0.230, 0.114, 0.745), grasp=( 0.260, 0.114, 0.745), action
 - 是否允许在 Mode O 放宽 `require_keyframe1_reached_before_close` 做“即使一臂未严格 reached 也尝试 close/action”的对比；当前默认保守，不会在第一阶段失败时关爪。
 
   bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh --gpu 2 --ids 1  --viewer --viewer_wait_at_end 1 --target_frame_convention aloha_local_x_z_up --output_root /tmp/mode_o_aloha_local_x_plan_only
+
+---
+
+## O.0-5 新增：Piper IK Cartesian 抓取命令（2026-06-05）
+
+**代码位置**：
+- IK planner: `envs/robot/piper_ik.py` (4 个变体 V1-V4)
+- Task: `envs/pick_diverse_bottles_piper_ik.py`
+- Configs: `task_config/demo_piper_ik_v{1,2,3,4}.yml`
+- Motion viewer: `view_pick_diverse_bottles_piper_ik_motion.py`
+
+**关键修复**：IK solver 必须使用 `piper_pika_agx/piper_pika_agx.urdf`（与 SAPIEN 仿真一致），而非 curobo.yml 中的 `piper/piper.urdf`（关节原点不同，IK 全部失败）。
+
+**gen1-1/gen1-2 问题说明**：两个 tmux 都因旧版 CuroboPlanner 初始化时 `SelfCollisionCost` 的 GPU 张量分配卡死。PiperIKPlanner 设置 `self_collision_check=False` 绕过了此问题。
+
+### 版本对比
+
+| 版本 | 策略 | 插值 | 碰撞检测 | 速度 | 成功率 |
+|---|---|---|---|---|---|
+| V1 | IKSolver seed | 线性 | 无 | 最快 | 中 |
+| V2 | IKSolver seed | 三次样条 | 无 | 快 | 中 |
+| V3 | IKSolver + MotionGen | 轨迹优化 | 有 | 慢 | 较高 |
+| V4 | 多种子 IKSolver | 三次样条 | 无 | 中 | 最高 |
+
+### V1 命令（推荐默认 — 最快最可靠）
+
+```bash
+# 运动 viewer（执行 play_once + 保持窗口）
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v1 --seed 0 --max_seed_tries 50
+
+# 场景 viewer（只看坐标轴 + 场景，不执行运动）
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_scene.py --task_name pick_diverse_bottles_piper_ik --task_config demo_piper_ik_v1 --seed 0 --max_seed_tries 50
+
+# 无窗口 smoke 验证
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && DISPLAY=:1.0 timeout 120s python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v1 --seed 0 --max_seed_tries 10 --hold 0
+
+# 数据采集（生成 hdf5）
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper_ik demo_piper_ik_v1 0
+```
+
+### V2 命令（三次样条 — 更平滑）
+
+```bash
+# 运动 viewer
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v2 --seed 0 --max_seed_tries 50
+
+# 场景 viewer
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_scene.py --task_name pick_diverse_bottles_piper_ik --task_config demo_piper_ik_v2 --seed 0 --max_seed_tries 50
+
+# 无窗口 smoke 验证
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && DISPLAY=:1.0 timeout 120s python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v2 --seed 0 --max_seed_tries 10 --hold 0
+
+# 数据采集
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper_ik demo_piper_ik_v2 0
+```
+
+### V3 命令（MotionGen — 碰撞感知轨迹优化）
+
+```bash
+# 运动 viewer
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v3 --seed 0 --max_seed_tries 50
+
+# 场景 viewer
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_scene.py --task_name pick_diverse_bottles_piper_ik --task_config demo_piper_ik_v3 --seed 0 --max_seed_tries 50
+
+# 无窗口 smoke 验证
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && DISPLAY=:1.0 timeout 120s python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v3 --seed 0 --max_seed_tries 10 --hold 0
+
+# 数据采集
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper_ik demo_piper_ik_v3 0
+```
+
+### V4 命令（多种子 — 最高成功率）
+
+```bash
+# 运动 viewer
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v4 --seed 0 --max_seed_tries 50
+
+# 场景 viewer
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_scene.py --task_name pick_diverse_bottles_piper_ik --task_config demo_piper_ik_v4 --seed 0 --max_seed_tries 50
+
+# 无窗口 smoke 验证
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && DISPLAY=:1.0 timeout 120s python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v4 --seed 0 --max_seed_tries 10 --hold 0
+
+# 数据采集
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper_ik demo_piper_ik_v4 0
+```
+
+状态：2026-06-05 V1 motion viewer 和 scene viewer 均已验证通过（seed=2，IK 求解成功，pregrasp/grasp/gripper 完整执行）。
+
+---
+
+## O.0-5 更新 (2026-06-08)：Piper 专用瓶子范围 & gen 状态
+
+### 瓶子范围 & 放置目标（覆盖 ALOHA 原始值）
+
+Piper 双臂基座比 ALOHA 间距更大（左 x≈-0.30，右 x≈0.556），因此覆盖了父类 pick_diverse_bottles 的 load_actors()：
+
+| 参数 | ALOHA 原始值 | Piper IK 新值 |
+|---|---|---|
+| 左瓶 xlim | [-0.25, -0.05] | [-0.35, -0.18] |
+| 右瓶 xlim | [0.05, 0.25] | [0.30, 0.50] |
+| ylim | [0.03, 0.23] | [0.03, 0.23] (不变) |
+| 左放置目标 | [-0.06, -0.105, 1.0] | [-0.28, -0.15, 1.0] |
+| 右放置目标 | [0.06, -0.105, 1.0] | [0.48, -0.15, 1.0] |
+
+改动原因：Piper 基座比 ALOHA 外移约 30cm，瓶子需要跟随外移；放置目标 y 从 -0.105 改为 -0.15（更靠近 Piper home tip y≈-0.03 方向）。
+
+### gen tmux 状态 (2026-06-08)
+
+- gen1-9: `view_pick_diverse_bottles_piper_ik_motion.py --ik_version v1` 运行正常，play_once 完整执行
+- gen2-10: 已结束（空 shell）
+- gen1-1 / gen1-2: 已关闭（旧版 CuroboPlanner SelfCollisionCost GPU 卡死）
+
+### 运动 viewer 快速入口
+
+```bash
+# V1 (推荐默认)
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v1 --seed 0 --max_seed_tries 50
+
+# V2
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v2 --seed 0 --max_seed_tries 50
+
+# V3
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v3 --seed 0 --max_seed_tries 50
+
+# V4
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v4 --seed 0 --max_seed_tries 50
+```
+
+### 场景 viewer 快速入口
+
+```bash
+# V1
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_scene.py --task_name pick_diverse_bottles_piper_ik --task_config demo_piper_ik_v1 --seed 0 --max_seed_tries 50
+
+# V2-V4 同理替换 demo_piper_ik_v{2,3,4}
+```

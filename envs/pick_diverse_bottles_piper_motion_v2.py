@@ -191,8 +191,8 @@ class pick_diverse_bottles_piper_motion(pick_diverse_bottles):
         left_tip = self._forward_offset_pose(left_wrist, 0.10)
         right_tip = self._forward_offset_pose(right_wrist, 0.10)
 
-        axes.append(("ee_current_left",  left_tip,  0.09, (0.0, 1.0, 1.0)))   # 亮青色
-        axes.append(("ee_current_right", right_tip, 0.09, (0.0, 1.0, 1.0)))
+        axes.append(("ee_current_left",  left_tip,  0.07, (0.0, 1.0, 1.0)))   # 亮青色
+        axes.append(("ee_current_right", right_tip, 0.07, (0.0, 1.0, 1.0)))
 
         print(
             "[piper-motion][target-axis] ee_current (tip +10cm) "
@@ -209,8 +209,8 @@ class pick_diverse_bottles_piper_motion(pick_diverse_bottles):
             left_tip_pose = self._forward_offset_pose(left_wrist_pose, 0.10)
             right_tip_pose = self._forward_offset_pose(right_wrist_pose, 0.10)
 
-            axes.append((f"stage_{stage_name}_left",  left_tip_pose,  0.08, stage_color))
-            axes.append((f"stage_{stage_name}_right", right_tip_pose, 0.08, stage_color))
+            axes.append((f"stage_{stage_name}_left",  left_tip_pose,  0.06, stage_color))
+            axes.append((f"stage_{stage_name}_right", right_tip_pose, 0.06, stage_color))
 
             print(
                 f"[piper-motion][target-axis] stage_{stage_name} (tip) "

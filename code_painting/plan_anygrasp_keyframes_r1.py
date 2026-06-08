@@ -6126,8 +6126,8 @@ def main() -> None:
     # Save final joint state for async staged chaining
     if args.save_final_joints_json is not None:
         try:
-            final_left = renderer.robot.get_left_arm_joints().tolist()
-            final_right = renderer.robot.get_right_arm_joints().tolist()
+            final_left = [float(v) for v in renderer.robot.get_left_arm_real_jointState()[:6]]
+            final_right = [float(v) for v in renderer.robot.get_right_arm_real_jointState()[:6]]
             args.save_final_joints_json.parent.mkdir(parents=True, exist_ok=True)
             with open(str(args.save_final_joints_json), "w") as jf:
                 json.dump({"left": final_left, "right": final_right}, jf, indent=2)
