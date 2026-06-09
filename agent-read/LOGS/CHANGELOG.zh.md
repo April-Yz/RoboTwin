@@ -2660,3 +2660,21 @@
   - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_keyframes_foundation_pose.py` 通过。
   - `bash -n code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh` 通过。
   - `pick_diverse_bottles id0` smoke 已生成 `N-3_foundation_pose_viewer_smoke/.../rank_previews/keyframe_000038_rank_1.png`，图中明确显示 `L: proj=behind_camera` 与 `R: proj=behind_camera`。
+
+## 2026-06-09（Mode N-4 Foundation replay pose 顺序修复与 camera 可视化）
+
+- 问题复查：
+  - 进一步验证 `foundation_replay_d435/foundation_input_0/multi_object_world_poses.npz` 后确认，`left_bottle__pose_world_wxyz[:3]` 与 `left_bottle__pose_world_matrix[:3,3]` 一致，都是真实物体位置。
+  - 旧 Mode N 读取 `pose_world_wxyz[4:7]` 作为物体位置，实际读到 quaternion 的后三位。例如 frame 38 左瓶真实位置约 `(-0.0395, 0.0943, 0.7323)`，旧读取为 `(0.3273, 0.6319, 0.6086)`。
+  - 因此 N-2/N-3 的 C 型夹爪飞出不是 Foundation 物体不在视野内，也不是 head camera 图像本身错误，而是 Mode N 读取 Foundation pose 顺序错误。
+- 修改：
+  - `plan_keyframes_foundation_pose.py` 中 object position 改为读取 `pose_world_wxyz[:3]`。
+  - `plan_keyframes_foundation_pose.py` 与 `plan_keyframes_human_replay.py` 的 head camera pose 解析改为 `pos=[:3]`、`quat=[3:7]`。
+  - 2D rank-preview 投影函数补上 SAPIEN camera frame 到 OpenCV frame 的转换：`[x, y, z]_cv = [x, -y, -z]_sapien_camera`。
+  - `--debug_viewer_overlay` 现在同时打开 `--debug_visualize_cameras 1` 和 `--viewer_show_camera_frustums 1`，viewer 中可看到 head/third camera 轴与 frustum。
+  - `COMMAND_LIBRARY.zh.md` Mode N 命令更新到 `N-4_foundation_pose_order_fix` 和 `N-4_foundation_pose_debug_viewer`。
+- 验证：
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_keyframes_foundation_pose.py code_painting/plan_keyframes_human_replay.py` 通过。
+  - `bash -n code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh` 通过。
+  - `pick_diverse_bottles id0` smoke 输出中 frame 38 目标变为左 `(-0.058, 0.071, 0.735)`、右 `(0.253, 0.095, 0.747)`，与瓶子真实位置只差约 3cm retreat。
+  - 新 `rank_previews/keyframe_000038_rank_1.png` 显示 `L: proj=inside(...)` 与 `R: proj=inside(...)`，2D C 型线框与 3D C 型 actor 均在瓶子附近。

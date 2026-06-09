@@ -137,8 +137,8 @@ def compute_hand_world_pose(
         return None
 
     head_pose_wxyz = head_cam_poses[frame].astype(np.float64)
-    qw, qx, qy, qz = head_pose_wxyz[:4]
-    head_pos_world = head_pose_wxyz[4:7]
+    head_pos_world = head_pose_wxyz[:3]
+    qw, qx, qy, qz = head_pose_wxyz[3:7]
 
     # Camera CV axis remap
     cam_cv_to_local = CV_TO_WORLD_CAMERA_PRESETS.get(cv_axis_mode, CV_TO_WORLD_CAMERA_PRESETS["legacy_r1"])

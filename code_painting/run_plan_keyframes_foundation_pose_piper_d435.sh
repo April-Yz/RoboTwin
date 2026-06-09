@@ -30,6 +30,8 @@ VISUALIZE_TARGETS=1
 DISABLE_EXECUTION_COLLISIONS=1
 PURE_SCENE_OUTPUT=1
 DEBUG_CANDIDATE_TOP_K=1
+DEBUG_VISUALIZE_CAMERAS=0
+VIEWER_SHOW_CAMERA_FRUSTUMS=0
 
 usage() {
   cat <<'EOF'
@@ -60,6 +62,8 @@ Options:
   --cartesian_auto_step_m <M>
   --ik_max_rotation_threshold_rad <RAD>
   --debug_viewer_overlay  Show Mode N target axes and top-1 C-gripper actors in viewer/videos
+  --debug_visualize_cameras <0|1>
+  --viewer_show_camera_frustums <0|1>
   --pure_scene_output <0|1>
   --debug_candidate_top_k <N>
 EOF
@@ -82,7 +86,9 @@ while (($# > 0)); do
     --ik_max_rotation_threshold_rad) IK_MAX_ROTATION_THRESHOLD_RAD="$2"; shift 2 ;;
     --visualize_targets) VISUALIZE_TARGETS=1; shift ;;
     --disable_execution_collisions) DISABLE_EXECUTION_COLLISIONS=1; shift ;;
-    --debug_viewer_overlay) PURE_SCENE_OUTPUT=0; VISUALIZE_TARGETS=1; DEBUG_CANDIDATE_TOP_K=1; shift ;;
+    --debug_viewer_overlay) PURE_SCENE_OUTPUT=0; VISUALIZE_TARGETS=1; DEBUG_CANDIDATE_TOP_K=1; DEBUG_VISUALIZE_CAMERAS=1; VIEWER_SHOW_CAMERA_FRUSTUMS=1; shift ;;
+    --debug_visualize_cameras) DEBUG_VISUALIZE_CAMERAS="$2"; shift 2 ;;
+    --viewer_show_camera_frustums) VIEWER_SHOW_CAMERA_FRUSTUMS="$2"; shift 2 ;;
     --pure_scene_output) PURE_SCENE_OUTPUT="$2"; shift 2 ;;
     --debug_candidate_top_k) DEBUG_CANDIDATE_TOP_K="$2"; shift 2 ;;
     --tasks) shift; TASK="$1"; shift ;;
@@ -188,6 +194,8 @@ for ID in "${IDS[@]}"; do
     --replan_until_reached_max_attempts "$REPLAN_MAX_ATTEMPTS"
     --pure_scene_output "$PURE_SCENE_OUTPUT"
     --debug_candidate_top_k "$DEBUG_CANDIDATE_TOP_K"
+    --debug_visualize_cameras "$DEBUG_VISUALIZE_CAMERAS"
+    --viewer_show_camera_frustums "$VIEWER_SHOW_CAMERA_FRUSTUMS"
   )
 
   if ((VIEWER)); then

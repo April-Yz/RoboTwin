@@ -2007,3 +2007,14 @@
   - `bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh --gpu 2 --ids 1 --viewer --viewer_wait_at_end 1 --tasks pick_diverse_bottles --debug_viewer_overlay --foundation_pose_retreat_m 0.03 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-3_foundation_pose_debug_viewer`
 - 说明：
   - `rank_previews/*.png` 会打印 `proj=inside/offscreen/behind_camera`；如果 C 型夹爪没有显示，先看该字段判断目标是否在 head camera 后方或画面外。
+
+## 2026-06-09（Mode N-4 pose 顺序修复命令）
+
+- 修改命令：
+  - Mode N 批量输出目录改为 `/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-4_foundation_pose_order_fix`。
+  - Mode N viewer 演示输出目录改为 `/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-4_foundation_pose_debug_viewer`。
+  - `--debug_viewer_overlay` 现在会同时显示 target axis、top-1 C 型夹爪 actor、camera axes 和 SAPIEN camera frustum。
+- 批量命令：
+  - `for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh --gpu 1 --ids 0 1 2 3 4 --continue_on_error --tasks $TASK --foundation_pose_retreat_m 0.03 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-4_foundation_pose_order_fix; done`
+- viewer 演示命令：
+  - `bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh --gpu 2 --ids 1 --viewer --viewer_wait_at_end 1 --tasks pick_diverse_bottles --debug_viewer_overlay --foundation_pose_retreat_m 0.03 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-4_foundation_pose_debug_viewer`

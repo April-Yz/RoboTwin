@@ -2382,7 +2382,11 @@ def project_world_point_to_pixel(
 
     point_h = np.ones(4, dtype=np.float64)
     point_h[:3] = np.asarray(point_world, dtype=np.float64).reshape(3)
-    point_cam = world_to_camera @ point_h
+    point_cam_sapien = world_to_camera @ point_h
+    point_cam = np.array(
+        [point_cam_sapien[0], -point_cam_sapien[1], -point_cam_sapien[2]],
+        dtype=np.float64,
+    )
     z = float(point_cam[2])
     if not np.isfinite(z) or z <= 1e-6:
         return None

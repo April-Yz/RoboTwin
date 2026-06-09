@@ -2662,3 +2662,21 @@
   - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_keyframes_foundation_pose.py` passed.
   - `bash -n code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh` passed.
   - The `pick_diverse_bottles id0` smoke run generated `N-3_foundation_pose_viewer_smoke/.../rank_previews/keyframe_000038_rank_1.png`, which explicitly shows `L: proj=behind_camera` and `R: proj=behind_camera`.
+
+## 2026-06-09 (Mode N-4 Foundation Replay Pose Order Fix And Camera Visualization)
+
+- Rechecked issue:
+  - Further inspection of `foundation_replay_d435/foundation_input_0/multi_object_world_poses.npz` confirmed that `left_bottle__pose_world_wxyz[:3]` matches `left_bottle__pose_world_matrix[:3,3]`; both are the true object position.
+  - Old Mode N read `pose_world_wxyz[4:7]` as object position, which was actually the last three quaternion components. For frame 38, the left bottle true position is approximately `(-0.0395, 0.0943, 0.7323)`, while the old read was `(0.3273, 0.6319, 0.6086)`.
+  - Therefore the N-2/N-3 C-gripper target left the view because Mode N read the Foundation pose order incorrectly. The Foundation object was visible and the head-camera image itself was not broken.
+- Changes:
+  - `plan_keyframes_foundation_pose.py` now reads object position from `pose_world_wxyz[:3]`.
+  - `plan_keyframes_foundation_pose.py` and `plan_keyframes_human_replay.py` now parse head-camera pose as `pos=[:3]`, `quat=[3:7]`.
+  - The 2D rank-preview projection now converts SAPIEN camera frame to OpenCV frame as `[x, y, z]_cv = [x, -y, -z]_sapien_camera`.
+  - `--debug_viewer_overlay` now also enables `--debug_visualize_cameras 1` and `--viewer_show_camera_frustums 1`, so the viewer shows head/third camera axes and frustums.
+  - Updated the Mode N commands in `COMMAND_LIBRARY.zh.md` to `N-4_foundation_pose_order_fix` and `N-4_foundation_pose_debug_viewer`.
+- Validation:
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_keyframes_foundation_pose.py code_painting/plan_keyframes_human_replay.py` passed.
+  - `bash -n code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh` passed.
+  - The `pick_diverse_bottles id0` smoke output changed frame-38 targets to left `(-0.058, 0.071, 0.735)` and right `(0.253, 0.095, 0.747)`, about one retreat offset from the true bottle positions.
+  - The new `rank_previews/keyframe_000038_rank_1.png` shows `L: proj=inside(...)` and `R: proj=inside(...)`; both the 2D C-gripper wireframe and the 3D C-gripper actor are near the bottles.

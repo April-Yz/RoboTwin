@@ -2009,3 +2009,14 @@
   - `bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh --gpu 2 --ids 1 --viewer --viewer_wait_at_end 1 --tasks pick_diverse_bottles --debug_viewer_overlay --foundation_pose_retreat_m 0.03 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-3_foundation_pose_debug_viewer`
 - Notes:
   - `rank_previews/*.png` prints `proj=inside/offscreen/behind_camera`; if the C-gripper is not visible, check this field first to determine whether the target is behind the head camera or outside the image.
+
+## 2026-06-09 (Mode N-4 Pose Order Fix Command)
+
+- Changed command:
+  - The Mode N batch output root is now `/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-4_foundation_pose_order_fix`.
+  - The Mode N viewer demo output root is now `/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-4_foundation_pose_debug_viewer`.
+  - `--debug_viewer_overlay` now shows target axes, top-1 C-gripper actors, camera axes, and the SAPIEN camera frustum.
+- Batch command:
+  - `for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh --gpu 1 --ids 0 1 2 3 4 --continue_on_error --tasks $TASK --foundation_pose_retreat_m 0.03 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-4_foundation_pose_order_fix; done`
+- Viewer demo command:
+  - `bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh --gpu 2 --ids 1 --viewer --viewer_wait_at_end 1 --tasks pick_diverse_bottles --debug_viewer_overlay --foundation_pose_retreat_m 0.03 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-4_foundation_pose_debug_viewer`

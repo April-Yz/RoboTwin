@@ -794,7 +794,7 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && cd /home/zaijia0
 - `--ids 0 --dry_run` 路径解析通过。
 - `pick_diverse_bottles id0` 无 viewer smoke 可生成 `plan_summary_first_frame_foundation.json`、`pose_debug.jsonl`、`head_cam_plan.mp4`、`third_cam_plan.mp4`。本次 pregrasp 左右臂均 reached，但 grasp 未双臂同时 reached，因此默认安全约束阻止 close/action。
 
-## Mode N-3：Foundation 位置 + 人手朝向的 C 型夹爪预览
+## Mode N-4：Foundation 位置 + 人手朝向的 C 型夹爪预览
 
 用途：调试 Mode N 合成目标是否合理。Mode N 使用 FoundationPose 物体世界位置作为目标位置，并复用人手 gripper 旋转矩阵作为目标朝向；`rank_previews/*.png` 会叠加 2D C 型夹爪和 RGB 局部轴，方便检查“Foundation 位置 + 人手朝向”的组合是否跑偏。
 
@@ -803,20 +803,21 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && cd /home/zaijia0
 - `plan_keyframes_foundation_pose.py` 和 `plan_keyframes_human_replay.py` 写入 planner summary 的 pose 数组顺序已修正为 `[x, y, z, qw, qx, qy, qz]`。
 - 字段名仍沿用历史名字 `pose_world_wxyz` / `raw_pose_world_wxyz`，但 planner 中 `pose_wxyz_to_matrix()` 实际按前三位位置、后四位 quaternion 解析。
 - 修复前 Mode N/M wrapper 写成 `[qw, qx, qy, qz, x, y, z]`，会让 planner 把 quaternion 当作世界位置，导致目标位置明显异常。
+- N-4 继续修正 Foundation replay 读取侧：`multi_object_world_poses.npz` 中 `object__pose_world_wxyz` 和 `head_camera_pose_world_wxyz` 的实际顺序也是 `[x, y, z, qw, qx, qy, qz]`。旧 N-2/N-3 在 Mode N 里取 `object_pose[4:7]`，实际取到 quaternion，因此 C 型夹爪会飞到 head camera 视野外；这不是 Foundation 物体本身出画，也不是 head 视角坏了。
 - `rank_previews/*.png` 现在额外画 2D C 型夹爪：左臂蓝色、右臂橙色；局部轴为 X=红、Y=绿、Z=蓝。Mode N 默认以 local `+Z` 蓝轴作为 `foundation_pose_retreat_m` 的前进/后退轴。
-- N-3 预览图额外打印 target xyz、object->target 偏移和 `proj=inside/offscreen/behind_camera`。如果 C 型夹爪不在 head camera 视野内，图片会明确标记，而不是看起来像没有生成。
-- `--debug_viewer_overlay` 会关闭 clean video 模式，在 viewer/视频里显示每次规划目标的 target axis 和 top-1 C 型夹爪 actor。
+- N-4 预览图额外打印 target xyz、object->target 偏移和 `proj=inside/offscreen/behind_camera`。如果 C 型夹爪不在 head camera 视野内，图片会明确标记，而不是看起来像没有生成。
+- `--debug_viewer_overlay` 会关闭 clean video 模式，在 viewer/视频里显示每次规划目标的 target axis、top-1 C 型夹爪 actor、camera axes 和 SAPIEN camera frustum。
 - rank preview 会按 `(frame, arm)` 标记 selected candidate，并会为左右臂各自的 debug frame 补齐预览帧。
 
 推荐命令：
 
 ```bash
-# 0608 Mode N-3：Foundation 物体位置 + 人手 gripper 朝向，输出带 2D C 型夹爪/局部轴/投影状态的 rank_previews
+# 0609 Mode N-4：Foundation 物体位置 + 人手 gripper 朝向，输出带 2D C 型夹爪/局部轴/投影状态的 rank_previews
 for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do
   bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh \
     --gpu 1 --ids 0 1 2 3 4 --continue_on_error --tasks $TASK \
     --foundation_pose_retreat_m 0.03 \
-    --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-3_foundation_pose_viewer
+    --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-4_foundation_pose_order_fix
 done
 ```
 
@@ -827,7 +828,7 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_po
   --gpu 2 --ids 1 --viewer --viewer_wait_at_end 1 --tasks pick_diverse_bottles \
   --debug_viewer_overlay \
   --foundation_pose_retreat_m 0.03 \
-  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-3_foundation_pose_debug_viewer
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-4_foundation_pose_debug_viewer
 ```
 
 单条 smoke/debug：
@@ -836,12 +837,12 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_po
 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh \
   --gpu 1 --ids 0 --continue_on_error --tasks pick_diverse_bottles \
   --foundation_pose_retreat_m 0.03 \
-  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-3_foundation_pose_viewer_smoke
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-4_foundation_pose_order_fix_smoke
 ```
 
 检查输出：
 
 ```text
-/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-3_foundation_pose_viewer/<TASK>/foundation_input_<ID>/plan_summary_foundation_pose.json
-/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-3_foundation_pose_viewer/<TASK>/foundation_input_<ID>/rank_previews/keyframe_<FRAME>_rank_1.png
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-4_foundation_pose_order_fix/<TASK>/foundation_input_<ID>/plan_summary_foundation_pose.json
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-4_foundation_pose_order_fix/<TASK>/foundation_input_<ID>/rank_previews/keyframe_<FRAME>_rank_1.png
 ```

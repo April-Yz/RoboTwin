@@ -131,7 +131,7 @@ def compute_hand_world_rotation(
         return None
 
     head_pose_wxyz = head_cam_poses[frame].astype(np.float64)
-    qw, qx, qy, qz = head_pose_wxyz[:4]
+    qw, qx, qy, qz = head_pose_wxyz[3:7]
 
     cam_cv_to_local = CV_TO_WORLD_CAMERA_PRESETS.get(cv_axis_mode, CV_TO_WORLD_CAMERA_PRESETS["legacy_r1"])
     rot_world_from_head = R.from_quat([qx, qy, qz, qw]).as_matrix()
@@ -157,7 +157,7 @@ def get_object_world_position(
     pose_wxyz = poses[frame].astype(np.float64)
     if not np.isfinite(pose_wxyz).all():
         return None
-    return pose_wxyz[4:7]  # [px, py, pz]
+    return pose_wxyz[:3]  # [px, py, pz]
 
 
 # ──────────────────────────────────────────────
@@ -349,6 +349,8 @@ def run_planner_with_targets(plan_summary_path: Path, args: argparse.Namespace, 
         "--debug_common_candidate_top_k", "0",
         "--debug_visualize_selected_keyframe_axes", str(args.debug_visualize_selected_keyframe_axes),
         "--debug_visualize_ik_waypoints", str(args.debug_visualize_ik_waypoints),
+        "--debug_visualize_cameras", str(args.debug_visualize_cameras),
+        "--viewer_show_camera_frustums", str(args.viewer_show_camera_frustums),
         "--debug_gripper_actor_forward_axis", args.debug_gripper_actor_forward_axis,
         "--enable_grasp_action_object_collision", str(args.enable_grasp_action_object_collision),
         "--replay_objects_ignore_collision", str(args.replay_objects_ignore_collision),
@@ -456,6 +458,8 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--debug_candidate_top_k", type=int, default=1)
     parser.add_argument("--debug_visualize_selected_keyframe_axes", type=int, default=1)
     parser.add_argument("--debug_visualize_ik_waypoints", type=int, default=1)
+    parser.add_argument("--debug_visualize_cameras", type=int, default=0)
+    parser.add_argument("--viewer_show_camera_frustums", type=int, default=0)
     parser.add_argument("--debug_gripper_actor_forward_axis", type=str, default="local_z")
     parser.add_argument("--pure_scene_output", type=int, default=1)
     parser.add_argument("--enable_grasp_action_object_collision", type=int, default=0)
