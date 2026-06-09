@@ -2018,3 +2018,14 @@
   - `for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh --gpu 1 --ids 0 1 2 3 4 --continue_on_error --tasks $TASK --foundation_pose_retreat_m 0.03 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-4_foundation_pose_order_fix; done`
 - viewer 演示命令：
   - `bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh --gpu 2 --ids 1 --viewer --viewer_wait_at_end 1 --tasks pick_diverse_bottles --debug_viewer_overlay --foundation_pose_retreat_m 0.03 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-4_foundation_pose_debug_viewer`
+
+## 2026-06-09（Mode N-5 pregrasp/grasp retreat 参数）
+
+- 修改命令：
+  - `COMMAND_LIBRARY.zh.md` 的 Mode N 模块更新为 `N-5_pregrasp15_grasp8`。
+  - 批量与 viewer 命令显式使用 `--foundation_pose_retreat_m 0.08 --approach_offset_m 0.07`。
+- 参数含义：
+  - `grasp target = object center - 0.08m * local +Z`。
+  - `pregrasp = grasp - 0.07m * local +Z`，因此 pregrasp 总 retreat 为 0.15m，pregrasp 到 grasp 前进 0.07m。
+- 说明：
+  - 文档补充了 `cartesian_interp_ik` 的中间插值行为：TCP 位置线性插值、TCP 朝向 Slerp、逐 waypoint 求 IK；中途末端朝下/扭回通常来自 IK 腕/肘解分支变化。

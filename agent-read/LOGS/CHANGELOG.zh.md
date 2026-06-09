@@ -2678,3 +2678,16 @@
   - `bash -n code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh` 通过。
   - `pick_diverse_bottles id0` smoke 输出中 frame 38 目标变为左 `(-0.058, 0.071, 0.735)`、右 `(0.253, 0.095, 0.747)`，与瓶子真实位置只差约 3cm retreat。
   - 新 `rank_previews/keyframe_000038_rank_1.png` 显示 `L: proj=inside(...)` 与 `R: proj=inside(...)`，2D C 型线框与 3D C 型 actor 均在瓶子附近。
+
+## 2026-06-09（Mode N-5 retreat 参数与插值说明）
+
+- 问题复查：
+  - 当前 Mode N 不是直接在关键帧 0 和关键帧 1 之间做一次目标姿态插值，而是分 stage 规划：pregrasp、grasp、action。每个 stage 调用 URDF IK planner。
+  - 默认 `cartesian_interp_ik` 会在当前 TCP 和 stage 目标 TCP 之间做位置线性插值、四元数 Slerp，然后逐 waypoint 求 IK。
+  - 如果某个 waypoint 的 IK 从当前腕/肘分支切到另一组可行解，执行视频中会看到末端先朝下或扭转，之后再回到目标；这更像 IK 解分支跳变，而不是 keyframe1 的目标朝向本身错误。
+- 修改：
+  - `COMMAND_LIBRARY.zh.md` 的 Mode N 模块更新为 N-5。
+  - N-5 命令使用 `--foundation_pose_retreat_m 0.08 --approach_offset_m 0.07`，对应 grasp retreat 8cm、pregrasp 总 retreat 15cm、pregrasp 到 grasp 前进 7cm。
+  - 同步更新 `agent-read/COMMANDS/piper_anygrasp_keyframes.zh.md` / `.en.md` 和命令日志。
+- 验证：
+  - 本次只改文档和命令参数说明，未改 planner 代码。

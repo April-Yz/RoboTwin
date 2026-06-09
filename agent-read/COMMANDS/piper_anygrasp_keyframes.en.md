@@ -805,19 +805,22 @@ Key fixes:
 - Before this fix the Mode N/M wrappers wrote `[qw, qx, qy, qz, x, y, z]`, causing the planner to interpret quaternion values as world positions.
 - N-4 also fixes the Foundation replay read side: `object__pose_world_wxyz` and `head_camera_pose_world_wxyz` in `multi_object_world_poses.npz` are actually `[x, y, z, qw, qx, qy, qz]`. Old N-2/N-3 Mode N read `object_pose[4:7]`, which was quaternion data, so the C-gripper target flew out of the head-camera view. This was not a Foundation object visibility problem and not a broken head view.
 - `rank_previews/*.png` now draws a 2D C-shaped gripper: left arm in blue, right arm in orange; local axes are X=red, Y=green, Z=blue. Mode N uses local `+Z` blue as the forward/retreat axis for `foundation_pose_retreat_m`.
-- N-4 preview images also print target xyz, object-to-target offset, and `proj=inside/offscreen/behind_camera`. If the C-gripper is outside the head-camera view, the image explicitly marks that state instead of looking empty.
+- N-4/N-5 preview images also print target xyz, object-to-target offset, and `proj=inside/offscreen/behind_camera`. If the C-gripper is outside the head-camera view, the image explicitly marks that state instead of looking empty.
 - `--debug_viewer_overlay` disables clean-video mode and shows target axes, top-1 C-gripper actors, camera axes, and the SAPIEN camera frustum in the viewer/videos.
 - Rank previews mark the selected candidate by `(frame, arm)` and include preview frames from each arm's debug frame set.
+- The default planner mode is `cartesian_interp_ik`: each stage linearly interpolates TCP position and Slerps TCP orientation from the current TCP to the target TCP, then solves IK waypoint by waypoint. If IK switches to another wrist/elbow branch mid-stage, the end effector can visually dip or twist before returning to the target; that usually indicates an IK branch change, not that keyframe-1 target orientation is reversed.
+- N-5 uses `--foundation_pose_retreat_m 0.08 --approach_offset_m 0.07`: the grasp target retreats 8 cm from the object center, the total pregrasp retreat is 15 cm, and pregrasp advances 7 cm to grasp.
 
 Recommended command:
 
 ```bash
-# 0609 Mode N-4: Foundation object position + human gripper orientation, with 2D C-gripper/local-axis/projection-status rank previews
+# 0609 Mode N-5: Foundation object position + human gripper orientation, with 2D C-gripper/local-axis/projection-status rank previews
 for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do
   bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh \
     --gpu 1 --ids 0 1 2 3 4 --continue_on_error --tasks $TASK \
-    --foundation_pose_retreat_m 0.03 \
-    --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-4_foundation_pose_order_fix
+    --foundation_pose_retreat_m 0.08 \
+    --approach_offset_m 0.07 \
+    --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-5_pregrasp15_grasp8
 done
 ```
 
@@ -827,8 +830,9 @@ Viewer demo:
 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh \
   --gpu 2 --ids 1 --viewer --viewer_wait_at_end 1 --tasks pick_diverse_bottles \
   --debug_viewer_overlay \
-  --foundation_pose_retreat_m 0.03 \
-  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-4_foundation_pose_debug_viewer
+  --foundation_pose_retreat_m 0.08 \
+  --approach_offset_m 0.07 \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-5_pregrasp15_grasp8_debug_viewer
 ```
 
 Single smoke/debug command:
@@ -836,13 +840,14 @@ Single smoke/debug command:
 ```bash
 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh \
   --gpu 1 --ids 0 --continue_on_error --tasks pick_diverse_bottles \
-  --foundation_pose_retreat_m 0.03 \
-  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-4_foundation_pose_order_fix_smoke
+  --foundation_pose_retreat_m 0.08 \
+  --approach_offset_m 0.07 \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-5_pregrasp15_grasp8_smoke
 ```
 
 Expected outputs:
 
 ```text
-/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-4_foundation_pose_order_fix/<TASK>/foundation_input_<ID>/plan_summary_foundation_pose.json
-/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-4_foundation_pose_order_fix/<TASK>/foundation_input_<ID>/rank_previews/keyframe_<FRAME>_rank_1.png
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-5_pregrasp15_grasp8/<TASK>/foundation_input_<ID>/plan_summary_foundation_pose.json
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-5_pregrasp15_grasp8/<TASK>/foundation_input_<ID>/rank_previews/keyframe_<FRAME>_rank_1.png
 ```

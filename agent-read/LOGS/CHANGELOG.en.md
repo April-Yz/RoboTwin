@@ -2680,3 +2680,16 @@
   - `bash -n code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh` passed.
   - The `pick_diverse_bottles id0` smoke output changed frame-38 targets to left `(-0.058, 0.071, 0.735)` and right `(0.253, 0.095, 0.747)`, about one retreat offset from the true bottle positions.
   - The new `rank_previews/keyframe_000038_rank_1.png` shows `L: proj=inside(...)` and `R: proj=inside(...)`; both the 2D C-gripper wireframe and the 3D C-gripper actor are near the bottles.
+
+## 2026-06-09 (Mode N-5 Retreat Parameters And Interpolation Notes)
+
+- Rechecked issue:
+  - Current Mode N does not directly interpolate once from keyframe 0 to keyframe 1. It plans staged motions: pregrasp, grasp, and action. Each stage calls the URDF IK planner.
+  - The default `cartesian_interp_ik` mode linearly interpolates TCP position, Slerps TCP orientation, and solves IK waypoint by waypoint.
+  - If a waypoint's IK switches from the current wrist/elbow branch to another feasible branch, the execution video can show the end effector dipping or twisting before returning to the target. This is more consistent with an IK branch change than with the keyframe-1 target orientation being reversed.
+- Changes:
+  - Updated the Mode N block in `COMMAND_LIBRARY.zh.md` to N-5.
+  - N-5 commands use `--foundation_pose_retreat_m 0.08 --approach_offset_m 0.07`, corresponding to an 8 cm grasp retreat, a 15 cm total pregrasp retreat, and a 7 cm pregrasp-to-grasp advance.
+  - Synchronized `agent-read/COMMANDS/piper_anygrasp_keyframes.zh.md` / `.en.md` and the command changelog.
+- Validation:
+  - This change only updates documentation and command-parameter guidance; planner code was not changed.

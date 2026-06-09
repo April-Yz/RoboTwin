@@ -2020,3 +2020,14 @@
   - `for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh --gpu 1 --ids 0 1 2 3 4 --continue_on_error --tasks $TASK --foundation_pose_retreat_m 0.03 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-4_foundation_pose_order_fix; done`
 - Viewer demo command:
   - `bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh --gpu 2 --ids 1 --viewer --viewer_wait_at_end 1 --tasks pick_diverse_bottles --debug_viewer_overlay --foundation_pose_retreat_m 0.03 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-4_foundation_pose_debug_viewer`
+
+## 2026-06-09 (Mode N-5 Pregrasp/Grasp Retreat Parameters)
+
+- Changed command:
+  - Updated the Mode N block in `COMMAND_LIBRARY.zh.md` to `N-5_pregrasp15_grasp8`.
+  - Batch and viewer commands now explicitly use `--foundation_pose_retreat_m 0.08 --approach_offset_m 0.07`.
+- Parameter meaning:
+  - `grasp target = object center - 0.08m * local +Z`.
+  - `pregrasp = grasp - 0.07m * local +Z`, so the total pregrasp retreat is 0.15 m and pregrasp advances 0.07 m to grasp.
+- Notes:
+  - Documented the `cartesian_interp_ik` intermediate interpolation behavior: linear TCP position interpolation, TCP-orientation Slerp, and waypoint-by-waypoint IK. A mid-stage dip/twist usually comes from an IK wrist/elbow branch switch.

@@ -805,19 +805,22 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && cd /home/zaijia0
 - 修复前 Mode N/M wrapper 写成 `[qw, qx, qy, qz, x, y, z]`，会让 planner 把 quaternion 当作世界位置，导致目标位置明显异常。
 - N-4 继续修正 Foundation replay 读取侧：`multi_object_world_poses.npz` 中 `object__pose_world_wxyz` 和 `head_camera_pose_world_wxyz` 的实际顺序也是 `[x, y, z, qw, qx, qy, qz]`。旧 N-2/N-3 在 Mode N 里取 `object_pose[4:7]`，实际取到 quaternion，因此 C 型夹爪会飞到 head camera 视野外；这不是 Foundation 物体本身出画，也不是 head 视角坏了。
 - `rank_previews/*.png` 现在额外画 2D C 型夹爪：左臂蓝色、右臂橙色；局部轴为 X=红、Y=绿、Z=蓝。Mode N 默认以 local `+Z` 蓝轴作为 `foundation_pose_retreat_m` 的前进/后退轴。
-- N-4 预览图额外打印 target xyz、object->target 偏移和 `proj=inside/offscreen/behind_camera`。如果 C 型夹爪不在 head camera 视野内，图片会明确标记，而不是看起来像没有生成。
+- N-4/N-5 预览图额外打印 target xyz、object->target 偏移和 `proj=inside/offscreen/behind_camera`。如果 C 型夹爪不在 head camera 视野内，图片会明确标记，而不是看起来像没有生成。
 - `--debug_viewer_overlay` 会关闭 clean video 模式，在 viewer/视频里显示每次规划目标的 target axis、top-1 C 型夹爪 actor、camera axes 和 SAPIEN camera frustum。
 - rank preview 会按 `(frame, arm)` 标记 selected candidate，并会为左右臂各自的 debug frame 补齐预览帧。
+- 默认规划模式是 `cartesian_interp_ik`：每个 stage 从当前 TCP 到目标 TCP 做位置线性插值和四元数 Slerp，然后逐 waypoint 求 IK。若 IK 中途换到另一组腕/肘解，画面上可能出现“先朝下再扭回目标”的末端朝向变化；这通常是 IK 解分支跳变，不代表关键帧 1 的目标朝向本身反向。
+- N-5 使用 `--foundation_pose_retreat_m 0.08 --approach_offset_m 0.07`：grasp target 离 object center 8cm，pregrasp 总 retreat 15cm，pregrasp 到 grasp 前进 7cm。
 
 推荐命令：
 
 ```bash
-# 0609 Mode N-4：Foundation 物体位置 + 人手 gripper 朝向，输出带 2D C 型夹爪/局部轴/投影状态的 rank_previews
+# 0609 Mode N-5：Foundation 物体位置 + 人手 gripper 朝向，输出带 2D C 型夹爪/局部轴/投影状态的 rank_previews
 for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do
   bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh \
     --gpu 1 --ids 0 1 2 3 4 --continue_on_error --tasks $TASK \
-    --foundation_pose_retreat_m 0.03 \
-    --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-4_foundation_pose_order_fix
+    --foundation_pose_retreat_m 0.08 \
+    --approach_offset_m 0.07 \
+    --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-5_pregrasp15_grasp8
 done
 ```
 
@@ -827,8 +830,9 @@ viewer 演示：
 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh \
   --gpu 2 --ids 1 --viewer --viewer_wait_at_end 1 --tasks pick_diverse_bottles \
   --debug_viewer_overlay \
-  --foundation_pose_retreat_m 0.03 \
-  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-4_foundation_pose_debug_viewer
+  --foundation_pose_retreat_m 0.08 \
+  --approach_offset_m 0.07 \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-5_pregrasp15_grasp8_debug_viewer
 ```
 
 单条 smoke/debug：
@@ -836,13 +840,14 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_po
 ```bash
 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh \
   --gpu 1 --ids 0 --continue_on_error --tasks pick_diverse_bottles \
-  --foundation_pose_retreat_m 0.03 \
-  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-4_foundation_pose_order_fix_smoke
+  --foundation_pose_retreat_m 0.08 \
+  --approach_offset_m 0.07 \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-5_pregrasp15_grasp8_smoke
 ```
 
 检查输出：
 
 ```text
-/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-4_foundation_pose_order_fix/<TASK>/foundation_input_<ID>/plan_summary_foundation_pose.json
-/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-4_foundation_pose_order_fix/<TASK>/foundation_input_<ID>/rank_previews/keyframe_<FRAME>_rank_1.png
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-5_pregrasp15_grasp8/<TASK>/foundation_input_<ID>/plan_summary_foundation_pose.json
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-5_pregrasp15_grasp8/<TASK>/foundation_input_<ID>/rank_previews/keyframe_<FRAME>_rank_1.png
 ```
