@@ -1997,3 +1997,15 @@
   - The `pose_world_wxyz` field name is historical; the wrapper and planner use `[x, y, z, qw, qx, qy, qz]`.
 - Validation command:
   - `bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh --gpu 1 --ids 2 --continue_on_error --tasks pick_diverse_bottles --foundation_pose_retreat_m 0.03 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-1_foundation_pose_viewer`
+
+## 2026-06-09 (Mode N-3 Projection Status And Viewer Overlay Command)
+
+- Changed command:
+  - The Mode N batch output root in `COMMAND_LIBRARY.zh.md` is now `/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-3_foundation_pose_viewer`.
+  - `run_plan_keyframes_foundation_pose_piper_d435.sh` now supports `--debug_viewer_overlay` for showing target axes and top-1 C-gripper actors.
+- Batch command:
+  - `for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh --gpu 1 --ids 0 1 2 3 4 --continue_on_error --tasks $TASK --foundation_pose_retreat_m 0.03 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-3_foundation_pose_viewer; done`
+- Viewer demo command:
+  - `bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh --gpu 2 --ids 1 --viewer --viewer_wait_at_end 1 --tasks pick_diverse_bottles --debug_viewer_overlay --foundation_pose_retreat_m 0.03 --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-3_foundation_pose_debug_viewer`
+- Notes:
+  - `rank_previews/*.png` prints `proj=inside/offscreen/behind_camera`; if the C-gripper is not visible, check this field first to determine whether the target is behind the head camera or outside the image.

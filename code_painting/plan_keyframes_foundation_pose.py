@@ -345,7 +345,7 @@ def run_planner_with_targets(plan_summary_path: Path, args: argparse.Namespace, 
         "--save_pose_debug", "1",
         "--save_debug_preview", "1",
         "--debug_visualize_targets", str(args.debug_visualize_targets),
-        "--debug_candidate_top_k", "0",
+        "--debug_candidate_top_k", str(args.debug_candidate_top_k),
         "--debug_common_candidate_top_k", "0",
         "--debug_visualize_selected_keyframe_axes", str(args.debug_visualize_selected_keyframe_axes),
         "--debug_visualize_ik_waypoints", str(args.debug_visualize_ik_waypoints),
@@ -453,6 +453,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--replan_until_reached_max_attempts", type=int, default=3, help="Max replan attempts per stage before giving up (default 3, 0=unbounded)")
     parser.add_argument("--reach_error_pose_source", type=str, default="ee")
     parser.add_argument("--debug_visualize_targets", type=int, default=1)
+    parser.add_argument("--debug_candidate_top_k", type=int, default=1)
     parser.add_argument("--debug_visualize_selected_keyframe_axes", type=int, default=1)
     parser.add_argument("--debug_visualize_ik_waypoints", type=int, default=1)
     parser.add_argument("--debug_gripper_actor_forward_axis", type=str, default="local_z")

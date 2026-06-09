@@ -2644,3 +2644,19 @@
   - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_keyframes_foundation_pose.py code_painting/plan_keyframes_human_replay.py` 通过。
   - `bash -n code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh` 通过。
   - `pick_diverse_bottles id2` smoke 已生成 `N-1_foundation_pose_viewer/pick_diverse_bottles/foundation_input_2/plan_summary_foundation_pose.json` 和 `rank_previews/keyframe_000036_rank_1.png`、`rank_previews/keyframe_000053_rank_1.png`。
+
+## 2026-06-09（Mode N-3 rank preview 投影状态与 viewer 调试叠加）
+
+- 问题复查：
+  - 用户生成的 `N-2_foundation_pose_viewer/pick_diverse_bottles/foundation_input_0/rank_previews` 中没有肉眼可见的 C 型夹爪。
+  - 复查 `plan_summary_foundation_pose.json` 和 smoke 日志后确认，新代码已经运行；该样例的合成目标投到 head camera 后位于相机后方，尤其右臂 keyframe 38 目标约为 `(0.644,-0.343,-0.297)`，相对右瓶低约 1.04m。
+- 修改：
+  - `rank_previews/*.png` 现在额外打印 target xyz、object->target 偏移和 `proj=inside/offscreen/behind_camera`。
+  - 2D C 型夹爪投影支持越界裁剪；目标在视野外时画边缘标记，目标在相机后方时在图底部标注 `behind camera`。
+  - `run_plan_keyframes_foundation_pose_piper_d435.sh` 新增 `--debug_viewer_overlay`，会把 `pure_scene_output` 置为 0，并在 viewer/视频里显示 target axis 与 top-1 C 型夹爪 actor。
+  - Mode N 默认传 `--debug_candidate_top_k 1` 给 planner，便于 viewer 调试规划目标。
+  - `COMMAND_LIBRARY.zh.md` 的 N 模块更新为 `N-3_foundation_pose_viewer`，并新增单条 `pick_diverse_bottles id1 --viewer --debug_viewer_overlay` 演示命令。
+- 验证：
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_keyframes_foundation_pose.py` 通过。
+  - `bash -n code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh` 通过。
+  - `pick_diverse_bottles id0` smoke 已生成 `N-3_foundation_pose_viewer_smoke/.../rank_previews/keyframe_000038_rank_1.png`，图中明确显示 `L: proj=behind_camera` 与 `R: proj=behind_camera`。

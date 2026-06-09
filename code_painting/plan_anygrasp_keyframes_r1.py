@@ -2348,6 +2348,20 @@ def project_world_point_to_image(
     image_width: int,
     image_height: int,
 ) -> Optional[Tuple[int, int]]:
+    pixel = project_world_point_to_pixel(camera, intrinsic, point_world)
+    if pixel is None:
+        return None
+    u, v = pixel
+    if u < -32 or u >= image_width + 32 or v < -32 or v >= image_height + 32:
+        return None
+    return u, v
+
+
+def project_world_point_to_pixel(
+    camera,
+    intrinsic: np.ndarray,
+    point_world: np.ndarray,
+) -> Optional[Tuple[int, int]]:
     try:
         camera_to_world = np.asarray(camera.get_model_matrix(), dtype=np.float64)
     except Exception:
@@ -2378,9 +2392,35 @@ def project_world_point_to_image(
         return None
     u = int(round(float(pixel[0] / pixel[2])))
     v = int(round(float(pixel[1] / pixel[2])))
-    if u < -32 or u >= image_width + 32 or v < -32 or v >= image_height + 32:
-        return None
     return u, v
+
+
+def pixel_is_inside_image(pixel_xy: Tuple[int, int], image_width: int, image_height: int) -> bool:
+    return 0 <= int(pixel_xy[0]) < int(image_width) and 0 <= int(pixel_xy[1]) < int(image_height)
+
+
+def draw_clipped_line(
+    image_bgr: np.ndarray,
+    start_xy: Tuple[int, int],
+    end_xy: Tuple[int, int],
+    color_bgr: Tuple[int, int, int],
+    thickness: int,
+) -> bool:
+    width = int(image_bgr.shape[1])
+    height = int(image_bgr.shape[0])
+    rect = (0, 0, width, height)
+    ok, clipped_start, clipped_end = cv2.clipLine(rect, (int(start_xy[0]), int(start_xy[1])), (int(end_xy[0]), int(end_xy[1])))
+    if not ok:
+        return False
+    cv2.line(image_bgr, clipped_start, clipped_end, color_bgr, int(thickness), cv2.LINE_AA)
+    return True
+
+
+def clamp_pixel_to_image_edge(pixel_xy: Tuple[int, int], image_width: int, image_height: int, pad: int = 8) -> Tuple[int, int]:
+    return (
+        int(np.clip(int(pixel_xy[0]), int(pad), int(image_width) - int(pad) - 1)),
+        int(np.clip(int(pixel_xy[1]), int(pad), int(image_height) - int(pad) - 1)),
+    )
 
 
 def draw_projected_gripper_wireframe(
@@ -2391,7 +2431,8 @@ def draw_projected_gripper_wireframe(
     color_bgr: Tuple[int, int, int],
     forward_axis: str,
     label: str,
-) -> None:
+    object_state: Optional[ObjectState] = None,
+) -> bool:
     pose_world = np.asarray(candidate.pose_world_matrix, dtype=np.float64).reshape(4, 4)
     rot = pose_world[:3, :3]
     center = pose_world[:3, 3]
@@ -2417,7 +2458,17 @@ def draw_projected_gripper_wireframe(
     height = int(image_bgr.shape[0])
 
     def project(point: np.ndarray) -> Optional[Tuple[int, int]]:
-        return project_world_point_to_image(camera, intrinsic, point, width, height)
+        return project_world_point_to_pixel(camera, intrinsic, point)
+
+    visible_any = False
+    if object_state is not None:
+        object_center = np.asarray(object_state.pose_world_wxyz[:3], dtype=np.float64).reshape(3)
+        object_px = project(object_center)
+        center_px_for_link = project(center)
+        if object_px is not None and center_px_for_link is not None:
+            visible_any = draw_clipped_line(image_bgr, object_px, center_px_for_link, (80, 80, 80), 1) or visible_any
+            if pixel_is_inside_image(object_px, width, height):
+                cv2.circle(image_bgr, object_px, 3, (80, 80, 80), -1, cv2.LINE_AA)
 
     for start, end in (
         (left_back, right_back),
@@ -2430,13 +2481,23 @@ def draw_projected_gripper_wireframe(
         end_px = project(end)
         if start_px is None or end_px is None:
             continue
-        cv2.line(image_bgr, start_px, end_px, color_bgr, 2, cv2.LINE_AA)
+        visible_any = draw_clipped_line(image_bgr, start_px, end_px, color_bgr, 3) or visible_any
 
     center_px = project(center)
     if center_px is None:
-        return
-    cv2.circle(image_bgr, center_px, 4, color_bgr, -1, cv2.LINE_AA)
-    draw_small_candidate_label(image_bgr, label, (center_px[0] + 5, center_px[1] - 5), color_bgr, font_scale=0.32)
+        y = height - 34 if str(label).startswith("L") else height - 14
+        draw_small_candidate_label(image_bgr, f"{label} behind camera", (12, y), color_bgr, font_scale=0.45)
+        return visible_any
+    if pixel_is_inside_image(center_px, width, height):
+        cv2.circle(image_bgr, center_px, 5, color_bgr, -1, cv2.LINE_AA)
+        draw_small_candidate_label(image_bgr, label, (center_px[0] + 6, center_px[1] - 6), color_bgr, font_scale=0.42)
+        visible_any = True
+    else:
+        edge_px = clamp_pixel_to_image_edge(center_px, width, height, pad=12)
+        cv2.drawMarker(image_bgr, edge_px, (0, 0, 0), markerType=cv2.MARKER_TRIANGLE_UP, markerSize=22, thickness=4, line_type=cv2.LINE_AA)
+        cv2.drawMarker(image_bgr, edge_px, color_bgr, markerType=cv2.MARKER_TRIANGLE_UP, markerSize=16, thickness=2, line_type=cv2.LINE_AA)
+        draw_small_candidate_label(image_bgr, f"{label} offscreen", (edge_px[0] + 4, edge_px[1] - 4), color_bgr, font_scale=0.38)
+        visible_any = True
 
     axis_len = 0.065
     for axis, axis_color, axis_label in (
@@ -2447,8 +2508,12 @@ def draw_projected_gripper_wireframe(
         end_px = project(center + axis * axis_len)
         if end_px is None:
             continue
-        cv2.arrowedLine(image_bgr, center_px, end_px, axis_color, 2, cv2.LINE_AA, tipLength=0.25)
-        draw_small_candidate_label(image_bgr, axis_label, (end_px[0] + 2, end_px[1] + 2), axis_color, font_scale=0.28)
+        draw_start = center_px if pixel_is_inside_image(center_px, width, height) else clamp_pixel_to_image_edge(center_px, width, height, pad=12)
+        if pixel_is_inside_image(draw_start, width, height) and pixel_is_inside_image(end_px, width, height):
+            cv2.arrowedLine(image_bgr, draw_start, end_px, axis_color, 2, cv2.LINE_AA, tipLength=0.25)
+            draw_small_candidate_label(image_bgr, axis_label, (end_px[0] + 2, end_px[1] + 2), axis_color, font_scale=0.34)
+            visible_any = True
+    return visible_any
 
 
 def draw_small_candidate_label(
@@ -2462,6 +2527,43 @@ def draw_small_candidate_label(
     thickness = 1
     x, y = int(pixel_xy[0]), int(pixel_xy[1])
     cv2.putText(image_bgr, text, (x, y), font, float(font_scale), color_bgr, thickness, cv2.LINE_AA)
+
+
+def candidate_target_debug_line(candidate: Optional[CandidatePose], arm_label: str, object_states: Dict[str, ObjectState]) -> str:
+    if candidate is None:
+        return f"{arm_label}: none"
+    target_xyz = np.asarray(candidate.pose_world_wxyz[:3], dtype=np.float64).reshape(3)
+    state = object_states.get(str(candidate.nearest_object))
+    if state is None:
+        return (
+            f"{arm_label}: target=({target_xyz[0]:+.3f},{target_xyz[1]:+.3f},{target_xyz[2]:+.3f}) "
+            f"object={candidate.nearest_object}"
+        )
+    object_xyz = np.asarray(state.pose_world_wxyz[:3], dtype=np.float64).reshape(3)
+    delta = target_xyz - object_xyz
+    return (
+        f"{arm_label}: target=({target_xyz[0]:+.3f},{target_xyz[1]:+.3f},{target_xyz[2]:+.3f}) "
+        f"d_obj=({delta[0]:+.3f},{delta[1]:+.3f},{delta[2]:+.3f}) |d|={np.linalg.norm(delta):.3f}"
+    )
+
+
+def candidate_projection_debug_line(
+    camera,
+    intrinsic: np.ndarray,
+    candidate: Optional[CandidatePose],
+    arm_label: str,
+    image_width: int,
+    image_height: int,
+) -> str:
+    if candidate is None:
+        return f"{arm_label}: proj=none"
+    pixel = project_world_point_to_pixel(camera, intrinsic, np.asarray(candidate.pose_world_wxyz[:3], dtype=np.float64))
+    if pixel is None:
+        return f"{arm_label}: proj=behind_camera"
+    if pixel_is_inside_image(pixel, image_width, image_height):
+        return f"{arm_label}: proj=inside({pixel[0]},{pixel[1]})"
+    edge = clamp_pixel_to_image_edge(pixel, image_width, image_height, pad=12)
+    return f"{arm_label}: proj=offscreen({pixel[0]},{pixel[1]}) edge=({edge[0]},{edge[1]})"
 
 
 def annotate_candidate_labels(
@@ -4620,6 +4722,10 @@ def export_rank_preview_images(
                     ),
                     "2D C-gripper overlay: left=blue right=orange",
                     "axes: X=red Y=green Z=blue(+Z approach)",
+                    candidate_target_debug_line(left_cand, "L", object_states),
+                    candidate_target_debug_line(right_cand, "R", object_states),
+                    candidate_projection_debug_line(renderer.zed_camera, head_intrinsic, left_cand, "L", int(args.image_width), int(args.image_height)),
+                    candidate_projection_debug_line(renderer.zed_camera, head_intrinsic, right_cand, "R", int(args.image_width), int(args.image_height)),
                 ]
                 head_rgb, _ = renderer.capture_camera(renderer.zed_camera)
                 image_bgr = base.overlay_text(head_rgb, overlay_lines)
@@ -4632,6 +4738,7 @@ def export_rank_preview_images(
                         color_bgr=(255, 100, 0),
                         forward_axis=str(args.debug_gripper_actor_forward_axis),
                         label=f"L{int(left_cand.candidate_idx)}",
+                        object_state=object_states.get(str(left_cand.nearest_object)),
                     )
                 if right_cand is not None:
                     draw_projected_gripper_wireframe(
@@ -4642,6 +4749,7 @@ def export_rank_preview_images(
                         color_bgr=(0, 140, 255),
                         forward_axis=str(args.debug_gripper_actor_forward_axis),
                         label=f"R{int(right_cand.candidate_idx)}",
+                        object_state=object_states.get(str(right_cand.nearest_object)),
                     )
                 annotate_candidate_labels(
                     image_bgr,

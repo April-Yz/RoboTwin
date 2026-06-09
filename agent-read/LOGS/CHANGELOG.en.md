@@ -2646,3 +2646,19 @@
   - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_keyframes_foundation_pose.py code_painting/plan_keyframes_human_replay.py` passed.
   - `bash -n code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh` passed.
   - The `pick_diverse_bottles id2` smoke run generated `N-1_foundation_pose_viewer/pick_diverse_bottles/foundation_input_2/plan_summary_foundation_pose.json` plus `rank_previews/keyframe_000036_rank_1.png` and `rank_previews/keyframe_000053_rank_1.png`.
+
+## 2026-06-09 (Mode N-3 Rank Preview Projection Status And Viewer Debug Overlay)
+
+- Rechecked issue:
+  - The user's `N-2_foundation_pose_viewer/pick_diverse_bottles/foundation_input_0/rank_previews` images did not show a visible C-shaped gripper.
+  - Rechecking `plan_summary_foundation_pose.json` and the smoke logs confirmed that the new code was running; in this sample the composed targets project behind the head camera. The right-arm keyframe-38 target is approximately `(0.644,-0.343,-0.297)`, about 1.04 m below the right bottle.
+- Changes:
+  - `rank_previews/*.png` now prints target xyz, object-to-target offset, and `proj=inside/offscreen/behind_camera`.
+  - The 2D C-gripper projection now clips lines at image bounds, draws edge markers for offscreen targets, and labels targets behind the camera at the bottom of the image.
+  - `run_plan_keyframes_foundation_pose_piper_d435.sh` now supports `--debug_viewer_overlay`, which sets `pure_scene_output=0` and shows target axes plus top-1 C-gripper actors in the viewer/videos.
+  - Mode N now passes `--debug_candidate_top_k 1` to the planner by default for viewer debugging.
+  - Updated the Mode N section in `COMMAND_LIBRARY.zh.md` to `N-3_foundation_pose_viewer` and added a single `pick_diverse_bottles id1 --viewer --debug_viewer_overlay` demo command.
+- Validation:
+  - `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python -m py_compile code_painting/plan_anygrasp_keyframes_r1.py code_painting/plan_keyframes_foundation_pose.py` passed.
+  - `bash -n code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh` passed.
+  - The `pick_diverse_bottles id0` smoke run generated `N-3_foundation_pose_viewer_smoke/.../rank_previews/keyframe_000038_rank_1.png`, which explicitly shows `L: proj=behind_camera` and `R: proj=behind_camera`.
