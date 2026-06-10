@@ -809,18 +809,20 @@ Key fixes:
 - `--debug_viewer_overlay` disables clean-video mode and shows target axes, top-1 C-gripper actors, camera axes, and the SAPIEN camera frustum in the viewer/videos.
 - Rank previews mark the selected candidate by `(frame, arm)` and include preview frames from each arm's debug frame set.
 - The default planner mode is `cartesian_interp_ik`: each stage linearly interpolates TCP position and Slerps TCP orientation from the current TCP to the target TCP, then solves IK waypoint by waypoint. If IK switches to another wrist/elbow branch mid-stage, the end effector can visually dip or twist before returning to the target; that usually indicates an IK branch change, not that keyframe-1 target orientation is reversed.
-- N-5 uses `--foundation_pose_retreat_m 0.08 --approach_offset_m 0.07`: the grasp target retreats 8 cm from the object center, the total pregrasp retreat is 15 cm, and pregrasp advances 7 cm to grasp.
+- N-6 uses `--foundation_pose_retreat_m 0.10 --approach_offset_m 0.07`: the grasp target retreats 10 cm from the object center, the total pregrasp retreat is 17 cm, and pregrasp advances 7 cm to grasp.
+- Current Mode N does not enable the roll/up constraints used by the R1/AnyGrasp path: `candidate_keep_camera_up=0`, `reach_rot_tol_deg=180`, and `urdfik_max_rotation_threshold_rad=3.14`. Therefore poses equivalent under a 180-degree roll about the approach axis are accepted, and wrist-camera-up / roll continuity is not enforced yet.
+- `pick_diverse_bottles id=1` N-6 viewer recheck: pregrasp/grasp position errors are about 1-2.4 cm; the right arm misses action after the third replan by about 38.9 cm. This points to action-stage IK branch/execution drift, not a Foundation object-position error.
 
 Recommended command:
 
 ```bash
-# 0609 Mode N-5: Foundation object position + human gripper orientation, with 2D C-gripper/local-axis/projection-status rank previews
+# 0610 Mode N-6: Foundation object position + human gripper orientation, with 2D C-gripper/local-axis/projection-status rank previews
 for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do
   bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh \
     --gpu 1 --ids 0 1 2 3 4 --continue_on_error --tasks $TASK \
-    --foundation_pose_retreat_m 0.08 \
+    --foundation_pose_retreat_m 0.10 \
     --approach_offset_m 0.07 \
-    --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-5_pregrasp15_grasp8
+    --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-6_pregrasp17_grasp10
 done
 ```
 
@@ -830,9 +832,9 @@ Viewer demo:
 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh \
   --gpu 2 --ids 1 --viewer --viewer_wait_at_end 1 --tasks pick_diverse_bottles \
   --debug_viewer_overlay \
-  --foundation_pose_retreat_m 0.08 \
+  --foundation_pose_retreat_m 0.10 \
   --approach_offset_m 0.07 \
-  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-5_pregrasp15_grasp8_debug_viewer
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-6_pregrasp17_grasp10_debug_viewer
 ```
 
 Single smoke/debug command:
@@ -840,14 +842,14 @@ Single smoke/debug command:
 ```bash
 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh \
   --gpu 1 --ids 0 --continue_on_error --tasks pick_diverse_bottles \
-  --foundation_pose_retreat_m 0.08 \
+  --foundation_pose_retreat_m 0.10 \
   --approach_offset_m 0.07 \
-  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-5_pregrasp15_grasp8_smoke
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-6_pregrasp17_grasp10_smoke
 ```
 
 Expected outputs:
 
 ```text
-/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-5_pregrasp15_grasp8/<TASK>/foundation_input_<ID>/plan_summary_foundation_pose.json
-/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-5_pregrasp15_grasp8/<TASK>/foundation_input_<ID>/rank_previews/keyframe_<FRAME>_rank_1.png
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-6_pregrasp17_grasp10/<TASK>/foundation_input_<ID>/plan_summary_foundation_pose.json
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-6_pregrasp17_grasp10/<TASK>/foundation_input_<ID>/rank_previews/keyframe_<FRAME>_rank_1.png
 ```

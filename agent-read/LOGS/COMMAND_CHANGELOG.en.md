@@ -2031,3 +2031,15 @@
   - `pregrasp = grasp - 0.07m * local +Z`, so the total pregrasp retreat is 0.15 m and pregrasp advances 0.07 m to grasp.
 - Notes:
   - Documented the `cartesian_interp_ik` intermediate interpolation behavior: linear TCP position interpolation, TCP-orientation Slerp, and waypoint-by-waypoint IK. A mid-stage dip/twist usually comes from an IK wrist/elbow branch switch.
+
+## 2026-06-10 (Mode N-6 Viewer Debug Command)
+
+- Changed command:
+  - Updated the recommended Mode N command to `N-6_pregrasp17_grasp10`.
+  - Parameters are now `--foundation_pose_retreat_m 0.10 --approach_offset_m 0.07`.
+- Parameter meaning:
+  - The grasp target is 10 cm from the object center.
+  - Pregrasp retreats another 7 cm behind grasp, for a total retreat of 17 cm.
+- Usage notes:
+  - The viewer command keeps `--debug_viewer_overlay` to show target axes, top-1 C-gripper actors, camera axes, and frustums.
+  - The docs note that current Mode N does not enable the R1/AnyGrasp roll/up constraints. Enforcing wrist-camera-up or rejecting bad roll variants requires a later planner/wrapper change.

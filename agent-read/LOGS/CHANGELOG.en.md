@@ -2693,3 +2693,20 @@
   - Synchronized `agent-read/COMMANDS/piper_anygrasp_keyframes.zh.md` / `.en.md` and the command changelog.
 - Validation:
   - This change only updates documentation and command-parameter guidance; planner code was not changed.
+
+## 2026-06-10 (Mode N-6 id1 Viewer Recheck And Issue Attribution)
+
+- Rechecked issue:
+  - The user ran `pick_diverse_bottles id=1 --viewer --debug_viewer_overlay --foundation_pose_retreat_m 0.10 --approach_offset_m 0.07` in `modeln-4`.
+  - The output directory was `N-5_pregrasp15_grasp8_debug_viewer/.../foundation_input_1`, but the actual parameters were a 10 cm grasp retreat and a 17 cm total pregrasp retreat. Command docs now use an N-6 directory name to avoid that mismatch.
+- Observations:
+  - `plan_summary.json` shows pregrasp/grasp position errors around 1-2.4 cm, which is usable.
+  - In the action stage, the left arm reached after the third replan with about 2.9 cm position error. The right arm did not reach after the third replan and ended about 38.9 cm away.
+  - `pose_debug.jsonl` shows that init-to-pregrasp already has large wrist-joint accumulated motion, about 4.25/4.23 rad on the left/right final wrist joint, despite small net change. The right action stage also shows large accumulated joint motion and branch switching.
+- Attribution:
+  - Foundation object position and projection are no longer the primary issue.
+  - Current Mode N allows `reach_rot_tol_deg=180` and `urdfik_max_rotation_threshold_rad=3.14`, with `candidate_keep_camera_up=0`; poses equivalent under a 180-degree roll about the approach axis are accepted, and wrist-camera-up / roll continuity is not enforced.
+  - Current `cartesian_interp_ik` solves IK waypoint by waypoint, and IK can switch to an unseeded or different wrist/elbow branch mid-stage. This explains the visual dip/twist and large roll about the approach axis.
+- Changes:
+  - Updated only `COMMAND_LIBRARY.zh.md` and agent-read command docs. The recommended command is now N-6: `--foundation_pose_retreat_m 0.10 --approach_offset_m 0.07`, with output root `N-6_pregrasp17_grasp10`.
+  - Planner code was not changed in this step; roll/up constraints, >180-degree erroneous-rotation rejection, and IK branch continuity remain unresolved.

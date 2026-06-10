@@ -2691,3 +2691,20 @@
   - 同步更新 `agent-read/COMMANDS/piper_anygrasp_keyframes.zh.md` / `.en.md` 和命令日志。
 - 验证：
   - 本次只改文档和命令参数说明，未改 planner 代码。
+
+## 2026-06-10（Mode N-6 id1 viewer 复查与问题归因）
+
+- 问题复查：
+  - 用户在 `modeln-4` 中运行 `pick_diverse_bottles id=1 --viewer --debug_viewer_overlay --foundation_pose_retreat_m 0.10 --approach_offset_m 0.07`。
+  - 输出目录为 `N-5_pregrasp15_grasp8_debug_viewer/.../foundation_input_1`，但实际参数是 grasp retreat 10cm、pregrasp 总 retreat 17cm；目录名已在命令文档中改为 N-6，避免继续误导。
+- 观察结果：
+  - `plan_summary.json` 显示 pregrasp/grasp 阶段位置误差约 1-2.4cm，基本可用。
+  - action 阶段左臂第 3 次 replan 后 reached，位置误差约 2.9cm；右臂第 3 次 replan 后未 reached，位置误差约 38.9cm。
+  - `pose_debug.jsonl` 显示 init->pregrasp 左右腕部末端关节累计转动约 4.25/4.23rad，但净变化很小；action 右臂也出现较大的关节累计转动和分支跳变。
+- 归因：
+  - Foundation 物体位置与投影不再是主要问题。
+  - 当前 Mode N 允许 `reach_rot_tol_deg=180` 和 `urdfik_max_rotation_threshold_rad=3.14`，且 `candidate_keep_camera_up=0`；绕前进轴 180 度等价的姿态会被接受，腕部相机朝上与 roll 连续性没有被强制。
+  - 当前 `cartesian_interp_ik` 逐 waypoint 求 IK，IK 可在中途选择 unseeded/另一组腕肘解，因此会出现视觉上先朝下、再扭回目标或绕前进轴大转的路径。
+- 修改：
+  - 仅更新 `COMMAND_LIBRARY.zh.md` 与 agent-read 命令文档，把推荐命令改为 N-6：`--foundation_pose_retreat_m 0.10 --approach_offset_m 0.07`，输出目录 `N-6_pregrasp17_grasp10`。
+  - 本次没有修改 planner 代码；roll/up 约束、>180 度错误旋转限制、IK 分支连续性仍待后续实现。

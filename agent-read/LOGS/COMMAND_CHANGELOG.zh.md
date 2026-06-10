@@ -2029,3 +2029,15 @@
   - `pregrasp = grasp - 0.07m * local +Z`，因此 pregrasp 总 retreat 为 0.15m，pregrasp 到 grasp 前进 0.07m。
 - 说明：
   - 文档补充了 `cartesian_interp_ik` 的中间插值行为：TCP 位置线性插值、TCP 朝向 Slerp、逐 waypoint 求 IK；中途末端朝下/扭回通常来自 IK 腕/肘解分支变化。
+
+## 2026-06-10（Mode N-6 viewer 调试命令）
+
+- 修改命令：
+  - Mode N 推荐命令改为 `N-6_pregrasp17_grasp10`。
+  - 参数改为 `--foundation_pose_retreat_m 0.10 --approach_offset_m 0.07`。
+- 参数含义：
+  - grasp target 离 object center 10cm。
+  - pregrasp 在 grasp 后方再退 7cm，总 retreat 17cm。
+- 使用说明：
+  - viewer 命令保留 `--debug_viewer_overlay`，用于显示 target axis、top-1 C 型夹爪 actor、head/third camera 轴与 frustum。
+  - 文档标注当前未启用 R1/AnyGrasp 路径中的 roll/up 约束，后续若要限制腕部相机朝上或拒绝错误 roll，需要改 planner/wrapper。
