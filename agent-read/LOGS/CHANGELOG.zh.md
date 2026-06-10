@@ -2708,3 +2708,15 @@
 - 修改：
   - 仅更新 `COMMAND_LIBRARY.zh.md` 与 agent-read 命令文档，把推荐命令改为 N-6：`--foundation_pose_retreat_m 0.10 --approach_offset_m 0.07`，输出目录 `N-6_pregrasp17_grasp10`。
   - 本次没有修改 planner 代码；roll/up 约束、>180 度错误旋转限制、IK 分支连续性仍待后续实现。
+
+## 2026-06-10（Piper IK 连续轨迹 v2 与 V1-V4 采集修复）
+
+- 根因：旧实现把四段 move 都从 home 规划；lift 的 x/y 参考错误；运动后未等待 PD 收敛；place 把瓶子功能点目标当成夹爪目标；Phase 1/2 还能混用无版本旧 pickle。
+- 修改：四段 move 改为逐段规划执行，下一段使用上一段 IK 末端关节状态；lift 保留 grasp x/y 和姿态，仅增加 z；close 后测量瓶子到末端偏移并修正 place；每段增加 endpoint settling。
+- 轨迹：新增 `piper_ik_cartesian` schema v2、IK 版本、动作名、目标、shape/finite/nonempty 校验，并拒绝旧格式。
+- V3：MotionGen 不可用、异常或规划失败时，回退到同一有效 IK 终点的三次插值。
+- Viewer/采集：viewer 默认要求真实成功；采集断点续跑识别 `_succ/_fail.hdf5`；新增 `demo_piper_ik_seq_v1..v4` 隔离旧数据。
+- 相机：`third_camera` 改为右侧视角，新增对向俯视 `opposite_top_camera`；所有 RGB camera 自动输出 MP4。
+- 验证：V1-V4 viewer 均在 seed 3 真实成功；V1 完整采集 5 集，成功 seed 为 3/6/10/14/18；V2/V3/V4 各完成 1 集 smoke，均生成 `_succ.hdf5`、v2 pickle、instruction 和六路视频。V1 重跑确认跳过现有 `_succ.hdf5`。
+- 最终检查：`py_compile`、四份 YAML、prompt JSON、`bash -n collect_data.sh`、`git diff --check` 和旧 pickle 拒绝测试均通过。
+- 清理：验证后删除可重复生成的 V2/V3/V4 smoke 配置和临时输出；保留忽略目录下的 V1 完整验证数据。

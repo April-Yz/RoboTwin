@@ -2043,3 +2043,11 @@
 - Usage notes:
   - The viewer command keeps `--debug_viewer_overlay` to show target axes, top-1 C-gripper actors, camera axes, and frustums.
   - The docs note that current Mode N does not enable the R1/AnyGrasp roll/up constraints. Enforcing wrist-camera-up or rejecting bad roll variants requires a later planner/wrapper change.
+
+## 2026-06-10 (New Piper IK V1-V4 Commands)
+
+- New configs: `demo_piper_ik_seq_v1`, `demo_piper_ik_seq_v2`, `demo_piper_ik_seq_v3`, and `demo_piper_ik_seq_v4`.
+- Viewer: `python view_pick_diverse_bottles_piper_ik_motion.py --ik_version vN --seed 0 --max_seed_tries 50 --require_success 1`.
+- Collection: `bash collect_data.sh pick_diverse_bottles_piper_ik demo_piper_ik_seq_vN 0`.
+- Headless: use `unset DISPLAY` with `--render_freq 0 --show_axes 0 --hold 0`.
+- Documentation: updated `COMMAND_LIBRARY.zh.md` and added `agent-read/COMMANDS/piper_ik_cartesian.en.md`.

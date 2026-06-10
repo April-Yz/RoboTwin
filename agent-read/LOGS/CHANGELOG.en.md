@@ -2710,3 +2710,15 @@
 - Changes:
   - Updated only `COMMAND_LIBRARY.zh.md` and agent-read command docs. The recommended command is now N-6: `--foundation_pose_retreat_m 0.10 --approach_offset_m 0.07`, with output root `N-6_pregrasp17_grasp10`.
   - Planner code was not changed in this step; roll/up constraints, >180-degree erroneous-rotation rejection, and IK branch continuity remain unresolved.
+
+## 2026-06-10 (Piper IK Sequential Trajectory V2 And V1-V4 Collection Fix)
+
+- Root causes: all four move segments were planned from home; lift used the wrong x/y reference; execution advanced before PD convergence; place treated bottle targets as gripper targets; and Phase 1/2 could mix unversioned legacy pickles.
+- Changes: move segments are planned and executed sequentially from the preceding IK endpoint; lift preserves grasp x/y and orientation and only increases z; place is corrected from the measured bottle-to-EE offset after close; every move holds its endpoint for settling.
+- Trajectory: added `piper_ik_cartesian` schema v2, IK version, action names, targets, and shape/finite/nonempty validation. Legacy formats are rejected.
+- V3: MotionGen unavailability, exceptions, or planning failure falls back to cubic interpolation to the same valid IK endpoint.
+- Viewer/collection: the viewer requires physical success by default; resume recognizes `_succ/_fail.hdf5`; new `demo_piper_ik_seq_v1..v4` configs isolate legacy data.
+- Cameras: `third_camera` is now a right-side view and `opposite_top_camera` adds an opposite overhead view. Every RGB camera produces an MP4.
+- Validation: V1-V4 viewers physically succeeded at seed 3. V1 completed five episodes with seeds 3/6/10/14/18. V2/V3/V4 each completed a one-episode smoke collection with `_succ.hdf5`, v2 pickle, instructions, and six videos. Rerunning V1 confirmed existing `_succ.hdf5` files are skipped.
+- Final checks: `py_compile`, all four YAML configs, the prompt JSON, `bash -n collect_data.sh`, `git diff --check`, and the legacy-pickle rejection test passed.
+- Cleanup: removed reproducible V2/V3/V4 smoke configs and temporary outputs after validation; retained the full ignored V1 validation dataset.

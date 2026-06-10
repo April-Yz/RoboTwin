@@ -19,6 +19,10 @@ task_config/*
 !task_config/demo_clean_piper_motion.yml
 !task_config/demo_clean_piper_motion_viewer.yml
 !task_config/demo_clean_piper_ik_orig_tcp.yml
+!task_config/demo_piper_ik_seq_v1.yml
+!task_config/demo_piper_ik_seq_v2.yml
+!task_config/demo_piper_ik_seq_v3.yml
+!task_config/demo_piper_ik_seq_v4.yml
 **/.DS_Store
 code_painting/*
 !code_painting/plan_first_frame_foundation_pick_diverse_bottles.py

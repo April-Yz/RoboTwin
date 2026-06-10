@@ -472,7 +472,7 @@ class PiperIKPlannerV3(PiperIKBase):
 
     def _solve_ik_impl(self, target_pos, target_quat, current_joints,
                        constraint_pose=None, arms_tag=None):
-        # Step 1: 先用 IKSolver 找目标 IK 解
+        # Step 1: use the same relaxed IK retry policy as V1/V2.
         target_pos_t = torch.tensor(target_pos, device=self.tensor_args.device, dtype=torch.float32)
         target_quat_t = torch.tensor(target_quat, device=self.tensor_args.device, dtype=torch.float32)
         goal = CuroboPose(target_pos_t, target_quat_t)
@@ -481,50 +481,70 @@ class PiperIKPlannerV3(PiperIKBase):
         ik_result = self.ik_solver.solve_batch(goal, seed_config=seed_t)
         _ensure_cuda_sync()
 
+        original_position_threshold = self.ik_solver.position_threshold
+        original_rotation_threshold = self.ik_solver.rotation_threshold
+        attempt = 0
+        while not ik_result.success.cpu().numpy().all() and attempt < 5:
+            attempt += 1
+            self.ik_solver.position_threshold *= 3
+            self.ik_solver.rotation_threshold *= 2
+            ik_result = self.ik_solver.solve_batch(goal, seed_config=seed_t)
+            _ensure_cuda_sync()
+            if self.ik_solver.position_threshold > 0.5:
+                break
+        self.ik_solver.position_threshold = original_position_threshold
+        self.ik_solver.rotation_threshold = original_rotation_threshold
+
         if not ik_result.success.cpu().numpy().all():
             return None
 
+        solution = ik_result.solution.cpu().numpy().reshape(-1, len(current_joints))[0]
+
+        def cubic_fallback(reason):
+            print(f"[piper-ik V3] MotionGen fallback for {arms_tag}: {reason}")
+            trajectory = _cubic_interpolate(current_joints, solution, 80)
+            return {
+                "success": True,
+                "solution": solution,
+                "position": trajectory["position"],
+                "velocity": trajectory["velocity"],
+            }
+
         # Step 2: 用 MotionGen 生成平滑轨迹（从当前关节角出发）
         if self._motion_gen is None:
-            # 降级为线性插值
-            solution = ik_result.solution.cpu().numpy()[0]
-            return {
-                "success": True,
-                "solution": solution,
-                "position": _linear_interpolate(current_joints, solution, 80)["position"],
-                "velocity": _linear_interpolate(current_joints, solution, 80)["velocity"],
-            }
+            return cubic_fallback("MotionGen is unavailable")
 
-        goal_pose = CuroboPose.from_list(list(target_pos) + list(target_quat))
-        start_joint = JointState.from_position(
-            torch.tensor(current_joints, dtype=torch.float32).cuda().reshape(1, -1),
-            joint_names=self.active_joints_name,
-        )
-
-        plan_config = MotionGenPlanConfig(max_attempts=10)
-        if constraint_pose is not None:
-            from curobo.wrap.reacher.motion_gen import PoseCostMetric
-            pose_cost_metric = PoseCostMetric(
-                hold_partial_pose=True,
-                hold_vec_weight=self._motion_gen.tensor_args.to_device(constraint_pose),
+        try:
+            goal_pose = CuroboPose.from_list(list(target_pos) + list(target_quat))
+            start_joint = JointState.from_position(
+                torch.tensor(
+                    current_joints,
+                    dtype=torch.float32,
+                    device=self.tensor_args.device,
+                ).reshape(1, -1),
+                joint_names=self.active_joints_name,
             )
-            plan_config.pose_cost_metric = pose_cost_metric
 
-        mg_result = self._motion_gen.plan_single(start_joint, goal_pose, plan_config)
-        _ensure_cuda_sync()
+            plan_config = MotionGenPlanConfig(max_attempts=10)
+            if constraint_pose is not None:
+                from curobo.wrap.reacher.motion_gen import PoseCostMetric
+                pose_cost_metric = PoseCostMetric(
+                    hold_partial_pose=True,
+                    hold_vec_weight=self._motion_gen.tensor_args.to_device(constraint_pose),
+                )
+                plan_config.pose_cost_metric = pose_cost_metric
+
+            mg_result = self._motion_gen.plan_single(start_joint, goal_pose, plan_config)
+            _ensure_cuda_sync()
+        except Exception as exc:
+            return cubic_fallback(f"planning exception: {exc}")
 
         if not mg_result.success.item():
-            # MotionGen 失败 → 降级为线性插值
-            solution = ik_result.solution.cpu().numpy()[0]
-            return {
-                "success": True,
-                "solution": solution,
-                "position": _linear_interpolate(current_joints, solution, 80)["position"],
-                "velocity": _linear_interpolate(current_joints, solution, 80)["velocity"],
-            }
+            return cubic_fallback("trajectory optimization returned failure")
 
         return {
             "success": True,
+            "solution": solution,
             "status": "Success",
             "position": np.array(mg_result.interpolated_plan.position.cpu()),
             "velocity": np.array(mg_result.interpolated_plan.velocity.cpu()),

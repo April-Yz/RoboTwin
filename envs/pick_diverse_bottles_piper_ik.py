@@ -14,6 +14,8 @@ O.0 对照实验 — Piper IK 版本，遵循 Cartesian 抓取逻辑。
 """
 
 import os
+import pickle
+from copy import deepcopy
 
 import numpy as np
 import sapien.core as sapien
@@ -27,6 +29,10 @@ from .utils import ArmTag, Action
 class pick_diverse_bottles_piper_ik(pick_diverse_bottles):
     """Piper IK task — Cartesian 抓取 + 多种 IK 后端。"""
 
+    TRAJECTORY_SCHEMA = "piper_ik_cartesian"
+    TRAJECTORY_VERSION = 2
+    MOVE_ACTION_NAMES = ("pregrasp", "grasp", "lift", "place")
+
     def setup_demo(self, **kwargs):
         super().setup_demo(**kwargs)
 
@@ -38,8 +44,19 @@ class pick_diverse_bottles_piper_ik(pick_diverse_bottles):
 
         ik_version = kwargs.get("ik_version", "v1")
         interp_steps = kwargs.get("ik_interp_steps", 50)
+        self.ik_version = ik_version
+        self.lift_height = float(kwargs.get("lift_height", 0.12))
+        self.move_settle_steps = int(kwargs.get("move_settle_steps", 80))
+        self.gripper_settle_steps = int(kwargs.get("gripper_settle_steps", 120))
         self.save_all_episodes = kwargs.get("save_all_episodes", False)
-        print(f"[piper-ik-task] IK version={ik_version} interp_steps={interp_steps} save_all={self.save_all_episodes}")
+        self._trajectory_targets = {"left": {}, "right": {}}
+        self._loaded_trajectory_metadata = None
+        self._last_success = False
+        print(
+            f"[piper-ik-task] IK version={ik_version} interp_steps={interp_steps} "
+            f"lift_height={self.lift_height:.3f} move_settle={self.move_settle_steps} "
+            f"save_all={self.save_all_episodes}"
+        )
 
         from envs.robot.piper_ik import create_piper_ik_planner
 
@@ -266,186 +283,262 @@ class pick_diverse_bottles_piper_ik(pick_diverse_bottles):
             Action(arm_tag, "close", target_gripper_pos=gripper_pos),
         ]
 
-    def play_once(self):
-        """Piper Cartesian 抓取流程 — Phase 1/2 兼容。
-
-        Phase 1 (need_plan=True):  IK 求解 → 存入 left_joint_path → 执行
-        Phase 2 (need_plan=False): 从 left_joint_path 回放 → 执行 → hdf5
-
-        步骤：pregrasp → grasp → gripper_close → lift → place
-        """
-        import numpy as np
-        from copy import deepcopy
-
+    def _build_action_sequence(self):
         left_arm = ArmTag("left")
         right_arm = ArmTag("right")
+        left_grasp = self._cartesian_grasp_actor(self.bottle1, left_arm, pre_grasp_dis=0.08)[1]
+        right_grasp = self._cartesian_grasp_actor(self.bottle2, right_arm, pre_grasp_dis=0.08)[1]
+        if len(left_grasp) != 3 or len(right_grasp) != 3:
+            raise RuntimeError("failed to construct pregrasp/grasp actions")
 
+        left_grasp_pose = list(left_grasp[1].target_pose)
+        right_grasp_pose = list(right_grasp[1].target_pose)
+        left_lift_pose = left_grasp_pose.copy()
+        right_lift_pose = right_grasp_pose.copy()
+        left_lift_pose[2] += self.lift_height
+        right_lift_pose[2] += self.lift_height
+
+        # The task targets describe the bottle functional points, not the gripper.
+        # Preserve the bottle-to-gripper XY offset measured at grasp construction.
+        left_functional_point = np.asarray(self.bottle1.get_functional_point(0), dtype=np.float64)
+        right_functional_point = np.asarray(self.bottle2.get_functional_point(0), dtype=np.float64)
+        left_place_xy = (
+            np.asarray(left_grasp_pose[:2])
+            + np.asarray(self.left_target_pose[:2])
+            - left_functional_point[:2]
+        )
+        right_place_xy = (
+            np.asarray(right_grasp_pose[:2])
+            + np.asarray(self.right_target_pose[:2])
+            - right_functional_point[:2]
+        )
+        left_place_pose = list(left_place_xy) + [left_lift_pose[2]] + left_grasp_pose[3:]
+        right_place_pose = list(right_place_xy) + [right_lift_pose[2]] + right_grasp_pose[3:]
+        print(
+            "[piper-ik] place gripper targets from bottle offsets: "
+            f"left=({left_place_pose[0]:.3f},{left_place_pose[1]:.3f},{left_place_pose[2]:.3f}) "
+            f"right=({right_place_pose[0]:.3f},{right_place_pose[1]:.3f},{right_place_pose[2]:.3f})"
+        )
+
+        sequence = [
+            ("pregrasp", left_grasp[0], right_grasp[0]),
+            ("grasp", left_grasp[1], right_grasp[1]),
+            ("close_gripper", left_grasp[2], right_grasp[2]),
+            ("lift", Action(left_arm, "move", target_pose=left_lift_pose),
+             Action(right_arm, "move", target_pose=right_lift_pose)),
+            ("place", Action(left_arm, "move", target_pose=left_place_pose),
+             Action(right_arm, "move", target_pose=right_place_pose)),
+            ("open_gripper", Action(left_arm, "open", target_gripper_pos=1.0),
+             Action(right_arm, "open", target_gripper_pos=1.0)),
+        ]
+        self._trajectory_targets = {
+            "left": {name: list(left.target_pose) for name, left, _ in sequence if left.action == "move"},
+            "right": {name: list(right.target_pose) for name, _, right in sequence if right.action == "move"},
+        }
+        return sequence
+
+    def _sequence_from_loaded_trajectory(self):
+        metadata = self._loaded_trajectory_metadata
+        if metadata is None:
+            raise ValueError("trajectory metadata was not loaded before replay")
+        targets = metadata["targets"]
+        left_arm = ArmTag("left")
+        right_arm = ArmTag("right")
+        sequence = []
+        for name in ("pregrasp", "grasp"):
+            constraint = [1, 1, 1, 0, 0, 0] if name == "grasp" else None
+            kwargs = {"constraint_pose": constraint} if constraint is not None else {}
+            sequence.append((
+                name,
+                Action(left_arm, "move", target_pose=targets["left"][name], **kwargs),
+                Action(right_arm, "move", target_pose=targets["right"][name], **kwargs),
+            ))
+        sequence.extend([
+            ("close_gripper", Action(left_arm, "close", target_gripper_pos=0.0),
+             Action(right_arm, "close", target_gripper_pos=0.0)),
+            ("lift", Action(left_arm, "move", target_pose=targets["left"]["lift"]),
+             Action(right_arm, "move", target_pose=targets["right"]["lift"])),
+            ("place", Action(left_arm, "move", target_pose=targets["left"]["place"]),
+             Action(right_arm, "move", target_pose=targets["right"]["place"])),
+            ("open_gripper", Action(left_arm, "open", target_gripper_pos=1.0),
+             Action(right_arm, "open", target_gripper_pos=1.0)),
+        ])
+        self._trajectory_targets = deepcopy(targets)
+        return sequence
+
+    @staticmethod
+    def _validate_plan_result(result, side, action_name):
+        if not isinstance(result, dict) or result.get("status") != "Success":
+            status = result.get("status") if isinstance(result, dict) else type(result).__name__
+            raise ValueError(f"{side} {action_name} trajectory is invalid: status={status}")
+        position = np.asarray(result.get("position"))
+        velocity = np.asarray(result.get("velocity"))
+        if position.ndim != 2 or position.shape[0] < 2 or position.shape[1] != 6:
+            raise ValueError(f"{side} {action_name} position shape is invalid: {position.shape}")
+        if velocity.shape != position.shape:
+            raise ValueError(
+                f"{side} {action_name} velocity shape {velocity.shape} != position shape {position.shape}"
+            )
+        if not np.isfinite(position).all() or not np.isfinite(velocity).all():
+            raise ValueError(f"{side} {action_name} trajectory contains non-finite values")
+
+    def _full_qpos_with_plan_endpoint(self, side, result):
+        entity = self.robot.left_entity if side == "left" else self.robot.right_entity
+        arm_joints = self.robot.left_arm_joints if side == "left" else self.robot.right_arm_joints
+        active_joints = list(entity.get_active_joints())
+        qpos = entity.get_qpos().copy()
+        for idx, joint in enumerate(arm_joints):
+            qpos[active_joints.index(joint)] = result["position"][-1][idx]
+        return qpos
+
+    def _execute_move_pair(self, action_name, left_action, right_action, left_result, right_result):
+        self._validate_plan_result(left_result, "left", action_name)
+        self._validate_plan_result(right_result, "right", action_name)
+        left_steps = left_result["position"].shape[0]
+        right_steps = right_result["position"].shape[0]
+        max_steps = max(left_steps, right_steps)
+        for step in range(max_steps):
+            left_idx = min(step, left_steps - 1)
+            right_idx = min(step, right_steps - 1)
+            self.robot.set_arm_joints(
+                left_result["position"][left_idx], left_result["velocity"][left_idx], "left")
+            self.robot.set_arm_joints(
+                right_result["position"][right_idx], right_result["velocity"][right_idx], "right")
+            self.scene.step()
+            if self.save_data and step % self.save_freq == 0:
+                self._take_picture()
+            self._update_render()
+
+        # Keep commanding the final IK endpoint so the PD controller converges
+        # before the next contact-sensitive stage starts.
+        for step in range(self.move_settle_steps):
+            self.robot.set_arm_joints(
+                left_result["position"][-1], np.zeros(6, dtype=np.float64), "left")
+            self.robot.set_arm_joints(
+                right_result["position"][-1], np.zeros(6, dtype=np.float64), "right")
+            self.scene.step()
+            if self.save_data and step % self.save_freq == 0:
+                self._take_picture()
+            self._update_render()
+
+        left_ee = self.robot.left_ee.child_link.get_pose()
+        right_ee = self.robot.right_ee.child_link.get_pose()
+        left_err = np.linalg.norm(np.asarray(left_ee.p) - np.asarray(left_action.target_pose[:3]))
+        right_err = np.linalg.norm(np.asarray(right_ee.p) - np.asarray(right_action.target_pose[:3]))
+        print(
+            f"[piper-ik][fk-check] {action_name}: "
+            f"L=({left_ee.p[0]:.3f},{left_ee.p[1]:.3f},{left_ee.p[2]:.3f}) err={left_err:.3f}m | "
+            f"R=({right_ee.p[0]:.3f},{right_ee.p[1]:.3f},{right_ee.p[2]:.3f}) err={right_err:.3f}m"
+        )
+
+    def _execute_gripper_pair(self, action_name, left_action, right_action):
+        self.robot.set_gripper(left_action.target_gripper_pos, "left")
+        self.robot.set_gripper(right_action.target_gripper_pos, "right")
+        for step in range(self.gripper_settle_steps):
+            self.scene.step()
+            if self.save_data and step % self.save_freq == 0:
+                self._take_picture()
+            self._update_render()
+        print(f"[piper-ik] {action_name}: grippers settled for {self.gripper_settle_steps} steps")
+
+    def _update_place_targets_from_closed_grasp(self, sequence):
+        """Use the measured post-close bottle/EE offset to place bottle functional points."""
+        place_actions = next((item for item in sequence if item[0] == "place"), None)
+        if place_actions is None:
+            raise RuntimeError("place action is missing")
+        _, left_place, right_place = place_actions
+        left_ee = np.asarray(self.robot.left_ee.child_link.get_pose().p, dtype=np.float64)
+        right_ee = np.asarray(self.robot.right_ee.child_link.get_pose().p, dtype=np.float64)
+        left_bottle = np.asarray(self.bottle1.get_functional_point(0), dtype=np.float64)
+        right_bottle = np.asarray(self.bottle2.get_functional_point(0), dtype=np.float64)
+        left_offset = left_bottle[:2] - left_ee[:2]
+        right_offset = right_bottle[:2] - right_ee[:2]
+        left_place.target_pose[:2] = (np.asarray(self.left_target_pose[:2]) - left_offset).tolist()
+        right_place.target_pose[:2] = (np.asarray(self.right_target_pose[:2]) - right_offset).tolist()
+        self._trajectory_targets["left"]["place"] = list(left_place.target_pose)
+        self._trajectory_targets["right"]["place"] = list(right_place.target_pose)
+        print(
+            "[piper-ik] measured closed-grasp offsets: "
+            f"left=({left_offset[0]:.3f},{left_offset[1]:.3f}) "
+            f"right=({right_offset[0]:.3f},{right_offset[1]:.3f}); "
+            f"place left=({left_place.target_pose[0]:.3f},{left_place.target_pose[1]:.3f}) "
+            f"right=({right_place.target_pose[0]:.3f},{right_place.target_pose[1]:.3f})"
+        )
+
+    def _wait_step_mode(self, action_name):
+        if not getattr(self, "_step_mode", False):
+            return
+        import select
+        import sys
+        print(f"[piper-ik][step-mode] '{action_name}' done. Press Enter...", flush=True)
+        while True:
+            self._update_render()
+            viewer = getattr(self, "viewer", None)
+            if viewer is not None:
+                viewer.render()
+            if sys.stdin in select.select([sys.stdin], [], [], 0.05)[0]:
+                sys.stdin.readline()
+                break
+
+    def play_once(self):
+        """Plan/replay pregrasp, grasp, lift and place as a state-continuous sequence."""
         if self.need_plan:
-            print("[piper-ik] Phase 1: planning + executing")
-            actions_left = self._cartesian_grasp_actor(self.bottle1, arm_tag=left_arm, pre_grasp_dis=0.08)
-            actions_right = self._cartesian_grasp_actor(self.bottle2, arm_tag=right_arm, pre_grasp_dis=0.08)
-
-            if actions_left is None or actions_right is None:
-                print("[piper-ik] grasp actor returned None")
-                return self.info
-
-            # 追加 lift + place 步骤
-            all_left = actions_left[1]   # [pregrasp_move, grasp_move, close_gripper]
-            all_right = actions_right[1]
-
-            # lift: 用瓶子位置 + 固定 z 偏移（避免 move_by_displacement 的相对误差）
-            l_bottle_z = self.bottle1.get_pose().p[2]
-            r_bottle_z = self.bottle2.get_pose().p[2]
-            l_ee = self.robot.left_ee.child_link.get_pose()
-            r_ee = self.robot.right_ee.child_link.get_pose()
-            lift_z = max(l_bottle_z, r_bottle_z) + 0.25  # 瓶子上方 25cm
-
-            lift_left_pose = [l_ee.p[0], l_ee.p[1], lift_z,
-                              float(l_ee.q[0]), float(l_ee.q[1]), float(l_ee.q[2]), float(l_ee.q[3])]
-            lift_right_pose = [r_ee.p[0], r_ee.p[1], lift_z,
-                               float(r_ee.q[0]), float(r_ee.q[1]), float(r_ee.q[2]), float(r_ee.q[3])]
-            all_left.append(Action(left_arm, "move", target_pose=lift_left_pose))
-            all_right.append(Action(right_arm, "move", target_pose=lift_right_pose))
-
-            # place: 移动到放置目标
-            all_left.append(Action(left_arm, "move", target_pose=self.left_target_pose))
-            all_right.append(Action(right_arm, "move", target_pose=self.right_target_pose))
-
-            # open gripper
-            all_left.append(self.open_gripper(arm_tag=left_arm, pos=1.0)[1][0])
-            all_right.append(self.open_gripper(arm_tag=right_arm, pos=1.0)[1][0])
-
-            all_left_actions = all_left
-            all_right_actions = all_right
-
-            for step_idx, (l_act, r_act) in enumerate(zip(all_left_actions, all_right_actions)):
-                print(f"[piper-ik] Step 1.{step_idx}: {l_act.action} / {r_act.action}")
-
-                if l_act.action == "move" and r_act.action == "move":
+            print("[piper-ik] Phase 1: sequential planning + execution")
+            sequence = self._build_action_sequence()
+            self.left_joint_path = []
+            self.right_joint_path = []
+            left_start_qpos = None
+            right_start_qpos = None
+            move_index = 0
+            for action_name, left_action, right_action in sequence:
+                print(f"[piper-ik] {action_name}: {left_action.action} / {right_action.action}")
+                if left_action.action == "move":
                     left_result = self.robot.left_plan_path(
-                        l_act.target_pose, constraint_pose=l_act.args.get("constraint_pose"))
+                        left_action.target_pose,
+                        constraint_pose=left_action.args.get("constraint_pose"),
+                        last_qpos=left_start_qpos,
+                    )
                     right_result = self.robot.right_plan_path(
-                        r_act.target_pose, constraint_pose=r_act.args.get("constraint_pose"))
-
-                    if left_result.get("status") != "Success" or right_result.get("status") != "Success":
-                        print(f"[piper-ik] plan FAILED: L={left_result.get('status')} R={right_result.get('status')}")
+                        right_action.target_pose,
+                        constraint_pose=right_action.args.get("constraint_pose"),
+                        last_qpos=right_start_qpos,
+                    )
+                    try:
+                        self._validate_plan_result(left_result, "left", action_name)
+                        self._validate_plan_result(right_result, "right", action_name)
+                    except ValueError as exc:
+                        print(f"[piper-ik] plan FAILED: {exc}")
                         self.plan_success = False
                         return self.info
-
                     self.left_joint_path.append(deepcopy(left_result))
                     self.right_joint_path.append(deepcopy(right_result))
-                # gripper step (no joint path needed)
-        else:
-            print("[piper-ik] Phase 2: replaying from recorded paths")
-            # Phase 2 also needs to reconstruct the action list for execution
-            actions_left = self._cartesian_grasp_actor(self.bottle1, arm_tag=left_arm, pre_grasp_dis=0.08)
-            actions_right = self._cartesian_grasp_actor(self.bottle2, arm_tag=right_arm, pre_grasp_dis=0.08)
-            all_left = actions_left[1]
-            all_right = actions_right[1]
-            l_bz = self.bottle1.get_pose().p[2]; r_bz = self.bottle2.get_pose().p[2]
-            l_ee = self.robot.left_ee.child_link.get_pose(); r_ee = self.robot.right_ee.child_link.get_pose()
-            lz = max(l_bz, r_bz) + 0.25
-            all_left.append(Action(left_arm, "move", target_pose=[
-                l_ee.p[0], l_ee.p[1], lz, float(l_ee.q[0]), float(l_ee.q[1]), float(l_ee.q[2]), float(l_ee.q[3])]))
-            all_right.append(Action(right_arm, "move", target_pose=[
-                r_ee.p[0], r_ee.p[1], lz, float(r_ee.q[0]), float(r_ee.q[1]), float(r_ee.q[2]), float(r_ee.q[3])]))
-            all_left.append(Action(left_arm, "move", target_pose=self.left_target_pose))
-            all_right.append(Action(right_arm, "move", target_pose=self.right_target_pose))
-            all_left.append(self.open_gripper(arm_tag=left_arm, pos=1.0)[1][0])
-            all_right.append(self.open_gripper(arm_tag=right_arm, pos=1.0)[1][0])
-            all_left_actions = all_left
-            all_right_actions = all_right
-
-        # ═══════════════ 执行 ═══════════════
-        self._move_cnt = 0
-        for step_idx, (l_act, r_act) in enumerate(zip(all_left_actions, all_right_actions)):
-            step_names = ["pregrasp", "grasp", "close_gripper", "lift", "place", "open_gripper"]
-            step_name = step_names[step_idx] if step_idx < len(step_names) else f"step{step_idx}"
-            print(f"[piper-ik] Step 1.{step_idx} ({step_name}): {l_act.action} / {r_act.action}")
-
-            if l_act.action == "move" and r_act.action == "move":
-                if self.need_plan:
-                    left_result = self.left_joint_path[self._move_cnt]
-                    right_result = self.right_joint_path[self._move_cnt]
-                    self._move_cnt += 1
+                    self._execute_move_pair(
+                        action_name, left_action, right_action, left_result, right_result)
+                    left_start_qpos = self._full_qpos_with_plan_endpoint("left", left_result)
+                    right_start_qpos = self._full_qpos_with_plan_endpoint("right", right_result)
+                    move_index += 1
                 else:
-                    left_result = deepcopy(self.left_joint_path[self.left_cnt])
-                    right_result = deepcopy(self.right_joint_path[self.right_cnt])
-                    self.left_cnt += 1
-                    self.right_cnt += 1
-
-                l_steps = left_result["position"].shape[0]
-                r_steps = right_result["position"].shape[0]
-                max_steps = max(l_steps, r_steps)
-
-                for t in range(max_steps):
-                    li = min(t, l_steps - 1)
-                    ri = min(t, r_steps - 1)
-                    self.robot.set_arm_joints(
-                        left_result["position"][li], left_result["velocity"][li], "left")
-                    self.robot.set_arm_joints(
-                        right_result["position"][ri], right_result["velocity"][ri], "right")
-                    self.scene.step()
-                    if self.save_data and t % self.save_freq == 0:
-                        self._take_picture()
-                    self._update_render()
-
-                # FK 验证：直接设置 qpos 测 IK 精度（绕过 PD 控制器）
-                if self.need_plan and step_idx <= 1:
-                    for side, arm_tag in [("left", "left"), ("right", "right")]:
-                        entity = self.robot.left_entity if arm_tag == "left" else self.robot.right_entity
-                        arm_joints = self.robot.left_arm_joints if arm_tag == "left" else self.robot.right_arm_joints
-                        ee_joint = self.robot.left_ee if arm_tag == "left" else self.robot.right_ee
-                        result = self.left_joint_path[step_idx] if arm_tag == "left" else self.right_joint_path[step_idx]
-                        sol_q = result["position"][-1]  # final joint angles from IK
-                        # Direct set qpos (bypass PD)
-                        qpos = entity.get_qpos().copy()
-                        for j_idx, joint in enumerate(arm_joints):
-                            active_idx = list(entity.get_active_joints()).index(joint)
-                            qpos[active_idx] = sol_q[j_idx]
-                        entity.set_qpos(qpos)
-                        ee_pose = ee_joint.child_link.get_pose()
-                        target = l_act.target_pose if arm_tag == "left" else r_act.target_pose
-                        t_pos = np.array(target[:3]) if isinstance(target, (list, np.ndarray)) else target.p
-                        direct_err = np.linalg.norm(np.array(ee_pose.p) - t_pos)
-                        print(f"[piper-ik][fk-direct] {step_name} {side}: "
-                              f"EE=({ee_pose.p[0]:.3f},{ee_pose.p[1]:.3f},{ee_pose.p[2]:.3f}) "
-                              f"err={direct_err:.3f}m")
-
-                # FK 验证：每次 move 后读取实际 EE 与目标对比
-                if self.need_plan:
-                    l_ee = self.robot.left_ee.child_link.get_pose()
-                    r_ee = self.robot.right_ee.child_link.get_pose()
-                    l_target = l_act.target_pose
-                    r_target = r_act.target_pose
-                    if isinstance(l_target, (list, np.ndarray)):
-                        l_err = np.linalg.norm(np.array(l_ee.p) - np.array(l_target[:3]))
-                        r_err = np.linalg.norm(np.array(r_ee.p) - np.array(r_target[:3]))
-                        print(f"[piper-ik][fk-check] {step_name}: "
-                              f"L_ee=({l_ee.p[0]:.3f},{l_ee.p[1]:.3f},{l_ee.p[2]:.3f}) err={l_err:.3f}m | "
-                              f"R_ee=({r_ee.p[0]:.3f},{r_ee.p[1]:.3f},{r_ee.p[2]:.3f}) err={r_err:.3f}m")
-
-            elif l_act.action in ("close", "open"):
-                gripper_pos = l_act.target_gripper_pos
-                print(f"[piper-ik] {l_act.action} gripper to {gripper_pos}")
-                self.robot.set_gripper(gripper_pos, "left")
-                self.robot.set_gripper(gripper_pos, "right")
-                for _ in range(80):
-                    self.scene.step()
-                    self._update_render()
-
-            # step_mode 等待
-            if getattr(self, "_step_mode", False):
-                import sys as _sys, select as _sel
-                print(f"[piper-ik][step-mode] '{step_name}' done. Press Enter...", flush=True)
-                while True:
-                    self._update_render()
-                    viewer = getattr(self, "viewer", None)
-                    if viewer is not None:
-                        viewer.render()
-                    if _sys.stdin in _sel.select([_sys.stdin], [], [], 0.05)[0]:
-                        _sys.stdin.readline()
-                        break
+                    self._execute_gripper_pair(action_name, left_action, right_action)
+                    if action_name == "close_gripper":
+                        self._update_place_targets_from_closed_grasp(sequence)
+                self._wait_step_mode(action_name)
+            if move_index != len(self.MOVE_ACTION_NAMES):
+                raise RuntimeError(f"planned {move_index} move actions, expected {len(self.MOVE_ACTION_NAMES)}")
+        else:
+            print("[piper-ik] Phase 2: validated trajectory replay")
+            sequence = self._sequence_from_loaded_trajectory()
+            move_index = 0
+            for action_name, left_action, right_action in sequence:
+                print(f"[piper-ik] replay {action_name}: {left_action.action} / {right_action.action}")
+                if left_action.action == "move":
+                    left_result = deepcopy(self.left_joint_path[move_index])
+                    right_result = deepcopy(self.right_joint_path[move_index])
+                    self._execute_move_pair(
+                        action_name, left_action, right_action, left_result, right_result)
+                    move_index += 1
+                else:
+                    self._execute_gripper_pair(action_name, left_action, right_action)
+                self._wait_step_mode(action_name)
 
         self.info["info"] = {
             "{A}": f"001_bottle/base{self.bottle1_id}",
@@ -453,6 +546,65 @@ class pick_diverse_bottles_piper_ik(pick_diverse_bottles):
         }
         print("[piper-ik] play_once finished")
         return self.info
+
+    def save_traj_data(self, idx):
+        """Save a named, versioned trajectory that cannot be confused with legacy paths."""
+        for action_name, left_result, right_result in zip(
+                self.MOVE_ACTION_NAMES, self.left_joint_path, self.right_joint_path):
+            self._validate_plan_result(left_result, "left", action_name)
+            self._validate_plan_result(right_result, "right", action_name)
+        if len(self.left_joint_path) != len(self.MOVE_ACTION_NAMES):
+            raise ValueError("trajectory does not contain all required move actions")
+        trajectory = {
+            "schema": self.TRAJECTORY_SCHEMA,
+            "version": self.TRAJECTORY_VERSION,
+            "ik_version": self.ik_version,
+            "move_action_names": list(self.MOVE_ACTION_NAMES),
+            "targets": deepcopy(self._trajectory_targets),
+            "left_joint_path": deepcopy(self.left_joint_path),
+            "right_joint_path": deepcopy(self.right_joint_path),
+        }
+        trajectory_dir = os.path.join(self.save_dir, "_traj_data")
+        os.makedirs(trajectory_dir, exist_ok=True)
+        file_path = os.path.join(trajectory_dir, f"episode{idx}.pkl")
+        with open(file_path, "wb") as file:
+            pickle.dump(trajectory, file)
+        print(f"[piper-ik] trajectory v{self.TRAJECTORY_VERSION} saved: {file_path}")
+
+    def load_tran_data(self, idx):
+        file_path = os.path.join(self.save_dir, "_traj_data", f"episode{idx}.pkl")
+        with open(file_path, "rb") as file:
+            trajectory = pickle.load(file)
+        if trajectory.get("schema") != self.TRAJECTORY_SCHEMA or trajectory.get("version") != self.TRAJECTORY_VERSION:
+            raise ValueError(
+                f"legacy/incompatible trajectory '{file_path}'; expected "
+                f"{self.TRAJECTORY_SCHEMA} v{self.TRAJECTORY_VERSION}. Re-run Phase 1 with a fresh output directory."
+            )
+        if trajectory.get("ik_version") != self.ik_version:
+            raise ValueError(
+                f"trajectory IK version {trajectory.get('ik_version')} != task IK version {self.ik_version}"
+            )
+        if tuple(trajectory.get("move_action_names", ())) != self.MOVE_ACTION_NAMES:
+            raise ValueError(f"trajectory action order is invalid: {trajectory.get('move_action_names')}")
+        for side in ("left", "right"):
+            paths = trajectory.get(f"{side}_joint_path")
+            if not isinstance(paths, list) or len(paths) != len(self.MOVE_ACTION_NAMES):
+                raise ValueError(f"{side} trajectory count is invalid")
+            for action_name, result in zip(self.MOVE_ACTION_NAMES, paths):
+                self._validate_plan_result(result, side, action_name)
+        targets = trajectory.get("targets")
+        for side in ("left", "right"):
+            if not isinstance(targets, dict) or set(targets.get(side, {})) != set(self.MOVE_ACTION_NAMES):
+                raise ValueError(f"{side} trajectory targets are missing or invalid")
+        self._loaded_trajectory_metadata = {
+            "schema": trajectory["schema"],
+            "version": trajectory["version"],
+            "ik_version": trajectory["ik_version"],
+            "move_action_names": trajectory["move_action_names"],
+            "targets": deepcopy(trajectory["targets"]),
+        }
+        print(f"[piper-ik] validated trajectory loaded: {file_path}")
+        return trajectory
 
     def check_success(self):
         """检查抓取是否成功，并打印调试信息。"""
@@ -470,10 +622,10 @@ class pick_diverse_bottles_piper_ik(pick_diverse_bottles):
         success = (
             abs(b1_pose[0] - bottle1_target[0]) < eps
             and abs(b1_pose[1] - bottle1_target[1]) < eps
-            and b1_pose[2] > 0.89
+            and b1_pose[2] > 0.78
             and abs(b2_pose[0] - bottle2_target[0]) < eps
             and abs(b2_pose[1] - bottle2_target[1]) < eps
-            and b2_pose[2] > 0.89
+            and b2_pose[2] > 0.78
         )
 
         # 记录最近一次 success 状态（供视频重命名用）
@@ -495,7 +647,7 @@ class pick_diverse_bottles_piper_ik(pick_diverse_bottles):
         return success
 
     def merge_pkl_to_hdf5_video(self):
-        """合并 pkl 为 hdf5+mp4，包含 head + third_view 双路视频，标注 success/fail。"""
+        """Merge observations into HDF5 and one video per available RGB camera."""
         import os as _os, numpy as _np
         from envs.utils.pkl2hdf5 import load_pkl_file, parse_dict_structure, append_data_to_structure, images_to_video
         import h5py as _h5py
@@ -504,6 +656,7 @@ class pick_diverse_bottles_piper_ik(pick_diverse_bottles):
             return
 
         cache_path = self.folder_path["cache"]
+        self.check_success()
         tag = "succ" if getattr(self, "_last_success", False) else "fail"
         hdf5_path = f"{self.save_dir}/data/episode{self.ep_num}_{tag}.hdf5"
         os.makedirs(f"{self.save_dir}/data", exist_ok=True)
@@ -527,14 +680,18 @@ class pick_diverse_bottles_piper_ik(pick_diverse_bottles):
         for pf in pkl_files:
             append_data_to_structure(data_list, load_pkl_file(pf))
 
-        # 为所有 camera 生成 mp4（包括 Piper config 中新增的 third_camera）
-        for cam_name in ["head_camera", "front_camera", "side_camera", "third_camera",
-                         "third_view", "observer", "third_view_rgb"]:
-            if cam_name in data_list.get("observation", {}):
-                cam_rgb = _np.array(data_list["observation"][cam_name]["rgb"])
+        # Generate videos for every static/wrist RGB camera, including
+        # third_camera (right side) and opposite_top_camera (opposite overhead).
+        for cam_name, cam_data in data_list.get("observation", {}).items():
+            if isinstance(cam_data, dict) and "rgb" in cam_data:
+                cam_rgb = _np.array(cam_data["rgb"])
                 cam_video = f"{self.save_dir}/video/episode{self.ep_num}_{tag}_{cam_name}.mp4"
                 images_to_video(cam_rgb, out_path=cam_video)
                 print(f"[piper-ik] {cam_name} video: {cam_video}")
+        if "third_view_rgb" in data_list:
+            cam_video = f"{self.save_dir}/video/episode{self.ep_num}_{tag}_third_view.mp4"
+            images_to_video(_np.array(data_list["third_view_rgb"]), out_path=cam_video)
+            print(f"[piper-ik] third_view video: {cam_video}")
 
         # hdf5
         with _h5py.File(hdf5_path, "w") as f:

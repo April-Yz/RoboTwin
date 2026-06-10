@@ -2041,3 +2041,11 @@
 - 使用说明：
   - viewer 命令保留 `--debug_viewer_overlay`，用于显示 target axis、top-1 C 型夹爪 actor、head/third camera 轴与 frustum。
   - 文档标注当前未启用 R1/AnyGrasp 路径中的 roll/up 约束，后续若要限制腕部相机朝上或拒绝错误 roll，需要改 planner/wrapper。
+
+## 2026-06-10（Piper IK V1-V4 新命令）
+
+- 新配置：`demo_piper_ik_seq_v1`、`demo_piper_ik_seq_v2`、`demo_piper_ik_seq_v3`、`demo_piper_ik_seq_v4`。
+- Viewer：`python view_pick_diverse_bottles_piper_ik_motion.py --ik_version vN --seed 0 --max_seed_tries 50 --require_success 1`。
+- 采集：`bash collect_data.sh pick_diverse_bottles_piper_ik demo_piper_ik_seq_vN 0`。
+- Headless：使用 `unset DISPLAY`、`--render_freq 0 --show_axes 0 --hold 0`。
+- 文档：更新 `COMMAND_LIBRARY.zh.md`，新增 `agent-read/COMMANDS/piper_ik_cartesian.zh.md`。

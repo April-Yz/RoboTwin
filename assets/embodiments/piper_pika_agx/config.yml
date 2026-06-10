@@ -140,13 +140,27 @@ static_camera_list:
 - name: third_camera
   type: D435
   position:
-  - -0.032
-  - 0.45
-  - 1.35
+  - 0.85
+  - 0.0
+  - 1.2
   forward:
+  - -0.7
+  - 0.2
+  - -0.7
+  left:
   - 0
-  - -0.6
-  - -0.8
+  - -1
+  - 0
+- name: opposite_top_camera
+  type: D435
+  position:
+  - 0.1
+  - 0.58
+  - 1.7
+  forward:
+  - -0.1
+  - -0.58
+  - -0.95
   left:
   - -1
   - 0

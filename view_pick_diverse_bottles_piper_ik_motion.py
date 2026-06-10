@@ -22,8 +22,9 @@ from envs import CONFIGS_PATH
 from view_pick_diverse_bottles_piper_scene import add_scene_debug_axes
 
 
-def run_one_episode(task_cls, build_args, seed_start, max_tries, show_axes, ik_version, step_mode=False):
-    """加载一个 stable scene 并执行 play_once。返回 (success, seed)。"""
+def run_one_episode(task_cls, build_args, seed_start, max_tries, show_axes, ik_version,
+                    step_mode=False, require_success=True):
+    """Load stable scenes until one completes and, by default, physically succeeds."""
     task = None
     for seed in range(seed_start, seed_start + max_tries):
         task = task_cls()
@@ -31,27 +32,35 @@ def run_one_episode(task_cls, build_args, seed_start, max_tries, show_axes, ik_v
             task.setup_demo(now_ep_num=0, seed=seed, **build_args)
             if show_axes:
                 add_scene_debug_axes(task)
-            # 等待 viewer 窗口真正打开（而非固定帧数）
-            print(f"[motion-viewer] waiting for viewer window to open...")
-            viewer_ready = False
-            for i in range(600):  # 最多等 12 秒
-                task._update_render()
-                viewer = getattr(task, "viewer", None)
-                if viewer is not None:
-                    window = getattr(viewer, "window", None)
-                    if window is not None:
-                        if not viewer_ready:
-                            print(f"[motion-viewer] viewer window ready after {i+1} frames")
-                            viewer_ready = True
-                        # 窗口就绪后再渲染 5 帧确保内容可见
-                        if i > 5:
-                            break
-                time.sleep(0.02)
-            if not viewer_ready:
-                print(f"[motion-viewer] WARNING: viewer window not detected, proceeding anyway")
+            if build_args["render_freq"]:
+                print("[motion-viewer] waiting for viewer window to open...")
+                viewer_ready = False
+                for i in range(600):  # 最多等 12 秒
+                    task._update_render()
+                    viewer = getattr(task, "viewer", None)
+                    if viewer is not None:
+                        window = getattr(viewer, "window", None)
+                        if window is not None:
+                            if not viewer_ready:
+                                print(f"[motion-viewer] viewer window ready after {i+1} frames")
+                                viewer_ready = True
+                            if i > 5:
+                                break
+                    time.sleep(0.02)
+                if not viewer_ready:
+                    print("[motion-viewer] WARNING: viewer window not detected, proceeding anyway")
+            else:
+                print("[motion-viewer] headless validation mode")
             if step_mode:
                 task._step_mode = True
             task.play_once()
+            physical_success = bool(task.plan_success and task.check_success())
+            if require_success and not physical_success:
+                print(f"[motion-viewer] seed={seed} completed but physical task failed")
+                task.close_env()
+                task = None
+                continue
+            print(f"[motion-viewer] seed={seed} physical_success={physical_success}")
             return True, seed, task
         except Exception as exc:
             print(f"[motion-viewer] seed={seed} FAILED: {exc}")
@@ -78,9 +87,11 @@ def main() -> None:
     parser.add_argument("--hold", type=int, default=1)
     parser.add_argument("--step_mode", type=int, default=0,
                         help="逐步确认模式：每个动作后等待终端回车才继续（1=启用）")
+    parser.add_argument("--require_success", type=int, default=1,
+                        help="1=跳过物理抓放失败的 seed；0=只要求轨迹执行完成")
     args_cli = parser.parse_args()
 
-    task_config = f"demo_piper_ik_{args_cli.ik_version}"
+    task_config = f"demo_piper_ik_seq_{args_cli.ik_version}"
     config_path = f"./task_config/{task_config}.yml"
     if not os.path.exists(config_path):
         print(f"[motion-viewer] config not found: {config_path}")
@@ -96,6 +107,7 @@ def main() -> None:
     build_args["save_data"] = False
     build_args["collect_data"] = False
     build_args["skip_planner"] = True
+    build_args["save_all_episodes"] = False
 
     with open(os.path.join(CONFIGS_PATH, "_embodiment_config.yml"), "r", encoding="utf-8") as f:
         embodiment_types = yaml.load(f.read(), Loader=yaml.FullLoader)
@@ -135,6 +147,7 @@ def main() -> None:
         ok, used_seed, task = run_one_episode(
             task_cls, build_args, next_seed, args_cli.max_seed_tries,
             args_cli.show_axes, args_cli.ik_version, args_cli.step_mode,
+            bool(args_cli.require_success),
         )
 
         if not ok:

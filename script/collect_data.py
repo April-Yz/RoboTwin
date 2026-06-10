@@ -193,8 +193,13 @@ def run(TASK_ENV, args):
         st_idx = 0
 
         def exist_hdf5(idx):
-            file_path = os.path.join(args["save_path"], 'data', f'episode{idx}.hdf5')
-            return os.path.exists(file_path)
+            data_dir = os.path.join(args["save_path"], "data")
+            file_names = (
+                f"episode{idx}.hdf5",
+                f"episode{idx}_succ.hdf5",
+                f"episode{idx}_fail.hdf5",
+            )
+            return any(os.path.exists(os.path.join(data_dir, name)) for name in file_names)
 
         while exist_hdf5(st_idx):
             st_idx += 1
