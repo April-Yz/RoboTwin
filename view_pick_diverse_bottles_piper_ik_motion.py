@@ -1,10 +1,11 @@
 """Motion viewer for Piper IK tasks (V1-V4).
 
 Usage:
+  # 单次运行
   python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v1 --seed 0
-  python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v2 --seed 0
-  python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v3 --seed 0
-  python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v4 --seed 0
+
+  # 连续运行 10 个 episode（自动找 stable seed，episode 间延时 2s）
+  python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v1 --num_episodes 10 --episode_delay 2.0
 """
 
 import os
@@ -21,15 +22,62 @@ from envs import CONFIGS_PATH
 from view_pick_diverse_bottles_piper_scene import add_scene_debug_axes
 
 
+def run_one_episode(task_cls, build_args, seed_start, max_tries, show_axes, ik_version, step_mode=False):
+    """加载一个 stable scene 并执行 play_once。返回 (success, seed)。"""
+    task = None
+    for seed in range(seed_start, seed_start + max_tries):
+        task = task_cls()
+        try:
+            task.setup_demo(now_ep_num=0, seed=seed, **build_args)
+            if show_axes:
+                add_scene_debug_axes(task)
+            # 等待 viewer 窗口真正打开（而非固定帧数）
+            print(f"[motion-viewer] waiting for viewer window to open...")
+            viewer_ready = False
+            for i in range(600):  # 最多等 12 秒
+                task._update_render()
+                viewer = getattr(task, "viewer", None)
+                if viewer is not None:
+                    window = getattr(viewer, "window", None)
+                    if window is not None:
+                        if not viewer_ready:
+                            print(f"[motion-viewer] viewer window ready after {i+1} frames")
+                            viewer_ready = True
+                        # 窗口就绪后再渲染 5 帧确保内容可见
+                        if i > 5:
+                            break
+                time.sleep(0.02)
+            if not viewer_ready:
+                print(f"[motion-viewer] WARNING: viewer window not detected, proceeding anyway")
+            if step_mode:
+                task._step_mode = True
+            task.play_once()
+            return True, seed, task
+        except Exception as exc:
+            print(f"[motion-viewer] seed={seed} FAILED: {exc}")
+            try:
+                task.close_env()
+            except Exception:
+                pass
+            task = None
+    return False, seed_start, None
+
+
 def main() -> None:
     parser = ArgumentParser()
     parser.add_argument("--task_name", default="pick_diverse_bottles_piper_ik")
     parser.add_argument("--ik_version", default="v1", choices=["v1", "v2", "v3", "v4"])
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--max_seed_tries", type=int, default=50)
+    parser.add_argument("--num_episodes", type=int, default=1,
+                        help="连续运行 episode 数量（>1 时自动循环）")
+    parser.add_argument("--episode_delay", type=float, default=2.0,
+                        help="episode 间保持 viewer 的秒数")
     parser.add_argument("--render_freq", type=int, default=1)
     parser.add_argument("--show_axes", type=int, default=1)
     parser.add_argument("--hold", type=int, default=1)
+    parser.add_argument("--step_mode", type=int, default=0,
+                        help="逐步确认模式：每个动作后等待终端回车才继续（1=启用）")
     args_cli = parser.parse_args()
 
     task_config = f"demo_piper_ik_{args_cli.ik_version}"
@@ -39,93 +87,88 @@ def main() -> None:
         sys.exit(1)
 
     with open(config_path, "r", encoding="utf-8") as f:
-        args = yaml.load(f.read(), Loader=yaml.FullLoader)
+        build_args = yaml.load(f.read(), Loader=yaml.FullLoader)
 
-    args["task_name"] = args_cli.task_name
-    args["task_config"] = task_config
-    args["render_freq"] = args_cli.render_freq
-    args["need_plan"] = True
-    args["save_data"] = False
-    args["collect_data"] = False
-    args["skip_planner"] = True
+    build_args["task_name"] = args_cli.task_name
+    build_args["task_config"] = task_config
+    build_args["render_freq"] = args_cli.render_freq
+    build_args["need_plan"] = True
+    build_args["save_data"] = False
+    build_args["collect_data"] = False
+    build_args["skip_planner"] = True
 
     with open(os.path.join(CONFIGS_PATH, "_embodiment_config.yml"), "r", encoding="utf-8") as f:
         embodiment_types = yaml.load(f.read(), Loader=yaml.FullLoader)
 
-    embodiment = args["embodiment"]
+    embodiment = build_args["embodiment"]
 
     def embodiment_file(name):
         return embodiment_types[name]["file_path"]
 
     if len(embodiment) == 3:
-        args["left_robot_file"] = embodiment_file(embodiment[0])
-        args["right_robot_file"] = embodiment_file(embodiment[1])
-        args["embodiment_dis"] = embodiment[2]
-        args["dual_arm_embodied"] = False
+        build_args["left_robot_file"] = embodiment_file(embodiment[0])
+        build_args["right_robot_file"] = embodiment_file(embodiment[1])
+        build_args["embodiment_dis"] = embodiment[2]
+        build_args["dual_arm_embodied"] = False
         embodiment_name = f"{embodiment[0]}+{embodiment[1]}"
     else:
         raise ValueError("embodiment must contain 3 values")
 
-    args["left_embodiment_config"] = get_embodiment_config(args["left_robot_file"])
-    args["right_embodiment_config"] = get_embodiment_config(args["right_robot_file"])
-    args["embodiment_name"] = embodiment_name
+    build_args["left_embodiment_config"] = get_embodiment_config(build_args["left_robot_file"])
+    build_args["right_embodiment_config"] = get_embodiment_config(build_args["right_robot_file"])
+    build_args["embodiment_name"] = embodiment_name
 
-    print(f"[motion-viewer] task={args_cli.task_name} ik_version={args_cli.ik_version} seed_start={args_cli.seed}")
+    print(f"[motion-viewer] task={args_cli.task_name} ik_version={args_cli.ik_version} "
+          f"num_episodes={args_cli.num_episodes} seed_start={args_cli.seed}")
     print(f"[motion-viewer] embodiment={embodiment_name}")
-    print("[motion-viewer] executing play_once with Piper IK planner")
 
-    task = None
-    loaded_seed = None
-    for seed in range(args_cli.seed, args_cli.seed + args_cli.max_seed_tries):
-        task = class_decorator(args_cli.task_name)
-        try:
-            task.setup_demo(now_ep_num=0, seed=seed, **args)
-            loaded_seed = seed
-            break
-        except Exception as exc:
-            print(f"[motion-viewer] skip seed={seed}: {exc}")
-            try:
-                task.close_env()
-            except Exception:
-                pass
-            task = None
+    import importlib
+    envs_module = importlib.import_module(f"envs.{args_cli.task_name}")
+    task_cls = getattr(envs_module, args_cli.task_name)
 
-    if task is None or loaded_seed is None:
-        raise RuntimeError(
-            f"failed to load a stable scene from seed {args_cli.seed} "
-            f"to {args_cli.seed + args_cli.max_seed_tries - 1}"
+    success_count = 0
+    next_seed = args_cli.seed
+
+    for ep in range(args_cli.num_episodes):
+        print(f"\n[motion-viewer] === Episode {ep+1}/{args_cli.num_episodes} (seed_start={next_seed}) ===")
+
+        ok, used_seed, task = run_one_episode(
+            task_cls, build_args, next_seed, args_cli.max_seed_tries,
+            args_cli.show_axes, args_cli.ik_version, args_cli.step_mode,
         )
 
-    print(f"[motion-viewer] loaded stable scene seed={loaded_seed}")
-    if args_cli.show_axes:
-        add_scene_debug_axes(task)
+        if not ok:
+            print(f"[motion-viewer] Episode {ep+1}: ALL SEEDS FAILED from {next_seed}")
+            break
 
-    try:
-        task.play_once()
-        print("[motion-viewer] play_once finished")
-        if args_cli.hold:
-            print("[motion-viewer] holding viewer; close window or Ctrl-C to exit")
-            while True:
-                task._update_render()
-                viewer = getattr(task, "viewer", None)
-                if viewer is None or getattr(viewer, "window", None) is None:
-                    print("[motion-viewer] viewer window closed")
-                    break
-                try:
-                    viewer.render()
-                except AttributeError as exc:
-                    if "should_close" not in str(exc):
-                        raise
-                    print("[motion-viewer] viewer window closed")
-                    break
-                time.sleep(0.02)
-    except KeyboardInterrupt:
-        pass
-    finally:
+        success_count += 1
+        next_seed = used_seed + 1
+        print(f"[motion-viewer] Episode {ep+1}: seed={used_seed} FINISHED (total_ok={success_count})")
+
+        # 短暂保持 viewer 显示结果
+        hold_start = time.time()
+        while time.time() - hold_start < args_cli.episode_delay:
+            task._update_render()
+            viewer = getattr(task, "viewer", None)
+            if viewer is None or getattr(viewer, "window", None) is None:
+                break
+            try:
+                viewer.render()
+            except AttributeError:
+                break
+            time.sleep(0.02)
+
+        # 关闭当前 episode 的 viewer
         try:
             task.close_env()
         except Exception:
             pass
+
+    print(f"\n[motion-viewer] DONE: {success_count}/{args_cli.num_episodes} episodes succeeded")
+
+    # 最后一个 episode 保持 viewer（如果 hold=1 且只有 1 个 episode）
+    if args_cli.num_episodes == 1 and success_count == 1:
+        print("[motion-viewer] single-episode mode: viewer already closed")
 
 
 if __name__ == "__main__":

@@ -5310,7 +5310,7 @@ done
 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh \
   --gpu 2 --ids 1 --viewer --viewer_wait_at_end 1 --tasks pick_diverse_bottles \
   --debug_viewer_overlay \
-  --foundation_pose_retreat_m 0.08 \
+  --foundation_pose_retreat_m 0.10 \
   --approach_offset_m 0.07 \
   --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-5_pregrasp15_grasp8_debug_viewer
 ```
@@ -5867,6 +5867,9 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate R
 
 # 数据采集（生成 hdf5）
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper_ik demo_piper_ik_v1 0
+
+# 连续 10 episode（自动找 stable seed，episode 间延时 2s）
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v1 --num_episodes 10 --episode_delay 2.0 --seed 0 --max_seed_tries 50
 ```
 
 ### V2 命令（三次样条 — 更平滑）
@@ -5898,7 +5901,7 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate R
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && DISPLAY=:1.0 timeout 120s python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v3 --seed 0 --max_seed_tries 10 --hold 0
 
 # 数据采集
-source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper_ik demo_piper_ik_v3 0
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper_ik demo_piper_ik_v3 1
 ```
 
 ### V4 命令（多种子 — 最高成功率）
@@ -5914,9 +5917,38 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate R
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && DISPLAY=:1.0 timeout 120s python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v4 --seed 0 --max_seed_tries 10 --hold 0
 
 # 数据采集
-source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper_ik demo_piper_ik_v4 0
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper_ik demo_piper_ik_v4 2
 ```
 
+
+### V1-V4 统一命令（2026-06-08 更新，6步流程 + approach方向修正）
+
+```bash
+# === V1 (推荐) ===
+# 运动 viewer（6步：pregrasp→grasp→close→lift→place→open）
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v1 --seed 0 --max_seed_tries 50
+
+# 逐步确认模式
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v1 --step_mode 1 --seed 0 --max_seed_tries 50
+
+# 连续 10 episode
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v1 --num_episodes 10 --episode_delay 2.0 --seed 0 --max_seed_tries 50
+
+# 场景 viewer
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_scene.py --task_name pick_diverse_bottles_piper_ik --task_config demo_piper_ik_v1 --seed 0 --max_seed_tries 50
+
+# 数据采集
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper_ik demo_piper_ik_v1 0
+
+# === V2 ===
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v2 --seed 0 --max_seed_tries 50
+
+# === V3 ===
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v3 --seed 0 --max_seed_tries 50
+
+# === V4 ===
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v4 --seed 0 --max_seed_tries 50
+```
 状态：2026-06-05 V1 motion viewer 和 scene viewer 均已验证通过（seed=2，IK 求解成功，pregrasp/grasp/gripper 完整执行）。
 
 ---
@@ -5966,4 +5998,494 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate R
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_scene.py --task_name pick_diverse_bottles_piper_ik --task_config demo_piper_ik_v1 --seed 0 --max_seed_tries 50
 
 # V2-V4 同理替换 demo_piper_ik_v{2,3,4}
+```
+
+---
+
+## O.0-5 更新 (2026-06-08 #2)：连续多 episode + 右手范围修正
+
+### 连续多 episode viewer
+
+新增 `--num_episodes N` 参数，自动连续运行 N 个 seed，episode 间短暂保持 viewer：
+
+```bash
+# V1 连续 10 个 episode
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v1 --num_episodes 10 --episode_delay 2.0 --seed 0 --max_seed_tries 50
+
+# V2 连续 10 个 episode
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v2 --num_episodes 10 --episode_delay 2.0 --seed 0 --max_seed_tries 50
+
+# V3 连续 10 个 episode
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v3 --num_episodes 10 --episode_delay 2.0 --seed 0 --max_seed_tries 50
+
+# V4 连续 10 个 episode
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v4 --num_episodes 10 --episode_delay 2.0 --seed 0 --max_seed_tries 50
+```
+
+参数说明：
+- `--num_episodes 10`：连续运行 10 个 episode（自动跳过 unstable seed）
+- `--episode_delay 2.0`：每个 episode 完成后保持 viewer 2 秒再进入下一个
+- 调小 `--episode_delay` 可加快连续运行速度
+- 终端会打印每个 episode 的进度 `Episode N/M: seed=X FINISHED (total_ok=Y)`
+
+### 右手范围修正 (2026-06-08)
+
+右臂基座位于 x≈0.556，原右瓶范围 x=[0.30, 0.50] 全部在基座左侧，导致右臂需跨身体够取。
+修正为 x=[0.38, 0.52]，使右瓶更靠近右臂自然 workspace。
+
+| 参数 | 修正前 | 修正后 |
+|---|---|---|
+| 右瓶 xlim | [0.30, 0.50] | [0.38, 0.52] |
+| 右放置目标 x | 0.48 | 0.52 |
+
+### 机器人不运动修复 (2026-06-08)
+
+根因：play_once 只调用了 set_arm_joints（设 PD 目标），未调用 scene.step()（物理步进）。
+修复：轨迹循环中添加 scene.step()，关节才会实际运动到目标位置。
+
+### V3 MotionGen 修复 (2026-06-08)
+
+- 添加 `**kwargs` 支持工厂函数传参
+- MotionGen 初始化异常捕获 → 降级为 IK + 三次样条插值
+
+---
+
+## O.0-5 更新 (2026-06-08 #3)：collect_data 修复 + 连续 episode 命令整理
+
+### collect_data GPU 卡死修复
+
+**错误**：`bash collect_data.sh pick_diverse_bottles_piper_ik demo_piper_ik_v1 0` 时，
+setup_demo → CuroboPlanner 初始化 → MotionGen.warmup() GPU 张量分配卡死。
+
+**根因**：config YAML 缺少 `skip_planner: true`。父类 `pick_diverse_bottles.setup_demo()`
+会初始化 CuroboPlanner（含 collision checking），在 Piper 上 GPU 卡死。
+
+**修复**：`demo_piper_ik_v{1,2,3,4}.yml` 全部添加 `skip_planner: true`。
+PiperIKPlanner 在 setup_demo 末尾独立初始化（含 `self_collision_check=False`），
+不受 skip_planner 影响。
+
+### 调试保存：save_all_episodes
+
+在 config YAML 中添加 `save_all_episodes: true` 可强制保存失败 episode 的 hdf5，
+方便回放分析 IK 失败原因：
+
+```yaml
+# demo_piper_ik_v1.yml 末尾添加：
+save_all_episodes: true
+```
+
+此时 `check_success()` 始终返回 True，collect_data 会保存所有 episode 数据。
+终端也会打印详细的 bottle 位置 vs target 距离信息：
+```
+[piper-ik][check] success=False b1=(-0.261,0.119,0.740) t1=(-0.28,-0.15) b1_z_ok=True dist1=0.270 ...
+```
+
+### viewer 预渲染修复
+
+在 `play_once()` 前增加 30 帧预渲染，确保 SAPIEN 窗口已打开可见，
+不会错过运动过程。
+
+### V1 连续 10 episode 命令（已整合到 V1 section）
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v1 --num_episodes 10 --episode_delay 2.0 --seed 0 --max_seed_tries 50
+```
+
+---
+
+## O.0-5 更新 (2026-06-08 #4)：collect_data 保存修复 + viewer 预热
+
+### gen2-10 问题分析
+
+gen2-10 运行的 collect_data 是在代码更新前启动的，缺少 `save_all_episodes`。
+需 Ctrl-C 终止后重跑。
+
+### 为什么 check_success 返回 False
+
+当前 IK task 的 play_once 只执行 pregrasp → grasp → gripper_close，
+不包含 lift → place 步骤，也不包含抓取物理（夹爪关闭不会附着瓶子）。
+因此瓶子始终保持原位附近，`check_success` 检查瓶子是否在目标位置会返回 False。
+
+日志示例：
+```
+[piper-ik][check] success=False b1=(-0.289,0.086,0.865) t1=(-0.280,-0.150) dist1=0.236
+```
+瓶子 z 从 0.740 升到 0.865（被推高 12cm），但未到达目标 y=-0.15。
+
+### 如何保存失败 episode 用于回放
+
+1. config YAML 已添加 `save_all_episodes: true`
+2. 重跑 collect_data：
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper_ik demo_piper_ik_v1 0
+```
+3. hdf5 文件会保存到 `data/pick_diverse_bottles_piper_ik/demo_piper_ik_v1/data/`
+4. 轨迹 pickle 文件在 `_traj_data/` 目录
+
+### viewer 预热优化
+
+预渲染帧数从 30 增加到 90（约 1.5 秒），第 1 个 episode 加载最慢（Vulkan 初始化），
+后续 episode 加载会快很多。
+
+### 所有 V1 命令汇总
+
+```bash
+# 场景 viewer（只看坐标轴）
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_scene.py --task_name pick_diverse_bottles_piper_ik --task_config demo_piper_ik_v1 --seed 0 --max_seed_tries 50
+
+# 运动 viewer（单次）
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v1 --seed 0 --max_seed_tries 50
+
+# 运动 viewer（连续 10 episode）
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v1 --num_episodes 10 --episode_delay 2.0 --seed 0 --max_seed_tries 50
+
+# 无窗口 smoke 验证
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && DISPLAY=:1.0 timeout 120s python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v1 --seed 0 --max_seed_tries 10 --hold 0
+
+# 数据采集（含失败保存）
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper_ik demo_piper_ik_v1 0
+```
+
+---
+
+## O.0-5 更新 (2026-06-08 #5)：collect_data 全流程跑通 ✓
+
+### 完整数据采集验证通过
+
+```text
+Phase 1: seed 5 → IK 求解 → play_once → save_traj_data (pickle) → check_success (save_all=True → 强制保存)
+Phase 2: 回放 pickle → 保存帧 → merge_pkl_to_hdf5_video → episode0.hdf5 + episode0.mp4
+
+输出：
+  data/pick_diverse_bottles_piper_ik/demo_piper_ik_v1/data/episode0.hdf5 (268KB)
+  data/pick_diverse_bottles_piper_ik/demo_piper_ik_v1/video/episode0.mp4  (15KB)
+```
+
+### 核心修复汇总
+
+1. `folder_path` 初始化：setup_demo 中确保 folder_path 存在
+2. Phase 1/2 兼容：play_once 在 Phase 1 将规划结果存入 left_joint_path，Phase 2 从中回放
+3. 帧保存：Phase 2 回放时调用 _take_picture() → hdf5 merge
+4. save_all_episodes：check_success 强制返回 True，失败 episode 也保存
+5. skip_planner：所有 config YAML 添加此标志，避免 CuroboPlanner GPU 卡死
+6. URDF 修正：IK solver 使用 piper_pika_agx.urdf（匹配 SAPIEN 仿真）
+7. viewer 预热：90 帧预渲染确保运动过程可见
+8. 右手范围修正：xlim [0.38, 0.52]，避免跨身体够取
+
+---
+
+## O.0-5 更新 (2026-06-08 #6)：viewer 智能等待 + 视频标注 + 多视角
+
+### viewer 智能等待
+
+不再使用固定帧数预热，改为轮询 `viewer.window` 直到窗口真正创建：
+- 最多等待 600 帧（12 秒）
+- 检测到窗口后再渲染 5 帧确保内容可见
+- 日志：`viewer window ready after N frames`
+
+### 视频文件名加 success/fail 标注
+
+`merge_pkl_to_hdf5_video()` 重写：合并完成后将文件重命名：
+- `episode0.mp4` → `episode0_fail.mp4` 或 `episode0_succ.mp4`
+- `episode0.hdf5` → `episode0_fail.hdf5` 或 `episode0_succ.hdf5`
+
+### 多视角采集
+
+所有 config YAML 启用 `third_view: true` + `observer: true`：
+- head_camera: 正常 D435 视角（320×240, 30fps）
+- observer: 第三人称全局视角（位置由 SAPIEN 自动管理）
+- 两路视频帧均存入 hdf5
+
+### head camera 位置确认
+
+当前 head camera 使用 Piper 标定 config 的位置：
+```yaml
+# piper_pika_agx/config.yml → static_camera_list
+position: [-0.032, -0.45, 1.35]   # 桌面上方，y=-0.45, z=1.35
+forward: [0, 0.6, -0.8]            # 向前下方俯瞰
+left: [-1, 0, 0]
+```
+与 ALOHA config 位置相同（y=-0.45, z=1.35），居中俯瞰桌面。
+
+### GPU 占用说明
+
+collect_data 需要 GPU（Curobo IK 求解）。当前 GPU 0/1 均为 100% 占用（~77GB/98GB），
+collect_data 会因 GPU 内存不足而卡死。等待 GPU 空闲后重跑即可。
+
+### V1 命令汇总（最终版）
+
+```bash
+# 场景 viewer
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_scene.py --task_name pick_diverse_bottles_piper_ik --task_config demo_piper_ik_v1 --seed 0 --max_seed_tries 50
+
+# 运动 viewer（单次）
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v1 --seed 0 --max_seed_tries 50
+
+# 运动 viewer（连续 10 episode）
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v1 --num_episodes 10 --episode_delay 2.0 --seed 0 --max_seed_tries 50
+
+# 数据采集（episode_num=5，含 save_all + succ/fail 标注 + 多视角）
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper_ik demo_piper_ik_v1 0
+```
+
+---
+
+## O.0-5 更新 (2026-06-08 #7)：step_mode 交互确认 + third_view mp4
+
+### 交互确认模式
+
+新增 `--step_mode 1` 参数。每个动作（pregrasp → grasp → gripper）执行完毕后，
+终端输出 `[step-mode] Step move_0 done. Press Enter to continue...`，
+等待用户按回车才继续下一步。
+
+```bash
+# V1 逐步确认模式
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v1 --step_mode 1 --seed 0 --max_seed_tries 50
+
+# V1 逐步确认 + 连续 3 episode
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v1 --num_episodes 3 --step_mode 1 --seed 0 --max_seed_tries 50
+```
+
+终端输出示例：
+```
+[piper-ik] Step 1.0: move / move
+... (pregrasp 运动完成)
+[piper-ik][step-mode] Step move_0 done. Press Enter to continue...
+[piper-ik] Step 1.1: move / move
+... (grasp 运动完成)
+[piper-ik][step-mode] Step move_1 done. Press Enter to continue...
+[piper-ik] Step 1.2: gripper / gripper
+... (夹爪关闭完成)
+[piper-ik][step-mode] Step gripper_2 done. Press Enter to continue...
+```
+
+### head camera 确认
+
+Piper 和 ALOHA 使用完全相同的 head camera 位置：
+```yaml
+# piper_pika_agx/config.yml → static_camera_list
+position: [-0.032, -0.45, 1.35]   # 桌面居中上方
+forward: [0, 0.6, -0.8]            # 向前下方俯瞰
+```
+两个 embodiment config 的 head_camera 参数完全一致。
+
+### third_view mp4 生成
+
+`merge_pkl_to_hdf5_video()` 重写，同时生成两路 mp4：
+- `episode0_fail_head.mp4`  — head_camera 视角（原有）
+- `episode0_fail_third.mp4` — third_view / observer 全局视角（新增）
+- `episode0_fail.hdf5`      — 完整数据
+
+### V1 全部命令汇总
+
+```bash
+# 场景 viewer（只看坐标轴）
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_scene.py --task_name pick_diverse_bottles_piper_ik --task_config demo_piper_ik_v1 --seed 0 --max_seed_tries 50
+
+# 运动 viewer（单次）
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v1 --seed 0 --max_seed_tries 50
+
+# 运动 viewer（逐步确认，每步按回车）
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v1 --step_mode 1 --seed 0 --max_seed_tries 50
+
+# 运动 viewer（连续 10 episode）
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v1 --num_episodes 10 --episode_delay 2.0 --seed 0 --max_seed_tries 50
+
+# 数据采集（多视角 + succ/fail 标注）
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper_ik demo_piper_ik_v1 0
+```
+
+---
+
+## O.0-5 更新 (2026-06-08 #8)：step_mode 非阻塞等待 + 新增 Piper 视角 camera
+
+### step_mode 非阻塞修复
+
+原 `input()` 阻塞主线程 → SAPIEN viewer 无法渲染 → 窗口在确认后才出现。
+
+修复为 `select.select` 非阻塞轮询：每 50ms 检查 stdin 同时持续调 `_update_render()`，
+viewer 在等待确认期间保持渲染。交互终端中正常使用：
+
+```bash
+# V1 逐步确认（viewer 持续渲染）
+python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v1 --step_mode 1 --seed 0 --max_seed_tries 50
+```
+
+终端的 3 次回车对应 pregrasp → grasp → gripper 各一次确认，viewer 每个阶段保持可见。
+
+### 新增 Piper workspace 视角 camera
+
+`piper_pika_agx/config.yml` 新增两个 camera：
+
+| camera | 位置 | 朝向 | 用途 |
+|---|---|---|---|
+| `head_camera` | (-0.032, -0.45, 1.35) | 向前下方 | 俯视全局 (原有) |
+| `front_camera` | (0.12, 0.55, 1.05) | 向后方桌面 | 正面看 Piper 操作区 |
+| `side_camera` | (-0.8, 0.0, 1.2) | 向右看 | 侧面看左臂操作 |
+
+数据采集自动包含所有 camera 的 rgb 帧，`merge_pkl_to_hdf5_video` 为每个 camera 生成独立 mp4：
+```
+episode0_fail_head_camera.mp4
+episode0_fail_front_camera.mp4
+episode0_fail_side_camera.mp4
+episode0_fail_third_view.mp4       (observer 全局视角)
+episode0_fail.hdf5
+```
+
+### 数据采集命令（多视角）
+
+```bash
+# V1（8 路视频：head+front+side+third，各带 succ/fail 标注）
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper_ik demo_piper_ik_v1 0
+```
+
+---
+
+## O.0-5 更新 (2026-06-08 #9)：step_mode 渲染修复 + third_camera 对称视角
+
+### step_mode viewer 不渲染 → 已修复
+
+**根因**：`_update_render()` 只更新 scene 内部状态，不调用 `viewer.render()` 绘制到屏幕。
+step_mode 等待循环中缺了 `viewer.render()`，导致窗口标签存在但内容为空白。
+
+**修复**：等待循环中同时调用 `_update_render()` + `viewer.render()`，每 50ms 一帧。
+
+### Camera 最终配置（4 路固定视角 + 1 路 observer）
+
+`piper_pika_agx/config.yml` static_camera_list：
+
+| camera | 位置 | 朝向 | 说明 |
+|---|---|---|---|
+| `head_camera` | (-0.032, -0.45, 1.35) | 向前下方 | 俯视桌面 (原有) |
+| `front_camera` | (0.12, 0.55, 1.05) | 向后方桌面 | 正面看操作区 |
+| `side_camera` | (-0.8, 0.0, 1.2) | 向右看 | 左侧视角 |
+| `third_camera` | (-0.032, 0.45, 1.35) | 向后方桌面 | 与 head 关于桌面(y=0)对称 |
+| `third_view` (observer) | SAPIEN 自由视角 | - | 全局第三人称 |
+
+### 数据采集输出
+
+```bash
+bash collect_data.sh pick_diverse_bottles_piper_ik demo_piper_ik_v1 0
+
+# 每个 episode 输出：
+video/episode0_fail_head_camera.mp4
+video/episode0_fail_front_camera.mp4
+video/episode0_fail_side_camera.mp4
+video/episode0_fail_third_camera.mp4
+video/episode0_fail_third_view.mp4     (observer)
+data/episode0_fail.hdf5
+```
+
+### step_mode 交互确认命令
+
+```bash
+# V1 逐步确认（每步按回车，viewer 持续可见）
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v1 --step_mode 1 --seed 0 --max_seed_tries 50
+```
+
+---
+
+## O.0-5 更新 (2026-06-08 #10)：前进轴方向修正
+
+### pregrasp/grasp 方向修复
+
+原逻辑错误：pregrasp 在瓶子上方（top-down），而非原始 ALOHA 的"沿前进轴后方→前方"。
+
+**修复**：`_cartesian_grasp_actor` 改为与原始 `get_grasp_pose` 一致的逻辑：
+
+1. 从 bottle contact matrix 计算抓取坐标系
+2. approach_dir = 抓取坐标系局部 +X（前进方向）
+3. 根据 approach_dir 指向 base 还是背离 base 确定偏移方向
+4. pregrasp = contact + approach_dir × (±0.10) ← 机器人与瓶子之间
+5. grasp = pregrasp ± approach_dir × 0.08 ← 向瓶子前进
+
+**验证**（seed=3）：
+```
+左臂: base y=-0.25  bottle y=0.141
+      pregrasp y=0.048 → grasp y=0.122 (向瓶子前进 +Y) ✓
+右臂: base y=-0.27  bottle y=0.194
+      pregrasp y=0.100 → grasp y=0.175 (向瓶子前进 +Y) ✓
+FK 精度: 0.000m（pregrasp/grasp 完全准确）
+```
+
+### 6 步完整流程
+
+```
+Step 0 (pregrasp):      EE → 瓶子后方 10cm（沿前进轴，机器人与瓶子之间）
+Step 1 (grasp):         EE → 向前 8cm 到瓶子
+Step 2 (close_gripper): 夹爪关闭
+Step 3 (lift):          EE 抬升 25cm
+Step 4 (place):         EE → 放置目标
+Step 5 (open_gripper):  夹爪打开
+```
+
+### 运行命令
+
+```bash
+# 完整 6 步运动 viewer
+python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v1 --seed 0 --max_seed_tries 50
+
+# 逐步确认模式
+python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v1 --step_mode 1 --seed 0
+
+# 连续 10 episode
+python view_pick_diverse_bottles_piper_ik_motion.py --ik_version v1 --num_episodes 10 --episode_delay 2.0 --seed 0
+```
+
+---
+
+## O.0-5 数据采集状态 (2026-06-09)
+
+### 各版本采集结果
+
+| 版本 | 状态 | episode 数 | 视频 | hdf5 |
+|---|---|---|---|---|
+| V1 | ✓ 完成 | 5 (seed 3,4,7,10,11) | head/front/side ×5 | ✓ |
+| V2 | ✓ 完成 | 5 | head/front/side ×5 | ✓ |
+| V3 | △ 搜索中 | 0 | - | - |
+| V4 | ✓ 完成 | 5 | head/front/side ×5 | ✓ |
+
+### 已知问题
+
+1. **third_camera mp4 缺失**：已修复，`merge_pkl_to_hdf5_video` 添加 `third_camera` 到生成列表
+2. **pre_grasp_dis 不一致**：Phase 1 用 0.08、Phase 2 用 0.12，已统一为 0.12
+3. **指令 JSON 缺失**：`pick_diverse_bottles_piper_ik.json` 不存在，不影响数据采集（仅影响 instruction 生成）
+4. **V3 不稳定**：种子成功率低（大量 "Objects is unstable"），MotionGen 偶发失败
+
+### 采集的视频 vs viewer 差异
+
+采集视频是 Phase 2 回放（need_plan=False），从 pickle 读取 Phase 1 记录的关节轨迹回放。
+viewer 是 Phase 1 直接执行。两者运动应一致（轨迹来源相同）。
+如有明显差异，检查 pre_grasp_dis 是否一致（现已统一为 0.12）。
+
+### 数据采集命令（episode_num=5）
+
+```bash
+# V1
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper_ik demo_piper_ik_v1 0
+
+# V2
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper_ik demo_piper_ik_v2 0
+
+# V3 (不稳定)
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper_ik demo_piper_ik_v3 0
+
+# V4
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && bash collect_data.sh pick_diverse_bottles_piper_ik demo_piper_ik_v4 0
+```
+
+### 输出文件
+
+```
+data/pick_diverse_bottles_piper_ik/demo_piper_ik_v1/
+├── video/
+│   ├── episode0_fail_head_camera.mp4
+│   ├── episode0_fail_front_camera.mp4
+│   ├── episode0_fail_side_camera.mp4
+│   ├── episode0_fail_third_camera.mp4    (现已修复)
+│   └── ...
+├── data/
+│   ├── episode0_fail.hdf5
+│   └── ...
+└── seed.txt
 ```

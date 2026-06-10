@@ -136,8 +136,8 @@ class PiperIKBase:
             robot_cfg,
             None,
             rotation_threshold=0.02,
-            position_threshold=0.01,
-            num_seeds=1,
+            position_threshold=0.005,  # 更严格的位置精度
+            num_seeds=2,               # 多种子提高成功率
             self_collision_check=False,
             self_collision_opt=False,
             tensor_args=self.tensor_args,
@@ -428,7 +428,7 @@ class PiperIKPlannerV3(PiperIKBase):
       - 比直接用 MotionGen（随机种子）更可靠，因为种子已接近目标
     """
 
-    def __init__(self, robot_origin_pose, active_joints_name, all_joints, yml_path=None):
+    def __init__(self, robot_origin_pose, active_joints_name, all_joints, yml_path=None, **kwargs):
         super().__init__(robot_origin_pose, active_joints_name, all_joints, yml_path)
         self._init_motion_gen(yml_path)
 
@@ -437,33 +437,38 @@ class PiperIKPlannerV3(PiperIKBase):
             self._motion_gen = None
             return
 
-        with open(yml_path, "r") as f:
-            yml_data = yaml.safe_load(f)
+        try:
+            with open(yml_path, "r") as f:
+                yml_data = yaml.safe_load(f)
 
-        world_config = {
-            "cuboid": {
-                "table": {
-                    "dims": [0.7, 2, 0.04],
-                    "pose": [
-                        self.robot_origin_pose.p[1],
-                        0.0,
-                        0.74 - self.robot_origin_pose.p[2],
-                        1, 0, 0, 0.0,
-                    ],
-                },
+            world_config = {
+                "cuboid": {
+                    "table": {
+                        "dims": [0.7, 2, 0.04],
+                        "pose": [
+                            self.robot_origin_pose.p[1],
+                            0.0,
+                            0.74 - self.robot_origin_pose.p[2],
+                            1, 0, 0, 0.0,
+                        ],
+                    },
+                }
             }
-        }
 
-        motion_gen_config = MotionGenConfig.load_from_robot_config(
-            yml_path,
-            world_config,
-            interpolation_dt=1 / 250,
-            num_trajopt_seeds=1,
-        )
-        self._motion_gen = MotionGen(motion_gen_config)
-        self._motion_gen.warmup()
-        self._motion_gen_config = motion_gen_config
-        print("[piper-ik V3] MotionGen initialized (collision-aware)")
+            motion_gen_config = MotionGenConfig.load_from_robot_config(
+                yml_path,
+                world_config,
+                interpolation_dt=1 / 250,
+                num_trajopt_seeds=1,
+            )
+            self._motion_gen = MotionGen(motion_gen_config)
+            self._motion_gen.warmup()
+            self._motion_gen_config = motion_gen_config
+            print("[piper-ik V3] MotionGen initialized (collision-aware)")
+        except Exception as exc:
+            print(f"[piper-ik V3] MotionGen init FAILED: {exc}")
+            print("[piper-ik V3] falling back to IK + cubic interpolation (no collision)")
+            self._motion_gen = None
 
     def _solve_ik_impl(self, target_pos, target_quat, current_joints,
                        constraint_pose=None, arms_tag=None):
