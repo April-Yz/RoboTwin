@@ -2051,3 +2051,10 @@
 - Collection: `bash collect_data.sh pick_diverse_bottles_piper_ik demo_piper_ik_seq_vN 0`.
 - Headless: use `unset DISPLAY` with `--render_freq 0 --show_axes 0 --hold 0`.
 - Documentation: updated `COMMAND_LIBRARY.zh.md` and added `agent-read/COMMANDS/piper_ik_cartesian.en.md`.
+
+## 2026-06-11 (Isolated O.1 Foundation Collection Command)
+
+- Viewer adds `--task_config`, `--foundation_id`, and `--foundation_frame`.
+- Added `collect_foundation_piper_ik.sh <v1-v4> <id> [frame] [gpu]`, generating isolated config and output names by version, ID, and frame.
+- Updated O.1 in `COMMAND_LIBRARY.zh.md` and removed the unsafe base-config `sed -i` batch workflow.
+- Added `agent-read/COMMANDS/piper_ik_foundation.en.md`.

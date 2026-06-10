@@ -2722,3 +2722,14 @@
 - Validation: V1-V4 viewers physically succeeded at seed 3. V1 completed five episodes with seeds 3/6/10/14/18. V2/V3/V4 each completed a one-episode smoke collection with `_succ.hdf5`, v2 pickle, instructions, and six videos. Rerunning V1 confirmed existing `_succ.hdf5` files are skipped.
 - Final checks: `py_compile`, all four YAML configs, the prompt JSON, `bash -n collect_data.sh`, `git diff --check`, and the legacy-pickle rejection test passed.
 - Cleanup: removed reproducible V2/V3/V4 smoke configs and temporary outputs after validation; retained the full ignored V1 validation dataset.
+
+## 2026-06-11 (O.1 Foundation OBJ Grasp Fix)
+
+- O.1 now loads the cola/bottle OBJ paths from the NPZ instead of substituting `001_bottle`.
+- Corrected the actor-origin versus OBJ-geometric-center error and compute table clearance from the lowest rotated mesh point.
+- Bounds-derived cylinder proxy is the default collision; exact convex remains optional.
+- Added distance-gated grasp assist for the narrow source meshes and release drives on open or environment close.
+- Trajectories bind Foundation input, frame, collision mode, and mesh geometry. Semantic instruction values and the missing task prompt were added.
+- Replay skips planner initialization, fixing V3 Phase-2 multi-camera rendering slowdown.
+- Validation: V1-V4 viewers reported `physical_success=True`; full V1-V4 collection produced validated replay, `episode0_succ.hdf5`, six videos, and instructions. V3 fallback worked after MotionGen failure.
+- Cleanup: removed this run's reproducible O.1 HDF5 files, videos, caches, generated config, and temporary logs after structural validation.

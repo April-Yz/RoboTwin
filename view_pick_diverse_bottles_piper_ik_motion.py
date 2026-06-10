@@ -89,9 +89,20 @@ def main() -> None:
                         help="逐步确认模式：每个动作后等待终端回车才继续（1=启用）")
     parser.add_argument("--require_success", type=int, default=1,
                         help="1=跳过物理抓放失败的 seed；0=只要求轨迹执行完成")
+    parser.add_argument("--task_config", type=str, default="",
+                        help="覆盖自动推断的 config 名称 (例如 demo_piper_ik_foundation_v1)")
+    parser.add_argument("--foundation_id", type=int, default=-1,
+                        help="O.1: override foundation_input_<ID> without editing YAML")
+    parser.add_argument("--foundation_frame", type=int, default=-1,
+                        help="O.1: override the FoundationPose frame without editing YAML")
     args_cli = parser.parse_args()
 
-    task_config = f"demo_piper_ik_seq_{args_cli.ik_version}"
+    if args_cli.task_config:
+        task_config = args_cli.task_config
+    elif "foundation" in args_cli.task_name:
+        task_config = f"demo_piper_ik_foundation_{args_cli.ik_version}"
+    else:
+        task_config = f"demo_piper_ik_seq_{args_cli.ik_version}"
     config_path = f"./task_config/{task_config}.yml"
     if not os.path.exists(config_path):
         print(f"[motion-viewer] config not found: {config_path}")
@@ -99,6 +110,17 @@ def main() -> None:
 
     with open(config_path, "r", encoding="utf-8") as f:
         build_args = yaml.load(f.read(), Loader=yaml.FullLoader)
+
+    if args_cli.foundation_id >= 0:
+        current_dir = build_args.get("foundation_input_dir")
+        if not current_dir:
+            raise ValueError("--foundation_id requires foundation_input_dir in the selected config")
+        input_root = os.path.dirname(current_dir.rstrip("/"))
+        build_args["foundation_input_dir"] = os.path.join(
+            input_root, f"foundation_input_{args_cli.foundation_id}"
+        )
+    if args_cli.foundation_frame >= 0:
+        build_args["foundation_frame"] = args_cli.foundation_frame
 
     build_args["task_name"] = args_cli.task_name
     build_args["task_config"] = task_config

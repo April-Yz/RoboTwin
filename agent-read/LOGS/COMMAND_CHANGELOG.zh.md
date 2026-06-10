@@ -2049,3 +2049,10 @@
 - 采集：`bash collect_data.sh pick_diverse_bottles_piper_ik demo_piper_ik_seq_vN 0`。
 - Headless：使用 `unset DISPLAY`、`--render_freq 0 --show_axes 0 --hold 0`。
 - 文档：更新 `COMMAND_LIBRARY.zh.md`，新增 `agent-read/COMMANDS/piper_ik_cartesian.zh.md`。
+
+## 2026-06-11（O.1 Foundation 独立采集命令）
+
+- Viewer 新增 `--task_config`、`--foundation_id` 和 `--foundation_frame`。
+- 新增 `collect_foundation_piper_ik.sh <v1-v4> <id> [frame] [gpu]`，按版本/ID/frame 生成独立 config 与输出目录。
+- 更新 `COMMAND_LIBRARY.zh.md` O.1，删除原地 `sed -i` 修改基础 config 的错误批处理方式。
+- 新增 `agent-read/COMMANDS/piper_ik_foundation.zh.md`。

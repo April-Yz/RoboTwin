@@ -5,6 +5,7 @@ This repository extends RoboTwin simulation, collection, and policy workflows wi
 ## Current Recommended Workflow
 
 - Piper IK dual-bottle task: use `pick_diverse_bottles_piper_ik` with `demo_piper_ik_seq_v1..v4`.
+- Foundation OBJ comparison: use `pick_diverse_bottles_piper_ik_foundation` with `demo_piper_ik_foundation_v1..v4` to load positions and source meshes from NPZ files.
 - Default IK: V1. V2 uses cubic interpolation, V3 uses MotionGen with an IK-interpolation fallback, and V4 uses multi-seed IK.
 - Data flow: Phase 1 finds stable, physically successful seeds and saves versioned trajectories. Phase 2 validates and replays them in the same seeded scene, producing HDF5, videos, and instructions.
 - Cameras: head, front, side, right-side `third_camera`, opposite overhead `opposite_top_camera`, and top-level `third_view`.
@@ -17,4 +18,4 @@ This repository extends RoboTwin simulation, collection, and policy workflows wi
 - Task: `envs/pick_diverse_bottles_piper_ik.py`
 - IK: `envs/robot/piper_ik.py`
 
-See `agent-read/COMMANDS/piper_ik_cartesian.en.md` for commands and `agent-read/VERSION_SUMMARY.en.md` for version relationships.
+See `agent-read/COMMANDS/piper_ik_cartesian.en.md` and `piper_ik_foundation.en.md` for commands, and `agent-read/VERSION_SUMMARY.en.md` for version relationships.

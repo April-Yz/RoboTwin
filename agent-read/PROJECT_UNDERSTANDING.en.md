@@ -25,3 +25,9 @@ The trajectory pickle stores schema, version, IK version, action names, Cartesia
 - V3 MotionGen optimization may fail in the current scene, but the fallback path has been validated successfully.
 - Viewer and collection use the same trajectory logic; collection adds pickle-schema validation and observation recording.
 - `save_all_episodes` is for debugging and should not be used for formal successful-data filtering.
+
+## O.1 Foundation OBJ Data Flow
+
+O.1 reads positions, optional orientations, and source OBJ paths from `multi_object_world_poses.npz`. Trimesh bounds define the geometric center, table clearance, and cylinder-proxy collision. The input-0 meshes are about 6.6 cm wide, so pure contact with the current Pika gripper pushes them during approach or close; a distance-gated grasp drive is enabled by default. Trajectories also bind the Foundation directory, frame, collision mode, and mesh geometry to prevent cross-input replay.
+
+Phase 2 only consumes validated joint paths and does not create IK or MotionGen planners, avoiding V3 replay GPU pressure and slow multi-camera rendering.

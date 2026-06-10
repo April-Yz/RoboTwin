@@ -1,0 +1,56 @@
+render_freq: 0
+episode_num: 1
+use_seed: false
+save_freq: 15
+embodiment: [piper_pika_agx_calibrated, piper_pika_agx_calibrated, 0.0]
+language_num: 100
+ik_version: "v4"
+ik_interp_steps: 50
+lift_height: 0.12
+move_settle_steps: 80
+gripper_settle_steps: 120
+foundation_input_dir: "/home/zaijia001/ssd/data/piper/hand/pick_diverse_bottles/foundation_replay_d435/foundation_input_0"
+foundation_frame: 0
+foundation_use_orientation: false
+foundation_table_clearance: 0.002
+foundation_mesh_mass: 0.05
+foundation_mesh_friction: 1.5
+foundation_collision_mode: "cylinder_proxy"
+foundation_collision_radius_padding: 0.0
+foundation_grasp_standoff: 0.085
+foundation_grasp_lateral_offset: 0.0
+foundation_grasp_assist: true
+foundation_grasp_assist_max_distance: 0.14
+foundation_left_description: "left cola bottle"
+foundation_right_description: "right bottle"
+domain_randomization:
+  random_background: false
+  cluttered_table: false
+  clean_background_rate: 1
+  random_head_camera_dis: 0
+  random_table_height: 0
+  random_light: false
+  crazy_random_light_rate: 0
+camera:
+  head_camera_type: D435
+  wrist_camera_type: D435
+  collect_head_camera: true
+  collect_wrist_camera: false
+data_type:
+  rgb: true
+  third_view: true
+  depth: false
+  pointcloud: false
+  observer: true
+  endpose: true
+  qpos: true
+  mesh_segmentation: false
+  actor_segmentation: false
+pcd_down_sample_num: 1024
+pcd_crop: true
+save_path: ./data
+clear_cache_freq: 5
+collect_data: true
+eval_video_log: true
+skip_planner: true
+save_all_episodes: false

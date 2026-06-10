@@ -2720,3 +2720,14 @@
 - 验证：V1-V4 viewer 均在 seed 3 真实成功；V1 完整采集 5 集，成功 seed 为 3/6/10/14/18；V2/V3/V4 各完成 1 集 smoke，均生成 `_succ.hdf5`、v2 pickle、instruction 和六路视频。V1 重跑确认跳过现有 `_succ.hdf5`。
 - 最终检查：`py_compile`、四份 YAML、prompt JSON、`bash -n collect_data.sh`、`git diff --check` 和旧 pickle 拒绝测试均通过。
 - 清理：验证后删除可重复生成的 V2/V3/V4 smoke 配置和临时输出；保留忽略目录下的 V1 完整验证数据。
+
+## 2026-06-11（O.1 Foundation OBJ 抓取修复）
+
+- O.1 现在实际加载 NPZ 指定的 cola/bottle OBJ，不再用 `001_bottle` 替代。
+- 修正 actor 原点与 OBJ 几何中心混淆；按旋转后最低网格点计算桌面 clearance。
+- 默认使用 bounds 圆柱代理碰撞；精确凸碰撞保留为可选项。
+- 为当前窄 OBJ 增加距离门控 grasp assist，并在 open/关闭场景时释放 drive。
+- 轨迹绑定 Foundation 输入、frame、碰撞模式和 mesh 几何；语言描述改为直接语义文本并补齐 task prompt。
+- replay 模式跳过 planner 初始化，解决 V3 Phase 2 多相机渲染卡顿。
+- 验证：V1-V4 viewer 均 `physical_success=True`；V1-V4 完整采集均生成 validated replay、`episode0_succ.hdf5`、六路视频和 instructions。V3 MotionGen 失败后正常回退。
+- 清理：结构检查后删除本轮可重复生成的 O.1 HDF5、视频、缓存、临时 config 和日志。

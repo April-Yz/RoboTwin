@@ -65,6 +65,8 @@ The fixed action order is `pregrasp -> grasp -> close -> lift -> place -> open`.
 
 The viewer plans and executes Phase 1 directly. Collection saves that trajectory in Phase 1 and validates/replays it in the same seeded scene during Phase 2. Motion targets and joint paths therefore match, while collection additionally records observations. Pickles without the required schema, version, action names, or valid nonempty paths are rejected.
 
+Phase 2 does not replan, so replay scenes skip IK/MotionGen planner initialization and avoid extra GPU pressure during V3 multi-camera collection.
+
 ## Related Code
 
 - `envs/pick_diverse_bottles_piper_ik.py`

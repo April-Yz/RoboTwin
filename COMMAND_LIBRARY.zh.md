@@ -6535,3 +6535,158 @@ bash collect_data.sh pick_diverse_bottles_piper_ik demo_piper_ik_seq_v4 0
 ```
 
 以上四个版本已用真实 `check_success()` 验证。V3 首选 MotionGen；若 MotionGen 初始化、优化或返回轨迹失败，会回退到同一有效 IK 终点的三次插值轨迹。`pick_diverse_bottles_piper_ik.json` 已临时从 `pick_diverse_bottles.json` 复制，instruction 生成可以正常运行。
+
+---
+
+## O.1 对比实验：Foundation 位姿 + 原始 OBJ + Piper IK Cartesian 抓取 [2026-06-11 修正并实测]
+
+### 当前结论
+
+O.1 不再使用 O.0 的随机位置和 `001_bottle` 替代模型，而是读取：
+
+`foundation_input_<ID>/multi_object_world_poses.npz`
+
+并使用其中的左右物体位置和原始 OBJ：
+
+- 左侧：`cola/cola.obj`
+- 右侧：`bottle/bottle.obj`
+- 默认使用直立朝向；`foundation_use_orientation: true` 才使用 FoundationPose 四元数。
+- 视觉网格是原始 OBJ；默认碰撞体是从 OBJ 尺寸生成的圆柱代理，不宣称视觉与碰撞完全相同。
+- 抓取基准点是 OBJ bounds 的局部几何中心变换到世界坐标，不是 actor 原点。
+- V1-V4 沿用 O.0 的顺序轨迹逻辑：每段从上一段末端关节状态继续，lift 保持 grasp 的 x/y 和姿态，只增加 z。
+
+### 原错误与根因
+
+1. **Viewer 读取错配置**：旧 viewer 固定加载 `demo_piper_ik_seq_v*`，因此 O.1 缺少 `foundation_input_dir`。现在可自动推断，也推荐显式传 `--task_config`。
+2. **只记录 OBJ 路径但仍加载 `001_bottle`**：旧实现并没有真正使用 Foundation OBJ。现在 visual actor 直接来自 NPZ 指定的 OBJ。
+3. **把 Foundation pose 的 p 当作瓶身中心**：这些 OBJ 的原点接近底部。input 0 的 actor z 约为 0.733/0.745 m，但实际几何中心约为 0.864/0.841 m；旧抓取 z 因而错误。
+4. **固定位置不代表物理稳定**：cola 的精确凸分解碰撞会倾倒。默认改用按 OBJ bounds 构造的 `cylinder_proxy`，并按旋转后最低角点计算桌面 clearance。
+5. **接近和闭合会把物体推走**：原 OBJ 直径约 0.066 m，小于当前 Pika 夹爪稳定接触所需宽度；open-gripper 接近也可能先碰到代理碰撞体。因此默认 `foundation_grasp_assist: true`：close 时先恢复稳定后的 Foundation pose，校验物体与 link6 距离，再建立刚性 drive；open 时释放。关闭该选项可测试纯接触物理，但 input 0 当前不能稳定完成。
+6. **V3 采集卡在相机帧**：Phase 2 只回放已保存关节轨迹，却重复初始化两套 MotionGen，占用 GPU 并拖慢多相机渲染。现在 `need_plan=false` 时跳过 planner 初始化。
+7. **语言描述路径错误**：旧代码生成不存在的 `001_bottle/basefoundation_*.json`。O.1 现在写入直接语义文本，并补充了任务 prompt。
+8. **批量命令污染配置和输出**：旧命令用 `sed -i` 修改同一个 YAML，使多个 Foundation ID 共用 config 名、seed 和轨迹目录。现在使用 `collect_foundation_piper_ik.sh` 为版本、ID、frame 生成独立配置和输出目录。
+
+### 场景和轨迹逻辑
+
+```text
+NPZ pose + OBJ path
+  -> trimesh 解析 bounds
+  -> 原始 OBJ visual
+  -> exact_convex 或 cylinder_proxy collision
+  -> 按旋转后最低点补 table clearance
+  -> OBJ 几何中心作为 grasp target
+  -> pregrasp
+  -> grasp
+  -> close + 距离门控 grasp-assist
+  -> lift（grasp x/y 不变，只增加 z）
+  -> place（使用闭合后实测物体/末端偏移修正）
+  -> open + 释放 grasp-assist
+```
+
+viewer 执行 Phase 1 的实时规划。采集先执行同一 Phase 1 并保存带 schema/version/action names/Foundation source 的 pickle，再在 Phase 2 重新建立相同场景、严格校验输入目录、frame、mesh 几何、碰撞模式后逐点回放。因此 viewer 与采集的动作目标和关节轨迹逻辑一致；采集额外保存 RGB、HDF5、视频和语言指令。
+
+### 关键配置
+
+| 参数 | 默认值 | 说明 |
+|---|---:|---|
+| `foundation_input_dir` | `foundation_input_0` | NPZ 目录 |
+| `foundation_frame` | `0` | 使用的检测帧 |
+| `foundation_use_orientation` | `false` | 默认保持直立；true 使用检测朝向 |
+| `foundation_table_clearance` | `0.002` | 网格最低点到桌面的间隙 |
+| `foundation_collision_mode` | `cylinder_proxy` | 可选 `exact_convex`，但 cola 可能倾倒 |
+| `foundation_grasp_standoff` | `0.085` | link6 相对 OBJ 中心的 y 向后退 |
+| `foundation_grasp_assist` | `true` | 窄 OBJ 的受控抓取约束 |
+| `foundation_grasp_assist_max_distance` | `0.14` | 建立 drive 前的距离门控 |
+| `ik_version` | `v1-v4` | V1 线性、V2 三次、V3 MotionGen+回退、V4 多种子 |
+
+### 环境
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
+conda activate RoboTwin_bw
+cd /home/zaijia001/ssd/RoboTwin
+```
+
+### V1-V4 Viewer
+
+有窗口：
+
+```bash
+python view_pick_diverse_bottles_piper_ik_motion.py \
+  --task_name pick_diverse_bottles_piper_ik_foundation \
+  --task_config demo_piper_ik_foundation_v1 \
+  --ik_version v1 --foundation_id 0 --foundation_frame 0 \
+  --seed 0 --max_seed_tries 1 --require_success 1
+```
+
+四版本无窗口成功检查：
+
+```bash
+unset DISPLAY
+for v in v1 v2 v3 v4; do
+  SAPIEN_RT_DENOISER=none timeout 300s \
+  python view_pick_diverse_bottles_piper_ik_motion.py \
+    --task_name pick_diverse_bottles_piper_ik_foundation \
+    --task_config demo_piper_ik_foundation_$v \
+    --ik_version $v --foundation_id 0 --foundation_frame 0 \
+    --seed 0 --max_seed_tries 1 --hold 0 --render_freq 0 \
+    --show_axes 0 --require_success 1
+done
+```
+
+`--foundation_id` 和 `--foundation_frame` 只覆盖本次 viewer 内存配置，不修改 YAML。
+
+### V1-V4 数据采集
+
+固定 config 的 input 0：
+
+```bash
+bash collect_data.sh pick_diverse_bottles_piper_ik_foundation demo_piper_ik_foundation_v1 0
+bash collect_data.sh pick_diverse_bottles_piper_ik_foundation demo_piper_ik_foundation_v2 0
+bash collect_data.sh pick_diverse_bottles_piper_ik_foundation demo_piper_ik_foundation_v3 0
+bash collect_data.sh pick_diverse_bottles_piper_ik_foundation demo_piper_ik_foundation_v4 0
+```
+
+第三个参数是 GPU ID，不是语言版本。
+
+指定 Foundation ID/frame 的推荐入口：
+
+```bash
+# 参数：IK 版本、foundation_input ID、frame、GPU ID
+bash collect_foundation_piper_ik.sh v1 0 0 0
+bash collect_foundation_piper_ik.sh v2 0 0 0
+bash collect_foundation_piper_ik.sh v3 0 0 0
+bash collect_foundation_piper_ik.sh v4 0 0 0
+```
+
+批量采集示例：
+
+```bash
+for id in 0 1 2 3 4; do
+  bash collect_foundation_piper_ik.sh v1 $id 0 0
+done
+```
+
+每个任务输出到独立目录，例如：
+
+`data/pick_diverse_bottles_piper_ik_foundation/demo_piper_ik_foundation_v1_id3_frame0/`
+
+禁止再用 `sed -i` 原地修改基础 config 后复用同一个输出目录。
+
+### input 0 实测结果（2026-06-11）
+
+- V1、V2、V3、V4 viewer 均通过 `physical_success=True`。
+- V1-V4 均完成 Phase 1 保存、Phase 2 validated replay、HDF5、六路 MP4 和 instruction 生成。
+- V3 的 MotionGen 在该场景返回 optimization failure，按设计回退到同一 IK 终点的插值轨迹；这不是采集失败。
+- 稳定后的 OBJ 中心：左约 `(-0.038, 0.096, 0.864)`，右约 `(0.230, 0.114, 0.841)`。
+- 采集包含原 side 视角以及新增对向俯视桌面的 `opposite_top_camera`。
+- prompt：`description/task_instruction/pick_diverse_bottles_piper_ik_foundation.json`。
+- 轨迹会拒绝旧格式、空路径以及 Foundation source/frame/mesh/collision 不匹配的 pickle。
+
+### 代码位置
+
+- `envs/pick_diverse_bottles_piper_ik_foundation.py`
+- `envs/pick_diverse_bottles_piper_ik.py`
+- `view_pick_diverse_bottles_piper_ik_motion.py`
+- `collect_foundation_piper_ik.sh`
+- `task_config/demo_piper_ik_foundation_v1.yml` 至 `v4.yml`

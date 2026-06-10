@@ -58,6 +58,10 @@ class pick_diverse_bottles_piper_ik(pick_diverse_bottles):
             f"save_all={self.save_all_episodes}"
         )
 
+        if not self.need_plan:
+            print("[piper-ik-task] replay mode: planner initialization skipped")
+            return
+
         from envs.robot.piper_ik import create_piper_ik_planner
 
         left_yml = os.path.join(ROOT_PATH, self.robot.left_curobo_yml_path)

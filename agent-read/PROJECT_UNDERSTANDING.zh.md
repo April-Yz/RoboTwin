@@ -25,3 +25,9 @@
 - V3 的 MotionGen 优化在当前场景可能失败，但回退路径已实测成功。
 - viewer 与采集轨迹逻辑一致；采集多一层 pickle schema 校验和观测保存。
 - `save_all_episodes` 仅用于调试，不应用于正式成功数据筛选。
+
+## O.1 Foundation OBJ 数据流
+
+O.1 从 `multi_object_world_poses.npz` 读取位置、可选朝向和原始 OBJ 路径。trimesh bounds 用于几何中心、桌面 clearance 和圆柱代理碰撞。input 0 的 OBJ 直径约 6.6cm，当前 Pika 夹爪纯接触会在接近或闭合时推走物体，因此默认使用距离门控 grasp drive。轨迹额外绑定 Foundation 目录、frame、碰撞模式和 mesh 几何，防止跨输入回放。
+
+Phase 2 只消费已验证关节路径，不创建 IK 或 MotionGen planner，避免 V3 回放占用 GPU 并拖慢多相机渲染。

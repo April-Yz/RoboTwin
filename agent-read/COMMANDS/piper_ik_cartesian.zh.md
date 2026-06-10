@@ -65,6 +65,8 @@ bash collect_data.sh pick_diverse_bottles_piper_ik demo_piper_ik_seq_v4 0
 
 viewer 直接规划并执行 Phase 1；采集 Phase 1 保存同一轨迹，Phase 2 在相同 seed 场景中校验并逐点回放。因此动作目标和关节轨迹一致，但采集额外保存观测。旧 pickle 缺少 schema、版本、动作名或有效轨迹时会被拒绝。
 
+Phase 2 不需要重新规划，因此 replay 场景会跳过 IK/MotionGen planner 初始化，避免 V3 多相机采集占用额外 GPU。
+
 ## 相关代码
 
 - `envs/pick_diverse_bottles_piper_ik.py`
