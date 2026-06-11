@@ -6582,9 +6582,9 @@ unset DISPLAY && SAPIEN_RT_DENOISER=none timeout 180s python view_pick_diverse_b
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
 
 bash collect_data.sh pick_diverse_bottles_piper_ik demo_piper_ik_seq_v1 0
-bash collect_data.sh pick_diverse_bottles_piper_ik demo_piper_ik_seq_v2 0
-bash collect_data.sh pick_diverse_bottles_piper_ik demo_piper_ik_seq_v3 0
-bash collect_data.sh pick_diverse_bottles_piper_ik demo_piper_ik_seq_v4 0
+bash collect_data.sh pick_diverse_bottles_piper_ik demo_piper_ik_seq_v2 1
+bash collect_data.sh pick_diverse_bottles_piper_ik demo_piper_ik_seq_v3 2
+bash collect_data.sh pick_diverse_bottles_piper_ik demo_piper_ik_seq_v4 3
 ```
 
 以上四个版本已用真实 `check_success()` 验证。V3 首选 MotionGen；若 MotionGen 初始化、优化或返回轨迹失败，会回退到同一有效 IK 终点的三次插值轨迹。`pick_diverse_bottles_piper_ik.json` 已临时从 `pick_diverse_bottles.json` 复制，instruction 生成可以正常运行。
@@ -6708,40 +6708,272 @@ viewer 会创建 SAPIEN 窗口，需要可用的 X11/Vulkan display；`unset DIS
 
 ### V1-V4 数据采集
 
-固定 config 的 input 0：
+`collect_foundation_piper_ik.sh` 是推荐的批量入口，参数顺序为：
 
-```bash
-bash collect_data.sh pick_diverse_bottles_piper_ik_foundation demo_piper_ik_foundation_v1 0
-bash collect_data.sh pick_diverse_bottles_piper_ik_foundation demo_piper_ik_foundation_v2 0
-bash collect_data.sh pick_diverse_bottles_piper_ik_foundation demo_piper_ik_foundation_v3 0
-bash collect_data.sh pick_diverse_bottles_piper_ik_foundation demo_piper_ik_foundation_v4 0
+```text
+bash collect_foundation_piper_ik.sh <v1|v2|v3|v4> <foundation_id> [foundation_frame] [gpu_id] [o1|o1.1|o1.2]
 ```
 
-第三个参数是 GPU ID，不是语言版本。
+脚本自动：
+1. 从基础 config (`demo_piper_ik_foundation_v<N>.yml`) 复制一份临时 config
+2. 注入 `foundation_input_dir`、`foundation_frame`、`foundation_mode`
+3. 输出到独立目录，避免不同 ID/模式互相覆盖
 
-指定 Foundation ID/frame 的推荐入口：
+输出目录命名规则：
+- O.1: `demo_piper_ik_foundation_v<N>_id<ID>_frame<FRAME>`
+- O.1.1 / O.1.2: `demo_piper_ik_foundation_v<N>_o1_<1|2>_id<ID>`
+
+---
+
+#### O.1 数据采集（单一 Foundation ID，直接使用 foundation_frame）
+
+O.1 读取 `foundation_input_<ID>/multi_object_world_poses.npz` 第 `foundation_frame` 帧的物体位姿，不依赖人手标注。
 
 ```bash
-# 参数：IK 版本、foundation_input ID、frame、GPU ID、mode
-bash collect_foundation_piper_ik.sh v1 0 0 0 o1
-bash collect_foundation_piper_ik.sh v2 0 0 1 o1.1
-bash collect_foundation_piper_ik.sh v3 0 0 2 o1.2
-bash collect_foundation_piper_ik.sh v4 0 0 3 o1.2
+# 单个 foundation ID，V1-V4
+bash collect_foundation_piper_ik.sh v1 0 0 0 o1    # V1, ID=0, frame=0, GPU=0
+bash collect_foundation_piper_ik.sh v2 0 0 1 o1    # V2, ID=0, frame=0, GPU=1
+bash collect_foundation_piper_ik.sh v3 0 0 0 o1    # V3, ID=0, frame=0, GPU=0
+bash collect_foundation_piper_ik.sh v4 0 0 0 o1    # V4, ID=0, frame=0, GPU=0
+
+# 不同 frame（如第 5 帧、第 10 帧）
+bash collect_foundation_piper_ik.sh v1 0 5 0 o1
+bash collect_foundation_piper_ik.sh v1 0 10 0 o1
 ```
 
-批量采集示例：
+批量 O.1（不同 foundation ID，固定 frame=0）：
 
 ```bash
-for id in 0 1 2 3 4; do
+# V1 批量：ID 0-9
+for id in 0 1 2 3 4 5 6 7 8 9; do
+  bash collect_foundation_piper_ik.sh v1 $id 0 0 o1
+done
+
+# V2 批量：ID 0-9
+for id in 0 1 2 3 4 5 6 7 8 9; do
+  bash collect_foundation_piper_ik.sh v2 $id 0 1 o1
+done
+```
+
+---
+
+#### O.1.1 数据采集（人手标注关键帧驱动）
+
+O.1.1 读取 `hand_keyframes_all.json` 中每个 video ID 的标注关键帧，用**第一关键帧**对应的 Foundation 物体位姿建场。后续动作与 O.1 相同（pregrasp → grasp → close → lift → place → open）。
+
+注意：O.1.1 需要标注文件中存在对应 ID 的记录，且至少有两个全局关键帧。
+
+```bash
+# 单 ID，V1-V4
+bash collect_foundation_piper_ik.sh v1 0 0 0 o1.1    # V1, ID=0, GPU=0
+bash collect_foundation_piper_ik.sh v2 0 0 1 o1.1    # V2, ID=0, GPU=1
+bash collect_foundation_piper_ik.sh v3 0 0 0 o1.1    # V3, ID=0, GPU=0
+bash collect_foundation_piper_ik.sh v4 0 0 0 o1.1    # V4, ID=0, GPU=0
+
+# 不同 ID 示例
+bash collect_foundation_piper_ik.sh v1 1 0 0 o1.1    # ID=1
+bash collect_foundation_piper_ik.sh v1 2 0 0 o1.1    # ID=2
+bash collect_foundation_piper_ik.sh v2 5 0 1 o1.1    # ID=5, V2, GPU=1
+```
+
+O.1.1 批量（V1，ID 0-9）：
+
+```bash
+for id in 0 1 2 3 4 5 6 7 8 9; do
   bash collect_foundation_piper_ik.sh v1 $id 0 0 o1.1
 done
 ```
 
-每个任务输出到独立目录，例如：
+O.1.1 全版本批量（6 个 ID × 4 版本 = 24 个 episode）：
 
-`data/pick_diverse_bottles_piper_ik_foundation/demo_piper_ik_foundation_v1_o1_1_id3/`
+```bash
+for id in 0 1 2 3 4 5; do
+  bash collect_foundation_piper_ik.sh v1 $id 0 0 o1.1
+  bash collect_foundation_piper_ik.sh v2 $id 0 1 o1.1
+  bash collect_foundation_piper_ik.sh v3 $id 0 0 o1.1
+  bash collect_foundation_piper_ik.sh v4 $id 0 1 o1.1
+done
 
-禁止再用 `sed -i` 原地修改基础 config 后复用同一个输出目录。
+for id in $(seq 0 120); do
+  bash collect_foundation_piper_ik.sh v1 $id 0 0 o1.2
+done
+
+for id in $(seq 0 120); do
+  bash collect_foundation_piper_ik.sh v2 $id 0 1 o1.2
+done
+
+for id in $(seq 0 120); do
+  bash collect_foundation_piper_ik.sh v3 $id 0 2 o1.2
+done
+
+for id in $(seq 0 120); do
+  bash collect_foundation_piper_ik.sh v4 $id 0 3 o1.2
+done
+```
+
+---
+
+#### O.1.2 数据采集（人手标注关键帧建场 + 人手 EE 目标 action）
+
+O.1.2 是**完整两阶段人手引导**模式：
+
+1. **第一阶段**：与 O.1.1 相同，用第一关键帧建场，执行 pregrasp → grasp → close
+2. **第二阶段**：从 `id_<ID>/world_targets_and_status.npz` 读取人手**第二关键帧**的左右 EE xyz 位置，以单个 `action` 取代 lift + place，将瓶子移动到人手放置位置
+
+这是最接近「复现人手抓放」的模式。O.1.2 需要：
+- `hand_keyframes_all.json` 中有对应 ID 的两帧标注
+- `human_replay/pick_diverse_bottles/id<ID>_z005/world_targets_and_status.npz` 存在
+
+```bash
+# 单 ID，V1-V4
+bash collect_foundation_piper_ik.sh v1 0 0 0 o1.2    # V1, ID=0, GPU=0
+bash collect_foundation_piper_ik.sh v2 0 0 1 o1.2    # V2, ID=0, GPU=1
+bash collect_foundation_piper_ik.sh v3 0 0 0 o1.2    # V3, ID=0, GPU=0
+bash collect_foundation_piper_ik.sh v4 0 0 0 o1.2    # V4, ID=0, GPU=0
+
+# 不同 ID
+bash collect_foundation_piper_ik.sh v1 1 0 0 o1.2    # ID=1
+bash collect_foundation_piper_ik.sh v1 3 0 0 o1.2    # ID=3
+bash collect_foundation_piper_ik.sh v2 7 0 1 o1.2    # ID=7, V2, GPU=1
+```
+
+O.1.2 批量（V1，6 个 ID）：
+
+```bash
+for id in 0 1 2 3 4 5; do
+  bash collect_foundation_piper_ik.sh v1 $id 0 0 o1.2
+done
+```
+
+O.1.2 全版本批量（6 个 ID × 4 版本 = 24 个 episode）：
+
+```bash
+for id in 0 1 2 3 4 5; do
+  bash collect_foundation_piper_ik.sh v1 $id 0 0 o1.2
+  bash collect_foundation_piper_ik.sh v2 $id 0 1 o1.2
+  bash collect_foundation_piper_ik.sh v3 $id 0 0 o1.2
+  bash collect_foundation_piper_ik.sh v4 $id 0 1 o1.2
+done
+```
+
+---
+
+#### O.1.2 大规模批量（所有有标注的 foundation ID）
+
+截至 2026-06-11，`foundation_replay_d435` 下有 102 个 foundation_input 目录 (ID 0-101)。以下命令扫描 `hand_keyframes_all.json` 中有标注的 ID 并批量采集：
+
+```bash
+# 第一步：列出 hand_keyframes_all.json 中有标注的有效 ID
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python -c "
+import json
+with open('code_painting/h2o_manual_review/pick_diverse_bottles/hand_keyframes_all.json') as f:
+    data = json.load(f)
+ids = sorted(int(k) for k in data.keys() if data[k].get('status') not in ('reject','discard','bad'))
+print('Valid IDs:', ids[:30], '... total', len(ids))
+"
+```
+
+```bash
+# 第二步：提取有效 ID 列表并批量运行 O.1.2（V1，GPU=0）
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+
+VALID_IDS=$(python -c "
+import json
+with open('code_painting/h2o_manual_review/pick_diverse_bottles/hand_keyframes_all.json') as f:
+    data = json.load(f)
+ids = [k for k in data.keys() if data[k].get('status') not in ('reject','discard','bad')]
+print(' '.join(ids))
+")
+
+for id in $VALID_IDS; do
+  bash collect_foundation_piper_ik.sh v1 $id 0 0 o1.2
+done
+```
+
+---
+
+#### 多 GPU 并行批量
+
+如果有 4 张 GPU，可将 ID 分片并行：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+
+# 终端 1 (GPU=0): ID 0,4,8,12,...
+for id in 0 4 8 12 16 20; do
+  bash collect_foundation_piper_ik.sh v1 $id 0 0 o1.2
+done
+
+# 终端 2 (GPU=1): ID 1,5,9,13,...
+for id in 1 5 9 13 17 21; do
+  bash collect_foundation_piper_ik.sh v1 $id 0 1 o1.2
+done
+
+# 终端 3 (GPU=2): ID 2,6,10,14,...
+for id in 2 6 10 14 18 22; do
+  bash collect_foundation_piper_ik.sh v1 $id 0 2 o1.2
+done
+
+# 终端 4 (GPU=3): ID 3,7,11,15,...
+for id in 3 7 11 15 19 23; do
+  bash collect_foundation_piper_ik.sh v1 $id 0 3 o1.2
+done
+```
+
+或用 tmux 窗口并行：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+
+tmux new-window -n o12-gpu0 "for id in 0 4 8 12 16 20; do bash collect_foundation_piper_ik.sh v1 \$id 0 0 o1.2; done; bash"
+tmux new-window -n o12-gpu1 "for id in 1 5 9 13 17 21; do bash collect_foundation_piper_ik.sh v1 \$id 0 1 o1.2; done; bash"
+tmux new-window -n o12-gpu2 "for id in 2 6 10 14 18 22; do bash collect_foundation_piper_ik.sh v1 \$id 0 2 o1.2; done; bash"
+tmux new-window -n o12-gpu3 "for id in 3 7 11 15 19 23; do bash collect_foundation_piper_ik.sh v1 \$id 0 3 o1.2; done; bash"
+```
+
+---
+
+#### 输出目录与数据格式
+
+每个任务的独立输出示例：
+
+```text
+data/pick_diverse_bottles_piper_ik_foundation/demo_piper_ik_foundation_v1_o1_2_id0/
+  ├── data/
+  │   ├── episode0_succ.hdf5        # HDF5 观测数据
+  │   └── episode1_succ.hdf5
+  ├── video/
+  │   ├── episode0_succ_head_camera.mp4
+  │   ├── episode0_succ_front_camera.mp4
+  │   ├── episode0_succ_side_camera.mp4
+  │   ├── episode0_succ_third_camera.mp4
+  │   ├── episode0_succ_opposite_top_camera.mp4
+  │   └── episode0_succ_third_view.mp4
+  ├── _traj_data/
+  │   └── episode0.pkl              # Phase 2 回放轨迹
+  └── instructions/
+      └── episode0.json             # 语言指令
+```
+
+注意：
+- 文件名带 `_succ` 或 `_fail` 标记，对应 `check_success()` 结果
+- O.1 / O.1.1 / O.1.2 的轨迹 pickle 含有 schema/version/mode/ID 信息，Phase 2 回放会校验一致性
+- 不同 mode 的轨迹不可混用
+
+---
+
+#### 旧版兼容命令（不推荐，仅供参考）
+
+以下命令直接使用基础 config（只定点 foundation_input_0），不通过 `collect_foundation_piper_ik.sh`：
+
+```bash
+bash collect_data.sh pick_diverse_bottles_piper_ik_foundation demo_piper_ik_foundation_v1 0
+bash collect_data.sh pick_diverse_bottles_piper_ik_foundation demo_piper_ik_foundation_v2 1
+bash collect_data.sh pick_diverse_bottles_piper_ik_foundation demo_piper_ik_foundation_v3 0
+bash collect_data.sh pick_diverse_bottles_piper_ik_foundation demo_piper_ik_foundation_v4 0
+```
+
+这些命令会复用同一个输出目录，不同 ID 之间会互相覆盖。**新采集工作请使用 `collect_foundation_piper_ik.sh` 入口。**
 
 ### input 0 实测结果（2026-06-11）
 
