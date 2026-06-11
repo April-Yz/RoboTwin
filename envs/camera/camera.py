@@ -57,6 +57,28 @@ class Camera:
 
         self.collect_head_camera = kwags["camera"].get("collect_head_camera", True)
         self.collect_wrist_camera = kwags["camera"].get("collect_wrist_camera", True)
+        self.wrist_camera_calibration_bundle = kwags["camera"].get(
+            "wrist_camera_calibration_bundle"
+        )
+        self.wrist_camera_axis_mode = kwags["camera"].get(
+            "wrist_camera_axis_mode", "legacy_r1"
+        )
+        self.wrist_camera_pose_reference = kwags["camera"].get(
+            "wrist_camera_pose_reference", "link"
+        )
+        if self.wrist_camera_pose_reference not in {"link", "planner_gripper"}:
+            raise ValueError(
+                f"Unsupported wrist_camera_pose_reference={self.wrist_camera_pose_reference!r}"
+            )
+        self.left_wrist_camera_local_pose = sapien.Pose()
+        self.right_wrist_camera_local_pose = sapien.Pose()
+        if self.collect_wrist_camera and self.wrist_camera_calibration_bundle:
+            self._load_wrist_camera_calibration()
+        elif self.collect_wrist_camera and self.wrist_camera_pose_reference != "link":
+            raise ValueError(
+                "Non-link wrist_camera_pose_reference requires "
+                "wrist_camera_calibration_bundle"
+            )
 
         # embodiment = kwags.get('embodiment')
         # embodiment_config_path = os.path.join(CONFIGS_PATH, '_embodiment_config.yml')
@@ -72,6 +94,47 @@ class Camera:
         # TODO
         self.static_camera_info_list = kwags["left_embodiment_config"]["static_camera_list"]
         self.static_camera_num = len(self.static_camera_info_list)
+
+    def _load_wrist_camera_calibration(self):
+        bundle_path = os.path.abspath(os.path.expanduser(self.wrist_camera_calibration_bundle))
+        if not os.path.isfile(bundle_path):
+            raise FileNotFoundError(f"Wrist camera calibration bundle not found: {bundle_path}")
+        with open(bundle_path, "r", encoding="utf-8") as file:
+            bundle = json.load(file)
+        if bundle.get("schema") != "piper_calibration_bundle.v1":
+            raise ValueError(
+                f"Unsupported wrist calibration schema in {bundle_path}: {bundle.get('schema')!r}"
+            )
+        wrist_data = bundle.get("wrist_cameras", {})
+        axis_rotations = {
+            "legacy_r1": np.array(
+                [[0.0, 0.0, 1.0], [-1.0, 0.0, 0.0], [0.0, -1.0, 0.0]],
+                dtype=np.float64,
+            ),
+            "diag_flip_yz": np.diag([1.0, -1.0, -1.0]).astype(np.float64),
+        }
+        if self.wrist_camera_axis_mode not in axis_rotations:
+            raise ValueError(f"Unsupported wrist_camera_axis_mode={self.wrist_camera_axis_mode!r}")
+        cv_to_render = axis_rotations[self.wrist_camera_axis_mode]
+
+        def calibrated_pose(key):
+            entry = wrist_data.get(key)
+            if not isinstance(entry, dict):
+                raise KeyError(f"Wrist calibration bundle is missing {key}")
+            matrix = np.asarray(entry.get("matrix"), dtype=np.float64)
+            if matrix.shape != (4, 4) or not np.isfinite(matrix).all():
+                raise ValueError(f"Invalid wrist calibration matrix for {key}")
+            render_rotation = matrix[:3, :3] @ cv_to_render.T
+            quat = t3d.quaternions.mat2quat(render_rotation)
+            return sapien.Pose(matrix[:3, 3], quat)
+
+        self.left_wrist_camera_local_pose = calibrated_pose("left_gripper_T_camera")
+        self.right_wrist_camera_local_pose = calibrated_pose("right_gripper_T_camera")
+        print(
+            f"[camera] calibrated wrist cameras: bundle={bundle_path} "
+            f"axis_mode={self.wrist_camera_axis_mode} "
+            f"reference={self.wrist_camera_pose_reference}"
+        )
 
     def load_camera(self, scene):
         """
@@ -289,8 +352,8 @@ class Camera:
         (rendering must be updated even when disabled, otherwise data cannot be collected).
         """
         if self.collect_wrist_camera:
-            self.left_camera.entity.set_pose(left_pose)
-            self.right_camera.entity.set_pose(right_pose)
+            self.left_camera.entity.set_pose(left_pose * self.left_wrist_camera_local_pose)
+            self.right_camera.entity.set_pose(right_pose * self.right_wrist_camera_local_pose)
 
     def get_config(self) -> dict:
         res = {}

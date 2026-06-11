@@ -2759,3 +2759,11 @@
 - Changes: fixed the CuRobo seed tensor to `[batch, num_seeds, dof]`; added explicit perturbed seeds and joint-continuity selection; added cubic joint smoothstep; retained the grasp quaternion for action by default; froze reached arms; and returned a nonzero status on execution failure.
 - Orientation finding: there is no strict roll constraint about local +Z. Piper's fixed `global_trans_matrix` and target/report frame conventions remain inconsistent, so approximately 178-180 degree rotation errors are not yet a strict success metric. `apply_global_trans_to_ik=1` performed worse.
 - Validation: `pick_diverse_bottles` IDs 1 and 2 completed successfully. ID 0 reached pregrasp/grasp, but action ended at approximately 4.39 cm / 6.41 cm left/right error, exceeding the 4 cm tolerance. The old issue was shared IK/execution behavior, not an ID-1-only annotation problem.
+
+## 2026-06-11 (O.1.2 Bounded Retries And Calibrated Wrist Cameras)
+
+- Tmux inspection confirmed that `gen2-10`, `genikv2-11`, `genikv3-12`, and `genikv4-13` had returned to their shells. Historical jobs ended through `Killed`/Ctrl-C rather than remaining active.
+- Corrected batch amplification: V1 now runs one rather than ten episodes per ID; all four configs use `max_seed_tries: 3`; the generic collector returns nonzero at the bound instead of looping forever on deterministic failures.
+- `collect_foundation_piper_ik.sh` now accepts an optional `run_tag`, creates isolated config/output names, and forces `episode_num: 1`.
+- All four Foundation configs enable wrist cameras with distinct extrinsics from `calibration_bundle_piper_new_table_0515.json`, composed from planner gripper poses after optical/render axis conversion.
+- Validation: a V1 O.1.2 two-phase collection produced HDF5, instructions, and eight MP4 files. Both wrist videos have 38 frames at 320x240 and moved about 0.37 m / 0.46 m. V4 ID 9 failed three seeds because right-grasp rotation was about 25.6 degrees against a 15-degree limit, then exited at the configured bound.

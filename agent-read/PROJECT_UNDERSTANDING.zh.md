@@ -33,3 +33,7 @@ O.1 从 `multi_object_world_poses.npz` 读取位置、可选朝向和原始 OBJ 
 O.1.1 从 `hand_keyframes_all.json` 取第一关键帧的 Foundation OBJ pose。O.1.2 进一步从 `world_targets_and_status.npz` 取第二关键帧的左右 EE xyz，以保留 grasp 朝向的单个 action 替代 lift/place。轨迹绑定 mode、episode ID、关键帧、action 来源、抓取门控参数和 mesh 几何，防止跨设定回放。
 
 Phase 2 只消费已验证关节路径，不创建 IK 或 MotionGen planner，避免 V3 回放占用 GPU 并拖慢多相机渲染。
+
+Foundation 的左右腕相机从 `calibration_bundle_piper_new_table_0515.json` 分别加载 gripper-to-camera 外参。该 gripper frame 与 planner EE frame 对齐，不是 raw URDF `link6`，所以每帧使用 `Robot.get_left_ee_pose()` / `get_right_ee_pose()` 作为相机父 pose，再做 optical-to-render 轴转换。所有 observation RGB camera 由现有 HDF5/video 合并流程自动导出。
+
+批采集 wrapper 强制每 ID 一个 episode并支持 run tag。`script/collect_data.py` 的 `max_seed_tries` 给 seed 搜索设置硬上限；这是针对几何确定性失败的终止条件，不把失败 episode 伪装成成功数据。

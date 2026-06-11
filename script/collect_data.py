@@ -105,6 +105,11 @@ def main(task_name=None, task_config=None):
 
 def run(TASK_ENV, args):
     epid, suc_num, fail_num, seed_list = 0, 0, 0, []
+    max_seed_tries = args.get("max_seed_tries")
+    if max_seed_tries is not None:
+        max_seed_tries = int(max_seed_tries)
+        if max_seed_tries <= 0:
+            raise ValueError("max_seed_tries must be positive when configured")
 
     print(f"Task Name: \033[34m{args['task_name']}\033[0m")
 
@@ -124,6 +129,7 @@ def run(TASK_ENV, args):
                     epid = max(seed_list) + 1
             print(f"Exist seed file, Start from: {epid} / {suc_num}")
 
+        seed_tries = 0
         while suc_num < args["episode_num"]:
             try:
                 TASK_ENV.setup_demo(now_ep_num=suc_num, seed=epid, **args)
@@ -167,10 +173,17 @@ def run(TASK_ENV, args):
                 time.sleep(1)
 
             epid += 1
+            seed_tries += 1
 
             with open(os.path.join(args["save_path"], "seed.txt"), "w") as file:
                 for sed in seed_list:
                     file.write("%s " % sed)
+
+            if max_seed_tries is not None and seed_tries >= max_seed_tries and suc_num < args["episode_num"]:
+                raise RuntimeError(
+                    f"Seed search exhausted after {seed_tries} tries; "
+                    f"collected {suc_num}/{args['episode_num']} successful episodes"
+                )
 
         print(f"\nComplete simulation, failed \033[91m{fail_num}\033[0m times / {epid} tries \n")
     else:

@@ -10,6 +10,7 @@
 - O.1 no longer resets object pose before close. A post-close state gate verifies that the object stayed stable and lies in the two-finger capture region before attaching a drive at the current pose.
 - The default base-only `support_proxy` prevents the open gripper from tipping narrow bottle bodies during pregrasp/grasp.
 - O.1.1 sets up from the first annotated keyframe. O.1.2 replaces lift/place with one action using second-keyframe EE xyz while retaining the grasp orientation.
+- O.1.2 uses distinct 0515 wrist extrinsics with the planner gripper pose as parent. Batch collection runs one episode per ID and tries at most three seeds.
 
 ## Mode N-7
 

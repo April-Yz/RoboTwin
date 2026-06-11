@@ -33,3 +33,7 @@ O.1 reads positions, optional orientations, and source OBJ paths from `multi_obj
 O.1.1 uses the first annotated keyframe in `hand_keyframes_all.json` for the Foundation OBJ setup. O.1.2 additionally loads left/right EE xyz at the second keyframe from `world_targets_and_status.npz` and replaces lift/place with one action that retains the grasp orientation. Trajectories bind mode, episode ID, keyframes, action source, grasp-gate parameters, and mesh geometry to prevent cross-setting replay.
 
 Phase 2 only consumes validated joint paths and does not create IK or MotionGen planners, avoiding V3 replay GPU pressure and slow multi-camera rendering.
+
+Foundation wrist cameras load distinct gripper-to-camera extrinsics from `calibration_bundle_piper_new_table_0515.json`. That gripper frame matches the planner EE frame rather than raw URDF `link6`, so each render composes the local camera pose with `Robot.get_left_ee_pose()` / `get_right_ee_pose()` after optical-to-render axis conversion. The existing HDF5/video merge path exports every observation RGB camera automatically.
+
+The batch wrapper forces one episode per ID and supports isolated run tags. `script/collect_data.py` applies `max_seed_tries` as a hard bound on seed search. This terminates deterministic geometry failures without treating them as successful episodes.

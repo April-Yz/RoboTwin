@@ -2079,3 +2079,10 @@
 - `run_plan_keyframes_human_replay_piper_d435.sh` 新增/转发 IK seed、关节连续性、cubic 插值、action 朝向来源、replan 冻结与失败退出参数。
 - 推荐默认：`joint_interp`、`joint_trajectory_interpolation=cubic`、`ik_solution_selection=joint_continuity`、6 个 0.05rad 扰动 seed、`action_orientation_source=grasp`、`reach_pos_tol_m=0.04`。
 - `COMMAND_LIBRARY.zh.md` L15.20 与 Mode M 命令已更新；多 ID 诊断可使用 `--ids 0 1 2 --continue_on_error`。
+
+## 2026-06-11（O.1.2 wrist 批采集命令）
+
+- Foundation wrapper 新格式：`bash collect_foundation_piper_ik.sh <v1-v4> <id> [frame] [gpu] [mode] [run_tag]`。
+- 推荐使用 `wrist0515` 等新 tag，避免已有 head-only HDF5 被断点逻辑跳过。
+- O.1.2 全量命令增加每 ID `timeout 600s` 和版本独立 failure log；V1-V4 GPU 仍分别为 0/1/2/3。
+- 输出新增 `episode0_succ_left_camera.mp4` 和 `episode0_succ_right_camera.mp4`。

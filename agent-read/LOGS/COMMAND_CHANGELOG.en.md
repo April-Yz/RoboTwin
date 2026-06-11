@@ -2081,3 +2081,10 @@
 - `run_plan_keyframes_human_replay_piper_d435.sh` now exposes and forwards IK seed, joint-continuity, cubic interpolation, action-orientation, reached-arm freezing, and failure-exit settings.
 - Recommended defaults are `joint_interp`, `joint_trajectory_interpolation=cubic`, `ik_solution_selection=joint_continuity`, six 0.05-rad perturbed seeds, `action_orientation_source=grasp`, and `reach_pos_tol_m=0.04`.
 - Updated L15.20 and Mode M in `COMMAND_LIBRARY.zh.md`. Use `--ids 0 1 2 --continue_on_error` for cross-ID diagnosis.
+
+## 2026-06-11 (O.1.2 Wrist Batch Collection Command)
+
+- New Foundation wrapper format: `bash collect_foundation_piper_ik.sh <v1-v4> <id> [frame] [gpu] [mode] [run_tag]`.
+- Use a new tag such as `wrist0515` so resume logic does not skip an existing head-only HDF5.
+- Full O.1.2 commands now apply a 600-second timeout per ID and a version-specific failure log. V1-V4 remain assigned to GPUs 0/1/2/3.
+- New outputs are `episode0_succ_left_camera.mp4` and `episode0_succ_right_camera.mp4`.

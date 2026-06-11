@@ -1,5 +1,6 @@
 render_freq: 0
-episode_num: 10
+episode_num: 1
+max_seed_tries: 3
 use_seed: false
 save_freq: 15
 embodiment: [piper_pika_agx_calibrated, piper_pika_agx_calibrated, 0.0]
@@ -44,7 +45,10 @@ camera:
   head_camera_type: D435
   wrist_camera_type: D435
   collect_head_camera: true
-  collect_wrist_camera: false
+  collect_wrist_camera: true
+  wrist_camera_calibration_bundle: "/home/zaijia001/ssd/RoboTwin/calibration_bundle_piper_new_table_0515.json"
+  wrist_camera_axis_mode: "legacy_r1"
+  wrist_camera_pose_reference: "planner_gripper"
 data_type:
   rgb: true
   third_view: true

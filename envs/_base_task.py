@@ -432,7 +432,18 @@ class Base_Task(gym.Env):
             now_ambient_light = self.scene.ambient_light
             now_ambient_light = np.clip(np.array(now_ambient_light) + np.random.rand(3) * 0.2 - 0.1, 0, 1)
             self.scene.set_ambient_light(now_ambient_light)
-        self.cameras.update_wrist_camera(self.robot.left_camera.get_pose(), self.robot.right_camera.get_pose())
+        if (
+            self.cameras.collect_wrist_camera
+            and self.cameras.wrist_camera_pose_reference == "planner_gripper"
+        ):
+            left_pose_values = self.robot.get_left_ee_pose()
+            right_pose_values = self.robot.get_right_ee_pose()
+            left_wrist_reference = sapien.Pose(left_pose_values[:3], left_pose_values[3:])
+            right_wrist_reference = sapien.Pose(right_pose_values[:3], right_pose_values[3:])
+        else:
+            left_wrist_reference = self.robot.left_camera.get_pose()
+            right_wrist_reference = self.robot.right_camera.get_pose()
+        self.cameras.update_wrist_camera(left_wrist_reference, right_wrist_reference)
         self.scene.update_render()
 
     # =========================================================== Basic APIs ===========================================================

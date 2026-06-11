@@ -36,13 +36,27 @@ Use `--foundation_mode o1.1` or `--foundation_mode o1.2` for the keyframe modes.
 # Fixed input 0
 bash collect_data.sh pick_diverse_bottles_piper_ik_foundation demo_piper_ik_foundation_v1 0
 
-# Arguments: IK version, foundation_input ID, frame, GPU ID, mode
+# Arguments: IK version, foundation_input ID, frame, GPU ID, mode, optional run tag
 bash collect_foundation_piper_ik.sh v1 0 0 0 o1
 bash collect_foundation_piper_ik.sh v1 0 0 0 o1.1
-bash collect_foundation_piper_ik.sh v1 0 0 0 o1.2
+bash collect_foundation_piper_ik.sh v1 0 0 0 o1.2 wrist0515
 ```
 
-The wrapper creates isolated config and output names by version, ID, and frame/mode. O.1.1/O.1.2 override the frame with the first annotation. Do not mutate the base YAML with `sed -i` and reuse one trajectory directory.
+The wrapper creates isolated config and output names by version, ID, frame/mode, and run tag, and forces one episode per ID. O.1.1/O.1.2 override the frame with the first annotation. Use a new run tag after enabling wrist cameras: an existing HDF5 is skipped, so an old head-only directory is not upgraded in place. Do not mutate the base YAML with `sed -i` and reuse one trajectory directory.
+
+Recommended batch form:
+
+```bash
+RUN_TAG=wrist0515
+FAIL_LOG=/tmp/o12_v1_${RUN_TAG}_failures.log
+: > "$FAIL_LOG"
+for id in $(seq 0 120); do
+  timeout 600s bash collect_foundation_piper_ik.sh v1 "$id" 0 0 o1.2 "$RUN_TAG" \
+    || echo "FAIL v1 id=$id status=$?" | tee -a "$FAIL_LOG"
+done
+```
+
+For V2/V3/V4 use version/GPU pairs `v2/1`, `v3/2`, and `v4/3`. Inputs currently cover IDs 0-101; scanning 102-120 exits quickly for missing NPZ files and records those IDs in the failure log.
 
 ## Execution Logic
 
@@ -54,6 +68,15 @@ The wrapper creates isolated config and output names by version, ID, and frame/m
 - After close, the task checks object displacement, rotation, link6 distance, projection between both fingers, and radial distance. A drive is attached at the current object pose only after every gate passes.
 - The default `support_proxy` has no full bottle-body contacts, so `foundation_grasp_require_contact=false` uses the geometric capture gate. This is controlled, no-teleport grasp assist rather than pure-contact physics.
 - Phase 1 plans sequentially and saves. Phase 2 validates the Foundation source and trajectory schema before replay and does not initialize planners.
+- Each version tries at most `max_seed_tries: 3` seeds. A deterministic failure returns nonzero instead of looping indefinitely and appearing stuck.
+
+## Wrist Cameras
+
+- All four Foundation configs enable `collect_wrist_camera: true`.
+- The left and right cameras load their distinct `left_gripper_T_camera` and `right_gripper_T_camera` transforms from `calibration_bundle_piper_new_table_0515.json`.
+- The calibration gripper frame matches the planner EE frame, so `wrist_camera_pose_reference: planner_gripper` is required. Raw `link6` placement puts the view inside the gripper base.
+- `wrist_camera_axis_mode: legacy_r1` converts the calibrated OpenCV optical frame to the SAPIEN render frame.
+- Phase 2 automatically exports every observation RGB camera. The new files are `episode0_succ_left_camera.mp4` and `episode0_succ_right_camera.mp4`, and both cameras are also present in HDF5 observations.
 
 ## Grasp Debugging
 
@@ -63,7 +86,9 @@ If pregrasp still collides, increase `foundation_pregrasp_distance` and inspect 
 
 ## Validated State
 
-On 2026-06-11 with `foundation_input_0`, V1 viewer and full two-phase collection succeeded for O.1, O.1.1, and O.1.2. Full O.1.2 collection also succeeded with V2/V3/V4. The annotated frames are 38 and 78, and all four O.1.2 backends produced validated replay, `episode0_succ.hdf5`, instructions, and six videos.
+On 2026-06-11 with `foundation_input_0`, V1 viewer and full two-phase collection succeeded for O.1, O.1.1, and O.1.2. Full O.1.2 collection also succeeded with V2/V3/V4. The annotated frames are 38 and 78. After correcting the wrist reference frame, a V1 O.1.2 run produced validated replay, `episode0_succ.hdf5`, instructions, and eight videos. Both wrist videos have 38 frames at 320x240; their camera positions moved about 0.37 m and 0.46 m.
+
+The reviewed tmux panes had already returned to the shell; they were not still collecting. Earlier jobs showed `Killed` and Ctrl-C. V1 had been configured for ten episodes per ID, while failed seed search had no bound. V4 ID 9 deterministically exceeded the right-grasp rotation gate at about 25.6 degrees versus a 15-degree limit across multiple seeds. Current configs use one episode per ID, three seed attempts, and the documented outer timeout.
 
 ## Related Code
 

@@ -2757,3 +2757,11 @@
 - 修改：修正 CuRobo seed tensor 为 `[batch, num_seeds, dof]`；增加显式扰动 seed 与关节连续性选解；增加 cubic joint smoothstep；action 默认保留 grasp quaternion；冻结已 reached 手；执行失败返回非零退出码。
 - 姿态结论：当前没有 local +Z 前进轴的严格 roll 限制。Piper 固定 `global_trans_matrix` 与 target/report frame 约定不一致，约 178-180 度旋转误差暂不能作为严格成功条件；`apply_global_trans_to_ik=1` 实测更差。
 - 验证：`pick_diverse_bottles` ID 1、2 完整成功；ID 0 pregrasp/grasp 成功，但 action 左右误差约 4.39cm/6.41cm，超过 4cm 阈值。旧问题是共享 IK/执行问题，不是 ID 1 标注独有。
+
+## 2026-06-11（O.1.2 有限重试与标定腕相机）
+
+- tmux 复查确认 `gen2-10`、`genikv2-11`、`genikv3-12`、`genikv4-13` 已回到 shell；历史任务由 `Killed`/Ctrl-C 结束，并非仍在采集。
+- 修正批处理放大因素：V1 从每 ID 10 episodes 改为 1；四配置增加 `max_seed_tries: 3`；通用采集器达到上限后返回非零，避免确定性失败无限循环。
+- `collect_foundation_piper_ik.sh` 新增可选 `run_tag`，生成隔离 config/output，并强制 `episode_num: 1`。
+- 四份 Foundation 配置启用左右 wrist；从 `calibration_bundle_piper_new_table_0515.json` 读取独立外参，以 planner gripper pose 为父坐标并转换 optical/render 轴。
+- 验证：V1 O.1.2 两阶段采集成功，生成 HDF5、instruction 和八路 MP4；左右腕各 38 帧、320x240，移动约 0.37m/0.46m。V4 ID 9 在三个 seed 上均因右 grasp 旋转约 25.6 度超过 15 度门限失败，并按上限退出。
