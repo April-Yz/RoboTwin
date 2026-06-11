@@ -95,6 +95,9 @@ def main() -> None:
                         help="O.1: override foundation_input_<ID> without editing YAML")
     parser.add_argument("--foundation_frame", type=int, default=-1,
                         help="O.1: override the FoundationPose frame without editing YAML")
+    parser.add_argument("--foundation_mode", default="",
+                        choices=["", "o1", "o1.1", "o1.2"],
+                        help="O.1 mode: frame 0, annotated object frame, or annotated EE action")
     args_cli = parser.parse_args()
 
     if args_cli.task_config:
@@ -121,6 +124,8 @@ def main() -> None:
         )
     if args_cli.foundation_frame >= 0:
         build_args["foundation_frame"] = args_cli.foundation_frame
+    if args_cli.foundation_mode:
+        build_args["foundation_mode"] = args_cli.foundation_mode
 
     build_args["task_name"] = args_cli.task_name
     build_args["task_config"] = task_config

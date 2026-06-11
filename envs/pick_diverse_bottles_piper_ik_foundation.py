@@ -1,6 +1,8 @@
 """O.1: FoundationPose positions and source OBJ meshes with Piper Cartesian IK."""
 
+import json
 import pickle
+import re
 from copy import deepcopy
 from pathlib import Path
 
@@ -18,9 +20,27 @@ class pick_diverse_bottles_piper_ik_foundation(pick_diverse_bottles_piper_ik):
     """Use FoundationPose positions and source visual meshes instead of random assets."""
 
     def setup_demo(self, **kwargs):
+        self._foundation_mode = str(kwargs.get("foundation_mode", "o1")).lower()
+        if self._foundation_mode not in {"o1", "o1.1", "o1.2"}:
+            raise ValueError(f"unsupported foundation_mode={self._foundation_mode!r}")
         self._foundation_input_dir = kwargs.get("foundation_input_dir")
         self._foundation_frame = int(kwargs.get("foundation_frame", 0))
-        self._foundation_use_orientation = bool(kwargs.get("foundation_use_orientation", True))
+        self._foundation_annotation_json = Path(
+            kwargs.get(
+                "foundation_annotation_json",
+                "code_painting/h2o_manual_review/pick_diverse_bottles/hand_keyframes_all.json",
+            )
+        ).expanduser().resolve()
+        self._foundation_hand_targets_root = Path(
+            kwargs.get(
+                "foundation_hand_targets_root",
+                "code_painting/human_replay/pick_diverse_bottles",
+            )
+        ).expanduser().resolve()
+        self._foundation_episode_id = kwargs.get("foundation_episode_id")
+        self._foundation_keyframes = None
+        self._foundation_action_positions = None
+        self._foundation_use_orientation = bool(kwargs.get("foundation_use_orientation", False))
         self._foundation_table_clearance = float(kwargs.get("foundation_table_clearance", 0.002))
         self._foundation_mesh_mass = float(kwargs.get("foundation_mesh_mass", 0.05))
         self._foundation_mesh_friction = float(kwargs.get("foundation_mesh_friction", 1.5))
@@ -31,10 +51,28 @@ class pick_diverse_bottles_piper_ik_foundation(pick_diverse_bottles_piper_ik):
         self._foundation_collision_radius_padding = float(
             kwargs.get("foundation_collision_radius_padding", 0.0)
         )
-        self._foundation_collision_mode = kwargs.get("foundation_collision_mode", "cylinder_proxy")
+        self._foundation_collision_mode = kwargs.get("foundation_collision_mode", "support_proxy")
         self._foundation_grasp_assist = bool(kwargs.get("foundation_grasp_assist", True))
         self._foundation_grasp_assist_max_distance = float(
             kwargs.get("foundation_grasp_assist_max_distance", 0.14)
+        )
+        self._foundation_pregrasp_distance = float(
+            kwargs.get("foundation_pregrasp_distance", 0.12)
+        )
+        self._foundation_grasp_max_displacement = float(
+            kwargs.get("foundation_grasp_max_displacement", 0.025)
+        )
+        self._foundation_grasp_max_rotation_deg = float(
+            kwargs.get("foundation_grasp_max_rotation_deg", 15.0)
+        )
+        self._foundation_capture_radial_tolerance = float(
+            kwargs.get("foundation_capture_radial_tolerance", 0.065)
+        )
+        self._foundation_capture_segment_margin = float(
+            kwargs.get("foundation_capture_segment_margin", 0.15)
+        )
+        self._foundation_grasp_require_contact = bool(
+            kwargs.get("foundation_grasp_require_contact", False)
         )
         if np.hypot(
             self._foundation_grasp_standoff,
@@ -51,6 +89,9 @@ class pick_diverse_bottles_piper_ik_foundation(pick_diverse_bottles_piper_ik):
         self._foundation_data = None
         self._foundation_geometry = {}
         self._foundation_settled_poses = {}
+        self._foundation_settled_centers = {}
+        self._foundation_grasp_diagnostics = {}
+        self._foundation_grasp_valid = False
 
         if not self._foundation_input_dir:
             raise ValueError(
@@ -60,6 +101,26 @@ class pick_diverse_bottles_piper_ik_foundation(pick_diverse_bottles_piper_ik):
         npz_path = Path(self._foundation_input_dir) / "multi_object_world_poses.npz"
         if not npz_path.is_file():
             raise FileNotFoundError(f"Foundation NPZ not found: {npz_path}")
+
+        if self._foundation_episode_id is None:
+            match = re.search(r"foundation_input_(\d+)$", Path(self._foundation_input_dir).name)
+            if match is None:
+                raise ValueError(
+                    "foundation_episode_id is required when foundation_input_dir does not end "
+                    "with foundation_input_<ID>"
+                )
+            self._foundation_episode_id = int(match.group(1))
+        else:
+            self._foundation_episode_id = int(self._foundation_episode_id)
+
+        if self._foundation_mode in {"o1.1", "o1.2"}:
+            self._load_annotated_keyframes()
+            self._foundation_frame = self._foundation_keyframes[0]
+        if self._foundation_mode == "o1.2":
+            self.MOVE_ACTION_NAMES = ("pregrasp", "grasp", "action")
+            self._load_keyframe_action_positions()
+        else:
+            self.MOVE_ACTION_NAMES = type(self).MOVE_ACTION_NAMES
 
         self._foundation_data = dict(np.load(npz_path, allow_pickle=True))
         required = (
@@ -82,10 +143,65 @@ class pick_diverse_bottles_piper_ik_foundation(pick_diverse_bottles_piper_ik):
                 raise ValueError(f"{side}_bottle is not visible at frame {self._foundation_frame}")
 
         print(
-            f"[piper-ik-foundation] source={npz_path} frame={self._foundation_frame} "
-            f"use_orientation={self._foundation_use_orientation}"
+            f"[piper-ik-foundation] mode={self._foundation_mode} source={npz_path} "
+            f"episode={self._foundation_episode_id} frame={self._foundation_frame} "
+            f"keyframes={self._foundation_keyframes} use_orientation={self._foundation_use_orientation}"
         )
         super().setup_demo(**kwargs)
+
+    def _load_annotated_keyframes(self):
+        if not self._foundation_annotation_json.is_file():
+            raise FileNotFoundError(
+                f"Foundation keyframe annotation not found: {self._foundation_annotation_json}"
+            )
+        with self._foundation_annotation_json.open(encoding="utf-8") as file:
+            annotation = json.load(file)
+        video_key = f"hand_vis_{self._foundation_episode_id}.mp4"
+        record = annotation.get("videos", {}).get(video_key)
+        if not isinstance(record, dict):
+            raise KeyError(f"keyframe annotation is missing {video_key}")
+        if str(record.get("status", "done")).lower() in {"reject", "discard", "bad"}:
+            raise ValueError(f"{video_key} is marked {record.get('status')}")
+        keyframes = [int(value) for value in record.get("keyframes", [])]
+        if len(keyframes) < 2:
+            raise ValueError(f"{video_key} requires at least two global keyframes, got {keyframes}")
+        self._foundation_keyframes = (keyframes[0], keyframes[1])
+
+    def _load_keyframe_action_positions(self):
+        target_path = (
+            self._foundation_hand_targets_root
+            / f"id_{self._foundation_episode_id}"
+            / "world_targets_and_status.npz"
+        )
+        if not target_path.is_file():
+            raise FileNotFoundError(f"O.1.2 hand target NPZ not found: {target_path}")
+        data = np.load(target_path, allow_pickle=True)
+        required = ("selected_indices", "left_world_targets", "right_world_targets")
+        missing = [key for key in required if key not in data]
+        if missing:
+            raise KeyError(f"O.1.2 hand target NPZ is missing keys: {missing}")
+        action_frame = self._foundation_keyframes[1]
+        selected_indices = np.asarray(data["selected_indices"], dtype=np.int64).reshape(-1)
+        matches = np.flatnonzero(selected_indices == action_frame)
+        if matches.size != 1:
+            raise ValueError(
+                f"O.1.2 action frame {action_frame} must map to exactly one target row, "
+                f"got {matches.size}"
+            )
+        row = int(matches[0])
+        positions = {
+            "left": np.asarray(data["left_world_targets"][row, :3], dtype=np.float64),
+            "right": np.asarray(data["right_world_targets"][row, :3], dtype=np.float64),
+        }
+        if not all(np.isfinite(value).all() for value in positions.values()):
+            raise ValueError(f"O.1.2 action frame {action_frame} contains invalid EE positions")
+        self._foundation_action_positions = positions
+        self._foundation_action_source = str(target_path.resolve())
+        print(
+            f"[piper-ik-foundation] O.1.2 action frame={action_frame} "
+            f"left={np.round(positions['left'], 4).tolist()} "
+            f"right={np.round(positions['right'], 4).tolist()}"
+        )
 
     @staticmethod
     def _scalar_path(value):
@@ -158,17 +274,23 @@ class pick_diverse_bottles_piper_ik_foundation(pick_diverse_bottles_piper_ik):
             builder.add_multiple_convex_collisions_from_file(
                 filename=str(mesh_path), scale=[1, 1, 1]
             )
-        elif self._foundation_collision_mode == "cylinder_proxy":
+        elif self._foundation_collision_mode in {"cylinder_proxy", "support_proxy"}:
             extents = bounds[1] - bounds[0]
             radius = (
                 0.5 * max(extents[0], extents[2])
                 + self._foundation_collision_radius_padding
             )
-            half_length = 0.5 * extents[1]
+            if self._foundation_collision_mode == "support_proxy":
+                half_length = min(0.006, 0.05 * extents[1])
+                center_local = bounds.mean(axis=0)
+                center_local[1] = bounds[0, 1] + half_length
+            else:
+                half_length = 0.5 * extents[1]
+                center_local = bounds.mean(axis=0)
             # SAPIEN cylinders use local X as their long axis; Foundation bottle
             # meshes use local Y as vertical, so rotate the collision X axis to Y.
             cylinder_pose = sapien.Pose(
-                bounds.mean(axis=0),
+                center_local,
                 t3d.euler.euler2quat(0.0, 0.0, np.pi / 2),
             )
             high_friction_material = self.scene.create_physical_material(
@@ -235,6 +357,10 @@ class pick_diverse_bottles_piper_ik_foundation(pick_diverse_bottles_piper_ik):
             "left": deepcopy(self.bottle1.get_pose()),
             "right": deepcopy(self.bottle2.get_pose()),
         }
+        self._foundation_settled_centers = {
+            "left": np.asarray(left_center[:3], dtype=np.float64),
+            "right": np.asarray(right_center[:3], dtype=np.float64),
+        }
         print(
             "[piper-ik-foundation] actors settled: "
             f"left_center=({left_center[0]:.3f},{left_center[1]:.3f},{left_center[2]:.3f}) "
@@ -242,6 +368,7 @@ class pick_diverse_bottles_piper_ik_foundation(pick_diverse_bottles_piper_ik):
         )
 
     def _foundation_grasp_poses(self, actor, arm_tag, pre_grasp_dis):
+        pre_grasp_dis = self._foundation_pregrasp_distance
         center = np.asarray(actor.get_functional_point(0)[:3], dtype=np.float64)
         side_sign = -1.0 if arm_tag == "left" else 1.0
         grasp_offset = np.asarray([
@@ -289,29 +416,193 @@ class pick_diverse_bottles_piper_ik_foundation(pick_diverse_bottles_piper_ik):
             axes.append((f"plan_grasp_{side}", sapien.Pose(grasp, quat), 0.07, (0.3, 1.0, 0.5)))
         return axes
 
+    def _build_action_sequence(self):
+        sequence = super()._build_action_sequence()
+        if self._foundation_mode != "o1.2":
+            return sequence
+        pregrasp, grasp, close = sequence[:3]
+        left_grasp_pose = list(grasp[1].target_pose)
+        right_grasp_pose = list(grasp[2].target_pose)
+        left_action_pose = self._foundation_action_positions["left"].tolist() + left_grasp_pose[3:]
+        right_action_pose = self._foundation_action_positions["right"].tolist() + right_grasp_pose[3:]
+        action = (
+            "action",
+            Action(grasp[1].arm_tag, "move", target_pose=left_action_pose),
+            Action(grasp[2].arm_tag, "move", target_pose=right_action_pose),
+        )
+        sequence = [pregrasp, grasp, close, action]
+        self._trajectory_targets = {
+            "left": {
+                "pregrasp": list(pregrasp[1].target_pose),
+                "grasp": list(grasp[1].target_pose),
+                "action": left_action_pose,
+            },
+            "right": {
+                "pregrasp": list(pregrasp[2].target_pose),
+                "grasp": list(grasp[2].target_pose),
+                "action": right_action_pose,
+            },
+        }
+        print(
+            "[piper-ik-foundation] O.1.2 replaces lift/place with action: "
+            f"left={np.round(left_action_pose[:3], 4).tolist()} "
+            f"right={np.round(right_action_pose[:3], 4).tolist()}"
+        )
+        return sequence
+
+    def _sequence_from_loaded_trajectory(self):
+        if self._foundation_mode != "o1.2":
+            return super()._sequence_from_loaded_trajectory()
+        metadata = self._loaded_trajectory_metadata
+        if metadata is None:
+            raise ValueError("trajectory metadata was not loaded before replay")
+        targets = metadata["targets"]
+        from .utils import ArmTag
+
+        left_arm = ArmTag("left")
+        right_arm = ArmTag("right")
+        sequence = [
+            (
+                "pregrasp",
+                Action(left_arm, "move", target_pose=targets["left"]["pregrasp"]),
+                Action(right_arm, "move", target_pose=targets["right"]["pregrasp"]),
+            ),
+            (
+                "grasp",
+                Action(
+                    left_arm,
+                    "move",
+                    target_pose=targets["left"]["grasp"],
+                    constraint_pose=[1, 1, 1, 0, 0, 0],
+                ),
+                Action(
+                    right_arm,
+                    "move",
+                    target_pose=targets["right"]["grasp"],
+                    constraint_pose=[1, 1, 1, 0, 0, 0],
+                ),
+            ),
+            (
+                "close_gripper",
+                Action(left_arm, "close", target_gripper_pos=0.0),
+                Action(right_arm, "close", target_gripper_pos=0.0),
+            ),
+            (
+                "action",
+                Action(left_arm, "move", target_pose=targets["left"]["action"]),
+                Action(right_arm, "move", target_pose=targets["right"]["action"]),
+            ),
+        ]
+        self._trajectory_targets = deepcopy(targets)
+        return sequence
+
+    def _update_place_targets_from_closed_grasp(self, sequence):
+        if self._foundation_mode == "o1.2":
+            return
+        super()._update_place_targets_from_closed_grasp(sequence)
+
+    @staticmethod
+    def _quat_distance_deg(first, second):
+        first = np.asarray(first, dtype=np.float64)
+        second = np.asarray(second, dtype=np.float64)
+        first /= np.linalg.norm(first)
+        second /= np.linalg.norm(second)
+        dot = np.clip(abs(float(np.dot(first, second))), 0.0, 1.0)
+        return float(np.degrees(2.0 * np.arccos(dot)))
+
+    def _finger_contact_indices(self, actor, finger_links):
+        indices = set()
+        for contact in self.scene.get_contacts():
+            if hasattr(contact, "bodies") and contact.bodies:
+                entities = [getattr(body, "entity", None) for body in contact.bodies]
+            else:
+                entities = [getattr(contact, "actor0", None), getattr(contact, "actor1", None)]
+            if actor.actor not in entities:
+                continue
+            for index, finger_link in enumerate(finger_links):
+                if finger_link in entities:
+                    indices.add(index)
+        return sorted(indices)
+
+    def _validate_foundation_grasp(self, side, actor, ee_joint, gripper_joints):
+        current_pose = actor.get_pose()
+        settled_pose = self._foundation_settled_poses[side]
+        current_center = np.asarray(actor.get_functional_point(0)[:3], dtype=np.float64)
+        settled_center = self._foundation_settled_centers[side]
+        displacement = float(np.linalg.norm(current_center - settled_center))
+        rotation_deg = self._quat_distance_deg(current_pose.q, settled_pose.q)
+        ee_position = np.asarray(ee_joint.child_link.get_pose().p, dtype=np.float64)
+        ee_distance = float(np.linalg.norm(current_center - ee_position))
+
+        finger_links = [
+            item[0].child_link
+            for item in gripper_joints
+            if getattr(item[0], "child_link", None) is not None
+        ]
+        if len(finger_links) != 2:
+            raise RuntimeError(f"{side} grasp requires exactly two finger links")
+        finger_positions = np.asarray(
+            [link.get_pose().p for link in finger_links], dtype=np.float64
+        )
+        segment = finger_positions[1] - finger_positions[0]
+        segment_norm_sq = float(np.dot(segment, segment))
+        if segment_norm_sq <= 1e-8:
+            raise RuntimeError(f"{side} finger segment is degenerate")
+        projection = float(
+            np.dot(current_center - finger_positions[0], segment) / segment_norm_sq
+        )
+        closest = finger_positions[0] + np.clip(projection, 0.0, 1.0) * segment
+        radial_distance = float(np.linalg.norm(current_center - closest))
+        contact_indices = self._finger_contact_indices(actor, finger_links)
+        within_segment = (
+            -self._foundation_capture_segment_margin
+            <= projection
+            <= 1.0 + self._foundation_capture_segment_margin
+        )
+        valid = (
+            displacement <= self._foundation_grasp_max_displacement
+            and rotation_deg <= self._foundation_grasp_max_rotation_deg
+            and ee_distance <= self._foundation_grasp_assist_max_distance
+            and within_segment
+            and radial_distance <= self._foundation_capture_radial_tolerance
+            and (
+                not self._foundation_grasp_require_contact
+                or len(contact_indices) == len(finger_links)
+            )
+        )
+        diagnostics = {
+            "displacement_m": displacement,
+            "rotation_deg": rotation_deg,
+            "ee_distance_m": ee_distance,
+            "finger_projection": projection,
+            "finger_radial_distance_m": radial_distance,
+            "finger_contacts": contact_indices,
+            "valid": valid,
+        }
+        self._foundation_grasp_diagnostics[side] = diagnostics
+        print(
+            f"[piper-ik-foundation] grasp-state {side}: valid={valid} "
+            f"displacement={displacement:.4f}m rotation={rotation_deg:.1f}deg "
+            f"ee_distance={ee_distance:.3f}m projection={projection:.3f} "
+            f"radial={radial_distance:.3f}m contacts={contact_indices}"
+        )
+        if not valid:
+            raise RuntimeError(f"{side} grasp-state validation failed: {diagnostics}")
+        return current_pose, ee_joint.child_link.get_pose()
+
     def _attach_foundation_grasp_drives(self):
         if not self._foundation_grasp_assist or self._foundation_grasp_drives:
             return
-        for side, actor, ee_joint in (
-            ("left", self.bottle1, self.robot.left_ee),
-            ("right", self.bottle2, self.robot.right_ee),
+        validated = []
+        for side, actor, ee_joint, gripper_joints in (
+            ("left", self.bottle1, self.robot.left_ee, self.robot.left_gripper),
+            ("right", self.bottle2, self.robot.right_ee, self.robot.right_gripper),
         ):
-            settled_pose = self._foundation_settled_poses[side]
-            actor.actor.set_pose(settled_pose)
-            for component in actor.actor.get_components():
-                if hasattr(component, "set_linear_velocity"):
-                    component.set_linear_velocity([0.0, 0.0, 0.0])
-                    component.set_angular_velocity([0.0, 0.0, 0.0])
-            ee_link = ee_joint.child_link
-            ee_pose = ee_link.get_pose()
-            actor_pose = actor.get_pose()
-            center = np.asarray(actor.get_functional_point(0)[:3], dtype=np.float64)
-            distance = float(np.linalg.norm(center - np.asarray(ee_pose.p)))
-            if distance > self._foundation_grasp_assist_max_distance:
-                raise RuntimeError(
-                    f"{side} grasp-assist refused: object/EE distance {distance:.3f}m exceeds "
-                    f"{self._foundation_grasp_assist_max_distance:.3f}m"
-                )
+            actor_pose, ee_pose = self._validate_foundation_grasp(
+                side, actor, ee_joint, gripper_joints
+            )
+            validated.append((side, actor, ee_joint.child_link, actor_pose, ee_pose))
+        for side, actor, ee_link, actor_pose, ee_pose in validated:
             object_anchor = actor_pose.inv() * ee_pose
             drive = self.scene.create_drive(
                 ee_link,
@@ -327,9 +618,9 @@ class pick_diverse_bottles_piper_ik_foundation(pick_diverse_bottles_piper_ik):
             drive.set_drive_property_slerp(1e5, 1e4)
             self._foundation_grasp_drives.append(drive)
             print(
-                f"[piper-ik-foundation] grasp-assist attached {side}: "
-                f"object/EE distance={distance:.3f}m"
+                f"[piper-ik-foundation] grasp-assist attached {side} at current object pose"
             )
+        self._foundation_grasp_valid = True
 
     def _release_foundation_grasp_drives(self):
         for drive in self._foundation_grasp_drives:
@@ -343,11 +634,11 @@ class pick_diverse_bottles_piper_ik_foundation(pick_diverse_bottles_piper_ik):
         super().close_env(clear_cache=clear_cache)
 
     def _execute_gripper_pair(self, action_name, left_action, right_action):
-        if action_name == "close_gripper":
-            self._attach_foundation_grasp_drives()
-        elif action_name == "open_gripper":
+        if action_name == "open_gripper":
             self._release_foundation_grasp_drives()
         super()._execute_gripper_pair(action_name, left_action, right_action)
+        if action_name == "close_gripper":
+            self._attach_foundation_grasp_drives()
 
     def play_once(self):
         info = super().play_once()
@@ -357,6 +648,43 @@ class pick_diverse_bottles_piper_ik_foundation(pick_diverse_bottles_piper_ik):
                 "{B}": self._foundation_right_description,
             }
         return info
+
+    def check_success(self):
+        if self._foundation_mode != "o1.2":
+            return super().check_success()
+        targets = self._trajectory_targets
+        left_ee = np.asarray(self.robot.left_ee.child_link.get_pose().p, dtype=np.float64)
+        right_ee = np.asarray(self.robot.right_ee.child_link.get_pose().p, dtype=np.float64)
+        left_target = np.asarray(targets["left"]["action"][:3], dtype=np.float64)
+        right_target = np.asarray(targets["right"]["action"][:3], dtype=np.float64)
+        left_error = float(np.linalg.norm(left_ee - left_target))
+        right_error = float(np.linalg.norm(right_ee - right_target))
+        left_center = np.asarray(self.bottle1.get_functional_point(0)[:3], dtype=np.float64)
+        right_center = np.asarray(self.bottle2.get_functional_point(0)[:3], dtype=np.float64)
+        left_motion = float(
+            np.linalg.norm(left_center - self._foundation_settled_centers["left"])
+        )
+        right_motion = float(
+            np.linalg.norm(right_center - self._foundation_settled_centers["right"])
+        )
+        success = bool(
+            self.plan_success
+            and self._foundation_grasp_valid
+            and left_error < 0.12
+            and right_error < 0.12
+            and left_motion > 0.04
+            and right_motion > 0.04
+        )
+        self._last_success = success
+        print(
+            f"[piper-ik-foundation][O.1.2-check] success={success} "
+            f"ee_error=({left_error:.3f},{right_error:.3f})m "
+            f"object_motion=({left_motion:.3f},{right_motion:.3f})m "
+            f"grasp_valid={self._foundation_grasp_valid}"
+        )
+        if self.save_all_episodes:
+            return True
+        return success
 
     def save_traj_data(self, idx):
         super().save_traj_data(idx)
@@ -379,11 +707,36 @@ class pick_diverse_bottles_piper_ik_foundation(pick_diverse_bottles_piper_ik):
 
     def _foundation_context(self):
         return {
+            "mode": self._foundation_mode,
             "input_dir": str(Path(self._foundation_input_dir).resolve()),
             "frame": self._foundation_frame,
+            "episode_id": self._foundation_episode_id,
+            "annotated_keyframes": self._foundation_keyframes,
+            "annotation_json": (
+                str(self._foundation_annotation_json)
+                if self._foundation_mode in {"o1.1", "o1.2"}
+                else None
+            ),
+            "action_source": getattr(self, "_foundation_action_source", None),
+            "action_positions": (
+                {
+                    side: value.tolist()
+                    for side, value in self._foundation_action_positions.items()
+                }
+                if self._foundation_action_positions is not None
+                else None
+            ),
             "use_orientation": self._foundation_use_orientation,
             "collision_mode": self._foundation_collision_mode,
             "collision_radius_padding": self._foundation_collision_radius_padding,
+            "pregrasp_distance": self._foundation_pregrasp_distance,
             "grasp_assist": self._foundation_grasp_assist,
+            "grasp_state_limits": {
+                "max_displacement": self._foundation_grasp_max_displacement,
+                "max_rotation_deg": self._foundation_grasp_max_rotation_deg,
+                "capture_radial_tolerance": self._foundation_capture_radial_tolerance,
+                "capture_segment_margin": self._foundation_capture_segment_margin,
+                "require_contact": self._foundation_grasp_require_contact,
+            },
             "geometry": deepcopy(self._foundation_geometry),
         }

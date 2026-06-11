@@ -2733,3 +2733,14 @@
 - Replay skips planner initialization, fixing V3 Phase-2 multi-camera rendering slowdown.
 - Validation: V1-V4 viewers reported `physical_success=True`; full V1-V4 collection produced validated replay, `episode0_succ.hdf5`, six videos, and instructions. V3 fallback worked after MotionGen failure.
 - Cleanup: removed this run's reproducible O.1 HDF5 files, videos, caches, generated config, and temporary logs after structural validation.
+
+## 2026-06-11 (O.1 No-Teleport Grasp Gate And Keyframe Modes)
+
+- Root cause: old O.1 called `actor.set_pose(settled_pose)` before close, so a bottle tipped during pregrasp/grasp teleported back into the gripper. Full bottle-body cylinder collision also intersected the open-gripper approach path.
+- Changed: removed object pose reset; defaulted to a base-only `support_proxy`; after close, validate displacement, rotation, link6 distance, finger-segment projection, and radial distance before attaching a drive at the current object pose.
+- O.1.1 reads the first two episode keyframes from `hand_keyframes_all.json` and uses the first frame for Foundation OBJ setup.
+- O.1.2 performs pregrasp/grasp/close from the first frame, then loads left/right EE xyz at the second frame from `world_targets_and_status.npz` and replaces lift/place with one action retaining the grasp orientation.
+- Trajectory context now binds mode, episode ID, keyframes, annotation/action source, pregrasp distance, and grasp-gate parameters to prevent cross-mode replay.
+- Validation: `py_compile` and `bash -n` passed. V1 O.1/O.1.1/O.1.2 viewers and full two-phase collections passed. Full O.1.2 collection also passed on V2/V3/V4. Every collection produced a v2 pickle, validated replay, `episode0_succ.hdf5`, instructions, and six MP4 files.
+- Environment boundary: the current non-interactive shell's X11 socket reports `Renderer does not support display` to SAPIEN, so V2-V4 GUI window creation was not repeated there; full offscreen collection covered the same planning and replay logic.
+- Cleanup: after inspecting artifact structure, removed six reproducible validation output directories, temporary YAML files, and `/tmp` logs. Existing collected datasets were not modified.

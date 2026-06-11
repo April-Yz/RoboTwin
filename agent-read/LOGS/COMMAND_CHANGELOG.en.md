@@ -2058,3 +2058,10 @@
 - Added `collect_foundation_piper_ik.sh <v1-v4> <id> [frame] [gpu]`, generating isolated config and output names by version, ID, and frame.
 - Updated O.1 in `COMMAND_LIBRARY.zh.md` and removed the unsafe base-config `sed -i` batch workflow.
 - Added `agent-read/COMMANDS/piper_ik_foundation.en.md`.
+
+## 2026-06-11 (O.1.1 / O.1.2 Commands)
+
+- Viewer adds `--foundation_mode o1|o1.1|o1.2`.
+- Collection wrapper format is now `bash collect_foundation_piper_ik.sh <v1-v4> <id> [frame] [gpu] [o1|o1.1|o1.2]`.
+- O.1.1/O.1.2 output names include `o1_1` / `o1_2` and do not share O.1 `id<id>_frame<frame>` directories.
+- Example: `bash collect_foundation_piper_ik.sh v1 0 0 0 o1.2`.

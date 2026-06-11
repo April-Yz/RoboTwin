@@ -5,10 +5,11 @@
 ## 当前推荐工作流
 
 - Piper IK 双瓶抓放：使用 `pick_diverse_bottles_piper_ik` 与 `demo_piper_ik_seq_v1..v4`。
-- Foundation OBJ 对比：使用 `pick_diverse_bottles_piper_ik_foundation` 与 `demo_piper_ik_foundation_v1..v4`，从 NPZ 读取物体位置和原始网格。
+- Foundation OBJ 对比：使用 `pick_diverse_bottles_piper_ik_foundation` 与 `demo_piper_ik_foundation_v1..v4`。O.1 使用显式 frame，O.1.1 用第一标注关键帧建场，O.1.2 再用第二关键帧 EE 位置替代 lift/place。
 - 默认 IK：V1；V2 使用三次插值，V3 使用 MotionGen 并带 IK 插值回退，V4 使用多种子 IK。
 - 数据流程：Phase 1 找稳定且真实成功的 seed 并保存版本化轨迹；Phase 2 在相同 seed 场景中校验、回放并保存 HDF5/视频/instruction。
 - 相机：head、front、side、右侧 `third_camera`、对向俯视 `opposite_top_camera`，以及 top-level `third_view`。
+- Foundation 抓取默认使用底部 `support_proxy` 和 close 后几何状态门控；不会通过 `set_pose` 把倾倒物体瞬移回夹爪。
 
 ## 环境与入口
 

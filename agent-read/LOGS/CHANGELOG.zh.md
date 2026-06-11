@@ -2731,3 +2731,14 @@
 - replay 模式跳过 planner 初始化，解决 V3 Phase 2 多相机渲染卡顿。
 - 验证：V1-V4 viewer 均 `physical_success=True`；V1-V4 完整采集均生成 validated replay、`episode0_succ.hdf5`、六路视频和 instructions。V3 MotionGen 失败后正常回退。
 - 清理：结构检查后删除本轮可重复生成的 O.1 HDF5、视频、缓存、临时 config 和日志。
+
+## 2026-06-11（O.1 无瞬移抓取门控与关键帧模式）
+
+- 根因：旧 O.1 在 close 前执行 `actor.set_pose(settled_pose)`，因此 pregrasp/grasp 撞倒的瓶子会在 close 时瞬移回夹爪。完整瓶身圆柱碰撞也会与张开夹爪的接近路径发生提前碰撞。
+- 修改：删除物体 pose reset；默认改为底部 `support_proxy`；close 后检查位移、旋转、link6 距离、双指投影和径向距离，通过后才在物体当前 pose 建立 drive。
+- O.1.1：读取 `hand_keyframes_all.json` 中 episode 的前两个关键帧，用第一帧设置 Foundation OBJ pose。
+- O.1.2：第一帧完成 pregrasp/grasp/close，第二帧从 `world_targets_and_status.npz` 取左右 EE xyz，以保留 grasp 朝向的单一 action 代替 lift/place。
+- 轨迹上下文新增 mode、episode ID、关键帧、annotation/action 来源、pregrasp 距离和抓取门控参数，防止跨模式回放。
+- 验证：`py_compile` 和 `bash -n` 通过；V1 的 O.1/O.1.1/O.1.2 viewer 与完整两阶段采集通过；O.1.2 的 V2/V3/V4 完整采集通过。每次采集均生成 v2 pickle、validated replay、`episode0_succ.hdf5`、instructions 和六路 MP4。
+- 环境边界：当前非交互 shell 的 X11 socket 对 SAPIEN 报 `Renderer does not support display`，因此 V2-V4 未在该 shell 重复 GUI 建窗；离屏完整采集已覆盖同一规划和回放逻辑。
+- 清理：检查产物结构后删除本轮六个可重复生成的 validation 输出目录、临时 YAML 和 `/tmp` 日志；未修改已有采集数据。

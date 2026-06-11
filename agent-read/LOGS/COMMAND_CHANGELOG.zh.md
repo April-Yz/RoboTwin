@@ -2056,3 +2056,10 @@
 - 新增 `collect_foundation_piper_ik.sh <v1-v4> <id> [frame] [gpu]`，按版本/ID/frame 生成独立 config 与输出目录。
 - 更新 `COMMAND_LIBRARY.zh.md` O.1，删除原地 `sed -i` 修改基础 config 的错误批处理方式。
 - 新增 `agent-read/COMMANDS/piper_ik_foundation.zh.md`。
+
+## 2026-06-11（O.1.1 / O.1.2 命令）
+
+- Viewer 新增 `--foundation_mode o1|o1.1|o1.2`。
+- 采集 wrapper 新格式：`bash collect_foundation_piper_ik.sh <v1-v4> <id> [frame] [gpu] [o1|o1.1|o1.2]`。
+- O.1.1/O.1.2 输出名包含 `o1_1` / `o1_2`，不与 O.1 的 `id<id>_frame<frame>` 目录混用。
+- 示例：`bash collect_foundation_piper_ik.sh v1 0 0 0 o1.2`。

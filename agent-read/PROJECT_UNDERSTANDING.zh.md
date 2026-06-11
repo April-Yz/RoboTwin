@@ -28,6 +28,8 @@
 
 ## O.1 Foundation OBJ 数据流
 
-O.1 从 `multi_object_world_poses.npz` 读取位置、可选朝向和原始 OBJ 路径。trimesh bounds 用于几何中心、桌面 clearance 和圆柱代理碰撞。input 0 的 OBJ 直径约 6.6cm，当前 Pika 夹爪纯接触会在接近或闭合时推走物体，因此默认使用距离门控 grasp drive。轨迹额外绑定 Foundation 目录、frame、碰撞模式和 mesh 几何，防止跨输入回放。
+O.1 从 `multi_object_world_poses.npz` 读取位置、可选朝向和原始 OBJ 路径。trimesh bounds 用于几何中心和桌面 clearance。input 0 的 OBJ 直径约 6.6cm，完整瓶身碰撞会在 pregrasp/grasp 接近时被当前 Pika 夹爪推倒，因此默认用底部 `support_proxy` 保留桌面支撑。close 后不重置物体 pose，而是校验物体位移/旋转、link6 距离以及双指几何夹持状态，通过后才在当前 pose 建立 drive。
+
+O.1.1 从 `hand_keyframes_all.json` 取第一关键帧的 Foundation OBJ pose。O.1.2 进一步从 `world_targets_and_status.npz` 取第二关键帧的左右 EE xyz，以保留 grasp 朝向的单个 action 替代 lift/place。轨迹绑定 mode、episode ID、关键帧、action 来源、抓取门控参数和 mesh 几何，防止跨设定回放。
 
 Phase 2 只消费已验证关节路径，不创建 IK 或 MotionGen planner，避免 V3 回放占用 GPU 并拖慢多相机渲染。

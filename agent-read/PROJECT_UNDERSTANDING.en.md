@@ -28,6 +28,8 @@ The trajectory pickle stores schema, version, IK version, action names, Cartesia
 
 ## O.1 Foundation OBJ Data Flow
 
-O.1 reads positions, optional orientations, and source OBJ paths from `multi_object_world_poses.npz`. Trimesh bounds define the geometric center, table clearance, and cylinder-proxy collision. The input-0 meshes are about 6.6 cm wide, so pure contact with the current Pika gripper pushes them during approach or close; a distance-gated grasp drive is enabled by default. Trajectories also bind the Foundation directory, frame, collision mode, and mesh geometry to prevent cross-input replay.
+O.1 reads positions, optional orientations, and source OBJ paths from `multi_object_world_poses.npz`. Trimesh bounds define the geometric center and table clearance. The input-0 meshes are about 6.6 cm wide, and full bottle-body collision causes the current Pika gripper to tip them during pregrasp/grasp approach, so the default uses a base-only `support_proxy`. Close never resets object pose. It validates displacement/rotation, link6 distance, and geometric capture between both fingers before attaching a drive at the current pose.
+
+O.1.1 uses the first annotated keyframe in `hand_keyframes_all.json` for the Foundation OBJ setup. O.1.2 additionally loads left/right EE xyz at the second keyframe from `world_targets_and_status.npz` and replaces lift/place with one action that retains the grasp orientation. Trajectories bind mode, episode ID, keyframes, action source, grasp-gate parameters, and mesh geometry to prevent cross-setting replay.
 
 Phase 2 only consumes validated joint paths and does not create IK or MotionGen planners, avoiding V3 replay GPU pressure and slow multi-camera rendering.

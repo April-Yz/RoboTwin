@@ -18,4 +18,4 @@ Use `demo_piper_ik_seq_v1` by default. Use V2 for smoother interpolation, V3 for
 
 ## O.1 Foundation Variants
 
-`demo_piper_ik_foundation_v1..v4` retain the same IK-version semantics while replacing random RoboTwin bottle assets with positions and source OBJ meshes from Foundation NPZ files. Start with V1. Stable collection currently defaults to cylinder-proxy collision and grasp assist. O.1 pickles also require an exact Foundation-source context match.
+`demo_piper_ik_foundation_v1..v4` retain the same IK-version semantics while replacing random RoboTwin bottle assets with positions and source OBJ meshes from Foundation NPZ files. O.1 uses an explicit frame, O.1.1 sets up from the first annotated keyframe, and O.1.2 replaces lift/place with second-keyframe EE xyz. Start with V1. The default uses a base-only `support_proxy` and no-teleport grasp-state gating. Pickles require an exact Foundation mode/source/keyframe/action/geometry context match.
