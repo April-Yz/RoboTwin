@@ -190,6 +190,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--arm", choices=["auto", "left", "right"], default="auto")
     parser.add_argument("--execute_both_arms", type=int, default=1, help="If 1 and --arm auto, execute synchronized dual-arm stages and advance only when both arms satisfy reach checks.")
     parser.add_argument("--dual_stage_require_all_plans", type=int, default=1, help="If 1 in dual-arm mode, do not execute either arm in a stage unless both left/right plans are successful. This prevents one arm from moving alone when the other arm's IK fails.")
+    parser.add_argument("--dual_stage_freeze_reached_arms_on_replan", type=int, default=0, help="If 1, once one arm reaches a dual-arm stage target, later replan attempts hold that arm fixed and only move unreached arms.")
     parser.add_argument("--require_keyframe1_reached_before_close", type=int, default=0, help="If 1, skip gripper close and second-keyframe action unless the first-keyframe grasp stage reached the configured pose tolerance.")
     parser.add_argument("--require_keyframe1_reached_before_action", type=int, default=0, help="If 1, skip the second-keyframe action stage unless the first-keyframe grasp stage reached the configured pose tolerance.")
     parser.add_argument("--debug_stop_after_keyframe1", type=int, default=0, help="If 1, stop execution after the first-keyframe pregrasp/grasp stages. The gripper is not closed and the second-keyframe action is marked skipped. Use this to debug init-to-keyframe1 reachability in isolation.")
@@ -410,6 +411,7 @@ def preview_candidate_entry_to_pose(
 def load_reused_plan_summary(
     path: Path,
     requested_arm_mode: str,
+    postprocess_args: Optional[argparse.Namespace] = None,
 ) -> Tuple[ArmSelectionResult, Dict[str, ArmDebugInfo], List[Tuple[str, List[SelectedKeyframe]]], Dict]:
     with path.open("r", encoding="utf-8") as f:
         summary = json.load(f)
@@ -434,6 +436,11 @@ def load_reused_plan_summary(
             raise ValueError(
                 f"reuse_plan_summary_json={path} does not contain selected candidates for requested arm={requested_arm_mode}"
             )
+    if postprocess_args is not None:
+        execution_sequences = [
+            (arm_name, postprocess_selected_keyframe_rolls(seq, postprocess_args))
+            for arm_name, seq in execution_sequences
+        ]
 
     primary_arm_name = str(summary.get("selected_arm", execution_sequences[0][0]))
     primary_sequence = None
@@ -4349,6 +4356,7 @@ def execute_dual_stage_until_reached(
 
     attempt_history: List[Dict[str, object]] = []
     last_arm_metrics: Dict[str, Dict[str, object]] = {}
+    frozen_arms: set[str] = set()
     attempt = 0
     while True:
         attempt += 1
@@ -4372,8 +4380,11 @@ def execute_dual_stage_until_reached(
                 f"lat_cm={float(pre_plan_by_arm[arm]['error']['lateral_to_forward_axis_cm']):.2f} "
                 f"theory={short_direction_label(str(pre_plan_by_arm[arm]['theoretical_forward_axis_motion']))}"
             )
+        if frozen_arms:
+            print("[dual-freeze] stage={} try={} holding_reached_arms={}".format(label, attempt, ",".join(sorted(frozen_arms))))
         plans_by_arm: Dict[str, Optional[Dict]] = {
-            arm: renderer.plan_path(arm, target_pose_world_wxyz_by_arm[arm]) for arm in arms
+            arm: (None if arm in frozen_arms else renderer.plan_path(arm, target_pose_world_wxyz_by_arm[arm]))
+            for arm in arms
         }
         for arm in arms:
             plan = plans_by_arm.get(arm)
@@ -4447,7 +4458,7 @@ def execute_dual_stage_until_reached(
             joint_command_scene_steps=args.joint_command_scene_steps,
             joint_target_wait_steps=args.joint_target_wait_steps,
             joint_target_wait_tol_rad=args.joint_target_wait_tol_rad,
-            require_all_plans=bool(args.dual_stage_require_all_plans),
+            require_all_plans=bool(args.dual_stage_require_all_plans) and not bool(frozen_arms),
             print_pose_every=int(args.print_execution_pose_every),
         )
 
@@ -4458,13 +4469,14 @@ def execute_dual_stage_until_reached(
             error_breakdown = pose_error_breakdown(target_eval_pose, current_eval_pose)
             pos_err = float(error_breakdown["dist_m"])
             rot_err = float(error_breakdown["rot_err_deg"])
+            status = "Frozen" if arm in frozen_arms else statuses.get(arm, "Missing")
             reached = (
-                statuses.get(arm, "Missing") == "Success"
+                (status in {"Success", "Frozen"})
                 and pos_err <= float(args.reach_pos_tol_m)
                 and rot_err <= float(args.reach_rot_tol_deg)
             )
             arm_metrics[arm] = {
-                "status": statuses.get(arm, "Missing"),
+                "status": status,
                 "target_error": error_breakdown,
                 "pos_err_m": float(pos_err),
                 "rot_err_deg": float(rot_err),
@@ -4478,6 +4490,7 @@ def execute_dual_stage_until_reached(
                 "pre_plan_by_arm": pre_plan_by_arm,
                 "plan_solution_by_arm": plan_solution_by_arm,
                 "arms": arm_metrics,
+                "frozen_arms": sorted(frozen_arms),
                 "reached": bool(stage_reached),
             }
         )
@@ -4513,6 +4526,8 @@ def execute_dual_stage_until_reached(
                 "arms": arm_metrics,
                 "attempt_history": attempt_history,
             }
+        if bool(args.dual_stage_freeze_reached_arms_on_replan):
+            frozen_arms = {arm for arm in arms if bool(arm_metrics.get(arm, {}).get("reached", False))}
         if max_attempts is not None and attempt >= max_attempts:
             break
 
@@ -5153,6 +5168,7 @@ def main() -> None:
         selection_result, arm_debugs, execution_sequences, reused_plan_summary = load_reused_plan_summary(
             path=args.reuse_plan_summary_json,
             requested_arm_mode=str(args.arm),
+            postprocess_args=args,
         )
         if not (bool(args.execute_both_arms) and args.arm == "auto"):
             execution_sequences = [(selection_result.arm, selection_result.selected_keyframes)]
@@ -6165,6 +6181,7 @@ def main() -> None:
         "init_prefix_frames": int(args.init_prefix_frames),
         "execute_both_arms": int(args.execute_both_arms),
         "dual_stage_require_all_plans": int(args.dual_stage_require_all_plans),
+        "dual_stage_freeze_reached_arms_on_replan": int(args.dual_stage_freeze_reached_arms_on_replan),
         "require_keyframe1_reached_before_close": int(args.require_keyframe1_reached_before_close),
         "require_keyframe1_reached_before_action": int(args.require_keyframe1_reached_before_action),
         "debug_stop_after_keyframe1": int(args.debug_stop_after_keyframe1),

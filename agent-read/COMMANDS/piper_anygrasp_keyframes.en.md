@@ -809,20 +809,24 @@ Key fixes:
 - `--debug_viewer_overlay` disables clean-video mode and shows target axes, top-1 C-gripper actors, camera axes, and the SAPIEN camera frustum in the viewer/videos.
 - Rank previews mark the selected candidate by `(frame, arm)` and include preview frames from each arm's debug frame set.
 - The default planner mode is `cartesian_interp_ik`: each stage linearly interpolates TCP position and Slerps TCP orientation from the current TCP to the target TCP, then solves IK waypoint by waypoint. If IK switches to another wrist/elbow branch mid-stage, the end effector can visually dip or twist before returning to the target; that usually indicates an IK branch change, not that keyframe-1 target orientation is reversed.
-- N-6 uses `--foundation_pose_retreat_m 0.10 --approach_offset_m 0.07`: the grasp target retreats 10 cm from the object center, the total pregrasp retreat is 17 cm, and pregrasp advances 7 cm to grasp.
-- Current Mode N does not enable the roll/up constraints used by the R1/AnyGrasp path: `candidate_keep_camera_up=0`, `reach_rot_tol_deg=180`, and `urdfik_max_rotation_threshold_rad=3.14`. Therefore poses equivalent under a 180-degree roll about the approach axis are accepted, and wrist-camera-up / roll continuity is not enforced yet.
-- `pick_diverse_bottles id=1` N-6 viewer recheck: pregrasp/grasp position errors are about 1-2.4 cm; the right arm misses action after the third replan by about 38.9 cm. This points to action-stage IK branch/execution drift, not a Foundation object-position error.
+- N-7 uses `--foundation_pose_retreat_m 0.10 --approach_offset_m 0.07`: the grasp target retreats 10 cm from the object center, the total pregrasp retreat is 17 cm, and pregrasp advances 7 cm to grasp.
+- N-7 borrows the O.1.2 idea: the action stage uses only the second-keyframe Foundation object xyz, while orientation and retreat direction stay at the first-keyframe grasp orientation via `--foundation_pose_action_orientation_source grasp`.
+- N-7 adds `--dual_stage_freeze_reached_arms_on_replan 1`: once one arm reaches a dual-stage target, later replan attempts hold that arm fixed and only compensate unreached arms.
+- R1/AnyGrasp `candidate_keep_camera_up` treats local X as forward; Mode N currently uses local +Z as the approach axis, so that flag cannot be copied directly. The Mode-N-specific `--foundation_pose_keep_top_axis_up` resolves a 180-degree roll about local +Z, but `top_axis=y` worsened `pick_diverse_bottles id=1`, so keep the default 0 for now.
+- `pick_diverse_bottles id=1` comparison: N-6 action missed on the right arm by about 38.9 cm; keeping grasp orientation reduced that to about 12.1 cm; adding reached-arm freezing reached action with left/right errors about 2.78 cm / 2.07 cm. The remaining issue is that IK still accepts about-170-degree roll-equivalent solutions, so orientation error is not yet a strict success signal.
 
 Recommended command:
 
 ```bash
-# 0610 Mode N-6: Foundation object position + human gripper orientation, with 2D C-gripper/local-axis/projection-status rank previews
+# 0611 Mode N-7: Foundation object position + first-keyframe grasp orientation, with reached-arm freezing during dual replans
 for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do
   bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh \
     --gpu 1 --ids 0 1 2 3 4 --continue_on_error --tasks $TASK \
     --foundation_pose_retreat_m 0.10 \
     --approach_offset_m 0.07 \
-    --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-6_pregrasp17_grasp10
+    --foundation_pose_action_orientation_source grasp \
+    --dual_stage_freeze_reached_arms_on_replan 1 \
+    --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-7_action_grasp_rot_freeze
 done
 ```
 
@@ -834,7 +838,9 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_po
   --debug_viewer_overlay \
   --foundation_pose_retreat_m 0.10 \
   --approach_offset_m 0.07 \
-  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-6_pregrasp17_grasp10_debug_viewer
+  --foundation_pose_action_orientation_source grasp \
+  --dual_stage_freeze_reached_arms_on_replan 1 \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-7_action_grasp_rot_freeze_debug_viewer
 ```
 
 Single smoke/debug command:
@@ -844,12 +850,14 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_po
   --gpu 1 --ids 0 --continue_on_error --tasks pick_diverse_bottles \
   --foundation_pose_retreat_m 0.10 \
   --approach_offset_m 0.07 \
-  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-6_pregrasp17_grasp10_smoke
+  --foundation_pose_action_orientation_source grasp \
+  --dual_stage_freeze_reached_arms_on_replan 1 \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-7_action_grasp_rot_freeze_smoke
 ```
 
 Expected outputs:
 
 ```text
-/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-6_pregrasp17_grasp10/<TASK>/foundation_input_<ID>/plan_summary_foundation_pose.json
-/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-6_pregrasp17_grasp10/<TASK>/foundation_input_<ID>/rank_previews/keyframe_<FRAME>_rank_1.png
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-7_action_grasp_rot_freeze/<TASK>/foundation_input_<ID>/plan_summary_foundation_pose.json
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-7_action_grasp_rot_freeze/<TASK>/foundation_input_<ID>/rank_previews/keyframe_<FRAME>_rank_1.png
 ```

@@ -10,3 +10,9 @@
 - O.1 no longer resets object pose before close. A post-close state gate verifies that the object stayed stable and lies in the two-finger capture region before attaching a drive at the current pose.
 - The default base-only `support_proxy` prevents the open gripper from tipping narrow bottle bodies during pregrasp/grasp.
 - O.1.1 sets up from the first annotated keyframe. O.1.2 replaces lift/place with one action using second-keyframe EE xyz while retaining the grasp orientation.
+
+## Mode N-7
+
+- Mode N-7 ports the O.1.2 "action keeps grasp orientation" idea into the Foundation Pose + human-orientation path: action position comes from the second-keyframe Foundation object xyz, while orientation and retreat direction come from the first-keyframe grasp.
+- Dual-stage replanning can freeze arms that have already reached the target, preventing a later replan from pulling a reached arm away.
+- The R1/AnyGrasp camera-up roll constraint uses local X as forward; Mode N uses local +Z as forward, so that constraint cannot be reused directly.

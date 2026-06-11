@@ -5289,7 +5289,7 @@ for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle p
     --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay/keyframe/N_founposePhumanrot/foundation_pose
 done
 
-# 0610 / N-6
+# 0611 / N-7
 # 修复点：Foundation replay 的 pose_world_wxyz 实际顺序是 [x,y,z,qw,qx,qy,qz]。
 # 旧 N-2/N-3 曾把 object pose[4:7] 当位置，实际取到 quaternion，导致 C 型夹爪飞到视野外。
 # rank_previews/*.png 会叠加 Mode N 合成目标的 2D C 型夹爪、RGB 局部轴、目标 xyz 与 object->target 偏移。
@@ -5297,25 +5297,30 @@ done
 # C 型夹爪左臂蓝色、右臂橙色；X=红、Y=绿、Z=蓝，其中 +Z 是 foundation_pose_retreat_m 使用的夹爪前进/后退轴。
 # 轨迹插值说明：默认 urdfik_trajectory_mode=cartesian_interp_ik，会在“当前 TCP → 本 stage 目标 TCP”之间做位置线性插值和四元数 Slerp，
 # 再逐个 waypoint 求 IK。若 IK 在中途切到另一组腕/肘解，末端看起来可能先朝下再扭回目标；这通常是 IK 解分支变化，不是关键帧目标本身在反向。
-# N-6 距离设置：grasp target = object center 沿 local +Z 后退 0.10m；pregrasp = grasp 再后退 0.07m，因此 pregrasp 总 retreat 为 0.17m，pregrasp→grasp 前进 0.07m。
-# 当前未启用 R1/AnyGrasp 侧的 roll 约束：candidate_keep_camera_up=0、reach_rot_tol_deg=180、urdfik_max_rotation_threshold_rad=3.14，
-# 所以“绕前进轴 180 度等价”的姿态会被当作可接受，腕部相机朝上/roll 连续性也没有被强制。
-# id=1 观察：pregrasp/grasp 位置误差约 1-2.4cm；action 右臂第 3 次 replan 后偏到约 38.9cm，主要是后续 action IK 分支/执行漂移问题，非 Foundation 位置错误。
+# N-7 距离设置：grasp target = object center 沿 local +Z 后退 0.10m；pregrasp = grasp 再后退 0.07m，因此 pregrasp 总 retreat 为 0.17m，pregrasp→grasp 前进 0.07m。
+# N-7 借鉴 O.1.2：action 只使用第二关键帧 Foundation 物体 xyz，朝向和 retreat 方向保持第一关键帧 grasp 朝向，避免第二帧人手朝向带来额外 roll/IK 分支切换。
+# N-7 同时启用 dual_stage_freeze_reached_arms_on_replan=1：某只手在 dual replan 中已达标后，后续 attempt 冻结该手，只补偿未达标手，避免“左手已到位又被下一次 replan 带走”。
+# 校对结论：R1/AnyGrasp 的 candidate_keep_camera_up 按 local X 作为 forward；Mode N 当前 +Z 是前进轴，不能直接照搬。N 专用 foundation_pose_keep_top_axis_up 会绕 local +Z 做 180 度二选一，但 pick_diverse_bottles id=1 试验中 top_axis=y 变差，推荐先保持 0。
+# id=1 对比：N-6 action 右臂约 38.9cm miss；N-7 仅保持 grasp 朝向后约 12.1cm miss；N-7 再冻结已达标手后 action 左/右约 2.78cm/2.07cm，双臂达标。
 for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do
   bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh \
     --gpu 1 --ids 0 1 2 3 4 --continue_on_error --tasks $TASK \
     --foundation_pose_retreat_m 0.10 \
     --approach_offset_m 0.07 \
-    --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-6_pregrasp17_grasp10
+    --foundation_pose_action_orientation_source grasp \
+    --dual_stage_freeze_reached_arms_on_replan 1 \
+    --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-7_action_grasp_rot_freeze
 done
 
-# N-6 viewer 演示：显示每次规划目标的 target axis、top-1 C 型夹爪 actor、head/third camera 轴与 frustum
+# N-7 viewer 演示：显示每次规划目标的 target axis、top-1 C 型夹爪 actor、head/third camera 轴与 frustum
 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh \
   --gpu 2 --ids 1 --viewer --viewer_wait_at_end 1 --tasks pick_diverse_bottles \
   --debug_viewer_overlay \
   --foundation_pose_retreat_m 0.10 \
   --approach_offset_m 0.07 \
-  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-6_pregrasp17_grasp10_debug_viewer
+  --foundation_pose_action_orientation_source grasp \
+  --dual_stage_freeze_reached_arms_on_replan 1 \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-7_action_grasp_rot_freeze_debug_viewer
 ```
 
 ### retreat 参数调试

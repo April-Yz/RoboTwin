@@ -2742,3 +2742,11 @@
 - 验证：`py_compile` 和 `bash -n` 通过；V1 的 O.1/O.1.1/O.1.2 viewer 与完整两阶段采集通过；O.1.2 的 V2/V3/V4 完整采集通过。每次采集均生成 v2 pickle、validated replay、`episode0_succ.hdf5`、instructions 和六路 MP4。
 - 环境边界：当前非交互 shell 的 X11 socket 对 SAPIEN 报 `Renderer does not support display`，因此 V2-V4 未在该 shell 重复 GUI 建窗；离屏完整采集已覆盖同一规划和回放逻辑。
 - 清理：检查产物结构后删除本轮六个可重复生成的 validation 输出目录、临时 YAML 和 `/tmp` 日志；未修改已有采集数据。
+
+## 2026-06-11（Mode N-7 action 朝向与 dual replan 冻结）
+
+- 复查 `modeln-4` 的 N-6/N-7 输出后确认，Foundation 位置和投影不是当前主要问题；`pick_diverse_bottles id=1` 的 N-6 在 pregrasp/grasp 约 1-2.4cm，但 action 右臂第 3 次 replan 后约 38.9cm miss。
+- 新增 `--foundation_pose_action_orientation_source grasp`：第二关键帧 action 继续使用第二帧 Foundation 物体 xyz，但朝向和 retreat 方向沿用第一关键帧 grasp 朝向，借鉴 O.1.2 的“action 保持 grasp quaternion”逻辑。
+- 新增 `--dual_stage_freeze_reached_arms_on_replan`：dual-stage replan 中某只手已达标后，后续 attempt 保持该手关节不动，只补偿未达标手。
+- 校对 R1 的 `candidate_keep_camera_up` 后确认它按 local X 作为 forward；Mode N 当前用 local +Z 作为前进/retreat 轴，因此不能直接照搬。新增的 N 专用 `--foundation_pose_keep_top_axis_up` 绕 local +Z 做 180 度二选一，但 `top_axis=y` 在 id=1 变差，推荐暂不启用。
+- 验证：`py_compile` 和 `bash -n` 通过；`N-7_action_grasp_rot_freeze_smoke` 在 `pick_diverse_bottles id=1` 上 action 左/右误差约 2.78cm/2.07cm，双臂达标。未解决的问题是 IK 仍接受约 170 度 roll 等价姿态，朝向误差不能作为严格成功条件。

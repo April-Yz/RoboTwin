@@ -21,10 +21,16 @@ IDS=()
 ID_START=""
 ID_END=""
 FOUNDATION_POSE_RETREAT_M=0.03
+FOUNDATION_POSE_ACTION_ORIENTATION_SOURCE=keyframe
+FOUNDATION_POSE_KEEP_TOP_AXIS_UP=0
+FOUNDATION_POSE_TOP_AXIS=y
 TRAJECTORY_MODE=cartesian_interp_ik
 CARTESIAN_AUTO_STEP_M=0.03
 IK_MAX_ROTATION_THRESHOLD_RAD=3.14
 APPROACH_OFFSET_M=0.12
+CANDIDATE_KEEP_CAMERA_UP=0
+CANDIDATE_CAMERA_TOP_AXIS=z
+DUAL_STAGE_FREEZE_REACHED_ARMS_ON_REPLAN=0
 REPLAN_MAX_ATTEMPTS=3
 VISUALIZE_TARGETS=1
 DISABLE_EXECUTION_COLLISIONS=1
@@ -47,6 +53,13 @@ Required:
 Key parameter:
   --foundation_pose_retreat_m <M>  Retreat along gripper +Z from object center
                                    to grasp surface (default: 0.03 = 3cm)
+  --foundation_pose_action_orientation_source <keyframe|grasp>
+                         For action keyframe orientation, use the second hand keyframe
+                         or keep the first/grasp orientation (default: keyframe)
+  --foundation_pose_keep_top_axis_up <0|1>
+                         Resolve Mode N local-Z roll equivalence toward upward wrist/camera side
+  --foundation_pose_top_axis <x|y>
+                         Local non-forward axis treated as wrist/camera top (default: y)
 
 Options:
   --gpu <N>             GPU index (default: 2)
@@ -61,6 +74,9 @@ Options:
   --trajectory_mode <M>    Trajectory mode (default: cartesian_interp_ik)
   --cartesian_auto_step_m <M>
   --ik_max_rotation_threshold_rad <RAD>
+  --candidate_keep_camera_up <0|1>
+  --candidate_camera_top_axis <y|z>
+  --dual_stage_freeze_reached_arms_on_replan <0|1>
   --debug_viewer_overlay  Show Mode N target axes and top-1 C-gripper actors in viewer/videos
   --debug_visualize_cameras <0|1>
   --viewer_show_camera_frustums <0|1>
@@ -79,11 +95,17 @@ while (($# > 0)); do
     --dry_run) DRY_RUN=1; shift ;;
     --output_root) OUTPUT_ROOT="$2"; shift 2 ;;
     --foundation_pose_retreat_m) FOUNDATION_POSE_RETREAT_M="$2"; shift 2 ;;
+    --foundation_pose_action_orientation_source) FOUNDATION_POSE_ACTION_ORIENTATION_SOURCE="$2"; shift 2 ;;
+    --foundation_pose_keep_top_axis_up) FOUNDATION_POSE_KEEP_TOP_AXIS_UP="$2"; shift 2 ;;
+    --foundation_pose_top_axis) FOUNDATION_POSE_TOP_AXIS="$2"; shift 2 ;;
     --approach_offset_m) APPROACH_OFFSET_M="$2"; shift 2 ;;
     --replan_until_reached_max_attempts) REPLAN_MAX_ATTEMPTS="$2"; shift 2 ;;
     --trajectory_mode) TRAJECTORY_MODE="$2"; shift 2 ;;
     --cartesian_auto_step_m) CARTESIAN_AUTO_STEP_M="$2"; shift 2 ;;
     --ik_max_rotation_threshold_rad) IK_MAX_ROTATION_THRESHOLD_RAD="$2"; shift 2 ;;
+    --candidate_keep_camera_up) CANDIDATE_KEEP_CAMERA_UP="$2"; shift 2 ;;
+    --candidate_camera_top_axis) CANDIDATE_CAMERA_TOP_AXIS="$2"; shift 2 ;;
+    --dual_stage_freeze_reached_arms_on_replan) DUAL_STAGE_FREEZE_REACHED_ARMS_ON_REPLAN="$2"; shift 2 ;;
     --visualize_targets) VISUALIZE_TARGETS=1; shift ;;
     --disable_execution_collisions) DISABLE_EXECUTION_COLLISIONS=1; shift ;;
     --debug_viewer_overlay) PURE_SCENE_OUTPUT=0; VISUALIZE_TARGETS=1; DEBUG_CANDIDATE_TOP_K=1; DEBUG_VISUALIZE_CAMERAS=1; VIEWER_SHOW_CAMERA_FRUSTUMS=1; shift ;;
@@ -187,9 +209,15 @@ for ID in "${IDS[@]}"; do
     --output_dir "$OUT" --hand_keyframes_json "$HAND_KEYFRAMES_JSON"
     --video_id "$ID" --task "$TASK" --gpu "$GPU"
     --foundation_pose_retreat_m "$FOUNDATION_POSE_RETREAT_M"
+    --foundation_pose_action_orientation_source "$FOUNDATION_POSE_ACTION_ORIENTATION_SOURCE"
+    --foundation_pose_keep_top_axis_up "$FOUNDATION_POSE_KEEP_TOP_AXIS_UP"
+    --foundation_pose_top_axis "$FOUNDATION_POSE_TOP_AXIS"
     --urdfik_trajectory_mode "$TRAJECTORY_MODE"
     --urdfik_cartesian_interp_auto_step_m "$CARTESIAN_AUTO_STEP_M"
     --urdfik_max_rotation_threshold_rad "$IK_MAX_ROTATION_THRESHOLD_RAD"
+    --candidate_keep_camera_up "$CANDIDATE_KEEP_CAMERA_UP"
+    --candidate_camera_top_axis "$CANDIDATE_CAMERA_TOP_AXIS"
+    --dual_stage_freeze_reached_arms_on_replan "$DUAL_STAGE_FREEZE_REACHED_ARMS_ON_REPLAN"
     --approach_offset_m "$APPROACH_OFFSET_M"
     --replan_until_reached_max_attempts "$REPLAN_MAX_ATTEMPTS"
     --pure_scene_output "$PURE_SCENE_OUTPUT"

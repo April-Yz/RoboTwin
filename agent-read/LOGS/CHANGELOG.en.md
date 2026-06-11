@@ -2744,3 +2744,11 @@
 - Validation: `py_compile` and `bash -n` passed. V1 O.1/O.1.1/O.1.2 viewers and full two-phase collections passed. Full O.1.2 collection also passed on V2/V3/V4. Every collection produced a v2 pickle, validated replay, `episode0_succ.hdf5`, instructions, and six MP4 files.
 - Environment boundary: the current non-interactive shell's X11 socket reports `Renderer does not support display` to SAPIEN, so V2-V4 GUI window creation was not repeated there; full offscreen collection covered the same planning and replay logic.
 - Cleanup: after inspecting artifact structure, removed six reproducible validation output directories, temporary YAML files, and `/tmp` logs. Existing collected datasets were not modified.
+
+## 2026-06-11 (Mode N-7 Action Orientation And Dual-Replan Freezing)
+
+- Rechecked the `modeln-4` N-6/N-7 outputs and confirmed that Foundation position/projection is no longer the main issue. On `pick_diverse_bottles id=1`, N-6 reaches pregrasp/grasp at about 1-2.4 cm but misses the right action target by about 38.9 cm after the third replan.
+- Added `--foundation_pose_action_orientation_source grasp`: the second/action keyframe still uses the second Foundation object xyz, but orientation and retreat direction stay at the first-keyframe grasp orientation, mirroring O.1.2's "action keeps grasp quaternion" behavior.
+- Added `--dual_stage_freeze_reached_arms_on_replan`: in dual-stage replanning, once one arm reaches the target, later attempts hold that arm fixed and only compensate unreached arms.
+- Rechecked R1 `candidate_keep_camera_up`: it treats local X as forward, while Mode N currently uses local +Z as the approach/retreat axis, so it cannot be copied directly. The new Mode-N-specific `--foundation_pose_keep_top_axis_up` resolves a 180-degree roll about local +Z, but `top_axis=y` worsened id=1, so it is not recommended yet.
+- Validation: `py_compile` and `bash -n` passed. `N-7_action_grasp_rot_freeze_smoke` reached action on `pick_diverse_bottles id=1` with left/right errors about 2.78 cm / 2.07 cm. The remaining unresolved issue is that IK still accepts about-170-degree roll-equivalent poses, so orientation error is not yet a strict success signal.

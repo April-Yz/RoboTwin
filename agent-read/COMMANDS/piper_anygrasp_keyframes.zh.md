@@ -809,20 +809,24 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && cd /home/zaijia0
 - `--debug_viewer_overlay` 会关闭 clean video 模式，在 viewer/视频里显示每次规划目标的 target axis、top-1 C 型夹爪 actor、camera axes 和 SAPIEN camera frustum。
 - rank preview 会按 `(frame, arm)` 标记 selected candidate，并会为左右臂各自的 debug frame 补齐预览帧。
 - 默认规划模式是 `cartesian_interp_ik`：每个 stage 从当前 TCP 到目标 TCP 做位置线性插值和四元数 Slerp，然后逐 waypoint 求 IK。若 IK 中途换到另一组腕/肘解，画面上可能出现“先朝下再扭回目标”的末端朝向变化；这通常是 IK 解分支跳变，不代表关键帧 1 的目标朝向本身反向。
-- N-6 使用 `--foundation_pose_retreat_m 0.10 --approach_offset_m 0.07`：grasp target 离 object center 10cm，pregrasp 总 retreat 17cm，pregrasp 到 grasp 前进 7cm。
-- 当前 Mode N 没有启用 R1/AnyGrasp 路径中的 roll/up 约束：`candidate_keep_camera_up=0`、`reach_rot_tol_deg=180`、`urdfik_max_rotation_threshold_rad=3.14`。因此绕前进轴 180 度等价的姿态会被接受，腕部相机朝上和 roll 连续性还没有被强制。
-- `pick_diverse_bottles id=1` 的 N-6 viewer 复查：pregrasp/grasp 位置误差约 1-2.4cm；action 阶段右臂第 3 次 replan 后约 38.9cm 未到达，主要是 action IK 分支/执行漂移，不是 Foundation 物体位置错误。
+- N-7 使用 `--foundation_pose_retreat_m 0.10 --approach_offset_m 0.07`：grasp target 离 object center 10cm，pregrasp 总 retreat 17cm，pregrasp 到 grasp 前进 7cm。
+- N-7 借鉴 O.1.2：action 阶段只使用第二关键帧 Foundation 物体 xyz，朝向和 retreat 方向保持第一关键帧 grasp 朝向，对应 `--foundation_pose_action_orientation_source grasp`。
+- N-7 新增 `--dual_stage_freeze_reached_arms_on_replan 1`：dual replan 中某只手已达标后，后续 attempt 冻结该手，只补偿未达标手，避免已达标手被下一次 replan 带走。
+- R1/AnyGrasp 的 `candidate_keep_camera_up` 按 local X 作为 forward；Mode N 当前 local +Z 是前进轴，不能直接照搬。N 专用 `--foundation_pose_keep_top_axis_up` 会绕 local +Z 做 180 度二选一，但 `pick_diverse_bottles id=1` 中 `top_axis=y` 变差，推荐先保持默认 0。
+- `pick_diverse_bottles id=1` 对比：N-6 action 右臂约 38.9cm miss；仅保持 grasp 朝向后右臂约 12.1cm miss；再冻结已达标手后 action 左/右约 2.78cm/2.07cm，双臂达标。剩余问题是 IK 仍接受约 170 度 roll 等价解，朝向指标还不能作为严格成功条件。
 
 推荐命令：
 
 ```bash
-# 0610 Mode N-6：Foundation 物体位置 + 人手 gripper 朝向，输出带 2D C 型夹爪/局部轴/投影状态的 rank_previews
+# 0611 Mode N-7：Foundation 物体位置 + 第一关键帧 grasp 朝向，dual replan 冻结已达标手
 for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do
   bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_pose_piper_d435.sh \
     --gpu 1 --ids 0 1 2 3 4 --continue_on_error --tasks $TASK \
     --foundation_pose_retreat_m 0.10 \
     --approach_offset_m 0.07 \
-    --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-6_pregrasp17_grasp10
+    --foundation_pose_action_orientation_source grasp \
+    --dual_stage_freeze_reached_arms_on_replan 1 \
+    --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-7_action_grasp_rot_freeze
 done
 ```
 
@@ -834,7 +838,9 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_po
   --debug_viewer_overlay \
   --foundation_pose_retreat_m 0.10 \
   --approach_offset_m 0.07 \
-  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-6_pregrasp17_grasp10_debug_viewer
+  --foundation_pose_action_orientation_source grasp \
+  --dual_stage_freeze_reached_arms_on_replan 1 \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-7_action_grasp_rot_freeze_debug_viewer
 ```
 
 单条 smoke/debug：
@@ -844,12 +850,14 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_po
   --gpu 1 --ids 0 --continue_on_error --tasks pick_diverse_bottles \
   --foundation_pose_retreat_m 0.10 \
   --approach_offset_m 0.07 \
-  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-6_pregrasp17_grasp10_smoke
+  --foundation_pose_action_orientation_source grasp \
+  --dual_stage_freeze_reached_arms_on_replan 1 \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-7_action_grasp_rot_freeze_smoke
 ```
 
 检查输出：
 
 ```text
-/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-6_pregrasp17_grasp10/<TASK>/foundation_input_<ID>/plan_summary_foundation_pose.json
-/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-6_pregrasp17_grasp10/<TASK>/foundation_input_<ID>/rank_previews/keyframe_<FRAME>_rank_1.png
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-7_action_grasp_rot_freeze/<TASK>/foundation_input_<ID>/plan_summary_foundation_pose.json
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-7_action_grasp_rot_freeze/<TASK>/foundation_input_<ID>/rank_previews/keyframe_<FRAME>_rank_1.png
 ```

@@ -2063,3 +2063,13 @@
 - 采集 wrapper 新格式：`bash collect_foundation_piper_ik.sh <v1-v4> <id> [frame] [gpu] [o1|o1.1|o1.2]`。
 - O.1.1/O.1.2 输出名包含 `o1_1` / `o1_2`，不与 O.1 的 `id<id>_frame<frame>` 目录混用。
 - 示例：`bash collect_foundation_piper_ik.sh v1 0 0 0 o1.2`。
+
+## 2026-06-11（Mode N-7 命令）
+
+- `run_plan_keyframes_foundation_pose_piper_d435.sh` 新增：
+  - `--foundation_pose_action_orientation_source keyframe|grasp`
+  - `--foundation_pose_keep_top_axis_up 0|1`
+  - `--foundation_pose_top_axis x|y`
+  - `--dual_stage_freeze_reached_arms_on_replan 0|1`
+- 推荐 N-7 命令使用 `--foundation_pose_action_orientation_source grasp --dual_stage_freeze_reached_arms_on_replan 1`，输出到 `N-7_action_grasp_rot_freeze`。
+- `COMMAND_LIBRARY.zh.md` 和 `agent-read/COMMANDS/piper_anygrasp_keyframes.zh.md` 已更新批量、viewer、smoke 命令。

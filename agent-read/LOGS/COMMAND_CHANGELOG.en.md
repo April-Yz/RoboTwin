@@ -2065,3 +2065,13 @@
 - Collection wrapper format is now `bash collect_foundation_piper_ik.sh <v1-v4> <id> [frame] [gpu] [o1|o1.1|o1.2]`.
 - O.1.1/O.1.2 output names include `o1_1` / `o1_2` and do not share O.1 `id<id>_frame<frame>` directories.
 - Example: `bash collect_foundation_piper_ik.sh v1 0 0 0 o1.2`.
+
+## 2026-06-11 (Mode N-7 Commands)
+
+- `run_plan_keyframes_foundation_pose_piper_d435.sh` now supports:
+  - `--foundation_pose_action_orientation_source keyframe|grasp`
+  - `--foundation_pose_keep_top_axis_up 0|1`
+  - `--foundation_pose_top_axis x|y`
+  - `--dual_stage_freeze_reached_arms_on_replan 0|1`
+- The recommended N-7 command uses `--foundation_pose_action_orientation_source grasp --dual_stage_freeze_reached_arms_on_replan 1` and writes to `N-7_action_grasp_rot_freeze`.
+- Updated batch, viewer, and smoke commands in `COMMAND_LIBRARY.zh.md` and `agent-read/COMMANDS/piper_anygrasp_keyframes.en.md`.

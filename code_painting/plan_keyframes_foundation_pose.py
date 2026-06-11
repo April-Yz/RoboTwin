@@ -198,6 +198,54 @@ def compute_foundation_pose_target(
     return target_pose
 
 
+def compute_foundation_pose_target_with_rotation(
+    obj_data: Dict[str, np.ndarray],
+    object_name: str,
+    frame: int,
+    rot_world: np.ndarray,
+    quat_wxyz: np.ndarray,
+    retreat_m: float,
+) -> Optional[np.ndarray]:
+    """Compute object-position target with an explicitly supplied world rotation."""
+    obj_pos = get_object_world_position(obj_data, object_name, frame)
+    if obj_pos is None:
+        return None
+    approach_axis_world = np.asarray(rot_world, dtype=np.float64).reshape(3, 3)[:, 2]
+    retreated_pos = obj_pos - retreat_m * approach_axis_world
+    return np.concatenate([retreated_pos, np.asarray(quat_wxyz, dtype=np.float64).reshape(4)]).astype(np.float64)
+
+
+def top_axis_up_dot(rotation_world: np.ndarray, top_axis: str) -> float:
+    axis_idx = {"x": 0, "y": 1, "z": 2}[str(top_axis)]
+    axis_vec = np.asarray(rotation_world, dtype=np.float64).reshape(3, 3)[:, axis_idx]
+    return float(np.dot(axis_vec, np.array([0.0, 0.0, 1.0], dtype=np.float64)))
+
+
+def constrain_roll_about_local_z_keep_top_up(
+    rot_world: np.ndarray,
+    top_axis: str,
+) -> Tuple[np.ndarray, Dict[str, float]]:
+    """Choose between the given rotation and a 180 deg roll about local +Z.
+
+    Mode N uses local +Z as the gripper approach/forward axis. A 180 deg roll
+    about local +Z keeps the approach direction and retreat position convention
+    intact while choosing the wrist/camera side that faces more upward.
+    """
+    rot = np.asarray(rot_world, dtype=np.float64).reshape(3, 3)
+    roll_180_about_local_z = np.diag([-1.0, -1.0, 1.0]).astype(np.float64)
+    flipped = rot @ roll_180_about_local_z
+    base_dot = top_axis_up_dot(rot, top_axis)
+    flipped_dot = top_axis_up_dot(flipped, top_axis)
+    if flipped_dot > base_dot + 1e-9:
+        return flipped, {"original_top_axis_up_dot": float(base_dot), "top_axis_up_dot": float(flipped_dot), "roll_flip_applied": 1}
+    return rot, {"original_top_axis_up_dot": float(base_dot), "top_axis_up_dot": float(base_dot), "roll_flip_applied": 0}
+
+
+def rotation_matrix_to_wxyz(rot_world: np.ndarray) -> np.ndarray:
+    quat_xyzw = R.from_matrix(np.asarray(rot_world, dtype=np.float64).reshape(3, 3)).as_quat()
+    return np.array([quat_xyzw[3], quat_xyzw[0], quat_xyzw[1], quat_xyzw[2]], dtype=np.float64)
+
+
 # ──────────────────────────────────────────────
 # Plan summary generation
 # ──────────────────────────────────────────────
@@ -209,6 +257,7 @@ def build_candidate_entry(
     hand_rotation_cam: np.ndarray,
     target_object: str,
     candidate_idx: int = 0,
+    orientation_source: str = "hand_keyframe",
 ) -> dict:
     px, py, pz = float(pose_world_wxyz[0]), float(pose_world_wxyz[1]), float(pose_world_wxyz[2])
     qw, qx, qy, qz = float(pose_world_wxyz[3]), float(pose_world_wxyz[4]), float(pose_world_wxyz[5]), float(pose_world_wxyz[6])
@@ -226,7 +275,8 @@ def build_candidate_entry(
         "original_top_axis_up_dot": 0.0,
         "camera_up_flip_applied": 0,
         "forward_axis_change_deg": 0.0,
-        "camera_up_selection_mode": "none",
+        "camera_up_selection_mode": str(orientation_source),
+        "foundation_pose_orientation_source": str(orientation_source),
         "raw_pose_world_wxyz": [px, py, pz, qw, qx, qy, qz],
         "pose_world_wxyz": [px, py, pz, qw, qx, qy, qz],
         "translation_cam": [0.0, 0.0, 0.0],
@@ -244,6 +294,9 @@ def build_plan_summary(
     mode: str,
     retreat_m: float,
     cv_axis_mode: str = "legacy_r1",
+    action_orientation_source: str = "keyframe",
+    keep_top_axis_up: bool = False,
+    top_axis: str = "y",
 ) -> dict:
     obj_map = TASK_OBJECT_MAP.get(task, {"left": "object", "right": "object"})
     candidates_by_arm: Dict[str, List[dict]] = {"left": [], "right": []}
@@ -254,19 +307,55 @@ def build_plan_summary(
 
         rot_key = f"{arm}_gripper_rotation_matrix"
         hand_rotations = np.asarray(hand_data[rot_key]) if rot_key in hand_data else None
+        grasp_rot_world: Optional[np.ndarray] = None
+        grasp_quat_wxyz: Optional[np.ndarray] = None
+        grasp_hand_rot_cam: Optional[np.ndarray] = None
+        grasp_frame: Optional[int] = None
 
         for idx, kf_frame in enumerate(keyframes):
             if kf_frame <= 0:
                 continue
 
-            pose_wxyz = compute_foundation_pose_target(
-                hand_data, obj_data, arm, kf_frame, target_obj, retreat_m, cv_axis_mode
-            )
+            orientation_source = f"hand_frame_{int(kf_frame)}"
+            hand_rot_cam = hand_rotations[int(kf_frame)] if hand_rotations is not None and int(kf_frame) < len(hand_rotations) else np.eye(3)
+            if idx > 0 and action_orientation_source == "grasp" and grasp_rot_world is not None and grasp_quat_wxyz is not None:
+                pose_wxyz = compute_foundation_pose_target_with_rotation(
+                    obj_data=obj_data,
+                    object_name=target_obj,
+                    frame=kf_frame,
+                    rot_world=grasp_rot_world,
+                    quat_wxyz=grasp_quat_wxyz,
+                    retreat_m=retreat_m,
+                )
+                if grasp_hand_rot_cam is not None:
+                    hand_rot_cam = grasp_hand_rot_cam
+                orientation_source = f"grasp_frame_{int(grasp_frame)}"
+            else:
+                rot_result = compute_hand_world_rotation(hand_data, obj_data, arm, kf_frame, cv_axis_mode)
+                if rot_result is None:
+                    pose_wxyz = None
+                else:
+                    rot_world, quat_wxyz = rot_result
+                    if keep_top_axis_up:
+                        rot_world, roll_debug = constrain_roll_about_local_z_keep_top_up(rot_world, top_axis)
+                        quat_wxyz = rotation_matrix_to_wxyz(rot_world)
+                        orientation_source += f"_local_z_roll_keep_{top_axis}_up_flip{int(roll_debug['roll_flip_applied'])}"
+                    pose_wxyz = compute_foundation_pose_target_with_rotation(
+                        obj_data=obj_data,
+                        object_name=target_obj,
+                        frame=kf_frame,
+                        rot_world=rot_world,
+                        quat_wxyz=quat_wxyz,
+                        retreat_m=retreat_m,
+                    )
+                if idx == 0 and rot_result is not None and pose_wxyz is not None:
+                    grasp_rot_world = rot_world
+                    grasp_quat_wxyz = quat_wxyz
+                    grasp_hand_rot_cam = hand_rot_cam
+                    grasp_frame = int(kf_frame)
             if pose_wxyz is None:
                 print(f"  [WARNING] arm={arm} frame={kf_frame}: could not compute foundation pose target, skipping")
                 continue
-
-            hand_rot_cam = hand_rotations[int(kf_frame)] if hand_rotations is not None and int(kf_frame) < len(hand_rotations) else np.eye(3)
 
             entry = build_candidate_entry(
                 arm=arm,
@@ -275,10 +364,11 @@ def build_plan_summary(
                 hand_rotation_cam=hand_rot_cam,
                 target_object=target_obj,
                 candidate_idx=idx,
+                orientation_source=orientation_source,
             )
             candidates_by_arm[arm].append(entry)
 
-            print(f"  [{arm}] keyframe[{idx}] frame={kf_frame} obj={target_obj} retreat={retreat_m:.3f}m pos=({pose_wxyz[0]:.3f},{pose_wxyz[1]:.3f},{pose_wxyz[2]:.3f})")
+            print(f"  [{arm}] keyframe[{idx}] frame={kf_frame} obj={target_obj} retreat={retreat_m:.3f}m orientation={orientation_source} pos=({pose_wxyz[0]:.3f},{pose_wxyz[1]:.3f},{pose_wxyz[2]:.3f})")
 
     primary_arm = "left"
     if not candidates_by_arm["left"] and candidates_by_arm["right"]:
@@ -293,6 +383,9 @@ def build_plan_summary(
         "video_id": int(video_id),
         "target_source": "foundation_pose",
         "foundation_pose_retreat_m": float(retreat_m),
+        "foundation_pose_action_orientation_source": str(action_orientation_source),
+        "foundation_pose_keep_top_axis_up": int(bool(keep_top_axis_up)),
+        "foundation_pose_top_axis": str(top_axis),
         "mode": mode,
         "selected_arm": primary_arm,
         "selected_candidates": all_candidates,
@@ -317,6 +410,7 @@ def run_planner_with_targets(plan_summary_path: Path, args: argparse.Namespace, 
         "--arm", "auto",
         "--execute_both_arms", "1",
         "--dual_stage_require_all_plans", "1",
+        "--dual_stage_freeze_reached_arms_on_replan", str(args.dual_stage_freeze_reached_arms_on_replan),
         "--require_keyframe1_reached_before_close", str(args.require_keyframe1_reached_before_close),
         "--require_keyframe1_reached_before_action", str(args.require_keyframe1_reached_before_action),
         "--planner_backend", args.planner_backend,
@@ -327,6 +421,8 @@ def run_planner_with_targets(plan_summary_path: Path, args: argparse.Namespace, 
         "--urdfik_max_position_threshold_m", str(args.urdfik_max_position_threshold_m),
         "--urdfik_max_rotation_threshold_rad", str(args.urdfik_max_rotation_threshold_rad),
         "--candidate_orientation_remap_label", args.candidate_orientation_remap_label,
+        "--candidate_keep_camera_up", str(args.candidate_keep_camera_up),
+        "--candidate_camera_top_axis", args.candidate_camera_top_axis,
         "--candidate_target_local_x_offset_m", "0.0",
         "--candidate_target_local_z_offset_m", "0.0",
         "--approach_axis", args.approach_axis,
@@ -415,6 +511,24 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     # Mode K specific
     parser.add_argument("--foundation_pose_retreat_m", type=float, default=0.03,
                         help="Retreat distance along gripper approach axis (local +Z, blue) from object center to grasp surface. Default 3cm.")
+    parser.add_argument(
+        "--foundation_pose_action_orientation_source",
+        choices=["keyframe", "grasp"],
+        default="keyframe",
+        help="For the second/action keyframe, use that keyframe's hand orientation (keyframe) or keep the first/grasp keyframe orientation while still using the second Foundation object position (grasp).",
+    )
+    parser.add_argument(
+        "--foundation_pose_keep_top_axis_up",
+        type=int,
+        default=0,
+        help="If 1, resolve the 180-degree roll equivalence about Mode N local +Z so the selected top axis points more upward.",
+    )
+    parser.add_argument(
+        "--foundation_pose_top_axis",
+        choices=["x", "y"],
+        default="y",
+        help="Local axis treated as the wrist/camera top side when --foundation_pose_keep_top_axis_up=1. Local +Z remains the gripper approach axis.",
+    )
 
     # Planner args
     parser.add_argument("--image_width", type=int, default=640)
@@ -440,8 +554,11 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--urdfik_max_rotation_threshold_rad", type=float, default=3.14)
     parser.add_argument("--urdfik_num_seeds", type=int, default=20)
     parser.add_argument("--candidate_orientation_remap_label", type=str, default="identity")
+    parser.add_argument("--candidate_keep_camera_up", type=int, default=0)
+    parser.add_argument("--candidate_camera_top_axis", choices=["y", "z"], default="z")
     parser.add_argument("--approach_axis", type=str, default="local_z")
     parser.add_argument("--approach_offset_m", type=float, default=0.12)
+    parser.add_argument("--dual_stage_freeze_reached_arms_on_replan", type=int, default=0)
     parser.add_argument("--require_keyframe1_reached_before_close", type=int, default=1)
     parser.add_argument("--require_keyframe1_reached_before_action", type=int, default=1)
     parser.add_argument("--execute_interp_steps", type=int, default=24)
@@ -521,6 +638,9 @@ def main() -> None:
         mode=mode,
         retreat_m=args.foundation_pose_retreat_m,
         cv_axis_mode=args.camera_cv_axis_mode,
+        action_orientation_source=args.foundation_pose_action_orientation_source,
+        keep_top_axis_up=bool(args.foundation_pose_keep_top_axis_up),
+        top_axis=args.foundation_pose_top_axis,
     )
 
     plan_summary_path = args.output_dir / "plan_summary_foundation_pose.json"
