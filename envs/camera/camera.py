@@ -66,10 +66,22 @@ class Camera:
         self.wrist_camera_pose_reference = kwags["camera"].get(
             "wrist_camera_pose_reference", "link"
         )
-        if self.wrist_camera_pose_reference not in {"link", "planner_gripper"}:
+        if self.wrist_camera_pose_reference not in {
+            "link",
+            "planner_gripper",
+            "urdf_end_link",
+        }:
             raise ValueError(
                 f"Unsupported wrist_camera_pose_reference={self.wrist_camera_pose_reference!r}"
             )
+        self.wrist_camera_preview = bool(
+            kwags["camera"].get("wrist_camera_preview", False)
+        )
+        self.wrist_camera_simulation_adapter = kwags["camera"].get(
+            "wrist_camera_simulation_adapter"
+        )
+        self._wrist_preview_window = "RoboTwin wrist cameras"
+        self._wrist_preview_failed = False
         self.left_wrist_camera_local_pose = sapien.Pose()
         self.right_wrist_camera_local_pose = sapien.Pose()
         if self.collect_wrist_camera and self.wrist_camera_calibration_bundle:
@@ -106,6 +118,21 @@ class Camera:
                 f"Unsupported wrist calibration schema in {bundle_path}: {bundle.get('schema')!r}"
             )
         wrist_data = bundle.get("wrist_cameras", {})
+        adapter = np.eye(4, dtype=np.float64)
+        if self.wrist_camera_simulation_adapter:
+            adapters = wrist_data.get("simulation_adapters", {})
+            adapter_entry = adapters.get(self.wrist_camera_simulation_adapter)
+            if not isinstance(adapter_entry, dict):
+                raise KeyError(
+                    "Wrist calibration bundle is missing simulation adapter "
+                    f"{self.wrist_camera_simulation_adapter!r}"
+                )
+            adapter = np.asarray(adapter_entry.get("matrix"), dtype=np.float64)
+            if adapter.shape != (4, 4) or not np.isfinite(adapter).all():
+                raise ValueError(
+                    "Invalid wrist simulation adapter matrix for "
+                    f"{self.wrist_camera_simulation_adapter!r}"
+                )
         axis_rotations = {
             "legacy_r1": np.array(
                 [[0.0, 0.0, 1.0], [-1.0, 0.0, 0.0], [0.0, -1.0, 0.0]],
@@ -124,6 +151,7 @@ class Camera:
             matrix = np.asarray(entry.get("matrix"), dtype=np.float64)
             if matrix.shape != (4, 4) or not np.isfinite(matrix).all():
                 raise ValueError(f"Invalid wrist calibration matrix for {key}")
+            matrix = adapter @ matrix
             render_rotation = matrix[:3, :3] @ cv_to_render.T
             quat = t3d.quaternions.mat2quat(render_rotation)
             return sapien.Pose(matrix[:3, 3], quat)
@@ -133,7 +161,8 @@ class Camera:
         print(
             f"[camera] calibrated wrist cameras: bundle={bundle_path} "
             f"axis_mode={self.wrist_camera_axis_mode} "
-            f"reference={self.wrist_camera_pose_reference}"
+            f"reference={self.wrist_camera_pose_reference} "
+            f"adapter={self.wrist_camera_simulation_adapter or 'identity'}"
         )
 
     def load_camera(self, scene):
@@ -354,6 +383,53 @@ class Camera:
         if self.collect_wrist_camera:
             self.left_camera.entity.set_pose(left_pose * self.left_wrist_camera_local_pose)
             self.right_camera.entity.set_pose(right_pose * self.right_wrist_camera_local_pose)
+
+    def preview_wrist_camera_images(self):
+        if not self.collect_wrist_camera or not self.wrist_camera_preview:
+            return
+        try:
+            self.left_camera.take_picture()
+            self.right_camera.take_picture()
+
+            def preview_image(camera, label):
+                rgba = camera.get_picture("Color")
+                rgb = (rgba[:, :, :3] * 255).clip(0, 255).astype(np.uint8)
+                bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+                cv2.putText(
+                    bgr,
+                    label,
+                    (8, 22),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.6,
+                    (0, 255, 0),
+                    1,
+                    cv2.LINE_AA,
+                )
+                return bgr
+
+            combined = np.concatenate(
+                [
+                    preview_image(self.left_camera, "left wrist"),
+                    preview_image(self.right_camera, "right wrist"),
+                ],
+                axis=1,
+            )
+            cv2.imshow(self._wrist_preview_window, combined)
+            cv2.waitKey(1)
+        except cv2.error as exc:
+            if not self._wrist_preview_failed:
+                print(f"[camera] wrist preview disabled: {exc}")
+                self._wrist_preview_failed = True
+            self.wrist_camera_preview = False
+
+    def close_wrist_camera_preview(self):
+        if not self.wrist_camera_preview and not self._wrist_preview_failed:
+            return
+        try:
+            cv2.destroyWindow(self._wrist_preview_window)
+            cv2.waitKey(1)
+        except cv2.error:
+            pass
 
     def get_config(self) -> dict:
         res = {}

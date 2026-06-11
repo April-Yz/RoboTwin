@@ -2088,3 +2088,11 @@
 - Use a new tag such as `wrist0515` so resume logic does not skip an existing head-only HDF5.
 - Full O.1.2 commands now apply a 600-second timeout per ID and a version-specific failure log. V1-V4 remain assigned to GPUs 0/1/2/3.
 - New outputs are `episode0_succ_left_camera.mp4` and `episode0_succ_right_camera.mp4`.
+
+## 2026-06-11 (Wrist Viewer And ID-To-Episode Index Commands)
+
+- Viewer: add `--wrist_preview 1` to the Foundation O.1.2 command for a live left/right wrist RGB mosaic.
+- Batch collection: use a new `RUN_TAG=wrist0515_simfix` after the frame correction so old wrist outputs are not reused.
+- Video indexing: added `python script/index_foundation_piper_ik_videos.py --version v4 --mode o1.2 --run-tag wrist0515_simfix --output-video-dir <DIR> --method symlink --dry-run`.
+- Replacement rule: existing `episode<ID>_*.mp4` files are conflicts by default. Only explicit `--replace-episode` replaces that ID in the destination directory.
+- Omit `--run-tag` for the current untagged V4/O.1.2 legacy outputs. The dry run found indexable IDs 0-8 and destination conflicts for IDs 0-4 in `demo_piper_ik_v4_3/video`.

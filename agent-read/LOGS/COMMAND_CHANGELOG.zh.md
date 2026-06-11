@@ -2086,3 +2086,11 @@
 - 推荐使用 `wrist0515` 等新 tag，避免已有 head-only HDF5 被断点逻辑跳过。
 - O.1.2 全量命令增加每 ID `timeout 600s` 和版本独立 failure log；V1-V4 GPU 仍分别为 0/1/2/3。
 - 输出新增 `episode0_succ_left_camera.mp4` 和 `episode0_succ_right_camera.mp4`。
+
+## 2026-06-11（Wrist viewer 与 ID-to-episode 索引命令）
+
+- Viewer：Foundation O.1.2 命令可加 `--wrist_preview 1`，显示左右 wrist RGB 实时拼接。
+- 批采集：修正坐标后推荐新标签 `RUN_TAG=wrist0515_simfix`，避免复用旧 wrist 外参输出。
+- 视频索引：新增 `python script/index_foundation_piper_ik_videos.py --version v4 --mode o1.2 --run-tag wrist0515_simfix --output-video-dir <DIR> --method symlink --dry-run`。
+- 覆盖规则：已有 `episode<ID>_*.mp4` 默认报冲突；只有显式 `--replace-episode` 才替换目标目录同 ID 视频。
+- 当前无 tag V4/O.1.2 旧数据索引时省略 `--run-tag`；dry-run 验证可索引 ID 0-8，目标 `demo_piper_ik_v4_3/video` 的 ID 0-4 存在冲突。

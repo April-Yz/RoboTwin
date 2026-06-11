@@ -2767,3 +2767,11 @@
 - `collect_foundation_piper_ik.sh` now accepts an optional `run_tag`, creates isolated config/output names, and forces `episode_num: 1`.
 - All four Foundation configs enable wrist cameras with distinct extrinsics from `calibration_bundle_piper_new_table_0515.json`, composed from planner gripper poses after optical/render axis conversion.
 - Validation: a V1 O.1.2 two-phase collection produced HDF5, instructions, and eight MP4 files. Both wrist videos have 38 frames at 320x240 and moved about 0.37 m / 0.46 m. V4 ID 9 failed three seeds because right-grasp rotation was about 25.6 degrees against a 15-degree limit, then exited at the configured bound.
+
+## 2026-06-11 (Wrist Frame Adapter And Foundation Video Index)
+
+- Reviewed the 0515/new-table wrist hand-eye files against historical calibrations. Translation and orientation trends are stable; the right wrist's roughly 45-degree roll is a persistent physical mount difference.
+- Fixed the real TCP versus RoboTwin Pika CAD parent-frame mismatch. Foundation configs now use `urdf_end_link`, while the bundle supplies a translation-only `piper_pika_agx` shell-clearance adapter that preserves calibrated optical axes, lateral signs, and roll.
+- Added viewer option `--wrist_preview 1` for a live left/right wrist RGB mosaic.
+- Added `script/index_foundation_piper_ik_videos.py` to map each per-ID directory's `episode0_*` videos to aggregate `episode<ID>_*` names. It uses symlinks and rejects existing episodes by default; replacement requires explicit `--replace-episode`.
+- Validation: a full V1/O.1.2 two-phase run for `foundation_input_0` succeeded and produced 38-frame left/right wrist videos, HDF5, instructions, and a validated trajectory. Sampled frames show the corresponding bottle and gripper in both views. A `DISPLAY=:1.0` viewer run with `--wrist_preview 1` completed with `physical_success=True`.

@@ -34,6 +34,8 @@ O.1.1 uses the first annotated keyframe in `hand_keyframes_all.json` for the Fou
 
 Phase 2 only consumes validated joint paths and does not create IK or MotionGen planners, avoiding V3 replay GPU pressure and slow multi-camera rendering.
 
-Foundation wrist cameras load distinct gripper-to-camera extrinsics from `calibration_bundle_piper_new_table_0515.json`. That gripper frame matches the planner EE frame rather than raw URDF `link6`, so each render composes the local camera pose with `Robot.get_left_ee_pose()` / `get_right_ee_pose()` after optical-to-render axis conversion. The existing HDF5/video merge path exports every observation RGB camera automatically.
+Foundation wrist cameras load distinct gripper-to-camera extrinsics from `calibration_bundle_piper_new_table_0515.json`. Historical calibrations show that the right wrist's roughly 45-degree roll is a persistent physical mount difference. Because the RoboTwin Pika CAD has no equivalent real camera stand, each camera follows raw `link6`, applies a translation-only `piper_pika_agx` simulation clearance adapter, then applies optical-to-render conversion. The adapter does not rotate the calibrated optical axis or flip lateral signs. The existing HDF5/video merge path exports every observation RGB camera automatically.
+
+Foundation collection writes one directory per source ID, with internal episode numbering starting at `episode0`. `script/index_foundation_piper_ik_videos.py` maps source ID N to aggregate `episodeN` files without modifying source data and records the mapping in a manifest. Existing destination episodes are conflicts by default.
 
 The batch wrapper forces one episode per ID and supports isolated run tags. `script/collect_data.py` applies `max_seed_tries` as a hard bound on seed search. This terminates deterministic geometry failures without treating them as successful episodes.

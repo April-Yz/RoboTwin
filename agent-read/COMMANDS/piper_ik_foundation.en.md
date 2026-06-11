@@ -24,11 +24,11 @@ cd /home/zaijia001/ssd/RoboTwin
 python view_pick_diverse_bottles_piper_ik_motion.py \
   --task_name pick_diverse_bottles_piper_ik_foundation \
   --task_config demo_piper_ik_foundation_v1 \
-  --ik_version v1 --foundation_id 0 --foundation_frame 0 --foundation_mode o1 \
-  --seed 0 --max_seed_tries 1 --require_success 1
+  --ik_version v1 --foundation_id 0 --foundation_mode o1.2 \
+  --seed 0 --max_seed_tries 1 --require_success 1 --wrist_preview 1
 ```
 
-Use `--foundation_mode o1.1` or `--foundation_mode o1.2` for the keyframe modes. The viewer creates a SAPIEN window and requires a working X11/Vulkan display; do not use `unset DISPLAY` for this command.
+`--wrist_preview 1` adds a live left/right wrist RGB mosaic. The viewer requires a working X11/Vulkan display; remote desktops can explicitly use `DISPLAY=:1.0`. Do not use `unset DISPLAY`.
 
 ## Data Collection
 
@@ -39,7 +39,7 @@ bash collect_data.sh pick_diverse_bottles_piper_ik_foundation demo_piper_ik_foun
 # Arguments: IK version, foundation_input ID, frame, GPU ID, mode, optional run tag
 bash collect_foundation_piper_ik.sh v1 0 0 0 o1
 bash collect_foundation_piper_ik.sh v1 0 0 0 o1.1
-bash collect_foundation_piper_ik.sh v1 0 0 0 o1.2 wrist0515
+bash collect_foundation_piper_ik.sh v1 0 0 0 o1.2 wrist0515_simfix
 ```
 
 The wrapper creates isolated config and output names by version, ID, frame/mode, and run tag, and forces one episode per ID. O.1.1/O.1.2 override the frame with the first annotation. Use a new run tag after enabling wrist cameras: an existing HDF5 is skipped, so an old head-only directory is not upgraded in place. Do not mutate the base YAML with `sed -i` and reuse one trajectory directory.
@@ -47,7 +47,7 @@ The wrapper creates isolated config and output names by version, ID, frame/mode,
 Recommended batch form:
 
 ```bash
-RUN_TAG=wrist0515
+RUN_TAG=wrist0515_simfix
 FAIL_LOG=/tmp/o12_v1_${RUN_TAG}_failures.log
 : > "$FAIL_LOG"
 for id in $(seq 0 120); do
@@ -74,9 +74,25 @@ For V2/V3/V4 use version/GPU pairs `v2/1`, `v3/2`, and `v4/3`. Inputs currently 
 
 - All four Foundation configs enable `collect_wrist_camera: true`.
 - The left and right cameras load their distinct `left_gripper_T_camera` and `right_gripper_T_camera` transforms from `calibration_bundle_piper_new_table_0515.json`.
-- The calibration gripper frame matches the planner EE frame, so `wrist_camera_pose_reference: planner_gripper` is required. Raw `link6` placement puts the view inside the gripper base.
+- Cameras follow simulation `link6` through `wrist_camera_pose_reference: urdf_end_link`. `wrist_camera_simulation_adapter: piper_pika_agx` accounts for the real TCP/camera-stand versus Pika CAD origin and shell clearance.
+- The simulation adapter does not rotate the calibrated optical axis or flip lateral signs. The right wrist's roughly 45-degree roll is persistent across historical calibrations and reflects the physical mount rather than a 0515 regression.
 - `wrist_camera_axis_mode: legacy_r1` converts the calibrated OpenCV optical frame to the SAPIEN render frame.
 - Phase 2 automatically exports every observation RGB camera. The new files are `episode0_succ_left_camera.mp4` and `episode0_succ_right_camera.mp4`, and both cameras are also present in HDF5 observations.
+
+## ID-To-Episode Video Index
+
+Each per-ID Foundation directory internally contains `episode0_*`. Map source ID N to `episodeN_*` in an aggregate directory with:
+
+```bash
+python script/index_foundation_piper_ik_videos.py \
+  --version v4 --mode o1.2 --run-tag wrist0515_simfix \
+  --output-video-dir data/pick_diverse_bottles_piper_ik/demo_piper_ik_foundation_v4_o1_2_wrist0515_simfix/video \
+  --method symlink --dry-run
+```
+
+Remove `--dry-run` after inspection. The script writes `foundation_episode_index.json`. Existing episodes are conflicts by default; `--replace-episode` deletes that ID's old destination MP4 files and must be used explicitly.
+
+The currently available V4/O.1.2 directories have no run tag, so omit `--run-tag` when indexing those legacy outputs. A dry run against `demo_piper_ik_v4_3/video` found indexable IDs 0-8 and conflicts for existing IDs 0-4; ID 9 has no successful videos.
 
 ## Grasp Debugging
 
@@ -86,7 +102,7 @@ If pregrasp still collides, increase `foundation_pregrasp_distance` and inspect 
 
 ## Validated State
 
-On 2026-06-11 with `foundation_input_0`, V1 viewer and full two-phase collection succeeded for O.1, O.1.1, and O.1.2. Full O.1.2 collection also succeeded with V2/V3/V4. The annotated frames are 38 and 78. After correcting the wrist reference frame, a V1 O.1.2 run produced validated replay, `episode0_succ.hdf5`, instructions, and eight videos. Both wrist videos have 38 frames at 320x240; their camera positions moved about 0.37 m and 0.46 m.
+On 2026-06-11 with `foundation_input_0`, V1 viewer and full two-phase collection succeeded for O.1, O.1.1, and O.1.2. Full O.1.2 collection also succeeded with V2/V3/V4. The annotated frames are 38 and 78. The final wrist-adapter V1 O.1.2 run produced validated replay, `episode0_succ.hdf5`, instructions, and eight videos. Both wrist videos have 38 frames at 320x240, and sampled frames show the corresponding bottle and gripper in both views.
 
 The reviewed tmux panes had already returned to the shell; they were not still collecting. Earlier jobs showed `Killed` and Ctrl-C. V1 had been configured for ten episodes per ID, while failed seed search had no bound. V4 ID 9 deterministically exceeded the right-grasp rotation gate at about 25.6 degrees versus a 15-degree limit across multiple seeds. Current configs use one episode per ID, three seed attempts, and the documented outer timeout.
 
@@ -96,4 +112,6 @@ The reviewed tmux panes had already returned to the shell; they were not still c
 - `envs/pick_diverse_bottles_piper_ik.py`
 - `view_pick_diverse_bottles_piper_ik_motion.py`
 - `collect_foundation_piper_ik.sh`
+- `script/index_foundation_piper_ik_videos.py`
+- `code_painting/build_piper_calibration_bundle.py`
 - `task_config/demo_piper_ik_foundation_v1.yml` through `v4.yml`

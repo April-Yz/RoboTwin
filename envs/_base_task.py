@@ -432,19 +432,21 @@ class Base_Task(gym.Env):
             now_ambient_light = self.scene.ambient_light
             now_ambient_light = np.clip(np.array(now_ambient_light) + np.random.rand(3) * 0.2 - 0.1, 0, 1)
             self.scene.set_ambient_light(now_ambient_light)
-        if (
-            self.cameras.collect_wrist_camera
-            and self.cameras.wrist_camera_pose_reference == "planner_gripper"
-        ):
+        wrist_reference = self.cameras.wrist_camera_pose_reference
+        if self.cameras.collect_wrist_camera and wrist_reference == "planner_gripper":
             left_pose_values = self.robot.get_left_ee_pose()
             right_pose_values = self.robot.get_right_ee_pose()
             left_wrist_reference = sapien.Pose(left_pose_values[:3], left_pose_values[3:])
             right_wrist_reference = sapien.Pose(right_pose_values[:3], right_pose_values[3:])
+        elif self.cameras.collect_wrist_camera and wrist_reference == "urdf_end_link":
+            left_wrist_reference = self.robot.left_ee.global_pose
+            right_wrist_reference = self.robot.right_ee.global_pose
         else:
             left_wrist_reference = self.robot.left_camera.get_pose()
             right_wrist_reference = self.robot.right_camera.get_pose()
         self.cameras.update_wrist_camera(left_wrist_reference, right_wrist_reference)
         self.scene.update_render()
+        self.cameras.preview_wrist_camera_images()
 
     # =========================================================== Basic APIs ===========================================================
 
@@ -590,6 +592,8 @@ class Base_Task(gym.Env):
         self.eval_video_ffmpeg = ffmpeg
 
     def close_env(self, clear_cache=False):
+        if hasattr(self, "cameras"):
+            self.cameras.close_wrist_camera_preview()
         if clear_cache:
             # for actor in self.scene.get_all_actors():
             #     self.scene.remove_actor(actor)

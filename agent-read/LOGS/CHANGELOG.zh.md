@@ -2765,3 +2765,11 @@
 - `collect_foundation_piper_ik.sh` 新增可选 `run_tag`，生成隔离 config/output，并强制 `episode_num: 1`。
 - 四份 Foundation 配置启用左右 wrist；从 `calibration_bundle_piper_new_table_0515.json` 读取独立外参，以 planner gripper pose 为父坐标并转换 optical/render 轴。
 - 验证：V1 O.1.2 两阶段采集成功，生成 HDF5、instruction 和八路 MP4；左右腕各 38 帧、320x240，移动约 0.37m/0.46m。V4 ID 9 在三个 seed 上均因右 grasp 旋转约 25.6 度超过 15 度门限失败，并按上限退出。
+
+## 2026-06-11（Wrist 坐标适配与 Foundation 视频索引）
+
+- 复核 0515/new-table 左右 wrist 手眼文件及历史版本：平移和姿态趋势稳定；右腕约 45 度 roll 持续存在，属于实机安装差异。
+- 修复实机 TCP 外参与 RoboTwin Pika CAD 父坐标混用问题。Foundation 配置改为 `urdf_end_link`，bundle 提供 `piper_pika_agx` 平移净空 adapter；保留标定光轴、左右符号和 roll。
+- Viewer 新增 `--wrist_preview 1`，实时显示左右 wrist RGB 拼接窗口。
+- 新增 `script/index_foundation_piper_ik_videos.py`，把每个独立目录的 `episode0_*` 按 Foundation ID 映射为聚合目录 `episode<ID>_*`；默认软链接并拒绝覆盖，显式 `--replace-episode` 才替换目标 MP4。
+- 验证：V1/O.1.2 `foundation_input_0` 完整两阶段采集成功，生成 38 帧左右腕视频、HDF5、instruction 和 validated trajectory；抽帧确认两路均看到对应瓶子和夹爪。`DISPLAY=:1.0` viewer 连同 `--wrist_preview 1` 完整运行并通过 `physical_success=True`。

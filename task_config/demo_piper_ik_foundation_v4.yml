@@ -48,7 +48,8 @@ camera:
   collect_wrist_camera: true
   wrist_camera_calibration_bundle: "/home/zaijia001/ssd/RoboTwin/calibration_bundle_piper_new_table_0515.json"
   wrist_camera_axis_mode: "legacy_r1"
-  wrist_camera_pose_reference: "planner_gripper"
+  wrist_camera_pose_reference: "urdf_end_link"
+  wrist_camera_simulation_adapter: "piper_pika_agx"
 data_type:
   rgb: true
   third_view: true

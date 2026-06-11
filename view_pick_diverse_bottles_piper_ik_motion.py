@@ -89,6 +89,8 @@ def main() -> None:
                         help="逐步确认模式：每个动作后等待终端回车才继续（1=启用）")
     parser.add_argument("--require_success", type=int, default=1,
                         help="1=跳过物理抓放失败的 seed；0=只要求轨迹执行完成")
+    parser.add_argument("--wrist_preview", type=int, default=0,
+                        help="1=额外显示左右 wrist RGB 实时拼接窗口")
     parser.add_argument("--task_config", type=str, default="",
                         help="覆盖自动推断的 config 名称 (例如 demo_piper_ik_foundation_v1)")
     parser.add_argument("--foundation_id", type=int, default=-1,
@@ -126,6 +128,13 @@ def main() -> None:
         build_args["foundation_frame"] = args_cli.foundation_frame
     if args_cli.foundation_mode:
         build_args["foundation_mode"] = args_cli.foundation_mode
+    build_args.setdefault("camera", {})["wrist_camera_preview"] = bool(
+        args_cli.wrist_preview
+    )
+    if args_cli.wrist_preview and not build_args["camera"].get(
+        "collect_wrist_camera", False
+    ):
+        raise ValueError("--wrist_preview requires collect_wrist_camera: true")
 
     build_args["task_name"] = args_cli.task_name
     build_args["task_config"] = task_config
@@ -160,6 +169,8 @@ def main() -> None:
     print(f"[motion-viewer] task={args_cli.task_name} ik_version={args_cli.ik_version} "
           f"num_episodes={args_cli.num_episodes} seed_start={args_cli.seed}")
     print(f"[motion-viewer] embodiment={embodiment_name}")
+    if args_cli.wrist_preview:
+        print("[motion-viewer] wrist preview enabled: left/right RGB mosaic")
 
     import importlib
     envs_module = importlib.import_module(f"envs.{args_cli.task_name}")

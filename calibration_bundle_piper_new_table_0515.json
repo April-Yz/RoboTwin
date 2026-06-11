@@ -409,6 +409,9 @@
     ]
   },
   "wrist_cameras": {
+    "parent_frame": "urdf_end_pose_orient_tcp",
+    "camera_frame": "opencv_color_optical",
+    "axis_conversion": "render_camera = raw_optical @ legacy_r1.T",
     "left_gripper_T_camera": {
       "translation": [
         -0.1493144547324326,
@@ -486,6 +489,39 @@
           1.0
         ]
       ]
+    },
+    "simulation_adapters": {
+      "piper_pika_agx": {
+        "from_frame": "real_urdf_end_pose_orient_tcp",
+        "to_frame": "simulation_link6",
+        "matrix": [
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.075
+          ],
+          [
+            0.0,
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.0,
+            0.05
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "note": "Keeps the calibrated real TCP axes aligned with the simulation link6 task frame. The translation only converts the real TCP origin to a collision-free virtual camera stand above the Pika gripper shell; calibrated left/right lateral signs, optical axis, and camera roll are preserved."
+      }
     }
   },
   "derived_summary": {
