@@ -2752,3 +2752,10 @@
 - Added `--dual_stage_freeze_reached_arms_on_replan`: in dual-stage replanning, once one arm reaches the target, later attempts hold that arm fixed and only compensate unreached arms.
 - Rechecked R1 `candidate_keep_camera_up`: it treats local X as forward, while Mode N currently uses local +Z as the approach/retreat axis, so it cannot be copied directly. The new Mode-N-specific `--foundation_pose_keep_top_axis_up` resolves a 180-degree roll about local +Z, but `top_axis=y` worsened id=1, so it is not recommended yet.
 - Validation: `py_compile` and `bash -n` passed. `N-7_action_grasp_rot_freeze_smoke` reached action on `pick_diverse_bottles id=1` with left/right errors about 2.78 cm / 2.07 cm. The remaining unresolved issue is that IK still accepts about-170-degree roll-equivalent poses, so orientation error is not yet a strict success signal.
+
+## 2026-06-11 (Mode M Human Replay IK Continuity Fix)
+
+- Root causes: Mode M did not forward seed settings, old IK selection favored low-pose-error unseeded branches, failed Cartesian prefixes could still execute, and the safety gate skipped keyframe 2 after a keyframe-1 grasp miss.
+- Changes: fixed the CuRobo seed tensor to `[batch, num_seeds, dof]`; added explicit perturbed seeds and joint-continuity selection; added cubic joint smoothstep; retained the grasp quaternion for action by default; froze reached arms; and returned a nonzero status on execution failure.
+- Orientation finding: there is no strict roll constraint about local +Z. Piper's fixed `global_trans_matrix` and target/report frame conventions remain inconsistent, so approximately 178-180 degree rotation errors are not yet a strict success metric. `apply_global_trans_to_ik=1` performed worse.
+- Validation: `pick_diverse_bottles` IDs 1 and 2 completed successfully. ID 0 reached pregrasp/grasp, but action ended at approximately 4.39 cm / 6.41 cm left/right error, exceeding the 4 cm tolerance. The old issue was shared IK/execution behavior, not an ID-1-only annotation problem.

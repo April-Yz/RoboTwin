@@ -861,3 +861,36 @@ Expected outputs:
 /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-7_action_grasp_rot_freeze/<TASK>/foundation_input_<ID>/plan_summary_foundation_pose.json
 /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-7_action_grasp_rot_freeze/<TASK>/foundation_input_<ID>/rank_previews/keyframe_<FRAME>_rank_1.png
 ```
+
+## Mode M-0611: Human Replay IK Continuity
+
+Mode M `pick_diverse_bottles` uses two global keyframes. The old run appeared to execute only keyframe 1 because the safety gate skipped keyframe 2 after the first grasp missed tolerance, not because the second keyframe was absent.
+
+The wrapper now defaults to `joint_interp + cubic smoothstep`, selecting the smallest joint-change result among the current seed, six perturbed seeds, and an unseeded solve. It disables failed Cartesian partial-prefix execution. Action uses keyframe-2 xyz with the keyframe-1 grasp quaternion; dual replans freeze reached arms, and execution failure returns a nonzero status.
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_piper_d435.sh \
+  --gpu 2 --ids 1 --viewer --tasks pick_diverse_bottles \
+  --trajectory_mode joint_interp \
+  --joint_trajectory_interpolation cubic \
+  --ik_num_seeds 1 \
+  --ik_solution_selection joint_continuity \
+  --ik_seed_perturbations 6 \
+  --ik_seed_perturbation_scale 0.05 \
+  --execute_partial_cartesian_plan 0 \
+  --action_orientation_source grasp \
+  --dual_stage_freeze_reached_arms_on_replan 1 \
+  --reach_pos_tol_m 0.04 \
+  --reach_rot_tol_deg 180 \
+  --replan_until_reached_max_attempts 5 \
+  --fail_on_execution_failure 1 \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/human_replay_smooth
+```
+
+| ID | pregrasp L/R | grasp L/R | action L/R | Result |
+|---|---:|---:|---:|---|
+| 0 | 2.18/2.92 cm | 0.86/0.85 cm | 4.39/6.41 cm | action exceeds the 4 cm tolerance |
+| 1 | 1.41/2.02 cm | 0.53/0.78 cm | 3.14/3.57 cm | complete success |
+| 2 | 1.17/2.72 cm | 0.48/0.90 cm | 1.37/3.40 cm | complete success |
+
+There is no strict roll-range constraint about the local +Z approach axis yet. Piper `global_trans_matrix` is a fixed 180-degree rotation about local X, but IK targets and reported EE poses do not yet share one transform convention, so approximately 178-180 degree rotation errors cannot be treated as physical roll errors. `--apply_global_trans_to_ik 1` made IK worse in testing and is not recommended.

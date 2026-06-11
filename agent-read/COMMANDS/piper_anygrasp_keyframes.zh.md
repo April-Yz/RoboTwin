@@ -861,3 +861,36 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_po
 /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-7_action_grasp_rot_freeze/<TASK>/foundation_input_<ID>/plan_summary_foundation_pose.json
 /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-7_action_grasp_rot_freeze/<TASK>/foundation_input_<ID>/rank_previews/keyframe_<FRAME>_rank_1.png
 ```
+
+## Mode M-0611：Human Replay IK 连续性
+
+Mode M 的 `pick_diverse_bottles` 使用两个全局关键帧。旧版看起来只执行第一关键帧，是因为第一帧 grasp 未 reached 后，安全门控跳过了第二帧，不是关键帧读取缺失。
+
+当前 wrapper 默认使用 `joint_interp + cubic smoothstep`，从当前 seed、6 个小扰动 seed 和 unseeded 解中优先选择关节变化最小的解，禁止执行失败 Cartesian plan 的 partial prefix。action 使用第二关键帧 xyz，但保留第一关键帧 grasp quaternion；dual replan 冻结已 reached 的手，执行失败返回非零状态。
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_piper_d435.sh \
+  --gpu 2 --ids 1 --viewer --tasks pick_diverse_bottles \
+  --trajectory_mode joint_interp \
+  --joint_trajectory_interpolation cubic \
+  --ik_num_seeds 1 \
+  --ik_solution_selection joint_continuity \
+  --ik_seed_perturbations 6 \
+  --ik_seed_perturbation_scale 0.05 \
+  --execute_partial_cartesian_plan 0 \
+  --action_orientation_source grasp \
+  --dual_stage_freeze_reached_arms_on_replan 1 \
+  --reach_pos_tol_m 0.04 \
+  --reach_rot_tol_deg 180 \
+  --replan_until_reached_max_attempts 5 \
+  --fail_on_execution_failure 1 \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/human_replay_smooth
+```
+
+| ID | pregrasp 左/右 | grasp 左/右 | action 左/右 | 结果 |
+|---|---:|---:|---:|---|
+| 0 | 2.18/2.92cm | 0.86/0.85cm | 4.39/6.41cm | action 超过 4cm 阈值 |
+| 1 | 1.41/2.02cm | 0.53/0.78cm | 3.14/3.57cm | 完整成功 |
+| 2 | 1.17/2.72cm | 0.48/0.90cm | 1.37/3.40cm | 完整成功 |
+
+当前没有严格的 local +Z 前进轴 roll 范围约束。Piper `global_trans_matrix` 是绕 local X 的固定 180 度变换，但 IK target 和 EE 回报尚未统一变换约定，因此约 178-180 度旋转误差暂不能作为真实 roll 误差。`--apply_global_trans_to_ik 1` 实测使 IK 更差，暂不推荐。

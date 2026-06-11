@@ -86,7 +86,11 @@ class URDFInverseKinematics:
 
         seed_tensor = None
         if current_joints is not None:
-            seed_tensor = torch.tensor(current_joints, device=self.tensor_args.device, dtype=torch.float32).view(1, -1)
+            seed_tensor = torch.tensor(
+                current_joints,
+                device=self.tensor_args.device,
+                dtype=torch.float32,
+            ).view(1, 1, -1)
         if seed_tensor is not None:
             result = self.ik_solver.solve_batch(goal, seed_config=seed_tensor)
         else:

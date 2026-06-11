@@ -16,3 +16,10 @@
 - Mode N-7 ports the O.1.2 "action keeps grasp orientation" idea into the Foundation Pose + human-orientation path: action position comes from the second-keyframe Foundation object xyz, while orientation and retreat direction come from the first-keyframe grasp.
 - Dual-stage replanning can freeze arms that have already reached the target, preventing a later replan from pulling a reached arm away.
 - The R1/AnyGrasp camera-up roll constraint uses local X as forward; Mode N uses local +Z as forward, so that constraint cannot be reused directly.
+
+## Mode M-0611
+
+- Human Replay now defaults to cubic joint-space smoothstep and borrows O.1 V4's explicit small perturbations around the current joint seed, selecting the IK result with the smallest joint change.
+- Keyframe-2 action uses keyframe-2 position with the keyframe-1 grasp quaternion, while dual replans freeze reached arms.
+- `pick_diverse_bottles` IDs 1 and 2 completed successfully; ID 0 only failed the 4 cm action tolerance.
+- Piper IK target and EE report transforms still need to be unified before adding a strict roll constraint about the local +Z approach axis.

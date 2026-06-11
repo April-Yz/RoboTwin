@@ -236,6 +236,20 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--urdfik_max_position_threshold_m", type=float, default=None, help="Maximum relaxed URDF IK position threshold in meters. Default preserves the solver's old 2 mm cap.")
     parser.add_argument("--urdfik_max_rotation_threshold_rad", type=float, default=None, help="Maximum relaxed URDF IK rotation threshold in radians. Default preserves the solver's old 0.04 rad cap.")
     parser.add_argument("--urdfik_num_seeds", type=int, default=1, help="Number of CuRobo IK seeds used by URDF IK.")
+    parser.add_argument(
+        "--urdfik_solution_selection",
+        choices=["pose_error", "joint_continuity"],
+        default="pose_error",
+        help="Choose seeded/unseeded IK solutions by endpoint pose error or minimum joint change from the previous waypoint.",
+    )
+    parser.add_argument("--urdfik_seed_perturbations", type=int, default=0, help="Number of deterministic small perturbations around the current joint seed to try explicitly.")
+    parser.add_argument("--urdfik_seed_perturbation_scale", type=float, default=0.05, help="Standard deviation in radians for --urdfik_seed_perturbations.")
+    parser.add_argument(
+        "--urdfik_max_joint_step_rad",
+        type=float,
+        default=0.0,
+        help="Reject an IK waypoint if any arm joint changes by more than this many radians from the previous waypoint. <=0 disables the check.",
+    )
     parser.add_argument("--execute_partial_cartesian_plan", type=int, default=0, help="If 1, cartesian_interp_ik plans that fail at an intermediate waypoint still execute the successfully solved waypoint prefix as a Partial plan. Diagnostic only; reached remains false unless the final target is reached.")
     parser.add_argument("--piper_urdfik_apply_global_trans_to_ik", type=int, default=0, help="Piper diagnostic only. If 1, additionally remove global_trans_matrix from the gripper target before URDFIK. Default 0 matches the direct Piper hand replay convention.")
     parser.add_argument("--left_target_object", type=str, default="cup")
@@ -269,6 +283,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--approach_axis", choices=["local_x", "local_z"], default="local_x", help="Target local axis used for pregrasp retreat. Default local_x preserves the legacy AnyGrasp planner behavior. local_z matches the direct hand replay convention after remapping AnyGrasp +X to replay +Z.")
     parser.add_argument("--settle_steps", type=int, default=4)
     parser.add_argument("--execute_interp_steps", type=int, default=24)
+    parser.add_argument(
+        "--joint_trajectory_interpolation",
+        choices=["linear", "cubic"],
+        default="linear",
+        help="Interpolation used to densify joint waypoints before execution. cubic uses zero-slope smoothstep segments.",
+    )
     parser.add_argument("--joint_command_scene_steps", type=int, default=2, help="Physics scene steps to advance after each commanded arm waypoint.")
     parser.add_argument("--joint_target_wait_steps", type=int, default=60, help="Maximum extra physics scene steps used after a stage trajectory to let the arm converge to the final commanded joint target.")
     parser.add_argument("--joint_target_wait_tol_rad", type=float, default=0.01, help="Per-joint absolute tolerance in radians used by the final post-trajectory convergence wait.")
@@ -319,6 +339,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--viewer_show_camera_frustums", type=int, default=0, help="If 1, keep SAPIEN viewer camera frustum lines visible. Original viewer plugin field: show_camera_linesets.")
     parser.add_argument("--viewer_frame_delay", type=float, default=0.0)
     parser.add_argument("--viewer_wait_at_end", type=int, default=0)
+    parser.add_argument(
+        "--fail_on_execution_failure",
+        type=int,
+        default=0,
+        help="Exit nonzero after writing outputs when a required pregrasp/grasp/action stage did not reach its target.",
+    )
     parser.add_argument("--disable_table", type=int, default=1)
     parser.add_argument("--base_occluder_enable", type=int, default=0, help="If 1, add a visual-only box attached above the robot base to occlude the chassis in camera views. No collision is created.")
     parser.add_argument("--base_occluder_local_pos", type=float, nargs=3, default=[0.0, 0.0, 0.4], metavar=("X", "Y", "Z"))
@@ -757,6 +783,10 @@ def build_renderer(args: argparse.Namespace) -> ReplayRenderer:
         renderer_kwargs["urdfik_max_position_threshold_m"] = args.urdfik_max_position_threshold_m
         renderer_kwargs["urdfik_max_rotation_threshold_rad"] = args.urdfik_max_rotation_threshold_rad
         renderer_kwargs["urdfik_num_seeds"] = int(args.urdfik_num_seeds)
+        renderer_kwargs["urdfik_solution_selection"] = str(args.urdfik_solution_selection)
+        renderer_kwargs["urdfik_seed_perturbations"] = int(args.urdfik_seed_perturbations)
+        renderer_kwargs["urdfik_seed_perturbation_scale"] = float(args.urdfik_seed_perturbation_scale)
+        renderer_kwargs["urdfik_max_joint_step_rad"] = float(args.urdfik_max_joint_step_rad)
         renderer_kwargs["urdfik_execute_partial_cartesian_plan"] = bool(args.execute_partial_cartesian_plan)
         renderer_kwargs["urdfik_apply_global_trans_to_ik"] = bool(args.piper_urdfik_apply_global_trans_to_ik)
     renderer = renderer_cls(**renderer_kwargs)
@@ -3689,7 +3719,12 @@ def poses_are_effectively_same(
     return pos_err <= float(pos_tol_m) and rot_err <= float(rot_tol_deg)
 
 
-def interpolate_joint_trajectory(position: np.ndarray, velocity: np.ndarray, num_steps: int) -> Tuple[np.ndarray, np.ndarray]:
+def interpolate_joint_trajectory(
+    position: np.ndarray,
+    velocity: np.ndarray,
+    num_steps: int,
+    interpolation: str = "linear",
+) -> Tuple[np.ndarray, np.ndarray]:
     position = np.asarray(position, dtype=np.float64)
     velocity = np.asarray(velocity, dtype=np.float64)
     if position.shape[0] < 2 or int(num_steps) <= position.shape[0]:
@@ -3701,7 +3736,11 @@ def interpolate_joint_trajectory(position: np.ndarray, velocity: np.ndarray, num
     for idx in range(position.shape[0] - 1):
         start = position[idx]
         end = position[idx + 1]
-        seg = np.linspace(start, end, num=max(int(num_steps / max(position.shape[0] - 1, 1)), 2), endpoint=False)
+        segment_steps = max(int(num_steps / max(position.shape[0] - 1, 1)), 2)
+        ratios = np.linspace(0.0, 1.0, num=segment_steps, endpoint=False, dtype=np.float64)
+        if interpolation == "cubic":
+            ratios = ratios * ratios * (3.0 - 2.0 * ratios)
+        seg = start[None, :] + ratios[:, None] * (end - start)[None, :]
         out_pos.extend(seg.tolist())
     out_pos.append(position[-1].tolist())
     out_pos_arr = np.asarray(out_pos, dtype=np.float64)
@@ -3861,6 +3900,7 @@ def execute_single_arm_plan(
     attached_actor: Optional[sapien.Entity] = None,
     tcp_to_object: Optional[np.ndarray] = None,
     execute_interp_steps: int = 24,
+    joint_trajectory_interpolation: str = "linear",
     settle_steps: int = 4,
     hold_frames_after_stage: int = 0,
     target_visual_pose: Optional[np.ndarray] = None,
@@ -3885,7 +3925,12 @@ def execute_single_arm_plan(
 
     position = np.asarray(plan["position"], dtype=np.float64)
     velocity = np.asarray(plan["velocity"], dtype=np.float64)
-    position, velocity = interpolate_joint_trajectory(position, velocity, execute_interp_steps)
+    position, velocity = interpolate_joint_trajectory(
+        position,
+        velocity,
+        execute_interp_steps,
+        interpolation=joint_trajectory_interpolation,
+    )
     scene_steps_per_waypoint = max(int(joint_command_scene_steps), 1)
     for idx in range(position.shape[0]):
         renderer.robot.set_arm_joints(position[idx], velocity[idx], arm)
@@ -4018,6 +4063,7 @@ def execute_stage_until_reached(
             attached_actor=attached_actor,
             tcp_to_object=tcp_to_object,
             execute_interp_steps=args.execute_interp_steps,
+            joint_trajectory_interpolation=args.joint_trajectory_interpolation,
             settle_steps=args.settle_steps,
             hold_frames_after_stage=args.hold_frames_after_stage,
             target_visual_pose=target_visual_pose,
@@ -4164,6 +4210,7 @@ def execute_dual_arm_plan(
     third_writer: Optional[cv2.VideoWriter],
     use_overlay: bool,
     execute_interp_steps: int = 24,
+    joint_trajectory_interpolation: str = "linear",
     settle_steps: int = 4,
     hold_frames_after_stage: int = 0,
     debug_visuals: Optional[DebugVisualBundle] = None,
@@ -4213,7 +4260,12 @@ def execute_dual_arm_plan(
         plan = plans_by_arm[arm]
         position = np.asarray(plan["position"], dtype=np.float64)
         velocity = np.asarray(plan["velocity"], dtype=np.float64)
-        position, velocity = interpolate_joint_trajectory(position, velocity, execute_interp_steps)
+        position, velocity = interpolate_joint_trajectory(
+            position,
+            velocity,
+            execute_interp_steps,
+            interpolation=joint_trajectory_interpolation,
+        )
         trajectories[arm] = (position, velocity)
         max_steps = max(max_steps, int(position.shape[0]))
 
@@ -4446,6 +4498,7 @@ def execute_dual_stage_until_reached(
             third_writer=third_writer,
             use_overlay=use_overlay,
             execute_interp_steps=args.execute_interp_steps,
+            joint_trajectory_interpolation=args.joint_trajectory_interpolation,
             settle_steps=args.settle_steps,
             hold_frames_after_stage=args.hold_frames_after_stage,
             debug_visuals=debug_visuals,
@@ -6155,9 +6208,14 @@ def main() -> None:
         "urdfik_max_position_threshold_m": None if args.urdfik_max_position_threshold_m is None else float(args.urdfik_max_position_threshold_m),
         "urdfik_max_rotation_threshold_rad": None if args.urdfik_max_rotation_threshold_rad is None else float(args.urdfik_max_rotation_threshold_rad),
         "urdfik_num_seeds": int(args.urdfik_num_seeds),
+        "urdfik_solution_selection": str(args.urdfik_solution_selection),
+        "urdfik_seed_perturbations": int(args.urdfik_seed_perturbations),
+        "urdfik_seed_perturbation_scale": float(args.urdfik_seed_perturbation_scale),
+        "urdfik_max_joint_step_rad": float(args.urdfik_max_joint_step_rad),
         "execute_partial_cartesian_plan": int(args.execute_partial_cartesian_plan),
         "piper_urdfik_apply_global_trans_to_ik": int(args.piper_urdfik_apply_global_trans_to_ik),
         "execute_interp_steps": int(args.execute_interp_steps),
+        "joint_trajectory_interpolation": str(args.joint_trajectory_interpolation),
         "settle_steps": int(args.settle_steps),
         "joint_command_scene_steps": int(args.joint_command_scene_steps),
         "joint_target_wait_steps": int(args.joint_target_wait_steps),
@@ -6184,6 +6242,7 @@ def main() -> None:
         "dual_stage_freeze_reached_arms_on_replan": int(args.dual_stage_freeze_reached_arms_on_replan),
         "require_keyframe1_reached_before_close": int(args.require_keyframe1_reached_before_close),
         "require_keyframe1_reached_before_action": int(args.require_keyframe1_reached_before_action),
+        "fail_on_execution_failure": int(args.fail_on_execution_failure),
         "debug_stop_after_keyframe1": int(args.debug_stop_after_keyframe1),
         "execution_mode": "dual_sync" if dual_sync_mode else "single_or_sequential",
         "manual_candidate_overrides": {arm: {str(frame): idx for frame, idx in frame_map.items()} for arm, frame_map in args.manual_candidate_overrides.items() if frame_map},
@@ -6391,6 +6450,8 @@ def main() -> None:
         f"video={head_video_path}"
     )
     renderer.hold_viewer()
+    if bool(args.fail_on_execution_failure) and bool(summary["execution_failed"]):
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

@@ -203,6 +203,7 @@ def build_plan_summary(
     obj_data: Dict[str, np.ndarray],
     mode: str,
     cv_axis_mode: str = "legacy_r1",
+    action_orientation_source: str = "keyframe",
 ) -> dict:
     """Build a complete plan_summary.json."""
     obj_map = TASK_OBJECT_MAP.get(task, {"left": "object", "right": "object"})
@@ -215,6 +216,7 @@ def build_plan_summary(
         # Get hand rotation in camera space for the reference
         rot_key = f"{arm}_gripper_rotation_matrix"
         hand_rotations = np.asarray(hand_data[rot_key]) if rot_key in hand_data else None
+        grasp_pose_wxyz: Optional[np.ndarray] = None
 
         for idx, kf_frame in enumerate(keyframes):
             if kf_frame <= 0:
@@ -225,6 +227,12 @@ def build_plan_summary(
             if pose_wxyz is None:
                 print(f"  [WARNING] arm={arm} frame={kf_frame}: could not compute world pose, skipping")
                 continue
+            orientation_source = f"hand_frame_{int(kf_frame)}"
+            if idx > 0 and action_orientation_source == "grasp" and grasp_pose_wxyz is not None:
+                pose_wxyz = np.concatenate([pose_wxyz[:3], grasp_pose_wxyz[3:]]).astype(np.float64)
+                orientation_source = f"grasp_frame_{int(keyframes[0])}"
+            elif idx == 0:
+                grasp_pose_wxyz = pose_wxyz.copy()
 
             hand_rot_cam = hand_rotations[int(kf_frame)] if hand_rotations is not None and int(kf_frame) < len(hand_rotations) else np.eye(3)
 
@@ -236,8 +244,12 @@ def build_plan_summary(
                 target_object=target_obj,
                 candidate_idx=idx,
             )
+            entry["human_replay_orientation_source"] = orientation_source
             candidates_by_arm[arm].append(entry)
-            print(f"  [{arm}] keyframe[{idx}] frame={kf_frame} pos=({pose_wxyz[0]:.3f},{pose_wxyz[1]:.3f},{pose_wxyz[2]:.3f})")
+            print(
+                f"  [{arm}] keyframe[{idx}] frame={kf_frame} orientation={orientation_source} "
+                f"pos=({pose_wxyz[0]:.3f},{pose_wxyz[1]:.3f},{pose_wxyz[2]:.3f})"
+            )
 
     # Determine primary arm
     primary_arm = "left"
@@ -252,6 +264,7 @@ def build_plan_summary(
         "task": task,
         "video_id": int(video_id),
         "target_source": "human_replay",
+        "human_replay_action_orientation_source": str(action_orientation_source),
         "mode": mode,
         "selected_arm": primary_arm,
         "selected_candidates": all_candidates,
@@ -281,15 +294,22 @@ def run_planner_with_targets(
         "--arm", "auto",
         "--execute_both_arms", "1",
         "--dual_stage_require_all_plans", "1",
+        "--dual_stage_freeze_reached_arms_on_replan", str(args.dual_stage_freeze_reached_arms_on_replan),
         "--require_keyframe1_reached_before_close", str(args.require_keyframe1_reached_before_close),
         "--require_keyframe1_reached_before_action", str(args.require_keyframe1_reached_before_action),
         "--planner_backend", args.planner_backend,
         "--urdfik_trajectory_mode", args.urdfik_trajectory_mode,
         "--urdfik_joint_interp_waypoints", str(args.urdfik_joint_interp_waypoints),
         "--urdfik_cartesian_interp_auto_step_m", str(args.urdfik_cartesian_interp_auto_step_m),
+        "--urdfik_num_seeds", str(args.urdfik_num_seeds),
+        "--urdfik_solution_selection", args.urdfik_solution_selection,
+        "--urdfik_seed_perturbations", str(args.urdfik_seed_perturbations),
+        "--urdfik_seed_perturbation_scale", str(args.urdfik_seed_perturbation_scale),
+        "--urdfik_max_joint_step_rad", str(args.urdfik_max_joint_step_rad),
         "--execute_partial_cartesian_plan", str(args.execute_partial_cartesian_plan),
         "--urdfik_max_position_threshold_m", str(args.urdfik_max_position_threshold_m),
         "--urdfik_max_rotation_threshold_rad", str(args.urdfik_max_rotation_threshold_rad),
+        "--piper_urdfik_apply_global_trans_to_ik", str(args.piper_urdfik_apply_global_trans_to_ik),
         "--candidate_orientation_remap_label", args.candidate_orientation_remap_label,
         "--candidate_target_local_x_offset_m", "0.0",
         "--candidate_target_local_z_offset_m", "0.0",
@@ -301,6 +321,7 @@ def run_planner_with_targets(
         "--replan_until_reached", "1",
         "--replan_until_reached_max_attempts", str(args.replan_until_reached_max_attempts),
         "--execute_interp_steps", str(args.execute_interp_steps),
+        "--joint_trajectory_interpolation", args.joint_trajectory_interpolation,
         "--joint_command_scene_steps", str(args.joint_command_scene_steps),
         "--settle_steps", str(args.settle_steps),
         "--joint_target_wait_steps", str(args.joint_target_wait_steps),
@@ -330,6 +351,7 @@ def run_planner_with_targets(
         "--fovy_deg", str(args.fovy_deg),
         "--fps", str(int(args.fps)),
         "--robot_config", str(args.robot_config),
+        "--fail_on_execution_failure", str(args.fail_on_execution_failure),
     ]
 
     if view_mode:
@@ -390,28 +412,36 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--third_person_view", type=int, default=1)
     parser.add_argument("--head_only", type=int, default=0)
     parser.add_argument("--planner_backend", choices=["urdfik", "curobo"], default="urdfik")
-    parser.add_argument("--urdfik_trajectory_mode", type=str, default="cartesian_interp_ik")
+    parser.add_argument("--urdfik_trajectory_mode", type=str, default="joint_interp")
     parser.add_argument("--urdfik_joint_interp_waypoints", type=int, default=40)
     parser.add_argument("--urdfik_cartesian_interp_steps", type=int, default=-1)
     parser.add_argument("--urdfik_cartesian_interp_auto_step_m", type=float, default=0.03)
-    parser.add_argument("--execute_partial_cartesian_plan", type=int, default=1)
+    parser.add_argument("--execute_partial_cartesian_plan", type=int, default=0)
     parser.add_argument("--urdfik_max_position_threshold_m", type=float, default=0.02)
     parser.add_argument("--urdfik_max_rotation_threshold_rad", type=float, default=3.14)
-    parser.add_argument("--urdfik_num_seeds", type=int, default=20)
+    parser.add_argument("--urdfik_num_seeds", type=int, default=1)
+    parser.add_argument("--urdfik_solution_selection", choices=["pose_error", "joint_continuity"], default="joint_continuity")
+    parser.add_argument("--urdfik_seed_perturbations", type=int, default=6)
+    parser.add_argument("--urdfik_seed_perturbation_scale", type=float, default=0.05)
+    parser.add_argument("--urdfik_max_joint_step_rad", type=float, default=0.0)
+    parser.add_argument("--piper_urdfik_apply_global_trans_to_ik", type=int, default=0)
     parser.add_argument("--candidate_orientation_remap_label", type=str, default="identity")
     parser.add_argument("--approach_axis", type=str, default="local_z")
     parser.add_argument("--approach_offset_m", type=float, default=0.12)
+    parser.add_argument("--action_orientation_source", choices=["keyframe", "grasp"], default="grasp")
+    parser.add_argument("--dual_stage_freeze_reached_arms_on_replan", type=int, default=1)
     parser.add_argument("--require_keyframe1_reached_before_close", type=int, default=1)
     parser.add_argument("--require_keyframe1_reached_before_action", type=int, default=1)
     parser.add_argument("--execute_interp_steps", type=int, default=24)
+    parser.add_argument("--joint_trajectory_interpolation", choices=["linear", "cubic"], default="cubic")
     parser.add_argument("--joint_command_scene_steps", type=int, default=10)
     parser.add_argument("--settle_steps", type=int, default=30)
     parser.add_argument("--joint_target_wait_steps", type=int, default=25)
     parser.add_argument("--joint_target_wait_tol_rad", type=float, default=0.01)
     parser.add_argument("--hold_frames_after_stage", type=int, default=8)
-    parser.add_argument("--reach_pos_tol_m", type=float, default=0.03)
+    parser.add_argument("--reach_pos_tol_m", type=float, default=0.04)
     parser.add_argument("--reach_rot_tol_deg", type=float, default=180)
-    parser.add_argument("--replan_until_reached_max_attempts", type=int, default=3, help="Max replan attempts per stage before giving up (default 3, 0=unbounded)")
+    parser.add_argument("--replan_until_reached_max_attempts", type=int, default=5, help="Max replan attempts per stage before giving up (default 5, 0=unbounded)")
     parser.add_argument("--reach_error_pose_source", type=str, default="ee")
     parser.add_argument("--debug_visualize_targets", type=int, default=1)
     parser.add_argument("--debug_visualize_selected_keyframe_axes", type=int, default=1)
@@ -420,6 +450,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--pure_scene_output", type=int, default=1)
     parser.add_argument("--enable_grasp_action_object_collision", type=int, default=0)
     parser.add_argument("--replay_objects_ignore_collision", type=int, default=1)
+    parser.add_argument("--fail_on_execution_failure", type=int, default=1)
     parser.add_argument("--object_mesh_override", action="append", default=[], help="Repeatable mesh override in the form NAME=/abs/path/to/mesh.obj")
     parser.add_argument("--execution_object_visual_scale_override", action="append", default=[], help="Repeatable visual scale override NAME=SCALE")
     parser.add_argument("--execution_object_collision_scale_override", action="append", default=[], help="Repeatable collision scale override NAME=SCALE")
@@ -479,6 +510,7 @@ def main() -> None:
         obj_data=obj_data,
         mode=mode,
         cv_axis_mode=args.camera_cv_axis_mode,
+        action_orientation_source=args.action_orientation_source,
     )
 
     plan_summary_path = args.output_dir / "plan_summary_human_replay.json"

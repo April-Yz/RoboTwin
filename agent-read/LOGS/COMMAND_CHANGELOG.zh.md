@@ -2073,3 +2073,9 @@
   - `--dual_stage_freeze_reached_arms_on_replan 0|1`
 - 推荐 N-7 命令使用 `--foundation_pose_action_orientation_source grasp --dual_stage_freeze_reached_arms_on_replan 1`，输出到 `N-7_action_grasp_rot_freeze`。
 - `COMMAND_LIBRARY.zh.md` 和 `agent-read/COMMANDS/piper_anygrasp_keyframes.zh.md` 已更新批量、viewer、smoke 命令。
+
+## 2026-06-11（Mode M-0611 Human Replay 命令）
+
+- `run_plan_keyframes_human_replay_piper_d435.sh` 新增/转发 IK seed、关节连续性、cubic 插值、action 朝向来源、replan 冻结与失败退出参数。
+- 推荐默认：`joint_interp`、`joint_trajectory_interpolation=cubic`、`ik_solution_selection=joint_continuity`、6 个 0.05rad 扰动 seed、`action_orientation_source=grasp`、`reach_pos_tol_m=0.04`。
+- `COMMAND_LIBRARY.zh.md` L15.20 与 Mode M 命令已更新；多 ID 诊断可使用 `--ids 0 1 2 --continue_on_error`。

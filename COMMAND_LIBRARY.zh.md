@@ -4585,6 +4585,52 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_anygrasp_keyframes_pipe
 
 ## L15.20 异步独立关键帧执行设计 [已实现]
 
+### 0611 Human Replay / Mode M IK 连续性修复
+
+`pick_diverse_bottles` 属于模式 A（两个全局关键帧），不需要本节后面的异步 L/R staged wrapper。用户在 `modelL1521-5` 中运行的 `run_plan_keyframes_human_replay_piper_d435.sh` 实际是 Mode M 同步双臂路径。
+
+旧默认存在四个叠加问题：
+
+- 中间层声明了 `urdfik_num_seeds=20`，但未传给底层，实际日志一直是 `num_seeds=1`。
+- `cartesian_interp_ik` 允许执行 IK 失败前的 partial prefix，可能把机器人停在离目标很远的中间状态。
+- seeded/unseeded 解只按末端 pose 误差选，容易切换腕/肘分支；运动会突然翻腕或跳远。
+- 第一关键帧 grasp 未 reached 时，安全门控会跳过第二关键帧 action，所以视觉上像“只有第一关键帧”，并不是第二关键帧没有读取。
+
+当前推荐使用 O.1 V2/V4 的思路：关节空间 cubic smoothstep、围绕当前关节做显式扰动 seed 搜索、按关节连续性选解；第二关键帧使用自身 xyz，但保留第一关键帧 grasp quaternion。ID 1 viewer 命令：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_piper_d435.sh \
+  --gpu 2 --ids 1 --viewer --tasks pick_diverse_bottles \
+  --trajectory_mode joint_interp \
+  --joint_trajectory_interpolation cubic \
+  --ik_num_seeds 1 \
+  --ik_solution_selection joint_continuity \
+  --ik_seed_perturbations 6 \
+  --ik_seed_perturbation_scale 0.05 \
+  --ik_max_joint_step_rad 0 \
+  --execute_partial_cartesian_plan 0 \
+  --apply_global_trans_to_ik 0 \
+  --action_orientation_source grasp \
+  --dual_stage_freeze_reached_arms_on_replan 1 \
+  --reach_pos_tol_m 0.04 \
+  --reach_rot_tol_deg 180 \
+  --replan_until_reached_max_attempts 5 \
+  --fail_on_execution_failure 1 \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/human_replay_smooth
+```
+
+无 viewer 对比多个 ID：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_piper_d435.sh \
+  --gpu 2 --ids 0 1 2 --continue_on_error --tasks pick_diverse_bottles \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/human_replay_smooth
+```
+
+实测 ID 1、ID 2 完整执行 pregrasp/grasp/action；ID 0 的 action 也已执行，但最终左右位置误差约 4.39cm/6.41cm，超过 4cm 阈值。这说明旧问题不是 ID 1 标注独有，而是共享 IK 连续性和执行策略问题；修复后仍有 episode-specific 的第二目标可达性/跟踪误差。
+
+当前没有实现“绕 local +Z 前进轴只能在某个 180 度区间内”的严格 roll 约束。Piper 配置的 `global_trans_matrix=diag(1,-1,-1)` 本身是绕 local X 的固定 180 度坐标变换；目标送入 IK 和 EE 回报的变换约定还不一致，因此 summary 中约 178-180 度的旋转误差暂时不能直接解释为真实错误 roll。`--apply_global_trans_to_ik 1` 已测试，会使本批目标明显更难求解，当前保持 0；后续应统一目标/回报坐标系，再把旋转阈值从 180 度收紧。
+
 ### 六任务关键帧结构分析
 
 通过解析 `h2o_manual_review/<TASK>/hand_keyframes_all.json`，六个任务分为四种模式：
@@ -5065,7 +5111,7 @@ eog /home/zaijia001/ssd/data/piper/hand/pick_diverse_bottles/pick_diverse_bottle
 
 ### 设计目的
 
-隔离 AnyGrasp 候选选择的作用。直接使用人手 gripper pose（从 `hand_detections_<ID>.npz` 读取的世界空间位置+朝向）作为 IK 规划目标，**不使用 AnyGrasp 的任何候选**。除此之外，整个 planner 管线（pregrasp→grasp→action，Cartesian IK 规划，轴约定）**完全不变**。
+隔离 AnyGrasp 候选选择的作用。直接使用人手 gripper pose（从 `hand_detections_<ID>.npz` 读取的世界空间位置+朝向）作为 IK 规划目标，**不使用 AnyGrasp 的任何候选**。仍复用同一套 pregrasp→grasp→action、双臂 reached 门控和 Piper URDF IK 执行框架；0611 推荐配置改用关节连续性优先的 `joint_interp + cubic`。
 
 对比 L15.19.1（AnyGrasp robot_frame planner）和 Mode M，可以量化 AnyGrasp 抓取排序对执行成功率的贡献。
 
@@ -5117,11 +5163,13 @@ Viewer 模式会在 bash wrapper 和 Python 中间层都移除 `CUDA_VISIBLE_DEV
 
 以下命令直接替换 L15.19.1 viewer 命令中的 planner 脚本路径，其余参数保持一致：
 
+Mode M wrapper 已内置 L15.20 的 0611 连续性默认值：`joint_interp + cubic`、6 个扰动 seed、按 joint continuity 选解、action 保持 grasp 朝向、冻结已达标手、禁止 partial Cartesian prefix，并在执行失败时返回非零退出码。
+
 ```bash
 # pick_diverse_bottles (模式 A: 2全局关键帧)
 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_piper_d435.sh \
   --gpu 2 --ids 1 --viewer --tasks pick_diverse_bottles \
-  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/human_replay_viewer
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/human_replay_smooth
 
 # place_bread_basket (模式 B: L2+R2)
 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_piper_d435.sh \

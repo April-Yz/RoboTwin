@@ -2750,3 +2750,10 @@
 - 新增 `--dual_stage_freeze_reached_arms_on_replan`：dual-stage replan 中某只手已达标后，后续 attempt 保持该手关节不动，只补偿未达标手。
 - 校对 R1 的 `candidate_keep_camera_up` 后确认它按 local X 作为 forward；Mode N 当前用 local +Z 作为前进/retreat 轴，因此不能直接照搬。新增的 N 专用 `--foundation_pose_keep_top_axis_up` 绕 local +Z 做 180 度二选一，但 `top_axis=y` 在 id=1 变差，推荐暂不启用。
 - 验证：`py_compile` 和 `bash -n` 通过；`N-7_action_grasp_rot_freeze_smoke` 在 `pick_diverse_bottles id=1` 上 action 左/右误差约 2.78cm/2.07cm，双臂达标。未解决的问题是 IK 仍接受约 170 度 roll 等价姿态，朝向误差不能作为严格成功条件。
+
+## 2026-06-11（Mode M Human Replay IK 连续性修复）
+
+- 根因：Mode M 未向底层转发 seed 参数；旧 IK 倾向按 pose error 选 unseeded 分支；失败的 Cartesian prefix 仍可执行；第一帧 grasp 失败后第二帧被安全门控跳过。
+- 修改：修正 CuRobo seed tensor 为 `[batch, num_seeds, dof]`；增加显式扰动 seed 与关节连续性选解；增加 cubic joint smoothstep；action 默认保留 grasp quaternion；冻结已 reached 手；执行失败返回非零退出码。
+- 姿态结论：当前没有 local +Z 前进轴的严格 roll 限制。Piper 固定 `global_trans_matrix` 与 target/report frame 约定不一致，约 178-180 度旋转误差暂不能作为严格成功条件；`apply_global_trans_to_ik=1` 实测更差。
+- 验证：`pick_diverse_bottles` ID 1、2 完整成功；ID 0 pregrasp/grasp 成功，但 action 左右误差约 4.39cm/6.41cm，超过 4cm 阈值。旧问题是共享 IK/执行问题，不是 ID 1 标注独有。

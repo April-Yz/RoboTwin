@@ -16,3 +16,10 @@
 - Mode N-7 将 O.1.2 的“action 保持 grasp 朝向”移植到 Foundation Pose + 人手朝向路径：action 位置来自第二关键帧 Foundation 物体 xyz，朝向和 retreat 方向来自第一关键帧 grasp。
 - dual-stage replan 可以启用已达标手冻结，防止一只手已经满足阈值后被下一次 replan 重新带离目标。
 - R1/AnyGrasp 的 camera-up roll 约束以 local X 为 forward；Mode N 以 local +Z 为 forward，不能直接复用。
+
+## Mode M-0611
+
+- Human Replay 默认改为关节空间 cubic smoothstep，并借鉴 O.1 V4 对当前关节 seed 做显式小扰动搜索，按最小关节变化选择 IK 解。
+- 第二关键帧 action 使用第二帧位置和第一帧 grasp quaternion，dual replan 冻结已 reached 手。
+- `pick_diverse_bottles` ID 1、2 完整成功；ID 0 只在 action 超过 4cm 阈值。
+- 仍待统一 Piper IK target 与 EE report 坐标变换，并在统一后实现 local +Z 前进轴的严格 roll 约束。

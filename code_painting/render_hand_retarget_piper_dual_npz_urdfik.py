@@ -44,6 +44,16 @@ class HandRetargetPiperDualURDFIKRenderer(PiperDualReplayRenderer):
         self.urdfik_num_seeds = max(int(kwargs.pop("urdfik_num_seeds", 1)), 1)
         self.urdfik_execute_partial_cartesian_plan = bool(kwargs.pop("urdfik_execute_partial_cartesian_plan", False))
         self.urdfik_apply_global_trans_to_ik = bool(kwargs.pop("urdfik_apply_global_trans_to_ik", False))
+        self.urdfik_solution_selection = str(kwargs.pop("urdfik_solution_selection", "pose_error"))
+        self.urdfik_seed_perturbations = max(int(kwargs.pop("urdfik_seed_perturbations", 0)), 0)
+        self.urdfik_seed_perturbation_scale = max(
+            float(kwargs.pop("urdfik_seed_perturbation_scale", 0.05)),
+            0.0,
+        )
+        max_joint_step_raw = kwargs.pop("urdfik_max_joint_step_rad", None)
+        self.urdfik_max_joint_step_rad = (
+            None if max_joint_step_raw is None or float(max_joint_step_raw) <= 0.0 else float(max_joint_step_raw)
+        )
         kwargs["attach_planner"] = False
         if kwargs.get("init_left_arm_joints") is None:
             kwargs["init_left_arm_joints"] = DEFAULT_INIT_ARM_JOINTS.copy()
@@ -78,6 +88,10 @@ class HandRetargetPiperDualURDFIKRenderer(PiperDualReplayRenderer):
             f"max_rot_thresh={float(self.left_ik_solver.max_rotation_threshold):.4f} "
             f"num_seeds={self.urdfik_num_seeds} "
             f"partial_cartesian={int(self.urdfik_execute_partial_cartesian_plan)} "
+            f"solution_selection={self.urdfik_solution_selection} "
+            f"seed_perturbations={self.urdfik_seed_perturbations} "
+            f"seed_perturbation_scale={self.urdfik_seed_perturbation_scale:.3f} "
+            f"max_joint_step_rad={self.urdfik_max_joint_step_rad} "
             f"apply_global_trans_to_ik={int(self.urdfik_apply_global_trans_to_ik)} "
             f"exec_waypoint_scene_steps={self.execute_waypoint_scene_steps} "
             f"exec_settle_scene_steps={self.execute_settle_scene_steps}"
@@ -252,6 +266,19 @@ class HandRetargetPiperDualURDFIKRenderer(PiperDualReplayRenderer):
         solver = self.left_ik_solver if arm == "left" else self.right_ik_solver
         candidates = [("seeded", current_seed)]
         if current_seed is not None:
+            rng = np.random.RandomState(42)
+            for perturb_idx in range(self.urdfik_seed_perturbations):
+                perturbation = rng.normal(
+                    0.0,
+                    self.urdfik_seed_perturbation_scale,
+                    size=np.asarray(current_seed).shape,
+                )
+                candidates.append(
+                    (
+                        f"perturbed_{perturb_idx + 1}",
+                        np.asarray(current_seed, dtype=np.float64) + perturbation,
+                    )
+                )
             candidates.append(("unseeded", None))
         best_result = None
         best_mode = None
@@ -265,13 +292,55 @@ class HandRetargetPiperDualURDFIKRenderer(PiperDualReplayRenderer):
                 continue
             target_arm = solution[-6:].astype(np.float64)
             pos_err, rot_err = self._solution_error_to_ee_target(arm, target_arm, ee_pos_base, ee_quat_base)
-            score = (pos_err, rot_err)
+            if current_seed is None:
+                joint_l2 = 0.0
+                joint_max = 0.0
+            else:
+                joint_delta = target_arm - np.asarray(current_seed, dtype=np.float64).reshape(6)
+                joint_l2 = float(np.linalg.norm(joint_delta))
+                joint_max = float(np.max(np.abs(joint_delta)))
+            continuity_violation = (
+                self.urdfik_max_joint_step_rad is not None
+                and joint_max > float(self.urdfik_max_joint_step_rad)
+            )
+            if self.urdfik_solution_selection == "joint_continuity":
+                score = (int(continuity_violation), joint_l2, joint_max, pos_err, rot_err)
+            else:
+                score = (int(continuity_violation), pos_err, rot_err, joint_l2, joint_max)
             if best_score is None or score < best_score:
                 best_result = result
                 best_mode = mode
                 best_score = score
-        if best_result is not None and best_mode == "unseeded":
-            print(f"[ik-candidate] arm={arm} chosen=unseeded pos_err={best_score[0]:.4f}m rot_err={best_score[1]:.2f}deg")
+        if best_result is None:
+            return None
+        best_solution = best_result.solution.detach().cpu().numpy().reshape(-1)[-6:].astype(np.float64)
+        best_pos_err, best_rot_err = self._solution_error_to_ee_target(
+            arm, best_solution, ee_pos_base, ee_quat_base
+        )
+        if current_seed is None:
+            best_joint_l2 = 0.0
+            best_joint_max = 0.0
+        else:
+            best_joint_delta = best_solution - np.asarray(current_seed, dtype=np.float64).reshape(6)
+            best_joint_l2 = float(np.linalg.norm(best_joint_delta))
+            best_joint_max = float(np.max(np.abs(best_joint_delta)))
+        if (
+            self.urdfik_max_joint_step_rad is not None
+            and best_joint_max > float(self.urdfik_max_joint_step_rad)
+        ):
+            print(
+                f"[ik-continuity-reject] arm={arm} mode={best_mode} "
+                f"joint_max={best_joint_max:.3f}rad joint_l2={best_joint_l2:.3f}rad "
+                f"limit={float(self.urdfik_max_joint_step_rad):.3f}rad "
+                f"pos_err={best_pos_err:.4f}m rot_err={best_rot_err:.2f}deg"
+            )
+            return None
+        if best_mode == "unseeded" or self.urdfik_solution_selection == "joint_continuity":
+            print(
+                f"[ik-candidate] arm={arm} chosen={best_mode} "
+                f"joint_max={best_joint_max:.3f}rad joint_l2={best_joint_l2:.3f}rad "
+                f"pos_err={best_pos_err:.4f}m rot_err={best_rot_err:.2f}deg"
+            )
         return best_result
 
     def _plan_path_joint_interp(self, arm, target_pose_world):
