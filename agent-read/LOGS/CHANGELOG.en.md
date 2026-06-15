@@ -2806,3 +2806,10 @@
 - Fixed the unused `--hold 1` option; a single episode now retains the final window until it is closed or interrupted.
 - `gen1` failures came from two reused non-empty debug tags, followed by a successful new-tag viewer run, then `unset DISPLAY` and an ineffective `set DISPLAY`. The correct recovery is `export DISPLAY=:1.0`.
 - Validation: `xdpyinfo` connected to `:1.0`; the V1/O.1.2 ID 0 viewer listed `left_camera/right_camera/head_camera` and finished with `physical_success=True`; `hold=1` retained the viewer and exited via `Ctrl-C` without a traceback.
+
+## 2026-06-16 (Live Piper IK SAPIEN Motion)
+
+- Root cause: custom move, endpoint-settle, and gripper-settle loops in `envs/pick_diverse_bottles_piper_ik.py` called only `_update_render()`. Wrist images updated live, but `viewer.render()` was omitted, so SAPIEN showed only the final hold state.
+- Added `_render_execution_step()` to always refresh observation cameras and draw SAPIEN according to `render_freq`; viewer runs now validate and report the number of live motion frames.
+- Mode 1 validation: a 1920x1080 `SAPIEN` window existed during execution, rendered 510 live frames, and finished with `physical_success=True`.
+- Mode 2 validation: `SAPIEN` and the 640x299 `RoboTwin wrist cameras` window coexisted during execution, rendered 510 live SAPIEN frames, and finished with `physical_success=True`.

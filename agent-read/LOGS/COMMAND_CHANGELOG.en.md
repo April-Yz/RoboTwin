@@ -2121,3 +2121,9 @@
 - Added `--show_camera_frustums 1`, recommended with `--render_freq 1 --show_axes 1 --wrist_preview 1 --hold 1`.
 - In tmux `gen1`, restore the GUI after `unset DISPLAY` with `export DISPLAY=:1.0`.
 - Use a timestamped debug tag such as `TAG="o121_v1_viewer_$(date +%Y%m%d_%H%M%S)"` to avoid overwrite rejection.
+
+## 2026-06-16 (Two Live Motion Commands)
+
+- Mode 1: `--render_freq 1 --show_camera_frustums 1 --wrist_preview 0` for live SAPIEN plus camera frustums only.
+- Mode 2: switch to `--wrist_preview 1` to show live SAPIEN and dual-wrist RGB concurrently.
+- When not recording, both modes omit `TAG`, `--wrist_debug_record`, and `--wrist_debug_tag`.

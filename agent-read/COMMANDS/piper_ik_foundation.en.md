@@ -154,3 +154,7 @@ python view_pick_diverse_bottles_piper_ik_motion.py \
 ```
 
 `--show_camera_frustums 1` enables SAPIEN camera frustums and verifies that `left_camera`, `right_camera`, and `head_camera` are present. `--wrist_preview 1` is the separate dual-wrist RGB window, while `--hold 1` keeps the final viewer open. After `unset DISPLAY`, restore the GUI with `export DISPLAY=:1.0`; `set DISPLAY` is ineffective. The timestamped tag avoids `FileExistsError` from an existing non-empty output directory.
+
+### Live Motion Modes
+
+The Piper IK executor now refreshes both observation cameras and `viewer.render()` during move, settle, and gripper steps. Mode 1 uses `--wrist_preview 0` for live SAPIEN robot motion plus camera frustums only. Mode 2 uses `--wrist_preview 1` to show SAPIEN and the dual-wrist RGB window concurrently. Neither mode needs a debug tag; complete commands are in the 2026-06-16 O.1.2.1 addition to `COMMAND_LIBRARY.zh.md`.

@@ -160,3 +160,7 @@ python view_pick_diverse_bottles_piper_ik_motion.py \
 ```
 
 `--show_camera_frustums 1` 启用 SAPIEN 相机视锥，并验证 `left_camera`、`right_camera`、`head_camera` 都存在。`--wrist_preview 1` 是独立的双腕 RGB 窗口；`--hold 1` 会保持最终 viewer。执行过 `unset DISPLAY` 后必须用 `export DISPLAY=:1.0` 恢复，`set DISPLAY` 无效。时间戳 tag 避免已有非空输出目录导致 `FileExistsError`。
+
+### 实时运动模式
+
+Piper IK 执行器现在在 move、settle、gripper 每个可视化步同时刷新 observation cameras 和 `viewer.render()`。模式 1 使用 `--wrist_preview 0`，只显示实时 SAPIEN 机器人运动和 camera frustums；模式 2 使用 `--wrist_preview 1`，同时显示 SAPIEN 与左右 wrist RGB。两种模式无需 debug tag，完整命令见 `COMMAND_LIBRARY.zh.md` O.1.2.1 的 2026-06-16 补充。

@@ -23,7 +23,7 @@
 ## 已知边界
 
 - V3 的 MotionGen 优化在当前场景可能失败，但回退路径已实测成功。
-- viewer 与采集轨迹逻辑一致；采集多一层 pickle schema 校验和观测保存。Motion viewer 可显式打开 SAPIEN camera linesets，动态显示左右 wrist 并显示静态 head 相机视锥；单 episode 的 `hold=1` 保持最终状态。
+- viewer 与采集轨迹逻辑一致；采集多一层 pickle schema 校验和观测保存。Piper IK 自定义执行循环必须在 `_update_render()` 后调用 `viewer.render()` 才能实时刷新主窗口；当前 move、settle、gripper 均遵循该顺序。Motion viewer 可同时显示动态 wrist/静态 head 相机视锥和双腕 RGB。
 - `save_all_episodes` 仅用于调试，不应用于正式成功数据筛选。
 
 ## O.1 Foundation OBJ 数据流

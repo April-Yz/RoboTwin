@@ -2804,3 +2804,10 @@
 - 修复 `--hold 1` 未被使用的问题；单 episode 现在保持最终窗口直到关窗或 `Ctrl-C`。
 - `gen1` 失败原因：两次复用了非空 debug tag；一次换新 tag 后 viewer 实际完整成功；随后 `unset DISPLAY` 且误用 `set DISPLAY`，导致 SAPIEN 无显示。正确恢复为 `export DISPLAY=:1.0`。
 - 验证：`:1.0` 通过 `xdpyinfo`；V1/O.1.2 ID 0 viewer 日志列出 `left_camera/right_camera/head_camera`，最终 `physical_success=True`；`hold=1` 进入持续保持并可由 `Ctrl-C` 无 traceback 退出。
+
+## 2026-06-16（Piper IK 实时 SAPIEN 运动）
+
+- 根因：`envs/pick_diverse_bottles_piper_ik.py` 的自定义 move、末端 settle 和 gripper settle 循环只调用 `_update_render()`，实时更新了 wrist 图像，却遗漏 `viewer.render()`；因此 SAPIEN 只在末尾 hold 时显示最终状态。
+- 新增统一 `_render_execution_step()`：始终刷新 observation cameras，并按 `render_freq` 实时绘制 SAPIEN；viewer 模式结束后校验并打印实时运动帧数。
+- 模式 1 验证：运动期间检测到 1920x1080 `SAPIEN` 窗口，实时绘制 510 帧，`physical_success=True`。
+- 模式 2 验证：运动期间同时检测到 `SAPIEN` 和 640x299 `RoboTwin wrist cameras`，实时绘制 510 帧，`physical_success=True`。

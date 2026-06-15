@@ -86,6 +86,16 @@ def run_one_episode(task_cls, build_args, seed_start, max_tries, show_axes, ik_v
             if step_mode:
                 task._step_mode = True
             task.play_once()
+            if build_args["render_freq"]:
+                live_render_count = getattr(task, "_piper_ik_live_render_count", 0)
+                if live_render_count <= 0:
+                    raise RuntimeError(
+                        "SAPIEN viewer did not render any frame during robot execution"
+                    )
+                print(
+                    "[motion-viewer] live SAPIEN motion frames="
+                    f"{live_render_count}"
+                )
             physical_success = bool(task.plan_success and task.check_success())
             if require_success and not physical_success:
                 print(f"[motion-viewer] seed={seed} completed but physical task failed")

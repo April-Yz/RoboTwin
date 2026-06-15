@@ -7032,7 +7032,7 @@ ffmpeg -y -i OLD.mp4 -an \
   -c:v libx264 -crf 23 -pix_fmt yuv420p -movflags +faststart NEW.mp4
 ```
 
-#### 3. 有 viewer：显示 wrist/head 相机框线并同步预览、录像
+#### 3. 有 viewer：显示 wrist/head 相机框线并同步预览（可选录像）
 
 `gen1` 当前可用图形显示为 `:1.0`。如果前面运行过 `unset DISPLAY`，必须使用 `export DISPLAY=:1.0` 恢复；`set DISPLAY` 不会设置或导出环境变量。先用 `xdpyinfo` 检查连接，再运行 viewer：
 
@@ -7041,7 +7041,6 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate R
 export DISPLAY=:1.0
 xdpyinfo >/dev/null || { echo "DISPLAY=:1.0 不可用"; exit 1; }
 
-TAG="o121_v1_viewer_$(date +%Y%m%d_%H%M%S)"
 python view_pick_diverse_bottles_piper_ik_motion.py \
   --task_name pick_diverse_bottles_piper_ik_foundation \
   --ik_version v1 --foundation_id 0 --foundation_mode o1.2 \
@@ -7051,14 +7050,14 @@ python view_pick_diverse_bottles_piper_ik_motion.py \
   --wrist_right_forward_offset_m 0.11 \
   --wrist_left_roll_deg -15 \
   --wrist_right_roll_deg -60 \
-  --wrist_debug_record 1 --wrist_debug_tag "$TAG" \
+  --wrist_debug_record 0 \
   --max_seed_tries 1 --require_success 1
 ```
 
 - `--show_camera_frustums 1`：在 SAPIEN 主 viewer 中打开橙色相机视锥框线。日志会校验并列出 `left_camera`、`right_camera`、`head_camera`；左右 wrist 框线随夹爪运动，head 框线固定。SAPIEN 的这个开关会同时显示场景内其他相机框线。
 - `--wrist_preview 1`：额外打开 OpenCV 左右 wrist RGB 拼接窗口。这与主 viewer 中的三维框线不是同一功能。
 - `--hold 1`：动作完成后保持最终 viewer，关闭 SAPIEN 窗口或在终端按 `Ctrl-C` 才退出。需要自动结束时改为 `--hold 0 --episode_delay 2`。
-- `TAG` 包含当前时间，避免覆盖已有 `data/wrist_camera_debug/<TAG>`。相同 tag 对应非空目录时程序会主动拒绝运行。
+- 默认 `--wrist_debug_record 0` 不录像。需要录像时改为 `--wrist_debug_record 1 --wrist_debug_tag "o121_v1_viewer_$(date +%Y%m%d_%H%M%S)"`；时间戳可避免覆盖已有非空目录。
 
 V2/V3/V4 只改 `--ik_version v2/v3/v4`；该 viewer 命令本身不使用批采集 GPU 位置参数。
 
@@ -7069,3 +7068,56 @@ V2/V3/V4 只改 `--ik_version v2/v3/v4`；该 viewer 命令本身不使用批采
 3. 后续执行 `unset DISPLAY` 后，又用 `set DISPLAY` 尝试恢复，这是无效命令；因此两次 O.1 viewer 都报 `Create window failed: Renderer does not support display`。恢复方法是上面的 `export DISPLAY=:1.0`。
 
 2026-06-15 实测上述框线功能：V1/O.1.2 ID 0 的 viewer 在 `DISPLAY=:1.0` 成功打开，日志确认左右 wrist 和 head 三个 camera frustum 均存在，最终 `physical_success=True`。
+
+### O.1.2.1 补充：真正实时的机器人运动 Viewer（2026-06-16）
+
+此前不是 SAPIEN 加载失败。Piper IK 自定义轨迹执行循环每一步只调用 `_update_render()`：这会更新 wrist camera 图像和 OpenCV 拼接窗口，但没有调用 `viewer.render()`。所以 wrist 画面实时变化，而 SAPIEN 主窗口只在动作结束后的 hold 阶段才绘制最终状态。现在 move、末端 settle 和 gripper settle 三类循环都已恢复实时 `viewer.render()`，并打印 `live SAPIEN motion frames=<N>`；若启用 viewer 却没有任何运动帧，命令会直接报错。
+
+#### 1. 只看实时机器人运动（推荐先用这条确认）
+
+该模式只有 SAPIEN 主窗口，不打开 wrist RGB 拼接窗口。主窗口实时显示机器人运动，并显示左右 wrist、head 以及场景其他相机的橙色视锥框线：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+export DISPLAY=:1.0
+xdpyinfo >/dev/null || { echo "DISPLAY=:1.0 不可用"; exit 1; }
+
+python view_pick_diverse_bottles_piper_ik_motion.py \
+  --task_name pick_diverse_bottles_piper_ik_foundation \
+  --ik_version v1 --foundation_id 0 --foundation_mode o1.2 \
+  --render_freq 1 --show_axes 1 --show_camera_frustums 1 \
+  --wrist_preview 0 --hold 1 \
+  --wrist_left_forward_offset_m 0.125 \
+  --wrist_right_forward_offset_m 0.11 \
+  --wrist_left_roll_deg -15 \
+  --wrist_right_roll_deg -60 \
+  --max_seed_tries 1 --require_success 1
+```
+
+#### 2. 同时看实时机器人运动和左右 wrist RGB
+
+这条只比模式 1 多打开 `--wrist_preview 1`。运动期间同时存在：
+
+- `SAPIEN`：实时机器人、物体、坐标轴和相机视锥。
+- `RoboTwin wrist cameras`：实时左右 wrist RGB 拼接。
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+export DISPLAY=:1.0
+xdpyinfo >/dev/null || { echo "DISPLAY=:1.0 不可用"; exit 1; }
+
+python view_pick_diverse_bottles_piper_ik_motion.py \
+  --task_name pick_diverse_bottles_piper_ik_foundation \
+  --ik_version v1 --foundation_id 0 --foundation_mode o1.2 \
+  --render_freq 1 --show_axes 1 --show_camera_frustums 1 \
+  --wrist_preview 1 --hold 1 \
+  --wrist_left_forward_offset_m 0.125 \
+  --wrist_right_forward_offset_m 0.11 \
+  --wrist_left_roll_deg -15 \
+  --wrist_right_roll_deg -60 \
+  --max_seed_tries 1 --require_success 1
+```
+
+这两条都不录像，因此不需要 `TAG`、`--wrist_debug_record` 或 `--wrist_debug_tag`。若需要动作结束后自动退出，把 `--hold 1` 改为 `--hold 0 --episode_delay 0`。
+
+验证结果：模式 1 在运动执行期间检测到 1920x1080 的 `SAPIEN` 窗口；模式 2 同时检测到 `SAPIEN` 和 640x299 的 `RoboTwin wrist cameras`。两种模式均实时绘制 510 个 SAPIEN 运动帧，V1/O.1.2 ID 0 均为 `physical_success=True`。

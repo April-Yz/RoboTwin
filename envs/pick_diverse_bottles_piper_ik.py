@@ -411,7 +411,7 @@ class pick_diverse_bottles_piper_ik(pick_diverse_bottles):
             self.scene.step()
             if self.save_data and step % self.save_freq == 0:
                 self._take_picture()
-            self._update_render()
+            self._render_execution_step(step)
 
         # Keep commanding the final IK endpoint so the PD controller converges
         # before the next contact-sensitive stage starts.
@@ -423,7 +423,7 @@ class pick_diverse_bottles_piper_ik(pick_diverse_bottles):
             self.scene.step()
             if self.save_data and step % self.save_freq == 0:
                 self._take_picture()
-            self._update_render()
+            self._render_execution_step(step)
 
         left_ee = self.robot.left_ee.child_link.get_pose()
         right_ee = self.robot.right_ee.child_link.get_pose()
@@ -442,8 +442,20 @@ class pick_diverse_bottles_piper_ik(pick_diverse_bottles):
             self.scene.step()
             if self.save_data and step % self.save_freq == 0:
                 self._take_picture()
-            self._update_render()
+            self._render_execution_step(step)
         print(f"[piper-ik] {action_name}: grippers settled for {self.gripper_settle_steps} steps")
+
+    def _render_execution_step(self, step):
+        """Refresh observation cameras and the interactive viewer during execution."""
+        self._update_render()
+        if self.render_freq and step % self.render_freq == 0:
+            viewer = getattr(self, "viewer", None)
+            if viewer is None:
+                raise RuntimeError("render_freq is enabled but the SAPIEN viewer is missing")
+            viewer.render()
+            self._piper_ik_live_render_count = getattr(
+                self, "_piper_ik_live_render_count", 0
+            ) + 1
 
     def _update_place_targets_from_closed_grasp(self, sequence):
         """Use the measured post-close bottle/EE offset to place bottle functional points."""

@@ -31,3 +31,4 @@
 - 坐标链缺失的是 `link6_T_real_tcp`；0515 提供的是 `real_tcp_T_camera`。当前 tuning 用于估计缺失机械外参，不等价于物理重标定。
 - Debug recorder 使用 VS Code 兼容的 H.264/yuv420p/faststart；正式 wrapper 支持四个 `WRIST_*` 环境变量进行无 viewer 参数覆盖。
 - Viewer 新增 `--show_camera_frustums 1`，显式显示并校验 `left_camera`、`right_camera`、`head_camera`；修复 `--hold 1` 过去未生效的问题。
+- 修复 Piper IK move/settle/gripper 循环只更新 wrist 图像但不调用 `viewer.render()` 的问题；实时 SAPIEN 与双腕预览可独立或同时运行。

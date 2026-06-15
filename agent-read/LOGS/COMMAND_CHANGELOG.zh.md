@@ -2119,3 +2119,9 @@
 - 新增 `--show_camera_frustums 1`；推荐与 `--render_freq 1 --show_axes 1 --wrist_preview 1 --hold 1` 配合。
 - tmux `gen1` 在执行过 `unset DISPLAY` 后使用 `export DISPLAY=:1.0` 恢复图形环境。
 - Debug tag 推荐使用 `TAG="o121_v1_viewer_$(date +%Y%m%d_%H%M%S)"`，避免覆盖拒绝。
+
+## 2026-06-16（实时运动双模式命令）
+
+- 模式 1：`--render_freq 1 --show_camera_frustums 1 --wrist_preview 0`，只看实时 SAPIEN 和相机框线。
+- 模式 2：将上面改为 `--wrist_preview 1`，同时显示实时 SAPIEN 和左右 wrist RGB。
+- 两种模式不录像时均省略 `TAG`、`--wrist_debug_record`、`--wrist_debug_tag`。
