@@ -19,3 +19,7 @@ Use `demo_piper_ik_seq_v1` by default. Use V2 for smoother interpolation, V3 for
 ## O.1 Foundation Variants
 
 `demo_piper_ik_foundation_v1..v4` retain the same IK-version semantics while replacing random RoboTwin bottle assets with positions and source OBJ meshes from Foundation NPZ files. O.1 uses an explicit frame, O.1.1 sets up from the first annotated keyframe, O.1.2 replaces lift/place with second-keyframe EE xyz, and O.1.2.1 adds per-side wrist forward/roll tuning without changing the original 0515 files. Start with V1. Defaults include a base-only `support_proxy` and no-teleport grasp-state gating. Pickles require an exact Foundation mode/source/keyframe/action/geometry context match. Batch collection isolates outputs with run tags, runs one episode per ID, bounds seed retries, and can index videos by Foundation ID as `episode<ID>`.
+
+### O.1.2.1 Wrist Debug Addition
+
+O.1.2.1 separates the confirmed parent-frame composition error from the still-unmeasured `link6_T_real_tcp`, and adds same-frame left/right/mosaic viewer recording with parameter JSON. It does not change V1-V4 IK semantics or formal collection trajectories.

@@ -24,3 +24,8 @@
 - 第二关键帧 action 使用第二帧位置和第一帧 grasp quaternion，dual replan 冻结已 reached 手。
 - `pick_diverse_bottles` ID 1、2 完整成功；ID 0 只在 action 超过 4cm 阈值。
 - 仍待统一 Piper IK target 与 EE report 坐标变换，并在统一后实现 local +Z 前进轴的严格 roll 约束。
+
+## O.1.2.1 Wrist Debug Recorder
+
+- Viewer 可用 `--wrist_debug_record 1 --wrist_debug_tag <TAG>` 保存左右原始视频、带标签拼接视频和上下文 JSON。
+- 坐标链缺失的是 `link6_T_real_tcp`；0515 提供的是 `real_tcp_T_camera`。当前 tuning 用于估计缺失机械外参，不等价于物理重标定。

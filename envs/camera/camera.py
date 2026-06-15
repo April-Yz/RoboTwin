@@ -81,8 +81,21 @@ class Camera:
             "wrist_camera_simulation_adapter"
         )
         self.wrist_camera_tuning = kwags["camera"].get("wrist_camera_tuning", {})
+        self.wrist_camera_debug_record_dir = kwags["camera"].get(
+            "wrist_camera_debug_record_dir"
+        )
+        self.wrist_camera_debug_fps = float(
+            kwags["camera"].get("wrist_camera_debug_fps", 30.0)
+        )
+        self.wrist_camera_debug_context = kwags["camera"].get(
+            "wrist_camera_debug_context", {}
+        )
+        if not np.isfinite(self.wrist_camera_debug_fps) or self.wrist_camera_debug_fps <= 0:
+            raise ValueError("wrist_camera_debug_fps must be a positive finite value")
         self._wrist_preview_window = "RoboTwin wrist cameras"
         self._wrist_preview_failed = False
+        self._wrist_debug_writers = {}
+        self._wrist_debug_frame_count = 0
         self.left_wrist_camera_local_pose = sapien.Pose()
         self.right_wrist_camera_local_pose = sapien.Pose()
         if self.collect_wrist_camera and self.wrist_camera_calibration_bundle:
@@ -412,16 +425,20 @@ class Camera:
             self.right_camera.entity.set_pose(right_pose * self.right_wrist_camera_local_pose)
 
     def preview_wrist_camera_images(self):
-        if not self.collect_wrist_camera or not self.wrist_camera_preview:
+        debug_recording = bool(self.wrist_camera_debug_record_dir)
+        if not self.collect_wrist_camera or not (self.wrist_camera_preview or debug_recording):
             return
         try:
             self.left_camera.take_picture()
             self.right_camera.take_picture()
 
-            def preview_image(camera, label):
+            def camera_image(camera):
                 rgba = camera.get_picture("Color")
                 rgb = (rgba[:, :, :3] * 255).clip(0, 255).astype(np.uint8)
-                bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+                return cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+
+            def labeled_image(bgr, label):
+                bgr = bgr.copy()
                 cv2.putText(
                     bgr,
                     label,
@@ -434,29 +451,92 @@ class Camera:
                 )
                 return bgr
 
+            left_bgr = camera_image(self.left_camera)
+            right_bgr = camera_image(self.right_camera)
             combined = np.concatenate(
                 [
-                    preview_image(self.left_camera, "left wrist"),
-                    preview_image(self.right_camera, "right wrist"),
+                    labeled_image(left_bgr, "left wrist"),
+                    labeled_image(right_bgr, "right wrist"),
                 ],
                 axis=1,
             )
-            cv2.imshow(self._wrist_preview_window, combined)
-            cv2.waitKey(1)
+            if debug_recording:
+                self._write_wrist_debug_frames(left_bgr, right_bgr, combined)
+            if self.wrist_camera_preview:
+                try:
+                    cv2.imshow(self._wrist_preview_window, combined)
+                    cv2.waitKey(1)
+                except cv2.error as exc:
+                    if not self._wrist_preview_failed:
+                        print(f"[camera] wrist preview disabled; recording continues: {exc}")
+                        self._wrist_preview_failed = True
+                    self.wrist_camera_preview = False
         except cv2.error as exc:
-            if not self._wrist_preview_failed:
-                print(f"[camera] wrist preview disabled: {exc}")
-                self._wrist_preview_failed = True
-            self.wrist_camera_preview = False
+            raise RuntimeError(f"Failed to read wrist camera images: {exc}") from exc
+
+    def _write_wrist_debug_frames(self, left_bgr, right_bgr, combined_bgr):
+        output_dir = os.path.abspath(os.path.expanduser(self.wrist_camera_debug_record_dir))
+        if not self._wrist_debug_writers:
+            os.makedirs(output_dir, exist_ok=True)
+            fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+            frame_specs = {
+                "left": left_bgr,
+                "right": right_bgr,
+                "mosaic": combined_bgr,
+            }
+            for name, frame in frame_specs.items():
+                height, width = frame.shape[:2]
+                path = os.path.join(output_dir, f"wrist_debug_{name}.mp4")
+                writer = cv2.VideoWriter(
+                    path, fourcc, self.wrist_camera_debug_fps, (width, height)
+                )
+                if not writer.isOpened():
+                    raise IOError(f"Cannot open wrist debug video writer: {path}")
+                self._wrist_debug_writers[name] = writer
+            metadata = {
+                "schema": "robotwin.wrist_camera_debug.v1",
+                "camera_type": self.wrist_camera_type,
+                "fps": self.wrist_camera_debug_fps,
+                "pose_reference": self.wrist_camera_pose_reference,
+                "simulation_adapter": self.wrist_camera_simulation_adapter,
+                "axis_mode": self.wrist_camera_axis_mode,
+                "tuning": self.wrist_camera_tuning,
+                "context": self.wrist_camera_debug_context,
+                "videos": {
+                    "left": "wrist_debug_left.mp4",
+                    "right": "wrist_debug_right.mp4",
+                    "mosaic": "wrist_debug_mosaic.mp4",
+                },
+            }
+            with open(
+                os.path.join(output_dir, "wrist_debug_config.json"),
+                "w",
+                encoding="utf-8",
+            ) as file:
+                json.dump(metadata, file, ensure_ascii=False, indent=2)
+                file.write("\n")
+            print(f"[camera] wrist debug recording started: {output_dir}")
+        self._wrist_debug_writers["left"].write(left_bgr)
+        self._wrist_debug_writers["right"].write(right_bgr)
+        self._wrist_debug_writers["mosaic"].write(combined_bgr)
+        self._wrist_debug_frame_count += 1
 
     def close_wrist_camera_preview(self):
-        if not self.wrist_camera_preview and not self._wrist_preview_failed:
-            return
-        try:
-            cv2.destroyWindow(self._wrist_preview_window)
-            cv2.waitKey(1)
-        except cv2.error:
-            pass
+        if self._wrist_debug_writers:
+            for writer in self._wrist_debug_writers.values():
+                writer.release()
+            print(
+                "[camera] wrist debug recording saved: "
+                f"{self.wrist_camera_debug_record_dir} "
+                f"frames={self._wrist_debug_frame_count}"
+            )
+            self._wrist_debug_writers.clear()
+        if self.wrist_camera_preview or self._wrist_preview_failed:
+            try:
+                cv2.destroyWindow(self._wrist_preview_window)
+                cv2.waitKey(1)
+            except cv2.error:
+                pass
 
     def get_config(self) -> dict:
         res = {}

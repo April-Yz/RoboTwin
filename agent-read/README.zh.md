@@ -10,7 +10,7 @@
 - 数据流程：Phase 1 找稳定且真实成功的 seed 并保存版本化轨迹；Phase 2 在相同 seed 场景中校验、回放并保存 HDF5/视频/instruction。
 - 相机：head、front、side、右侧 `third_camera`、对向俯视 `opposite_top_camera`、top-level `third_view`；Foundation 配置使用 0515 左右手眼标定、Pika 基础 adapter 和逐侧 wrist 前移/roll tuning 输出独立腕视频，并支持 viewer 实时双腕拼接。
 - Foundation 抓取默认使用底部 `support_proxy` 和 close 后几何状态门控；不会通过 `set_pose` 把倾倒物体瞬移回夹爪。
-- Foundation 批采集推荐使用独立 run tag、每 ID 一个 episode、最多三次 seed 和外层 timeout，避免复用旧 head-only HDF5 或无限重试。
+- Foundation 批采集推荐使用独立 run tag、每 ID 一个 episode、最多三次 seed 和外层 timeout，避免复用旧 head-only HDF5 或无限重试。Viewer 可用 wrist debug recorder 保存左右/拼接 MP4 和参数 JSON，比较不同相机 tuning。
 - `script/index_foundation_piper_ik_videos.py` 可把独立输出中的 Foundation ID N 安全映射为聚合目录的 `episodeN_*`；默认软链接并拒绝覆盖已有 episode。
 
 ## 环境与入口

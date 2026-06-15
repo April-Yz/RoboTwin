@@ -24,3 +24,8 @@
 - Keyframe-2 action uses keyframe-2 position with the keyframe-1 grasp quaternion, while dual replans freeze reached arms.
 - `pick_diverse_bottles` IDs 1 and 2 completed successfully; ID 0 only failed the 4 cm action tolerance.
 - Piper IK target and EE report transforms still need to be unified before adding a strict roll constraint about the local +Z approach axis.
+
+## O.1.2.1 Wrist Debug Recorder
+
+- The viewer accepts `--wrist_debug_record 1 --wrist_debug_tag <TAG>` and saves raw left/right videos, a labeled mosaic, and context JSON.
+- The missing frame-chain segment is `link6_T_real_tcp`; 0515 supplies `real_tcp_T_camera`. Current tuning estimates missing mechanical extrinsics and is not a physical recalibration.

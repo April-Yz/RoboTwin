@@ -19,3 +19,7 @@ Piper Cartesian IK 基础版。单次 IK 后使用线性关节插值。当前作
 ## O.1 Foundation 变体
 
 `demo_piper_ik_foundation_v1..v4` 保留相同 IK 版本语义，但把随机 RoboTwin bottle 替换为 Foundation NPZ 的位置和原始 OBJ。O.1 使用显式 frame；O.1.1 用第一标注关键帧建场；O.1.2 使用第二关键帧 EE xyz 替代 lift/place；O.1.2.1 增加不改原始 0515 文件的逐侧 wrist 前移/roll tuning。推荐从 V1 开始；默认使用底部 `support_proxy` 和无瞬移抓取状态门控。pickle 要求 Foundation mode/source/keyframes/action/几何上下文完全匹配。批采集使用 run tag 隔离输出、每 ID 一个 episode 和有限 seed 重试；视频可再按 Foundation ID 索引为 `episode<ID>`。
+
+### O.1.2.1 Wrist 调试补充
+
+O.1.2.1 将可确定的父帧拼接错误与尚未测量的 `link6_T_real_tcp` 分开，并提供 viewer 同帧左右/拼接视频录制和参数 JSON。该功能不改变 V1-V4 IK 语义或正式采集轨迹。

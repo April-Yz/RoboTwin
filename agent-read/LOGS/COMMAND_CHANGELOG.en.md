@@ -2103,3 +2103,9 @@
 - Viewer options added: `--wrist_left_forward_offset_m`, `--wrist_right_forward_offset_m`, `--wrist_left_roll_deg`, and `--wrist_right_roll_deg`.
 - Defaults in all four Foundation YAML files are left `0.125/-15` and right `0.11/-60`.
 - Full commands and the URDF/0515 analysis are in O.1.2.1 of `COMMAND_LIBRARY.zh.md` and `agent-read/COMMANDS/piper_ik_foundation.en.md`.
+
+## 2026-06-15 (Viewer Wrist Debug Video Command)
+
+- Added `--wrist_debug_record`, `--wrist_debug_tag`, `--wrist_debug_dir`, and `--wrist_debug_fps`.
+- Append `--wrist_debug_record 1 --wrist_debug_tag <parameter-name>` to a tuning viewer command.
+- Outputs are `wrist_debug_left.mp4`, `wrist_debug_right.mp4`, `wrist_debug_mosaic.mp4`, and `wrist_debug_config.json`.

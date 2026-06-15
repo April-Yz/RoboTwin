@@ -6921,3 +6921,49 @@ python view_pick_diverse_bottles_piper_ik_motion.py \
 - 左右 wrist 都是 38 帧、320x240；抽帧确认 Pika 外壳退出画面，右侧瓶身从约 60 度斜置恢复接近竖直。
 - `DISPLAY=:1.0` 的 V4 viewer 使用最终默认 tuning 和 `--wrist_preview 1` 完整运行，`physical_success=True`。
 - 该修正只改变观测相机 pose，不改变 pregrasp、grasp、close、action 轨迹或成功判定。
+
+### O.1.2.1 补充：结论边界、参数方向与 viewer 录制
+
+这里不是“只能微调、无法得出结论”。目前结论分为两类：
+
+- **已确定的根因**：矩阵拼接公式没有问题，但旧代码把不等价的父坐标系当成了同一个 frame。完整链条应为 `world_T_link6 @ link6_T_real_tcp @ real_tcp_T_camera @ optical_T_render`。0515 提供 `real_tcp_T_camera`；当前 URDF 没有真实 TCP、相机支架和镜头 optical-center link，因此 `link6_T_real_tcp` 不能省略。
+- **尚未由 CAD/测量确定的量**：`link6_T_real_tcp` 的精确 6D 外参。当前逐侧 tuning 是对这段缺失外参的经验补偿，已验证能消除外壳遮挡和画面 roll，但不能称为新的物理手眼标定。
+- **得到物理结论的方法**：确认实机 `/urdf_end_pose_orient` 对应 link6、Pika base 还是 fingertip TCP；测量左右镜头 optical center 到该 frame 的 XYZ/RPY，或把真实支架和 camera link 加入 URDF。完成后 tuning 应回到零，或只保留可选的训练画面 roll normalization。
+
+| 参数 | 调什么 | 正值效果 | 负值效果 |
+|---|---|---|---|
+| `--wrist_left_forward_offset_m` | 左相机沿自身光轴的位置，单位米 | 沿正在看的方向前移，物体变大；越过外壳前缘后遮挡减少 | 后退，视野更宽，但更容易落回外壳 |
+| `--wrist_right_forward_offset_m` | 右相机沿自身光轴的位置 | 同上，仅右侧 | 同上，仅右侧 |
+| `--wrist_left_roll_deg` | 左画面绕光轴旋转 | 当前 render frame 中顺时针 | 当前 render frame 中逆时针 |
+| `--wrist_right_roll_deg` | 右画面绕光轴旋转 | 当前 render frame 中顺时针 | 当前 render frame 中逆时针 |
+| `--wrist_debug_record 1` | 同步保存 viewer wrist 帧 | 启用三路 MP4 和 JSON | `0` 不录制 |
+| `--wrist_debug_tag TAG` | 本次对比实验名 | 建独立目录；拒绝覆盖非空目录 | 不适用 |
+| `--wrist_debug_fps 30` | MP4 回放帧率 | 只改变回放速度 | 不允许小于等于零 |
+
+`forward_offset_m` 不是父坐标系 X/Y/Z，而是每台相机自己的 optical forward。因此左右姿态即使不同，正值都表示沿当前视线向前。roll 正负号是当前 SAPIEN render frame 的实测图像结果。
+
+录制命令：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+
+python view_pick_diverse_bottles_piper_ik_motion.py \
+  --task_name pick_diverse_bottles_piper_ik_foundation \
+  --ik_version v1 --foundation_id 0 --foundation_mode o1.2 \
+  --wrist_preview 1 --hold 0 \
+  --wrist_left_forward_offset_m 0.125 --wrist_right_forward_offset_m 0.11 \
+  --wrist_left_roll_deg -15 --wrist_right_roll_deg -60 \
+  --wrist_debug_record 1 \
+  --wrist_debug_tag left125_right110_roll_m15_m60
+```
+
+输出到 `data/wrist_camera_debug/<TAG>/`：
+
+- `wrist_debug_left.mp4`
+- `wrist_debug_right.mp4`
+- `wrist_debug_mosaic.mp4`
+- `wrist_debug_config.json`
+
+JSON 记录 camera type、reference、adapter、axis mode、左右 tuning、task/config、IK 版本、Foundation ID/mode 和 seed。录制不依赖桌面窗口，可以不加 `--wrist_preview 1`。当前每次命令只允许录一个 episode，避免多个 episode 覆盖同一 tag。
+
+验证：V1/O.1.2 ID 0 viewer `physical_success=True`；最终保留的无窗口左、右和拼接三路 MP4 都是 511 帧、30 FPS，分辨率分别为 320x240、320x240、640x240，JSON 与命令参数一致。

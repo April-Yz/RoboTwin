@@ -124,3 +124,9 @@ tmux 批处理复查显示会话已经回到 shell，并非仍在运行。旧任
 - `script/index_foundation_piper_ik_videos.py`
 - `code_painting/build_piper_calibration_bundle.py`
 - `task_config/demo_piper_ik_foundation_v1.yml` 至 `v4.yml`
+
+## O.1.2.1 坐标结论与 Viewer Debug 录制
+
+正确链条是 `world_T_link6 @ link6_T_real_tcp @ real_tcp_T_camera @ optical_T_render`。0515 只提供 `real_tcp_T_camera`，当前缺少实机 TCP/支架/镜头中心对应的 `link6_T_real_tcp`。因此矩阵可以拼接，问题是省略了未知机械外参；当前 tuning 是经验补偿，不是新的物理标定。
+
+forward offset 正值沿每台相机自身视线前移。当前 render frame 中 roll 正值顺时针、负值逆时针。加 `--wrist_debug_record 1 --wrist_debug_tag <TAG>` 会保存左右原始 MP4、带标签拼接 MP4 和参数 JSON 到 `data/wrist_camera_debug/<TAG>/`。

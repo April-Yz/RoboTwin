@@ -2784,3 +2784,10 @@
 - The viewer exposes four temporary override arguments for live tuning without editing YAML.
 - Validation: Python compilation and all four YAML parses passed. V4 ID 0 O.1.2 under tag `wrist_o121_verified_0615_smoke` completed both phases and produced 38-frame left/right wrist MP4s, HDF5, instructions, and six other videos. Sampled frames show no shell occlusion and an upright right view; the final viewer with `--wrist_preview 1` completed with `physical_success=True`.
 - Cleanup: removed three reproducible intermediate tuning smoke runs and retained only `wrist_o121_verified_0615_smoke` for result inspection. All data directories are ignored by `data/*`.
+
+## 2026-06-15 (O.1.2.1 Viewer Wrist Debug Recording)
+
+- Added a viewer wrist debug recorder that writes raw left/right and labeled mosaic MP4s from the same render frames, plus JSON camera, tuning, task, and Foundation context.
+- `--wrist_debug_tag` refuses to overwrite a non-empty directory. Recording is currently limited to one episode per command.
+- Clarified the frame conclusion: transform composition is valid; the missing segment is `link6_T_real_tcp`, not the calibrated 0515 `real_tcp_T_camera`. Tuning is an empirical estimate of missing mechanical extrinsics.
+- Validation: V1/O.1.2 ID 0 viewer reported `physical_success=True`. The retained headless result has 511 frames per MP4 at 30 FPS; left/right are 320x240, the mosaic is 640x240, and JSON includes task/config/ID/mode/seed. The earlier recording without context was removed.

@@ -9,6 +9,7 @@ Usage:
 """
 
 import os
+import re
 import sys
 import time
 from argparse import ArgumentParser
@@ -99,6 +100,15 @@ def main() -> None:
                         help="覆盖左 wrist 绕光轴的有符号校正角（度）")
     parser.add_argument("--wrist_right_roll_deg", type=float, default=None,
                         help="覆盖右 wrist 绕光轴的有符号校正角（度）")
+    parser.add_argument("--wrist_debug_record", type=int, default=0,
+                        help="1=保存左右 wrist 原始视频、带标签拼接视频和参数 JSON")
+    parser.add_argument("--wrist_debug_tag", type=str, default="",
+                        help="debug 输出标签，只允许字母、数字、下划线和短横线")
+    parser.add_argument("--wrist_debug_dir", type=str,
+                        default="data/wrist_camera_debug",
+                        help="wrist debug 视频输出根目录")
+    parser.add_argument("--wrist_debug_fps", type=float, default=30.0,
+                        help="debug MP4 回放帧率")
     parser.add_argument("--task_config", type=str, default="",
                         help="覆盖自动推断的 config 名称 (例如 demo_piper_ik_foundation_v1)")
     parser.add_argument("--foundation_id", type=int, default=-1,
@@ -154,6 +164,33 @@ def main() -> None:
     ):
         raise ValueError("--wrist_preview requires collect_wrist_camera: true")
 
+    if args_cli.wrist_debug_record:
+        if not build_args["camera"].get("collect_wrist_camera", False):
+            raise ValueError("--wrist_debug_record requires collect_wrist_camera: true")
+        if args_cli.num_episodes != 1:
+            raise ValueError("--wrist_debug_record currently requires --num_episodes 1")
+        debug_tag = args_cli.wrist_debug_tag or time.strftime("%Y%m%d_%H%M%S")
+        if not re.fullmatch(r"[A-Za-z0-9_-]+", debug_tag):
+            raise ValueError("--wrist_debug_tag only accepts letters, digits, _ and -")
+        debug_output_dir = os.path.abspath(
+            os.path.join(args_cli.wrist_debug_dir, debug_tag)
+        )
+        if os.path.exists(debug_output_dir) and os.listdir(debug_output_dir):
+            raise FileExistsError(
+                f"Wrist debug output already exists and is not empty: {debug_output_dir}"
+            )
+        build_args["camera"]["wrist_camera_debug_record_dir"] = debug_output_dir
+        build_args["camera"]["wrist_camera_debug_fps"] = args_cli.wrist_debug_fps
+        build_args["camera"]["wrist_camera_debug_context"] = {
+            "task_name": args_cli.task_name,
+            "task_config": task_config,
+            "ik_version": args_cli.ik_version,
+            "seed": args_cli.seed,
+            "foundation_id": args_cli.foundation_id,
+            "foundation_frame": args_cli.foundation_frame,
+            "foundation_mode": args_cli.foundation_mode,
+        }
+
     build_args["task_name"] = args_cli.task_name
     build_args["task_config"] = task_config
     build_args["render_freq"] = args_cli.render_freq
@@ -191,6 +228,12 @@ def main() -> None:
         print("[motion-viewer] wrist preview enabled: left/right RGB mosaic")
     if tuning:
         print(f"[motion-viewer] wrist tuning={tuning}")
+
+    if args_cli.wrist_debug_record:
+        print(
+            "[motion-viewer] wrist debug recording="
+            f"{build_args['camera']['wrist_camera_debug_record_dir']}"
+        )
 
     import importlib
     envs_module = importlib.import_module(f"envs.{args_cli.task_name}")

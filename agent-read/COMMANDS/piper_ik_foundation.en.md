@@ -118,3 +118,9 @@ The reviewed tmux panes had already returned to the shell; they were not still c
 - `script/index_foundation_piper_ik_videos.py`
 - `code_painting/build_piper_calibration_bundle.py`
 - `task_config/demo_piper_ik_foundation_v1.yml` through `v4.yml`
+
+## O.1.2.1 Frame Conclusion And Viewer Debug Recording
+
+The required chain is `world_T_link6 @ link6_T_real_tcp @ real_tcp_T_camera @ optical_T_render`. The 0515 calibration only supplies `real_tcp_T_camera`; the missing real TCP, bracket, and optical-center transform is `link6_T_real_tcp`. Transform composition is valid, but an unknown mechanical extrinsic was omitted. Current tuning is an empirical compensation, not a new physical calibration.
+
+Positive forward offset moves along each camera's own viewing axis. In the current render convention, positive roll appears clockwise and negative roll counterclockwise. Add `--wrist_debug_record 1 --wrist_debug_tag <TAG>` to save raw left/right MP4s, a labeled mosaic MP4, and parameter JSON under `data/wrist_camera_debug/<TAG>/`.

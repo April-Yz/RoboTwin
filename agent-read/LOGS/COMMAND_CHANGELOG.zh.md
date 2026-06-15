@@ -2101,3 +2101,9 @@
 - Viewer 新增 `--wrist_left_forward_offset_m`、`--wrist_right_forward_offset_m`、`--wrist_left_roll_deg`、`--wrist_right_roll_deg`。
 - 默认值写入四份 Foundation YAML：左 `0.125/-15`、右 `0.11/-60`。
 - 完整命令和 URDF/0515 分析见 `COMMAND_LIBRARY.zh.md` O.1.2.1 与 `agent-read/COMMANDS/piper_ik_foundation.zh.md`。
+
+## 2026-06-15（Viewer wrist debug 视频命令）
+
+- 新增 `--wrist_debug_record`、`--wrist_debug_tag`、`--wrist_debug_dir`、`--wrist_debug_fps`。
+- 推荐在 tuning viewer 命令后加 `--wrist_debug_record 1 --wrist_debug_tag <参数名>`。
+- 输出 `wrist_debug_left.mp4`、`wrist_debug_right.mp4`、`wrist_debug_mosaic.mp4`、`wrist_debug_config.json`。

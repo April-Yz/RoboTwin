@@ -2782,3 +2782,10 @@
 - Viewer 新增四个临时覆盖参数，可在实时双腕窗口中微调而不修改 YAML。
 - 验证：`py_compile`、四份 YAML 解析通过；V4 ID 0 O.1.2 tag `wrist_o121_verified_0615_smoke` 完成两阶段采集，生成 38 帧左右 wrist MP4、HDF5、instructions 和其余六路视频。抽帧确认外壳退出画面且右侧 roll 扶正；最终 viewer 含 `--wrist_preview 1` 完整运行并报告 `physical_success=True`。
 - 清理：删除三组可重复生成的中间 tuning smoke，只保留最终 `wrist_o121_verified_0615_smoke` 供结果检查；所有数据目录均由 `data/*` 忽略。
+
+## 2026-06-15（O.1.2.1 viewer wrist debug 录制）
+
+- Viewer 新增独立 wrist debug recorder，同一渲染帧同时写左、右和带标签拼接 MP4，并保存 camera/tuning/task/Foundation 上下文 JSON。
+- `--wrist_debug_tag` 拒绝覆盖已有非空目录；当前限制单次一个 episode，防止多 episode 共用 tag。
+- 明确坐标结论：矩阵可拼接，错误来自缺失的 `link6_T_real_tcp`，不是 0515 `real_tcp_T_camera` 本身；tuning 是缺失机械外参的经验补偿。
+- 验证：V1/O.1.2 ID 0 viewer `physical_success=True`；最终保留的无窗口三路 MP4 各 511 帧，左/右 320x240、拼接 640x240，30 FPS，JSON 含 task/config/ID/mode/seed 且参数一致；已清理较早的不含 context 录制。
