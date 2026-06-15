@@ -39,7 +39,7 @@ bash collect_data.sh pick_diverse_bottles_piper_ik_foundation demo_piper_ik_foun
 # Arguments: IK version, foundation_input ID, frame, GPU ID, mode, optional run tag
 bash collect_foundation_piper_ik.sh v1 0 0 0 o1
 bash collect_foundation_piper_ik.sh v1 0 0 0 o1.1
-bash collect_foundation_piper_ik.sh v1 0 0 0 o1.2 wrist0515_simfix
+bash collect_foundation_piper_ik.sh v1 0 0 0 o1.2 wrist_o121_verified_0615
 ```
 
 The wrapper creates isolated config and output names by version, ID, frame/mode, and run tag, and forces one episode per ID. O.1.1/O.1.2 override the frame with the first annotation. Use a new run tag after enabling wrist cameras: an existing HDF5 is skipped, so an old head-only directory is not upgraded in place. Do not mutate the base YAML with `sed -i` and reuse one trajectory directory.
@@ -47,8 +47,9 @@ The wrapper creates isolated config and output names by version, ID, frame/mode,
 Recommended batch form:
 
 ```bash
-RUN_TAG=wrist0515_simfix
-FAIL_LOG=/tmp/o12_v1_${RUN_TAG}_failures.log
+RUN_TAG=wrist_o121_verified_0615
+mkdir -p data/tmp
+FAIL_LOG="$PWD/data/tmp/o12_v1_${RUN_TAG}_failures.log"
 : > "$FAIL_LOG"
 for id in $(seq 0 120); do
   timeout 600s bash collect_foundation_piper_ik.sh v1 "$id" 0 0 o1.2 "$RUN_TAG" \
@@ -74,8 +75,8 @@ For V2/V3/V4 use version/GPU pairs `v2/1`, `v3/2`, and `v4/3`. Inputs currently 
 
 - All four Foundation configs enable `collect_wrist_camera: true`.
 - The left and right cameras load their distinct `left_gripper_T_camera` and `right_gripper_T_camera` transforms from `calibration_bundle_piper_new_table_0515.json`.
-- Cameras follow simulation `link6` through `wrist_camera_pose_reference: urdf_end_link`. `wrist_camera_simulation_adapter: piper_pika_agx` accounts for the real TCP/camera-stand versus Pika CAD origin and shell clearance.
-- The simulation adapter does not rotate the calibrated optical axis or flip lateral signs. The right wrist's roughly 45-degree roll is persistent across historical calibrations and reflects the physical mount rather than a 0515 regression.
+- Cameras follow simulation `link6` through `wrist_camera_pose_reference: urdf_end_link`. `wrist_camera_simulation_adapter: piper_pika_agx` handles the base TCP/CAD translation, then per-side `wrist_camera_tuning` handles optical-axis displacement and training-view roll.
+- Current tuning is left `0.125 m/-15 deg`, right `0.11 m/-60 deg`. It does not rewrite the 0515 JSON or affect IK. The left/right displacement difference matches the approximately 1.43 cm difference between calibrated X translations.
 - `wrist_camera_axis_mode: legacy_r1` converts the calibrated OpenCV optical frame to the SAPIEN render frame.
 - Phase 2 automatically exports every observation RGB camera. The new files are `episode0_succ_left_camera.mp4` and `episode0_succ_right_camera.mp4`, and both cameras are also present in HDF5 observations.
 
@@ -85,8 +86,8 @@ Each per-ID Foundation directory internally contains `episode0_*`. Map source ID
 
 ```bash
 python script/index_foundation_piper_ik_videos.py \
-  --version v4 --mode o1.2 --run-tag wrist0515_simfix \
-  --output-video-dir data/pick_diverse_bottles_piper_ik/demo_piper_ik_foundation_v4_o1_2_wrist0515_simfix/video \
+  --version v4 --mode o1.2 --run-tag wrist_o121_verified_0615 \
+  --output-video-dir data/pick_diverse_bottles_piper_ik/demo_piper_ik_foundation_v4_o1_2_wrist_o121_verified_0615/video \
   --method symlink --dry-run
 ```
 
@@ -102,7 +103,9 @@ If pregrasp still collides, increase `foundation_pregrasp_distance` and inspect 
 
 ## Validated State
 
-On 2026-06-11 with `foundation_input_0`, V1 viewer and full two-phase collection succeeded for O.1, O.1.1, and O.1.2. Full O.1.2 collection also succeeded with V2/V3/V4. The annotated frames are 38 and 78. The final wrist-adapter V1 O.1.2 run produced validated replay, `episode0_succ.hdf5`, instructions, and eight videos. Both wrist videos have 38 frames at 320x240, and sampled frames show the corresponding bottle and gripper in both views.
+On 2026-06-15, O.1.2 V4 with `foundation_input_0` completed validated replay, `episode0_succ.hdf5`, instructions, and eight videos using the final tuning. Both wrist videos have 38 frames at 320x240; sampled frames confirm that the shell has left the image and the right view is upright. Old untagged tmux outputs were caused by an unset `RUN_TAG` and must not be mixed with this run.
+
+Viewer-only overrides are available as `--wrist_left_forward_offset_m`, `--wrist_right_forward_offset_m`, `--wrist_left_roll_deg`, and `--wrist_right_roll_deg`. The official Pika gripper URDF contains no camera link. Wrist rendering still uses the D435 preset; strict D405 matching requires measured intrinsics and a camera optical-center CAD transform.
 
 The reviewed tmux panes had already returned to the shell; they were not still collecting. Earlier jobs showed `Killed` and Ctrl-C. V1 had been configured for ten episodes per ID, while failed seed search had no bound. V4 ID 9 deterministically exceeded the right-grasp rotation gate at about 25.6 degrees versus a 15-degree limit across multiple seeds. Current configs use one episode per ID, three seed attempts, and the documented outer timeout.
 

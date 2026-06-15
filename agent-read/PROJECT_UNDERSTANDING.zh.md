@@ -34,7 +34,7 @@ O.1.1 从 `hand_keyframes_all.json` 取第一关键帧的 Foundation OBJ pose。
 
 Phase 2 只消费已验证关节路径，不创建 IK 或 MotionGen planner，避免 V3 回放占用 GPU 并拖慢多相机渲染。
 
-Foundation 的左右腕相机从 `calibration_bundle_piper_new_table_0515.json` 分别加载 gripper-to-camera 外参。历史标定显示右腕约 45 度 roll 是持续存在的实机安装差异。RoboTwin 的 Pika CAD 没有等价真实相机支架，因此相机每帧跟随 raw `link6`，先应用只含平移净空的 `piper_pika_agx` 仿真 adapter，再做 optical-to-render 轴转换；adapter 不旋转标定光轴、不翻转左右符号。所有 observation RGB camera 由现有 HDF5/video 合并流程自动导出。
+Foundation 的左右腕相机从 `calibration_bundle_piper_new_table_0515.json` 分别加载 gripper-to-camera 外参。官方 Pika gripper URDF 没有相机 link，官方 Piper+Pika 与当前 AGX 合并模型的 `link6 -> gripper` 轴表达也不同。相机每帧跟随 raw `link6`，应用基础 `piper_pika_agx` adapter、optical-to-render 转换，再应用逐侧 `forward_offset_m/image_roll_deg`；当前左为 `0.125/-15`，右为 `0.11/-60`。该最后一层只统一仿真训练视角，不改标定文件或 IK。所有 observation RGB camera 由现有 HDF5/video 合并流程自动导出。
 
 Foundation 数据按 ID 写入独立目录，每个目录内部从 `episode0` 开始。`script/index_foundation_piper_ik_videos.py` 负责在不改源数据的前提下把 ID N 映射为聚合目录中的 `episodeN`，并用 manifest 记录来源；已有目标 episode 默认视为冲突。
 

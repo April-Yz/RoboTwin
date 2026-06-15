@@ -6722,7 +6722,7 @@ bash collect_foundation_piper_ik.sh <v1|v2|v3|v4> <foundation_id> [foundation_fr
 | 3 | foundation_frame | NPZ 帧号（O.1 直接使用；O.1.1/O.1.2 由标注关键帧覆盖，可填 0） |
 | 4 | gpu_id | GPU 编号（0-3） |
 | 5 | `o1` / `o1.1` / `o1.2` | 模式：O.1=直接帧 / O.1.1=标注第一关键帧 / O.1.2=标注关键帧+人手 action |
-| 6 | run_tag | 可选输出标签，只允许字母、数字、`_`、`-`；当前修正后的 wrist 建议使用 `wrist0515_simfix` |
+| 6 | run_tag | 可选输出标签，只允许字母、数字、`_`、`-`；O.1.2.1 wrist 建议使用 `wrist_o121_verified_0615` |
 
 脚本自动生成独立 config 和输出目录，不会互相覆盖，并强制 `episode_num: 1`，避免 V1 基础配置误让每个 ID 连续采 10 个 episode。
 
@@ -6746,9 +6746,9 @@ data/pick_diverse_bottles_piper_ik_foundation/<config_name>/
   └── instructions/episode0.json
 ```
 
-**关于 wrist 相机**：四份 Foundation 配置现在使用 `collect_wrist_camera: true`。左右相机分别读取 `calibration_bundle_piper_new_table_0515.json` 中互不相同的 `left_gripper_T_camera` / `right_gripper_T_camera`，再通过 `wrist_camera_pose_reference: urdf_end_link` 跟随仿真 `link6`。`wrist_camera_simulation_adapter: piper_pika_agx` 只补真实 TCP/相机支架与 Pika CAD 原点的平移净空，不改 0515 手眼标定的光轴、左右符号或 roll；`legacy_r1` 再把 OpenCV optical frame 转成 SAPIEN render frame。
+**关于 wrist 相机**：四份 Foundation 配置现在使用 `collect_wrist_camera: true`。左右相机分别读取 `calibration_bundle_piper_new_table_0515.json` 中互不相同的 `left_gripper_T_camera` / `right_gripper_T_camera`，再通过 `wrist_camera_pose_reference: urdf_end_link` 跟随仿真 `link6`。`wrist_camera_simulation_adapter: piper_pika_agx` 处理基础 TCP/CAD 平移，`wrist_camera_tuning` 再做仿真专用的逐侧前移和画面 roll 校正；0515 原始标定 JSON 不被改写。当前值为左 `forward_offset_m=0.125, image_roll_deg=-15`，右 `0.11, -60`。`legacy_r1` 把 OpenCV optical frame 转成 SAPIEN render frame。
 
-0515 检查结论：左右历史标定的平移和姿态趋势一致，0515 本身没有突变。右腕标定长期存在约 45 度 roll，所以右路比左路斜是实机安装差异，不应强行拉平。旧实现的问题是把实机 TCP 外参直接接到不等价的 planner/raw link frame，导致左右翻转、看向侧墙或落进夹爪 CAD。当前仿真适配把相机抬到 Pika 外壳上方，保留夹爪占据画面下部的正常 wrist 视角，并让瓶子在接近、抓取和 action 阶段可见。Phase 2 会自动输出两路 MP4 并写入 HDF5 observations。
+0515 检查结论：没有证据表明 0515 求解突然失效；左右平移分别约 `-14.93 cm` / `-13.50 cm`，两侧 roll 差异也真实写在外参中。问题在于实机 TCP、官方 Piper/Pika 固定连接、AGX 转换后的 DAE 坐标和 RoboTwin `link6` 不是同一个父帧。训练数据还要求左右画面统一朝上，因此可以保留实机外参，同时在仿真末端增加明确、可覆盖的 image-roll tuning。当前 wrist 渲染仍使用 `D435` 的 `320x240, fovy=37°`；仓库没有 D405 内参项，D405/D435 差异会改变 FOV，但不会造成 60 度 roll 或相机落进外壳。Phase 2 会自动输出两路 MP4 并写入 HDF5 observations。
 
 旧的无 tag 目录若已有 `episode0_succ.hdf5` 会被断点逻辑跳过，不会自动补生成 wrist 视频。启用 wrist 后应使用新的 run tag 重新采集，并保留旧数据不动。
 
@@ -6756,43 +6756,38 @@ data/pick_diverse_bottles_piper_ik_foundation/<config_name>/
 
 #### O.1.2 全量批量采集（V1-V4 × 0-120）
 
+以下四段分别完整粘贴到四个 tmux pane；每段都自行设置 `RUN_TAG`，不要只复制 `FAIL_LOG/for` 部分：
+
 ```bash
+# V1 / GPU 0
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+RUN_TAG=wrist_o121_verified_0615; mkdir -p data/tmp
+FAIL_LOG="$PWD/data/tmp/o12_v1_${RUN_TAG}_failures.log"; : > "$FAIL_LOG"
+for id in $(seq 0 120); do timeout 600s bash collect_foundation_piper_ik.sh v1 "$id" 0 0 o1.2 "$RUN_TAG" || echo "FAIL v1 id=$id status=$?" | tee -a "$FAIL_LOG"; done
+```
 
-# 每次 wrist 配置变更时使用新的标签，避免复用旧 head-only HDF5
-RUN_TAG=wrist0515_simfix
+```bash
+# V2 / GPU 1
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+RUN_TAG=wrist_o121_verified_0615; mkdir -p data/tmp
+FAIL_LOG="$PWD/data/tmp/o12_v2_${RUN_TAG}_failures.log"; : > "$FAIL_LOG"
+for id in $(seq 0 120); do timeout 600s bash collect_foundation_piper_ik.sh v2 "$id" 0 1 o1.2 "$RUN_TAG" || echo "FAIL v2 id=$id status=$?" | tee -a "$FAIL_LOG"; done
+```
 
-# V1 (GPU=0)
-FAIL_LOG=/home/zaijia001/ssd/RoboTwin/data/tmp/o12_v1_${RUN_TAG}_failures.log
-: > "$FAIL_LOG"
-for id in $(seq 0 120); do
-  timeout 600s bash collect_foundation_piper_ik.sh v1 "$id" 0 0 o1.2 "$RUN_TAG" \
-    || echo "FAIL v1 id=$id status=$?" | tee -a "$FAIL_LOG"
-done
+```bash
+# V3 / GPU 2
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+RUN_TAG=wrist_o121_verified_0615; mkdir -p data/tmp
+FAIL_LOG="$PWD/data/tmp/o12_v3_${RUN_TAG}_failures.log"; : > "$FAIL_LOG"
+for id in $(seq 0 120); do timeout 600s bash collect_foundation_piper_ik.sh v3 "$id" 0 2 o1.2 "$RUN_TAG" || echo "FAIL v3 id=$id status=$?" | tee -a "$FAIL_LOG"; done
+```
 
-# V2 (GPU=1)
-FAIL_LOG=/home/zaijia001/ssd/RoboTwin/data/tmp/o12_v2_${RUN_TAG}_failures.log
-: > "$FAIL_LOG"
-for id in $(seq 0 120); do
-  timeout 600s bash collect_foundation_piper_ik.sh v2 "$id" 0 1 o1.2 "$RUN_TAG" \
-    || echo "FAIL v2 id=$id status=$?" | tee -a "$FAIL_LOG"
-done
-
-# V3 (GPU=2)
-FAIL_LOG=/home/zaijia001/ssd/RoboTwin/data/tmp/o12_v3_${RUN_TAG}_failures.log
-: > "$FAIL_LOG"
-for id in $(seq 0 120); do
-  timeout 600s bash collect_foundation_piper_ik.sh v3 "$id" 0 2 o1.2 "$RUN_TAG" \
-    || echo "FAIL v3 id=$id status=$?" | tee -a "$FAIL_LOG"
-done
-
-# V4 (GPU=3)
-FAIL_LOG=/home/zaijia001/ssd/RoboTwin/data/tmp/o12_v4_${RUN_TAG}_failures.log
-: > "$FAIL_LOG"
-for id in $(seq 0 120); do
-  timeout 600s bash collect_foundation_piper_ik.sh v4 "$id" 0 3 o1.2 "$RUN_TAG" \
-    || echo "FAIL v4 id=$id status=$?" | tee -a "$FAIL_LOG"
-done
+```bash
+# V4 / GPU 3
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+RUN_TAG=wrist_o121_verified_0615; mkdir -p data/tmp
+FAIL_LOG="$PWD/data/tmp/o12_v4_${RUN_TAG}_failures.log"; : > "$FAIL_LOG"
+for id in $(seq 0 120); do timeout 600s bash collect_foundation_piper_ik.sh v4 "$id" 0 3 o1.2 "$RUN_TAG" || echo "FAIL v4 id=$id status=$?" | tee -a "$FAIL_LOG"; done
 ```
 
 4 个版本分别在 tmux 窗口并行运行。当前实际 Foundation 输入是 ID 0-101；102-120 会因缺少 NPZ 快速返回非零并写入 failure log。每个 ID 最多尝试 `max_seed_tries: 3` 个 seed，确定性失败不会再无限循环；外层 `timeout 600s` 处理 GPU 拥塞或底层渲染无响应。每个成功 episode 会生成 Phase 1 轨迹、Phase 2 replay、8 路视频和 HDF5。
@@ -6803,9 +6798,9 @@ done
 
 ```bash
 python script/index_foundation_piper_ik_videos.py \
-  --version v4 --mode o1.2 --run-tag wrist0515_simfix \
+  --version v4 --mode o1.2 --run-tag wrist_o121_verified_0615 \
   --output-video-dir \
-  /home/zaijia001/ssd/RoboTwin/data/pick_diverse_bottles_piper_ik/demo_piper_ik_foundation_v4_o1_2_wrist0515_simfix/video \
+  /home/zaijia001/ssd/RoboTwin/data/pick_diverse_bottles_piper_ik/demo_piper_ik_foundation_v4_o1_2_wrist_o121_verified_0615/video \
   --method symlink --dry-run
 
 # dry-run 确认后，去掉 --dry-run 正式建立 episode<ID> 链接和 manifest
@@ -6851,7 +6846,7 @@ bash collect_data.sh pick_diverse_bottles_piper_ik_foundation demo_piper_ik_foun
 - V3 的 MotionGen 在该场景返回 optimization failure，按设计回退到同一 IK 终点的插值轨迹；这不是采集失败。
 - 稳定后的 OBJ 中心：左约 `(-0.038, 0.096, 0.864)`，右约 `(0.230, 0.114, 0.841)`。
 - 采集包含原 side 视角以及新增对向俯视桌面的 `opposite_top_camera`。
-- 使用 `urdf_end_link + piper_pika_agx` 仿真适配后，V1 O.1.2 wrist smoke 完整成功：左右腕视频均为 38 帧、320x240，抽帧可见各自夹爪和目标瓶；右腕保留实机标定的倾斜 roll。
+- 使用 `urdf_end_link + piper_pika_agx + wrist_camera_tuning` 后，V4/O.1.2 ID 0 完整两阶段采集成功：左右腕视频均为 38 帧、320x240；抽帧确认外壳不再遮挡，右腕画面按训练视角扶正。
 - prompt：`description/task_instruction/pick_diverse_bottles_piper_ik_foundation.json`。
 - 轨迹会拒绝旧格式、空路径以及 mode/ID/keyframes/action source/pregrasp/抓取门控/mesh/collision 不匹配的 pickle。
 - 默认 `support_proxy + require_contact=false` 是“防提前碰撞 + 几何夹持状态门控 + drive”，不是纯接触物理。如需严格接触试验，改为 `cylinder_proxy` 或 `exact_convex`，并设 `foundation_grasp_require_contact: true`；当前 input 0 预期会暴露 pregrasp/grasp 碰撞问题，而不是被瞬移掩盖。
@@ -6865,3 +6860,64 @@ bash collect_data.sh pick_diverse_bottles_piper_ik_foundation demo_piper_ik_foun
 - `script/index_foundation_piper_ik_videos.py`
 - `code_painting/build_piper_calibration_bundle.py`
 - `task_config/demo_piper_ik_foundation_v1.yml` 至 `v4.yml`
+
+## O.1.2.1 新增：Pika wrist 相机帧、外壳遮挡与逐侧微调（2026-06-15）
+
+### tmux 结论
+
+- `gen1-9`、`gen2-10`、`genikv2-11`、`genikv3-12`、`genikv4-13` 当前都已回到 shell，检查时没有任务卡住。
+- `gen2/genik*` 曾只粘贴 `FAIL_LOG=...${RUN_TAG}...` 和循环，没有先执行 `RUN_TAG=...`，因此出现 `o12_v4__failures.log`，随后写入无 tag 的 `demo_piper_ik_foundation_v4_o1_2_id<ID>`。
+- 无 tag 目录曾被 `planner_gripper`、`urdf_end_link` 和不同 adapter 配置重复使用，不能据此比较新旧 wrist。以后必须使用上面的自包含命令和新 tag。
+
+### 坐标与 URDF 结论
+
+1. 官方 `pika_gripper_description.urdf` 只有 `gripper_base_link`、左右夹指和两个 prismatic joint，不包含相机 link、相机支架或 D405/D435 模块。
+2. 官方 Piper+Pika URDF 的 `joint6_to_gripper_base` 带 `rpy="0 -1.57 0"`；AGX `pika2_gripper.urdf` 把类似轴变换烘焙到 DAE/关节布局，而当前合并 URDF 使用 identity `link6 -> gripper_base_link`。因此“模型外观看起来正确”不能证明 hand-eye 父帧正确。
+3. 上一次反向来自把 0515 optical 外参接到 `planner_gripper`：该帧相对 raw `link6` 带 `diag(1,-1,-1)`，即绕 X 轴 180 度，左右/上下轴随之翻转。当前使用 raw `urdf_end_link`，不再叠加该旋转。
+4. 相机靠后不是单纯的真实连接件嵌套。0515 外参本身给出左/右 TCP 到相机 X 平移约 `-0.149/-0.135 m`，而仿真缺少真实 TCP、相机支架和镜头中心 link；直接组合会把虚拟镜头留在 Pika 外壳内或后方。
+5. 左右 roll 差异不是 IK 朝向规划造成的。0515 外参已包含不同的绕光轴安装角；真实安装可以如此，但训练视频需要统一画面朝上，因此仿真允许最后一层 image-roll 校正。
+6. `agx_arm_sim` 有独立 RealSense D405 xacro，也有 D435 示例，但它们没有被原始 Pika gripper URDF 自动挂载。当前 RoboTwin wrist 使用 `D435` 渲染参数；要严格复现实机 D405，还缺实测内参、镜头 optical center 到 Pika/TCP 的 CAD 变换和左右安装照片/尺寸。
+
+官方参考：
+
+- https://github.com/agilexrobotics/pika_ros/tree/master/src/pika_gripper_description
+- https://github.com/agilexrobotics/agx_arm_urdf/tree/main/piper/urdf
+- https://github.com/agilexrobotics/agx_arm_sim/blob/master/agx_arm_description/urdf/pika_gripper_description.urdf
+- https://github.com/agilexrobotics/agx_arm_sim/blob/master/realsense2_description/urdf/_d405.urdf.xacro
+
+### 当前实现与 viewer
+
+基础配置保持 0515 JSON 不变，额外使用：
+
+```yaml
+wrist_camera_tuning:
+  left: {forward_offset_m: 0.125, image_roll_deg: -15.0}
+  right: {forward_offset_m: 0.11, image_roll_deg: -60.0}
+```
+
+`forward_offset_m` 沿每台 SAPIEN 相机自身 `+X` 光轴移动，避免左右外参不同却硬套父帧 XYZ；`image_roll_deg` 只绕光轴调整画面，不改变抓取器或 IK。左侧需要比右侧多前移约 1.5 cm，与两份 0515 X 平移之差一致。
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+
+# V1；V2-V4 只改 --ik_version
+python view_pick_diverse_bottles_piper_ik_motion.py \
+  --task_name pick_diverse_bottles_piper_ik_foundation \
+  --ik_version v1 --foundation_id 0 --foundation_mode o1.2 \
+  --wrist_preview 1 --hold 1
+
+# 临时试调，不修改 YAML。正数/负数以终端打印的 tuning 为准。
+python view_pick_diverse_bottles_piper_ik_motion.py \
+  --task_name pick_diverse_bottles_piper_ik_foundation \
+  --ik_version v1 --foundation_id 0 --foundation_mode o1.2 \
+  --wrist_preview 1 --hold 1 \
+  --wrist_left_forward_offset_m 0.125 --wrist_right_forward_offset_m 0.11 \
+  --wrist_left_roll_deg -15 --wrist_right_roll_deg -60
+```
+
+### 验证
+
+- V4 / ID 0 / O.1.2 使用 tag `wrist_o121_verified_0615_smoke` 完成 Phase 1、validated Phase 2、HDF5、instructions 和 8 路 MP4。
+- 左右 wrist 都是 38 帧、320x240；抽帧确认 Pika 外壳退出画面，右侧瓶身从约 60 度斜置恢复接近竖直。
+- `DISPLAY=:1.0` 的 V4 viewer 使用最终默认 tuning 和 `--wrist_preview 1` 完整运行，`physical_success=True`。
+- 该修正只改变观测相机 pose，不改变 pregrasp、grasp、close、action 轨迹或成功判定。

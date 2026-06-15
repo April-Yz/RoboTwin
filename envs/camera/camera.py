@@ -80,6 +80,7 @@ class Camera:
         self.wrist_camera_simulation_adapter = kwags["camera"].get(
             "wrist_camera_simulation_adapter"
         )
+        self.wrist_camera_tuning = kwags["camera"].get("wrist_camera_tuning", {})
         self._wrist_preview_window = "RoboTwin wrist cameras"
         self._wrist_preview_failed = False
         self.left_wrist_camera_local_pose = sapien.Pose()
@@ -144,7 +145,7 @@ class Camera:
             raise ValueError(f"Unsupported wrist_camera_axis_mode={self.wrist_camera_axis_mode!r}")
         cv_to_render = axis_rotations[self.wrist_camera_axis_mode]
 
-        def calibrated_pose(key):
+        def calibrated_pose(key, side):
             entry = wrist_data.get(key)
             if not isinstance(entry, dict):
                 raise KeyError(f"Wrist calibration bundle is missing {key}")
@@ -153,16 +154,42 @@ class Camera:
                 raise ValueError(f"Invalid wrist calibration matrix for {key}")
             matrix = adapter @ matrix
             render_rotation = matrix[:3, :3] @ cv_to_render.T
+            tuning = self.wrist_camera_tuning.get(side, {})
+            if not isinstance(tuning, dict):
+                raise ValueError(f"wrist_camera_tuning.{side} must be a mapping")
+            forward_offset = float(tuning.get("forward_offset_m", 0.0))
+            image_roll_deg = float(tuning.get("image_roll_deg", 0.0))
+            if not np.isfinite([forward_offset, image_roll_deg]).all():
+                raise ValueError(f"Invalid wrist camera tuning for {side}: {tuning!r}")
+
+            # SAPIEN cameras look along local +X. Move along that optical axis so the
+            # correction remains meaningful even when left/right calibration differs.
+            matrix[:3, 3] += render_rotation[:, 0] * forward_offset
+            roll_rad = np.deg2rad(image_roll_deg)
+            roll_about_forward = np.array(
+                [
+                    [1.0, 0.0, 0.0],
+                    [0.0, np.cos(roll_rad), -np.sin(roll_rad)],
+                    [0.0, np.sin(roll_rad), np.cos(roll_rad)],
+                ],
+                dtype=np.float64,
+            )
+            render_rotation = render_rotation @ roll_about_forward
             quat = t3d.quaternions.mat2quat(render_rotation)
             return sapien.Pose(matrix[:3, 3], quat)
 
-        self.left_wrist_camera_local_pose = calibrated_pose("left_gripper_T_camera")
-        self.right_wrist_camera_local_pose = calibrated_pose("right_gripper_T_camera")
+        self.left_wrist_camera_local_pose = calibrated_pose(
+            "left_gripper_T_camera", "left"
+        )
+        self.right_wrist_camera_local_pose = calibrated_pose(
+            "right_gripper_T_camera", "right"
+        )
         print(
             f"[camera] calibrated wrist cameras: bundle={bundle_path} "
             f"axis_mode={self.wrist_camera_axis_mode} "
             f"reference={self.wrist_camera_pose_reference} "
-            f"adapter={self.wrist_camera_simulation_adapter or 'identity'}"
+            f"adapter={self.wrist_camera_simulation_adapter or 'identity'} "
+            f"tuning={self.wrist_camera_tuning or 'identity'}"
         )
 
     def load_camera(self, scene):

@@ -10,7 +10,7 @@
 - O.1 不再在 close 前重置物体 pose。close 后状态门控检查物体是否仍稳定且位于双指夹持区域，通过后才在当前 pose 建立 drive。
 - 默认底部 `support_proxy` 避免细瓶身在 pregrasp/grasp 时被张开夹爪推倒。
 - O.1.1 使用第一标注关键帧建场；O.1.2 再用第二关键帧 EE xyz 的单一 action 代替 lift/place，朝向保留 grasp 设定。
-- O.1.2 使用 0515 左右独立 wrist 外参，并以 planner gripper pose 为父坐标；批采集每 ID 一个 episode、最多尝试三个 seed。
+- O.1.2 使用 0515 左右独立 wrist 外参，以 raw `urdf_end_link` 为父坐标，并在 optical/render 转换后应用逐侧仿真 tuning；批采集每 ID 一个 episode、最多尝试三个 seed。
 
 ## Mode N-7
 

@@ -50,6 +50,9 @@ camera:
   wrist_camera_axis_mode: "legacy_r1"
   wrist_camera_pose_reference: "urdf_end_link"
   wrist_camera_simulation_adapter: "piper_pika_agx"
+  wrist_camera_tuning:
+    left: {forward_offset_m: 0.125, image_roll_deg: -15.0}
+    right: {forward_offset_m: 0.11, image_roll_deg: -60.0}
 data_type:
   rgb: true
   third_view: true

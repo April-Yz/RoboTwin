@@ -2094,3 +2094,10 @@
 - 视频索引：新增 `python script/index_foundation_piper_ik_videos.py --version v4 --mode o1.2 --run-tag wrist0515_simfix --output-video-dir <DIR> --method symlink --dry-run`。
 - 覆盖规则：已有 `episode<ID>_*.mp4` 默认报冲突；只有显式 `--replace-episode` 才替换目标目录同 ID 视频。
 - 当前无 tag V4/O.1.2 旧数据索引时省略 `--run-tag`；dry-run 验证可索引 ID 0-8，目标 `demo_piper_ik_v4_3/video` 的 ID 0-4 存在冲突。
+
+## 2026-06-15（O.1.2.1 wrist tuning 与自包含批命令）
+
+- 新推荐 tag：`wrist_o121_verified_0615`。每个 tmux pane 的命令都独立设置 `RUN_TAG`、创建 `data/tmp` 并初始化 failure log，避免空变量写入无 tag 目录。
+- Viewer 新增 `--wrist_left_forward_offset_m`、`--wrist_right_forward_offset_m`、`--wrist_left_roll_deg`、`--wrist_right_roll_deg`。
+- 默认值写入四份 Foundation YAML：左 `0.125/-15`、右 `0.11/-60`。
+- 完整命令和 URDF/0515 分析见 `COMMAND_LIBRARY.zh.md` O.1.2.1 与 `agent-read/COMMANDS/piper_ik_foundation.zh.md`。

@@ -2096,3 +2096,10 @@
 - Video indexing: added `python script/index_foundation_piper_ik_videos.py --version v4 --mode o1.2 --run-tag wrist0515_simfix --output-video-dir <DIR> --method symlink --dry-run`.
 - Replacement rule: existing `episode<ID>_*.mp4` files are conflicts by default. Only explicit `--replace-episode` replaces that ID in the destination directory.
 - Omit `--run-tag` for the current untagged V4/O.1.2 legacy outputs. The dry run found indexable IDs 0-8 and destination conflicts for IDs 0-4 in `demo_piper_ik_v4_3/video`.
+
+## 2026-06-15 (O.1.2.1 Wrist Tuning And Self-Contained Batch Commands)
+
+- New recommended tag: `wrist_o121_verified_0615`. Each tmux-pane command independently sets `RUN_TAG`, creates `data/tmp`, and initializes its failure log so an empty variable cannot write to untagged outputs.
+- Viewer options added: `--wrist_left_forward_offset_m`, `--wrist_right_forward_offset_m`, `--wrist_left_roll_deg`, and `--wrist_right_roll_deg`.
+- Defaults in all four Foundation YAML files are left `0.125/-15` and right `0.11/-60`.
+- Full commands and the URDF/0515 analysis are in O.1.2.1 of `COMMAND_LIBRARY.zh.md` and `agent-read/COMMANDS/piper_ik_foundation.en.md`.

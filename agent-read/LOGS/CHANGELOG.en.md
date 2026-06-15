@@ -2775,3 +2775,12 @@
 - Added viewer option `--wrist_preview 1` for a live left/right wrist RGB mosaic.
 - Added `script/index_foundation_piper_ik_videos.py` to map each per-ID directory's `episode0_*` videos to aggregate `episode<ID>_*` names. It uses symlinks and rejects existing episodes by default; replacement requires explicit `--replace-episode`.
 - Validation: a full V1/O.1.2 two-phase run for `foundation_input_0` succeeded and produced 38-frame left/right wrist videos, HDF5, instructions, and a validated trajectory. Sampled frames show the corresponding bottle and gripper in both views. A `DISPLAY=:1.0` viewer run with `--wrist_preview 1` completed with `physical_success=True`.
+
+## 2026-06-15 (O.1.2.1 Wrist Shell And Roll Correction)
+
+- The `gen1/gen2/genikv2/genikv3/genikv4` tmux panes had all returned to their shells. Earlier batch snippets omitted `RUN_TAG`, produced `o12_v4__failures.log`, and mixed several camera configurations in untagged directories.
+- The official Pika gripper URDF has no camera. Official Piper+Pika uses `rpy="0 -1.57 0"` on `joint6_to_gripper_base`, while the current AGX-derived merge uses an identity connection, so visual alignment is not sufficient evidence of frame alignment.
+- `envs/camera/camera.py` now supports per-side `forward_offset_m` and `image_roll_deg`. Base YAML values are left `0.125 m/-15 deg` and right `0.11 m/-60 deg`, without changing the original 0515 JSON or IK.
+- The viewer exposes four temporary override arguments for live tuning without editing YAML.
+- Validation: Python compilation and all four YAML parses passed. V4 ID 0 O.1.2 under tag `wrist_o121_verified_0615_smoke` completed both phases and produced 38-frame left/right wrist MP4s, HDF5, instructions, and six other videos. Sampled frames show no shell occlusion and an upright right view; the final viewer with `--wrist_preview 1` completed with `physical_success=True`.
+- Cleanup: removed three reproducible intermediate tuning smoke runs and retained only `wrist_o121_verified_0615_smoke` for result inspection. All data directories are ignored by `data/*`.

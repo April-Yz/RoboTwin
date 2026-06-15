@@ -2773,3 +2773,12 @@
 - Viewer 新增 `--wrist_preview 1`，实时显示左右 wrist RGB 拼接窗口。
 - 新增 `script/index_foundation_piper_ik_videos.py`，把每个独立目录的 `episode0_*` 按 Foundation ID 映射为聚合目录 `episode<ID>_*`；默认软链接并拒绝覆盖，显式 `--replace-episode` 才替换目标 MP4。
 - 验证：V1/O.1.2 `foundation_input_0` 完整两阶段采集成功，生成 38 帧左右腕视频、HDF5、instruction 和 validated trajectory；抽帧确认两路均看到对应瓶子和夹爪。`DISPLAY=:1.0` viewer 连同 `--wrist_preview 1` 完整运行并通过 `physical_success=True`。
+
+## 2026-06-15（O.1.2.1 wrist 外壳与 roll 校正）
+
+- tmux `gen1/gen2/genikv2/genikv3/genikv4` 均已回到 shell。历史批处理漏设 `RUN_TAG`，产生 `o12_v4__failures.log` 并把多套相机配置混入无 tag 目录。
+- 官方 Pika gripper URDF 不含相机；官方 Piper+Pika 的 `joint6_to_gripper_base` 带 `rpy="0 -1.57 0"`，当前 AGX 合并 URDF 使用 identity 连接，说明外观对齐不能替代父帧对齐。
+- `envs/camera/camera.py` 新增逐侧 `forward_offset_m` 与 `image_roll_deg`。基础 YAML 采用左 `0.125 m/-15 deg`、右 `0.11 m/-60 deg`，保留 0515 原始 JSON 和 IK 不变。
+- Viewer 新增四个临时覆盖参数，可在实时双腕窗口中微调而不修改 YAML。
+- 验证：`py_compile`、四份 YAML 解析通过；V4 ID 0 O.1.2 tag `wrist_o121_verified_0615_smoke` 完成两阶段采集，生成 38 帧左右 wrist MP4、HDF5、instructions 和其余六路视频。抽帧确认外壳退出画面且右侧 roll 扶正；最终 viewer 含 `--wrist_preview 1` 完整运行并报告 `physical_success=True`。
+- 清理：删除三组可重复生成的中间 tuning smoke，只保留最终 `wrist_o121_verified_0615_smoke` 供结果检查；所有数据目录均由 `data/*` 忽略。
