@@ -183,7 +183,7 @@ bash /home/zaijia001/FoundationPose/run_piper_star_pear_foundation.sh
 > - `/home/zaijia001/ssd/RoboTwin/code_painting/run_piper_hamer_axes_replay_batch.sh`：D 批处理默认 `ROBOT_CONFIG/HEAD_POS/HEAD_QUAT`。
 > - `/home/zaijia001/ssd/RoboTwin/code_painting/run_piper_hamer_axes_with_objects_replay_batch.sh`：E 批处理默认 `ROBOT_CONFIG/HEAD_POS/HEAD_QUAT`。
 > - `/home/zaijia001/ssd/RoboTwin/code_painting/plot_piper_gripper_wrist_object_axis_distances.py`：debug 距离曲线默认 `robot_config/head_camera`。
-> - 如果后续启用真实 wrist camera 渲染，再把 `left_wrist_new_table_eye_in_hand.json` 和 `right_wrist_new_table_eye_in_hand.json` 的 `gripper_T_camera` 分别接到左右 wrist camera local pose 参数；当前 D/E 主 replay 主要使用 head camera，不依赖 wrist camera 标定。
+> - Foundation O.1/O.1.1/O.1.2 已启用真实 wrist 手眼外参：左右 `gripper_T_camera` 分别写入 calibration bundle，仿真侧再使用 `piper_pika_agx` 平移净空 adapter；D/E 主 replay 仍主要使用 head camera。
 
 # 从四个 handeye 标定文件生成一个自包含 Piper 标定 bundle；后续 replay 可以只指定 CALIBRATION_BUNDLE，避免散改 robot_config/head/wrist 参数
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda run -n RoboTwin_bw python /home/zaijia001/ssd/RoboTwin/code_painting/build_piper_calibration_bundle.py --head /home/zaijia001/ssd/data/piper/calibration/handeye/head_d435_new_table_0515_head_from_wrist.json --base /home/zaijia001/ssd/data/piper/calibration/handeye/left_base_T_right_base_new_table.json --left_wrist /home/zaijia001/ssd/data/piper/calibration/handeye/left_wrist_new_table_eye_in_hand.json --right_wrist /home/zaijia001/ssd/data/piper/calibration/handeye/right_wrist_new_table_eye_in_hand.json --template_robot_config /home/zaijia001/ssd/RoboTwin/robot_config_PiperPika_agx_dual_table.json --output /home/zaijia001/ssd/RoboTwin/calibration_bundle_piper_new_table_0515.json
@@ -6701,288 +6701,157 @@ python view_pick_diverse_bottles_piper_ik_motion.py \
   --task_name pick_diverse_bottles_piper_ik_foundation \
   --task_config demo_piper_ik_foundation_v1 \
   --ik_version v1 --foundation_id 0 --foundation_mode o1.2 \
-  --seed 0 --max_seed_tries 1 --require_success 1
+  --seed 0 --max_seed_tries 1 --require_success 1 --wrist_preview 1
 ```
 
-viewer 会创建 SAPIEN 窗口，需要可用的 X11/Vulkan display；`unset DISPLAY` 适用于下面的离屏采集，不适用于这个 viewer。`--foundation_id` / `--foundation_frame` / `--foundation_mode` 只覆盖本次 viewer 的内存配置，不修改 YAML。
+viewer 会创建 SAPIEN 窗口；`--wrist_preview 1` 另外创建一个 OpenCV 左右腕 RGB 拼接窗口。两者都需要可用的 X11/Vulkan display；远程桌面通常显式加 `DISPLAY=:1.0`。`unset DISPLAY` 只适用于下面的离屏采集。`--foundation_id` / `--foundation_frame` / `--foundation_mode` 只覆盖本次 viewer 的内存配置，不修改 YAML。
 
 ### V1-V4 数据采集
 
-`collect_foundation_piper_ik.sh` 是推荐的批量入口，参数顺序为：
+推荐使用 `collect_foundation_piper_ik.sh` 批量入口：
 
 ```text
-bash collect_foundation_piper_ik.sh <v1|v2|v3|v4> <foundation_id> [foundation_frame] [gpu_id] [o1|o1.1|o1.2]
+bash collect_foundation_piper_ik.sh <v1|v2|v3|v4> <foundation_id> [foundation_frame] [gpu_id] [o1|o1.1|o1.2] [run_tag]
 ```
 
-脚本自动：
-1. 从基础 config (`demo_piper_ik_foundation_v<N>.yml`) 复制一份临时 config
-2. 注入 `foundation_input_dir`、`foundation_frame`、`foundation_mode`
-3. 输出到独立目录，避免不同 ID/模式互相覆盖
+参数说明：
+| 位置 | 参数 | 说明 |
+|---|---|---|
+| 1 | `v1` / `v2` / `v3` / `v4` | IK 版本：V1 线性、V2 三次、V3 MotionGen、V4 多种子 |
+| 2 | foundation_id | `foundation_input_<ID>` 的 ID（0-101 可选，需 NPZ 和标注存在） |
+| 3 | foundation_frame | NPZ 帧号（O.1 直接使用；O.1.1/O.1.2 由标注关键帧覆盖，可填 0） |
+| 4 | gpu_id | GPU 编号（0-3） |
+| 5 | `o1` / `o1.1` / `o1.2` | 模式：O.1=直接帧 / O.1.1=标注第一关键帧 / O.1.2=标注关键帧+人手 action |
+| 6 | run_tag | 可选输出标签，只允许字母、数字、`_`、`-`；当前修正后的 wrist 建议使用 `wrist0515_simfix` |
 
-输出目录命名规则：
+脚本自动生成独立 config 和输出目录，不会互相覆盖，并强制 `episode_num: 1`，避免 V1 基础配置误让每个 ID 连续采 10 个 episode。
+
+**输出目录规则**：
 - O.1: `demo_piper_ik_foundation_v<N>_id<ID>_frame<FRAME>`
 - O.1.1 / O.1.2: `demo_piper_ik_foundation_v<N>_o1_<1|2>_id<ID>`
-
----
-
-#### O.1 数据采集（单一 Foundation ID，直接使用 foundation_frame）
-
-O.1 读取 `foundation_input_<ID>/multi_object_world_poses.npz` 第 `foundation_frame` 帧的物体位姿，不依赖人手标注。
-
-```bash
-# 单个 foundation ID，V1-V4
-bash collect_foundation_piper_ik.sh v1 0 0 0 o1    # V1, ID=0, frame=0, GPU=0
-bash collect_foundation_piper_ik.sh v2 0 0 1 o1    # V2, ID=0, frame=0, GPU=1
-bash collect_foundation_piper_ik.sh v3 0 0 0 o1    # V3, ID=0, frame=0, GPU=0
-bash collect_foundation_piper_ik.sh v4 0 0 0 o1    # V4, ID=0, frame=0, GPU=0
-
-# 不同 frame（如第 5 帧、第 10 帧）
-bash collect_foundation_piper_ik.sh v1 0 5 0 o1
-bash collect_foundation_piper_ik.sh v1 0 10 0 o1
-```
-
-批量 O.1（不同 foundation ID，固定 frame=0）：
-
-```bash
-# V1 批量：ID 0-9
-for id in 0 1 2 3 4 5 6 7 8 9; do
-  bash collect_foundation_piper_ik.sh v1 $id 0 0 o1
-done
-
-# V2 批量：ID 0-9
-for id in 0 1 2 3 4 5 6 7 8 9; do
-  bash collect_foundation_piper_ik.sh v2 $id 0 1 o1
-done
-```
-
----
-
-#### O.1.1 数据采集（人手标注关键帧驱动）
-
-O.1.1 读取 `hand_keyframes_all.json` 中每个 video ID 的标注关键帧，用**第一关键帧**对应的 Foundation 物体位姿建场。后续动作与 O.1 相同（pregrasp → grasp → close → lift → place → open）。
-
-注意：O.1.1 需要标注文件中存在对应 ID 的记录，且至少有两个全局关键帧。
-
-```bash
-# 单 ID，V1-V4
-bash collect_foundation_piper_ik.sh v1 0 0 0 o1.1    # V1, ID=0, GPU=0
-bash collect_foundation_piper_ik.sh v2 0 0 1 o1.1    # V2, ID=0, GPU=1
-bash collect_foundation_piper_ik.sh v3 0 0 0 o1.1    # V3, ID=0, GPU=0
-bash collect_foundation_piper_ik.sh v4 0 0 0 o1.1    # V4, ID=0, GPU=0
-
-# 不同 ID 示例
-bash collect_foundation_piper_ik.sh v1 1 0 0 o1.1    # ID=1
-bash collect_foundation_piper_ik.sh v1 2 0 0 o1.1    # ID=2
-bash collect_foundation_piper_ik.sh v2 5 0 1 o1.1    # ID=5, V2, GPU=1
-```
-
-O.1.1 批量（V1，ID 0-9）：
-
-```bash
-for id in 0 1 2 3 4 5 6 7 8 9; do
-  bash collect_foundation_piper_ik.sh v1 $id 0 0 o1.1
-done
-```
-
-O.1.1 全版本批量（6 个 ID × 4 版本 = 24 个 episode）：
-
-```bash
-for id in 0 1 2 3 4 5; do
-  bash collect_foundation_piper_ik.sh v1 $id 0 0 o1.1
-  bash collect_foundation_piper_ik.sh v2 $id 0 1 o1.1
-  bash collect_foundation_piper_ik.sh v3 $id 0 0 o1.1
-  bash collect_foundation_piper_ik.sh v4 $id 0 1 o1.1
-done
-
-for id in $(seq 0 120); do
-  bash collect_foundation_piper_ik.sh v1 $id 0 0 o1.2
-done
-
-for id in $(seq 0 120); do
-  bash collect_foundation_piper_ik.sh v2 $id 0 1 o1.2
-done
-
-for id in $(seq 0 120); do
-  bash collect_foundation_piper_ik.sh v3 $id 0 2 o1.2
-done
-
-for id in $(seq 0 120); do
-  bash collect_foundation_piper_ik.sh v4 $id 0 3 o1.2
-done
-```
-
----
-
-#### O.1.2 数据采集（人手标注关键帧建场 + 人手 EE 目标 action）
-
-O.1.2 是**完整两阶段人手引导**模式：
-
-1. **第一阶段**：与 O.1.1 相同，用第一关键帧建场，执行 pregrasp → grasp → close
-2. **第二阶段**：从 `id_<ID>/world_targets_and_status.npz` 读取人手**第二关键帧**的左右 EE xyz 位置，以单个 `action` 取代 lift + place，将瓶子移动到人手放置位置
-
-这是最接近「复现人手抓放」的模式。O.1.2 需要：
-- `hand_keyframes_all.json` 中有对应 ID 的两帧标注
-- `human_replay/pick_diverse_bottles/id<ID>_z005/world_targets_and_status.npz` 存在
-
-```bash
-# 单 ID，V1-V4
-bash collect_foundation_piper_ik.sh v1 0 0 0 o1.2    # V1, ID=0, GPU=0
-bash collect_foundation_piper_ik.sh v2 0 0 1 o1.2    # V2, ID=0, GPU=1
-bash collect_foundation_piper_ik.sh v3 0 0 0 o1.2    # V3, ID=0, GPU=0
-bash collect_foundation_piper_ik.sh v4 0 0 0 o1.2    # V4, ID=0, GPU=0
-
-# 不同 ID
-bash collect_foundation_piper_ik.sh v1 1 0 0 o1.2    # ID=1
-bash collect_foundation_piper_ik.sh v1 3 0 0 o1.2    # ID=3
-bash collect_foundation_piper_ik.sh v2 7 0 1 o1.2    # ID=7, V2, GPU=1
-```
-
-O.1.2 批量（V1，6 个 ID）：
-
-```bash
-for id in 0 1 2 3 4 5; do
-  bash collect_foundation_piper_ik.sh v1 $id 0 0 o1.2
-done
-```
-
-O.1.2 全版本批量（6 个 ID × 4 版本 = 24 个 episode）：
-
-```bash
-for id in 0 1 2 3 4 5; do
-  bash collect_foundation_piper_ik.sh v1 $id 0 0 o1.2
-  bash collect_foundation_piper_ik.sh v2 $id 0 1 o1.2
-  bash collect_foundation_piper_ik.sh v3 $id 0 0 o1.2
-  bash collect_foundation_piper_ik.sh v4 $id 0 1 o1.2
-done
-```
-
----
-
-#### O.1.2 大规模批量（所有有标注的 foundation ID）
-
-截至 2026-06-11，`foundation_replay_d435` 下有 102 个 foundation_input 目录 (ID 0-101)。以下命令扫描 `hand_keyframes_all.json` 中有标注的 ID 并批量采集：
-
-```bash
-# 第一步：列出 hand_keyframes_all.json 中有标注的有效 ID
-source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python -c "
-import json
-with open('code_painting/h2o_manual_review/pick_diverse_bottles/hand_keyframes_all.json') as f:
-    data = json.load(f)
-ids = sorted(int(k) for k in data.keys() if data[k].get('status') not in ('reject','discard','bad'))
-print('Valid IDs:', ids[:30], '... total', len(ids))
-"
-```
-
-```bash
-# 第二步：提取有效 ID 列表并批量运行 O.1.2（V1，GPU=0）
-source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
-
-VALID_IDS=$(python -c "
-import json
-with open('code_painting/h2o_manual_review/pick_diverse_bottles/hand_keyframes_all.json') as f:
-    data = json.load(f)
-ids = [k for k in data.keys() if data[k].get('status') not in ('reject','discard','bad')]
-print(' '.join(ids))
-")
-
-for id in $VALID_IDS; do
-  bash collect_foundation_piper_ik.sh v1 $id 0 0 o1.2
-done
-```
-
----
-
-#### 多 GPU 并行批量
-
-如果有 4 张 GPU，可将 ID 分片并行：
-
-```bash
-source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
-
-# 终端 1 (GPU=0): ID 0,4,8,12,...
-for id in 0 4 8 12 16 20; do
-  bash collect_foundation_piper_ik.sh v1 $id 0 0 o1.2
-done
-
-# 终端 2 (GPU=1): ID 1,5,9,13,...
-for id in 1 5 9 13 17 21; do
-  bash collect_foundation_piper_ik.sh v1 $id 0 1 o1.2
-done
-
-# 终端 3 (GPU=2): ID 2,6,10,14,...
-for id in 2 6 10 14 18 22; do
-  bash collect_foundation_piper_ik.sh v1 $id 0 2 o1.2
-done
-
-# 终端 4 (GPU=3): ID 3,7,11,15,...
-for id in 3 7 11 15 19 23; do
-  bash collect_foundation_piper_ik.sh v1 $id 0 3 o1.2
-done
-```
-
-或用 tmux 窗口并行：
-
-```bash
-source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
-
-tmux new-window -n o12-gpu0 "for id in 0 4 8 12 16 20; do bash collect_foundation_piper_ik.sh v1 \$id 0 0 o1.2; done; bash"
-tmux new-window -n o12-gpu1 "for id in 1 5 9 13 17 21; do bash collect_foundation_piper_ik.sh v1 \$id 0 1 o1.2; done; bash"
-tmux new-window -n o12-gpu2 "for id in 2 6 10 14 18 22; do bash collect_foundation_piper_ik.sh v1 \$id 0 2 o1.2; done; bash"
-tmux new-window -n o12-gpu3 "for id in 3 7 11 15 19 23; do bash collect_foundation_piper_ik.sh v1 \$id 0 3 o1.2; done; bash"
-```
-
----
-
-#### 输出目录与数据格式
-
-每个任务的独立输出示例：
+- 有 run tag：在上述名字末尾追加 `_<run_tag>`，例如 `demo_piper_ik_foundation_v1_o1_2_id0_wrist0515`
 
 ```text
-data/pick_diverse_bottles_piper_ik_foundation/demo_piper_ik_foundation_v1_o1_2_id0/
-  ├── data/
-  │   ├── episode0_succ.hdf5        # HDF5 观测数据
-  │   └── episode1_succ.hdf5
-  ├── video/
-  │   ├── episode0_succ_head_camera.mp4
-  │   ├── episode0_succ_front_camera.mp4
-  │   ├── episode0_succ_side_camera.mp4
-  │   ├── episode0_succ_third_camera.mp4
-  │   ├── episode0_succ_opposite_top_camera.mp4
-  │   └── episode0_succ_third_view.mp4
-  ├── _traj_data/
-  │   └── episode0.pkl              # Phase 2 回放轨迹
-  └── instructions/
-      └── episode0.json             # 语言指令
+data/pick_diverse_bottles_piper_ik_foundation/<config_name>/
+  ├── data/episode0_succ.hdf5
+  ├── video/episode0_succ_left_camera.mp4        # 左腕 D435（0515 标定）
+  ├── video/episode0_succ_right_camera.mp4       # 右腕 D435（0515 标定）
+  ├── video/episode0_succ_head_camera.mp4        # 头部 D435
+  ├── video/episode0_succ_front_camera.mp4        # 前向固定视角
+  ├── video/episode0_succ_side_camera.mp4         # 侧向固定视角
+  ├── video/episode0_succ_third_camera.mp4        # 第三视角
+  ├── video/episode0_succ_opposite_top_camera.mp4 # 对向俯视
+  ├── video/episode0_succ_third_view.mp4          # observer 视角
+  ├── _traj_data/episode0.pkl
+  └── instructions/episode0.json
 ```
 
-注意：
-- 文件名带 `_succ` 或 `_fail` 标记，对应 `check_success()` 结果
-- O.1 / O.1.1 / O.1.2 的轨迹 pickle 含有 schema/version/mode/ID 信息，Phase 2 回放会校验一致性
-- 不同 mode 的轨迹不可混用
+**关于 wrist 相机**：四份 Foundation 配置现在使用 `collect_wrist_camera: true`。左右相机分别读取 `calibration_bundle_piper_new_table_0515.json` 中互不相同的 `left_gripper_T_camera` / `right_gripper_T_camera`，再通过 `wrist_camera_pose_reference: urdf_end_link` 跟随仿真 `link6`。`wrist_camera_simulation_adapter: piper_pika_agx` 只补真实 TCP/相机支架与 Pika CAD 原点的平移净空，不改 0515 手眼标定的光轴、左右符号或 roll；`legacy_r1` 再把 OpenCV optical frame 转成 SAPIEN render frame。
+
+0515 检查结论：左右历史标定的平移和姿态趋势一致，0515 本身没有突变。右腕标定长期存在约 45 度 roll，所以右路比左路斜是实机安装差异，不应强行拉平。旧实现的问题是把实机 TCP 外参直接接到不等价的 planner/raw link frame，导致左右翻转、看向侧墙或落进夹爪 CAD。当前仿真适配把相机抬到 Pika 外壳上方，保留夹爪占据画面下部的正常 wrist 视角，并让瓶子在接近、抓取和 action 阶段可见。Phase 2 会自动输出两路 MP4 并写入 HDF5 observations。
+
+旧的无 tag 目录若已有 `episode0_succ.hdf5` 会被断点逻辑跳过，不会自动补生成 wrist 视频。启用 wrist 后应使用新的 run tag 重新采集，并保留旧数据不动。
 
 ---
 
-#### 旧版兼容命令（不推荐，仅供参考）
+#### O.1.2 全量批量采集（V1-V4 × 0-120）
 
-以下命令直接使用基础 config（只定点 foundation_input_0），不通过 `collect_foundation_piper_ik.sh`：
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+
+# 每次 wrist 配置变更时使用新的标签，避免复用旧 head-only HDF5
+RUN_TAG=wrist0515_simfix
+
+# V1 (GPU=0)
+FAIL_LOG=/home/zaijia001/ssd/RoboTwin/data/tmp/o12_v1_${RUN_TAG}_failures.log
+: > "$FAIL_LOG"
+for id in $(seq 0 120); do
+  timeout 600s bash collect_foundation_piper_ik.sh v1 "$id" 0 0 o1.2 "$RUN_TAG" \
+    || echo "FAIL v1 id=$id status=$?" | tee -a "$FAIL_LOG"
+done
+
+# V2 (GPU=1)
+FAIL_LOG=/home/zaijia001/ssd/RoboTwin/data/tmp/o12_v2_${RUN_TAG}_failures.log
+: > "$FAIL_LOG"
+for id in $(seq 0 120); do
+  timeout 600s bash collect_foundation_piper_ik.sh v2 "$id" 0 1 o1.2 "$RUN_TAG" \
+    || echo "FAIL v2 id=$id status=$?" | tee -a "$FAIL_LOG"
+done
+
+# V3 (GPU=2)
+FAIL_LOG=/home/zaijia001/ssd/RoboTwin/data/tmp/o12_v3_${RUN_TAG}_failures.log
+: > "$FAIL_LOG"
+for id in $(seq 0 120); do
+  timeout 600s bash collect_foundation_piper_ik.sh v3 "$id" 0 2 o1.2 "$RUN_TAG" \
+    || echo "FAIL v3 id=$id status=$?" | tee -a "$FAIL_LOG"
+done
+
+# V4 (GPU=3)
+FAIL_LOG=/home/zaijia001/ssd/RoboTwin/data/tmp/o12_v4_${RUN_TAG}_failures.log
+: > "$FAIL_LOG"
+for id in $(seq 0 120); do
+  timeout 600s bash collect_foundation_piper_ik.sh v4 "$id" 0 3 o1.2 "$RUN_TAG" \
+    || echo "FAIL v4 id=$id status=$?" | tee -a "$FAIL_LOG"
+done
+```
+
+4 个版本分别在 tmux 窗口并行运行。当前实际 Foundation 输入是 ID 0-101；102-120 会因缺少 NPZ 快速返回非零并写入 failure log。每个 ID 最多尝试 `max_seed_tries: 3` 个 seed，确定性失败不会再无限循环；外层 `timeout 600s` 处理 GPU 拥塞或底层渲染无响应。每个成功 episode 会生成 Phase 1 轨迹、Phase 2 replay、8 路视频和 HDF5。
+
+#### 按 Foundation ID 汇总为 episode ID
+
+每个 `foundation_input_<ID>` 使用独立输出目录，目录内部始终是 `episode0_*`。下面的索引脚本把源 ID 映射成目标 `episode<ID>_*`；默认创建相对软链接，不复制大视频，也不修改源数据：
+
+```bash
+python script/index_foundation_piper_ik_videos.py \
+  --version v4 --mode o1.2 --run-tag wrist0515_simfix \
+  --output-video-dir \
+  /home/zaijia001/ssd/RoboTwin/data/pick_diverse_bottles_piper_ik/demo_piper_ik_foundation_v4_o1_2_wrist0515_simfix/video \
+  --method symlink --dry-run
+
+# dry-run 确认后，去掉 --dry-run 正式建立 episode<ID> 链接和 manifest
+```
+
+如果要把当前已有的无 tag V4/O.1.2 子目录写入 `demo_piper_ik_v4_3/video`，省略 `--run-tag` 并先 dry-run。实测当前可索引 ID 0-8；ID 9 是失败目录，没有成功视频。目标目录已有 `episode0` 至 `episode4`，默认会报 conflict 并停止：
+
+```bash
+python script/index_foundation_piper_ik_videos.py \
+  --version v4 --mode o1.2 \
+  --output-video-dir \
+  /home/zaijia001/ssd/RoboTwin/data/pick_diverse_bottles_piper_ik/demo_piper_ik_v4_3/video \
+  --method symlink --dry-run
+```
+
+确认必须替换旧 episode 时，去掉 `--dry-run` 并加 `--replace-episode`。该参数会删除目标目录中同 ID 的旧 `episode<ID>_*.mp4`，但不会删除 Foundation 源目录。默认推荐写到新的聚合目录。
+
+2026-06-11 复查 tmux `gen2-10`、`genikv2-11`、`genikv3-12`、`genikv4-13`：pane 都已回到 shell，不是仍在采集。历史输出有 `Killed` 和 Ctrl-C；同时 V1 原配置为每 ID 10 episodes，失败 seed 又无限重试，因此视觉上很像卡住。V4 ID 9 在多个 seed 中右侧 grasp 旋转约 `25.6°`，稳定超过 `15°` 门限；这是同一关键帧/几何条件的确定性失败，单纯继续换 seed 无法解决。
+
+**进度监控** — 查看已完成的 succ/fail 数量：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+
+for ver in v1 v2 v3 v4; do
+  succ=$(find data/pick_diverse_bottles_piper_ik_foundation -name "episode*_succ.hdf5" -path "*${ver}_o1_2_id*" | wc -l)
+  fail=$(find data/pick_diverse_bottles_piper_ik_foundation -name "episode*_fail.hdf5" -path "*${ver}_o1_2_id*" | wc -l)
+  echo "${ver}: ${succ} succ, ${fail} fail"
+done
+```
+
+**旧版兼容**（不推荐 — 固定 ID=0，不通过脚本入口）：
 
 ```bash
 bash collect_data.sh pick_diverse_bottles_piper_ik_foundation demo_piper_ik_foundation_v1 0
-bash collect_data.sh pick_diverse_bottles_piper_ik_foundation demo_piper_ik_foundation_v2 1
-bash collect_data.sh pick_diverse_bottles_piper_ik_foundation demo_piper_ik_foundation_v3 0
-bash collect_data.sh pick_diverse_bottles_piper_ik_foundation demo_piper_ik_foundation_v4 0
 ```
-
-这些命令会复用同一个输出目录，不同 ID 之间会互相覆盖。**新采集工作请使用 `collect_foundation_piper_ik.sh` 入口。**
 
 ### input 0 实测结果（2026-06-11）
 
 - O.1、O.1.1、O.1.2 的 V1 viewer 均通过真实 `check_success()`。
-- O.1/O.1.1/O.1.2 的 V1 均完成 Phase 1 保存、Phase 2 validated replay、HDF5、六路 MP4 和 instruction 生成。
+- O.1/O.1.1/O.1.2 的 V1 均完成 Phase 1 保存、Phase 2 validated replay、HDF5、MP4 和 instruction 生成。
 - O.1.2 另外在 V2/V3/V4 完成了同样的完整采集链路；四版本的 action EE 误差约为 1.8-4.3cm，两个物体均移动超过 10cm。
 - V3 的 MotionGen 在该场景返回 optimization failure，按设计回退到同一 IK 终点的插值轨迹；这不是采集失败。
 - 稳定后的 OBJ 中心：左约 `(-0.038, 0.096, 0.864)`，右约 `(0.230, 0.114, 0.841)`。
 - 采集包含原 side 视角以及新增对向俯视桌面的 `opposite_top_camera`。
+- 使用 `urdf_end_link + piper_pika_agx` 仿真适配后，V1 O.1.2 wrist smoke 完整成功：左右腕视频均为 38 帧、320x240，抽帧可见各自夹爪和目标瓶；右腕保留实机标定的倾斜 roll。
 - prompt：`description/task_instruction/pick_diverse_bottles_piper_ik_foundation.json`。
 - 轨迹会拒绝旧格式、空路径以及 mode/ID/keyframes/action source/pregrasp/抓取门控/mesh/collision 不匹配的 pickle。
 - 默认 `support_proxy + require_contact=false` 是“防提前碰撞 + 几何夹持状态门控 + drive”，不是纯接触物理。如需严格接触试验，改为 `cylinder_proxy` 或 `exact_convex`，并设 `foundation_grasp_require_contact: true`；当前 input 0 预期会暴露 pregrasp/grasp 碰撞问题，而不是被瞬移掩盖。
@@ -6993,4 +6862,6 @@ bash collect_data.sh pick_diverse_bottles_piper_ik_foundation demo_piper_ik_foun
 - `envs/pick_diverse_bottles_piper_ik.py`
 - `view_pick_diverse_bottles_piper_ik_motion.py`
 - `collect_foundation_piper_ik.sh`
+- `script/index_foundation_piper_ik_videos.py`
+- `code_painting/build_piper_calibration_bundle.py`
 - `task_config/demo_piper_ik_foundation_v1.yml` 至 `v4.yml`
