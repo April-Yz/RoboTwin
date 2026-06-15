@@ -10,6 +10,7 @@ import torch
 import yaml
 import trimesh
 import math
+import subprocess
 from .._GLOBAL_CONFIGS import CONFIGS_PATH
 import os
 from sapien.sensor import StereoDepthSensor, StereoDepthSensorConfig
@@ -478,7 +479,6 @@ class Camera:
         output_dir = os.path.abspath(os.path.expanduser(self.wrist_camera_debug_record_dir))
         if not self._wrist_debug_writers:
             os.makedirs(output_dir, exist_ok=True)
-            fourcc = cv2.VideoWriter_fourcc(*"mp4v")
             frame_specs = {
                 "left": left_bgr,
                 "right": right_bgr,
@@ -487,16 +487,51 @@ class Camera:
             for name, frame in frame_specs.items():
                 height, width = frame.shape[:2]
                 path = os.path.join(output_dir, f"wrist_debug_{name}.mp4")
-                writer = cv2.VideoWriter(
-                    path, fourcc, self.wrist_camera_debug_fps, (width, height)
+                env = os.environ.copy()
+                ld_library_path = env.get("LD_LIBRARY_PATH", "")
+                if ld_library_path:
+                    env["LD_LIBRARY_PATH"] = ":".join(
+                        item
+                        for item in ld_library_path.split(":")
+                        if item and "/ssd/local_install/lib" not in item
+                    )
+                writer = subprocess.Popen(
+                    [
+                        "ffmpeg",
+                        "-y",
+                        "-loglevel",
+                        "error",
+                        "-f",
+                        "rawvideo",
+                        "-pixel_format",
+                        "bgr24",
+                        "-video_size",
+                        f"{width}x{height}",
+                        "-framerate",
+                        str(self.wrist_camera_debug_fps),
+                        "-i",
+                        "-",
+                        "-an",
+                        "-vcodec",
+                        "libx264",
+                        "-pix_fmt",
+                        "yuv420p",
+                        "-crf",
+                        "23",
+                        "-movflags",
+                        "+faststart",
+                        path,
+                    ],
+                    stdin=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    env=env,
                 )
-                if not writer.isOpened():
-                    raise IOError(f"Cannot open wrist debug video writer: {path}")
                 self._wrist_debug_writers[name] = writer
             metadata = {
                 "schema": "robotwin.wrist_camera_debug.v1",
                 "camera_type": self.wrist_camera_type,
                 "fps": self.wrist_camera_debug_fps,
+                "video_codec": "h264/libx264, yuv420p, faststart",
                 "pose_reference": self.wrist_camera_pose_reference,
                 "simulation_adapter": self.wrist_camera_simulation_adapter,
                 "axis_mode": self.wrist_camera_axis_mode,
@@ -516,21 +551,30 @@ class Camera:
                 json.dump(metadata, file, ensure_ascii=False, indent=2)
                 file.write("\n")
             print(f"[camera] wrist debug recording started: {output_dir}")
-        self._wrist_debug_writers["left"].write(left_bgr)
-        self._wrist_debug_writers["right"].write(right_bgr)
-        self._wrist_debug_writers["mosaic"].write(combined_bgr)
+        try:
+            self._wrist_debug_writers["left"].stdin.write(left_bgr.tobytes())
+            self._wrist_debug_writers["right"].stdin.write(right_bgr.tobytes())
+            self._wrist_debug_writers["mosaic"].stdin.write(combined_bgr.tobytes())
+        except BrokenPipeError as exc:
+            raise IOError("FFmpeg wrist debug writer stopped unexpectedly") from exc
         self._wrist_debug_frame_count += 1
 
     def close_wrist_camera_preview(self):
         if self._wrist_debug_writers:
-            for writer in self._wrist_debug_writers.values():
-                writer.release()
+            errors = []
+            for name, writer in self._wrist_debug_writers.items():
+                writer.stdin.close()
+                stderr = writer.stderr.read().decode("utf-8", errors="replace").strip()
+                if writer.wait() != 0:
+                    errors.append(f"{name}: {stderr or 'ffmpeg failed'}")
             print(
                 "[camera] wrist debug recording saved: "
                 f"{self.wrist_camera_debug_record_dir} "
                 f"frames={self._wrist_debug_frame_count}"
             )
             self._wrist_debug_writers.clear()
+            if errors:
+                raise IOError("Failed to finalize wrist debug video: " + "; ".join(errors))
         if self.wrist_camera_preview or self._wrist_preview_failed:
             try:
                 cv2.destroyWindow(self._wrist_preview_window)

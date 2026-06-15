@@ -29,3 +29,4 @@
 
 - Viewer 可用 `--wrist_debug_record 1 --wrist_debug_tag <TAG>` 保存左右原始视频、带标签拼接视频和上下文 JSON。
 - 坐标链缺失的是 `link6_T_real_tcp`；0515 提供的是 `real_tcp_T_camera`。当前 tuning 用于估计缺失机械外参，不等价于物理重标定。
+- Debug recorder 使用 VS Code 兼容的 H.264/yuv420p/faststart；正式 wrapper 支持四个 `WRIST_*` 环境变量进行无 viewer 参数覆盖。

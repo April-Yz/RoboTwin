@@ -124,3 +124,15 @@ The reviewed tmux panes had already returned to the shell; they were not still c
 The required chain is `world_T_link6 @ link6_T_real_tcp @ real_tcp_T_camera @ optical_T_render`. The 0515 calibration only supplies `real_tcp_T_camera`; the missing real TCP, bracket, and optical-center transform is `link6_T_real_tcp`. Transform composition is valid, but an unknown mechanical extrinsic was omitted. Current tuning is an empirical compensation, not a new physical calibration.
 
 Positive forward offset moves along each camera's own viewing axis. In the current render convention, positive roll appears clockwise and negative roll counterclockwise. Add `--wrist_debug_record 1 --wrist_debug_tag <TAG>` to save raw left/right MP4s, a labeled mosaic MP4, and parameter JSON under `data/wrist_camera_debug/<TAG>/`.
+
+Debug MP4s now use `H.264/avc1 + yuv420p + faststart` for direct VS Code playback. For headless debug recording, add `--render_freq 0 --show_axes 0 --wrist_preview 0`. To use the formal collection pipeline, set all four `WRIST_LEFT_FORWARD_OFFSET_M`, `WRIST_RIGHT_FORWARD_OFFSET_M`, `WRIST_LEFT_ROLL_DEG`, and `WRIST_RIGHT_ROLL_DEG` variables before `collect_foundation_piper_ik.sh`. The wrapper writes them into an isolated generated YAML, and Phase 2 produces the formal HDF5 and eight H.264 videos.
+
+```bash
+unset DISPLAY
+WRIST_LEFT_FORWARD_OFFSET_M=0.125 \
+WRIST_RIGHT_FORWARD_OFFSET_M=0.11 \
+WRIST_LEFT_ROLL_DEG=-15 \
+WRIST_RIGHT_ROLL_DEG=-60 \
+timeout 600s bash collect_foundation_piper_ik.sh \
+  v1 0 0 0 o1.2 wrist_left125_right110_roll_m15_m60
+```

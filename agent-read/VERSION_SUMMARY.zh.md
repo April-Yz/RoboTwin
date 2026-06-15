@@ -23,3 +23,4 @@ Piper Cartesian IK 基础版。单次 IK 后使用线性关节插值。当前作
 ### O.1.2.1 Wrist 调试补充
 
 O.1.2.1 将可确定的父帧拼接错误与尚未测量的 `link6_T_real_tcp` 分开，并提供 viewer 同帧左右/拼接视频录制和参数 JSON。该功能不改变 V1-V4 IK 语义或正式采集轨迹。
+Debug 视频现使用 H.264/faststart；正式采集 wrapper 可通过四个 `WRIST_*` 环境变量无 viewer 覆盖相机参数。

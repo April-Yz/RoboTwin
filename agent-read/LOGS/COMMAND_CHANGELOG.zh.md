@@ -2107,3 +2107,9 @@
 - 新增 `--wrist_debug_record`、`--wrist_debug_tag`、`--wrist_debug_dir`、`--wrist_debug_fps`。
 - 推荐在 tuning viewer 命令后加 `--wrist_debug_record 1 --wrist_debug_tag <参数名>`。
 - 输出 `wrist_debug_left.mp4`、`wrist_debug_right.mp4`、`wrist_debug_mosaic.mp4`、`wrist_debug_config.json`。
+
+## 2026-06-15（无 Viewer 正式 Wrist 参数命令）
+
+- 正式 wrapper 支持 `WRIST_LEFT_FORWARD_OFFSET_M`、`WRIST_RIGHT_FORWARD_OFFSET_M`、`WRIST_LEFT_ROLL_DEG`、`WRIST_RIGHT_ROLL_DEG`。
+- 四个变量必须同时设置；命令继续使用原参数顺序 `version id frame gpu mode run_tag`。
+- Debug recorder 输出改为 H.264/yuv420p/faststart，可直接在 VS Code 打开。

@@ -130,3 +130,15 @@ tmux 批处理复查显示会话已经回到 shell，并非仍在运行。旧任
 正确链条是 `world_T_link6 @ link6_T_real_tcp @ real_tcp_T_camera @ optical_T_render`。0515 只提供 `real_tcp_T_camera`，当前缺少实机 TCP/支架/镜头中心对应的 `link6_T_real_tcp`。因此矩阵可以拼接，问题是省略了未知机械外参；当前 tuning 是经验补偿，不是新的物理标定。
 
 forward offset 正值沿每台相机自身视线前移。当前 render frame 中 roll 正值顺时针、负值逆时针。加 `--wrist_debug_record 1 --wrist_debug_tag <TAG>` 会保存左右原始 MP4、带标签拼接 MP4 和参数 JSON 到 `data/wrist_camera_debug/<TAG>/`。
+
+Debug MP4 使用 `H.264/avc1 + yuv420p + faststart`，可直接在 VS Code 预览。无窗口快速录制加 `--render_freq 0 --show_axes 0 --wrist_preview 0`。若要走正式采集链路，在 `collect_foundation_piper_ik.sh` 前同时设置 `WRIST_LEFT_FORWARD_OFFSET_M`、`WRIST_RIGHT_FORWARD_OFFSET_M`、`WRIST_LEFT_ROLL_DEG`、`WRIST_RIGHT_ROLL_DEG`；wrapper 会把参数写入隔离的 generated YAML，Phase 2 继续生成正式 HDF5 和 8 路 H.264 视频。
+
+```bash
+unset DISPLAY
+WRIST_LEFT_FORWARD_OFFSET_M=0.125 \
+WRIST_RIGHT_FORWARD_OFFSET_M=0.11 \
+WRIST_LEFT_ROLL_DEG=-15 \
+WRIST_RIGHT_ROLL_DEG=-60 \
+timeout 600s bash collect_foundation_piper_ik.sh \
+  v1 0 0 0 o1.2 wrist_left125_right110_roll_m15_m60
+```

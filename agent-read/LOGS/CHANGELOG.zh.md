@@ -2789,3 +2789,11 @@
 - `--wrist_debug_tag` 拒绝覆盖已有非空目录；当前限制单次一个 episode，防止多 episode 共用 tag。
 - 明确坐标结论：矩阵可拼接，错误来自缺失的 `link6_T_real_tcp`，不是 0515 `real_tcp_T_camera` 本身；tuning 是缺失机械外参的经验补偿。
 - 验证：V1/O.1.2 ID 0 viewer `physical_success=True`；最终保留的无窗口三路 MP4 各 511 帧，左/右 320x240、拼接 640x240，30 FPS，JSON 含 task/config/ID/mode/seed 且参数一致；已清理较早的不含 context 录制。
+
+## 2026-06-15（Wrist Debug H.264 与无 viewer 正式参数覆盖）
+
+- 根因：旧 recorder 使用 `mp4v`，文件完整但 VS Code/Chromium codec 支持不稳定。改为 FFmpeg `libx264`、`yuv420p`、`faststart`，与正式采集视频的 H.264 逻辑一致。
+- 已将 `data/wrist_camera_debug` 现有 6 个旧 `mp4v` 文件原地转为 `h264/avc1/yuv420p`，文件名不变。
+- `collect_foundation_piper_ik.sh` 新增四个全量环境变量覆盖，写入 generated YAML；缺任一参数或数值非法时立即失败。
+- 验证：新 debug 三路各 511 帧 H.264，`moov` 位于文件前部；V1 ID 0 O.1.2 无 viewer 正式采集完整成功，左右 wrist 各 38 帧 H.264，generated YAML 为左 `0.125/-15`、右 `0.11/-60`。
+- 清理：删除重复的 `o121_h264_smoke_0615`，保留已转码的原 debug 目录和正式采集验证结果。

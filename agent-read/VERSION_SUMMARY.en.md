@@ -23,3 +23,4 @@ Use `demo_piper_ik_seq_v1` by default. Use V2 for smoother interpolation, V3 for
 ### O.1.2.1 Wrist Debug Addition
 
 O.1.2.1 separates the confirmed parent-frame composition error from the still-unmeasured `link6_T_real_tcp`, and adds same-frame left/right/mosaic viewer recording with parameter JSON. It does not change V1-V4 IK semantics or formal collection trajectories.
+Debug videos now use H.264/faststart. The formal collection wrapper accepts four `WRIST_*` environment variables for headless camera overrides.

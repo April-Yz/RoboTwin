@@ -2109,3 +2109,9 @@
 - Added `--wrist_debug_record`, `--wrist_debug_tag`, `--wrist_debug_dir`, and `--wrist_debug_fps`.
 - Append `--wrist_debug_record 1 --wrist_debug_tag <parameter-name>` to a tuning viewer command.
 - Outputs are `wrist_debug_left.mp4`, `wrist_debug_right.mp4`, `wrist_debug_mosaic.mp4`, and `wrist_debug_config.json`.
+
+## 2026-06-15 (Headless Formal Wrist Override Command)
+
+- The formal wrapper accepts `WRIST_LEFT_FORWARD_OFFSET_M`, `WRIST_RIGHT_FORWARD_OFFSET_M`, `WRIST_LEFT_ROLL_DEG`, and `WRIST_RIGHT_ROLL_DEG`.
+- All four variables are required together. Positional arguments remain `version id frame gpu mode run_tag`.
+- Debug recorder output now uses H.264/yuv420p/faststart for direct VS Code playback.

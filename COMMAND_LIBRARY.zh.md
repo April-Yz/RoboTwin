@@ -6967,3 +6967,67 @@ python view_pick_diverse_bottles_piper_ik_motion.py \
 JSON 记录 camera type、reference、adapter、axis mode、左右 tuning、task/config、IK 版本、Foundation ID/mode 和 seed。录制不依赖桌面窗口，可以不加 `--wrist_preview 1`。当前每次命令只允许录一个 episode，避免多个 episode 覆盖同一 tag。
 
 验证：V1/O.1.2 ID 0 viewer `physical_success=True`；最终保留的无窗口左、右和拼接三路 MP4 都是 511 帧、30 FPS，分辨率分别为 320x240、320x240、640x240，JSON 与命令参数一致。
+
+### O.1.2.1 补充：VS Code 兼容视频与无 viewer 正式采集
+
+旧 debug recorder 使用 OpenCV `mp4v`（MPEG-4 Part 2）。文件本身完整，但 VS Code/Chromium 经常不提供该 codec，所以会表现为“MP4 无法打开”。现在 recorder 已改为与正式数据兼容的 `H.264/avc1 + yuv420p`，并增加 `faststart`；`data/wrist_camera_debug` 下已有旧视频也已原地转码，文件名不变。
+
+#### 1. 无窗口、只录 wrist debug 视频
+
+这条命令不打开 SAPIEN viewer，不生成 HDF5，适合快速比较参数。必须为每组参数换一个 tag：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+unset DISPLAY
+
+python view_pick_diverse_bottles_piper_ik_motion.py \
+  --task_name pick_diverse_bottles_piper_ik_foundation \
+  --ik_version v1 --foundation_id 0 --foundation_mode o1.2 \
+  --render_freq 0 --show_axes 0 --hold 0 --wrist_preview 0 \
+  --wrist_left_forward_offset_m 0.125 \
+  --wrist_right_forward_offset_m 0.11 \
+  --wrist_left_roll_deg -15 \
+  --wrist_right_roll_deg -60 \
+  --wrist_debug_record 1 \
+  --wrist_debug_tag left125_right110_roll_m15_m60_headless
+```
+
+输出为 `data/wrist_camera_debug/<TAG>/` 下的左右、拼接 H.264 MP4 和 JSON。
+
+#### 2. 无 viewer、使用指定 wrist 参数跑原正式采集链路
+
+这条命令使用原来的 `collect_foundation_piper_ik.sh`，完整运行 Phase 1、validated Phase 2，并生成 HDF5、instruction 和 8 路 H.264 视频。四个环境变量必须全部提供；run tag 必须随参数变化，禁止复用旧目录：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+unset DISPLAY
+
+WRIST_LEFT_FORWARD_OFFSET_M=0.125 \
+WRIST_RIGHT_FORWARD_OFFSET_M=0.11 \
+WRIST_LEFT_ROLL_DEG=-15 \
+WRIST_RIGHT_ROLL_DEG=-60 \
+timeout 600s bash collect_foundation_piper_ik.sh \
+  v1 0 0 0 o1.2 wrist_left125_right110_roll_m15_m60
+```
+
+参数顺序仍是：`版本 Foundation_ID frame GPU mode run_tag`。V2/V3/V4 分别改为 `v2 ... GPU=1`、`v3 ... GPU=2`、`v4 ... GPU=3`。基础 YAML 的 `render_freq: 0` 和采集器的 Phase 2 都不会打开 viewer。
+
+正式输出示例：
+
+```text
+data/pick_diverse_bottles_piper_ik_foundation/
+  demo_piper_ik_foundation_v1_o1_2_id0_wrist_left125_right110_roll_m15_m60/
+    video/episode0_succ_left_camera.mp4
+    video/episode0_succ_right_camera.mp4
+    data/episode0_succ.hdf5
+    instructions/episode0.json
+```
+
+实测 `wrist_collect_override_h264_0615`：生成配置包含左 `0.125/-15`、右 `0.11/-60`；完整两阶段采集成功，左右 wrist 均为 38 帧 `H.264/avc1/yuv420p`。
+
+若需要手动修复其他历史 `mp4v` 文件：
+
+```bash
+ffmpeg -y -i OLD.mp4 -an \
+  -c:v libx264 -crf 23 -pix_fmt yuv420p -movflags +faststart NEW.mp4
+```

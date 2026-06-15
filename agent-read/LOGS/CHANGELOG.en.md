@@ -2791,3 +2791,11 @@
 - `--wrist_debug_tag` refuses to overwrite a non-empty directory. Recording is currently limited to one episode per command.
 - Clarified the frame conclusion: transform composition is valid; the missing segment is `link6_T_real_tcp`, not the calibrated 0515 `real_tcp_T_camera`. Tuning is an empirical estimate of missing mechanical extrinsics.
 - Validation: V1/O.1.2 ID 0 viewer reported `physical_success=True`. The retained headless result has 511 frames per MP4 at 30 FPS; left/right are 320x240, the mosaic is 640x240, and JSON includes task/config/ID/mode/seed. The earlier recording without context was removed.
+
+## 2026-06-15 (Wrist Debug H.264 And Headless Formal Overrides)
+
+- Root cause: the old recorder used `mp4v`. Files were complete, but VS Code/Chromium codec support is unreliable. Recording now uses FFmpeg `libx264`, `yuv420p`, and `faststart`, matching the formal H.264 output path.
+- Converted six existing `mp4v` files under `data/wrist_camera_debug` in place to `h264/avc1/yuv420p` without changing filenames.
+- `collect_foundation_piper_ik.sh` now accepts four all-or-none environment overrides and writes them into generated YAML. Missing or invalid values fail immediately.
+- Validation: the new three debug videos each contain 511 H.264 frames with front-loaded `moov`. A full headless V1 ID 0 O.1.2 formal collection succeeded; both wrist videos contain 38 H.264 frames and generated YAML contains left `0.125/-15`, right `0.11/-60`.
+- Cleanup: removed the duplicate `o121_h264_smoke_0615` output while retaining the converted original debug directories and the formal collection validation result.
