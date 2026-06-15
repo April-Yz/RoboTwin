@@ -2797,3 +2797,10 @@
 - `collect_foundation_piper_ik.sh` 新增四个全量环境变量覆盖，写入 generated YAML；缺任一参数或数值非法时立即失败。
 - 验证：新 debug 三路各 511 帧 H.264，`moov` 位于文件前部；V1 ID 0 O.1.2 无 viewer 正式采集完整成功，左右 wrist 各 38 帧 H.264，generated YAML 为左 `0.125/-15`、右 `0.11/-60`。
 - 清理：删除重复的 `o121_h264_smoke_0615`，保留已转码的原 debug 目录和正式采集验证结果。
+
+## 2026-06-15（Viewer wrist/head 相机框线）
+
+- `view_pick_diverse_bottles_piper_ik_motion.py` 新增 `--show_camera_frustums`，使用 SAPIEN `show_camera_linesets` 显示相机视锥，并在启用时校验左右 wrist 与 head camera 均已加载。
+- 修复 `--hold 1` 未被使用的问题；单 episode 现在保持最终窗口直到关窗或 `Ctrl-C`。
+- `gen1` 失败原因：两次复用了非空 debug tag；一次换新 tag 后 viewer 实际完整成功；随后 `unset DISPLAY` 且误用 `set DISPLAY`，导致 SAPIEN 无显示。正确恢复为 `export DISPLAY=:1.0`。
+- 验证：`:1.0` 通过 `xdpyinfo`；V1/O.1.2 ID 0 viewer 日志列出 `left_camera/right_camera/head_camera`，最终 `physical_success=True`；`hold=1` 进入持续保持并可由 `Ctrl-C` 无 traceback 退出。

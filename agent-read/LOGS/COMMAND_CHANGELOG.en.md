@@ -2115,3 +2115,9 @@
 - The formal wrapper accepts `WRIST_LEFT_FORWARD_OFFSET_M`, `WRIST_RIGHT_FORWARD_OFFSET_M`, `WRIST_LEFT_ROLL_DEG`, and `WRIST_RIGHT_ROLL_DEG`.
 - All four variables are required together. Positional arguments remain `version id frame gpu mode run_tag`.
 - Debug recorder output now uses H.264/yuv420p/faststart for direct VS Code playback.
+
+## 2026-06-15 (Viewer Command With Wrist/Head Frustums)
+
+- Added `--show_camera_frustums 1`, recommended with `--render_freq 1 --show_axes 1 --wrist_preview 1 --hold 1`.
+- In tmux `gen1`, restore the GUI after `unset DISPLAY` with `export DISPLAY=:1.0`.
+- Use a timestamped debug tag such as `TAG="o121_v1_viewer_$(date +%Y%m%d_%H%M%S)"` to avoid overwrite rejection.

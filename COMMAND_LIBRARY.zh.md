@@ -7031,3 +7031,41 @@ data/pick_diverse_bottles_piper_ik_foundation/
 ffmpeg -y -i OLD.mp4 -an \
   -c:v libx264 -crf 23 -pix_fmt yuv420p -movflags +faststart NEW.mp4
 ```
+
+#### 3. 有 viewer：显示 wrist/head 相机框线并同步预览、录像
+
+`gen1` 当前可用图形显示为 `:1.0`。如果前面运行过 `unset DISPLAY`，必须使用 `export DISPLAY=:1.0` 恢复；`set DISPLAY` 不会设置或导出环境变量。先用 `xdpyinfo` 检查连接，再运行 viewer：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+export DISPLAY=:1.0
+xdpyinfo >/dev/null || { echo "DISPLAY=:1.0 不可用"; exit 1; }
+
+TAG="o121_v1_viewer_$(date +%Y%m%d_%H%M%S)"
+python view_pick_diverse_bottles_piper_ik_motion.py \
+  --task_name pick_diverse_bottles_piper_ik_foundation \
+  --ik_version v1 --foundation_id 0 --foundation_mode o1.2 \
+  --render_freq 1 --show_axes 1 --show_camera_frustums 1 \
+  --wrist_preview 1 --hold 1 \
+  --wrist_left_forward_offset_m 0.125 \
+  --wrist_right_forward_offset_m 0.11 \
+  --wrist_left_roll_deg -15 \
+  --wrist_right_roll_deg -60 \
+  --wrist_debug_record 1 --wrist_debug_tag "$TAG" \
+  --max_seed_tries 1 --require_success 1
+```
+
+- `--show_camera_frustums 1`：在 SAPIEN 主 viewer 中打开橙色相机视锥框线。日志会校验并列出 `left_camera`、`right_camera`、`head_camera`；左右 wrist 框线随夹爪运动，head 框线固定。SAPIEN 的这个开关会同时显示场景内其他相机框线。
+- `--wrist_preview 1`：额外打开 OpenCV 左右 wrist RGB 拼接窗口。这与主 viewer 中的三维框线不是同一功能。
+- `--hold 1`：动作完成后保持最终 viewer，关闭 SAPIEN 窗口或在终端按 `Ctrl-C` 才退出。需要自动结束时改为 `--hold 0 --episode_delay 2`。
+- `TAG` 包含当前时间，避免覆盖已有 `data/wrist_camera_debug/<TAG>`。相同 tag 对应非空目录时程序会主动拒绝运行。
+
+V2/V3/V4 只改 `--ik_version v2/v3/v4`；该 viewer 命令本身不使用批采集 GPU 位置参数。
+
+`gen1` 历史结果并非全部失败：
+
+1. `left125_right110_roll_m15_m60_headless` 和 `left125_right110_roll_m15_m60` 两次在建场景前失败，原因是 debug tag 目录已存在且非空。
+2. 改为 `left125_right110_roll_m15_m60_2` 后 viewer 完整执行，`physical_success=True`，保存 560 帧 wrist debug 视频。
+3. 后续执行 `unset DISPLAY` 后，又用 `set DISPLAY` 尝试恢复，这是无效命令；因此两次 O.1 viewer 都报 `Create window failed: Renderer does not support display`。恢复方法是上面的 `export DISPLAY=:1.0`。
+
+2026-06-15 实测上述框线功能：V1/O.1.2 ID 0 的 viewer 在 `DISPLAY=:1.0` 成功打开，日志确认左右 wrist 和 head 三个 camera frustum 均存在，最终 `physical_success=True`。

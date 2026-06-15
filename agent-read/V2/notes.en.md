@@ -30,3 +30,4 @@
 - The viewer accepts `--wrist_debug_record 1 --wrist_debug_tag <TAG>` and saves raw left/right videos, a labeled mosaic, and context JSON.
 - The missing frame-chain segment is `link6_T_real_tcp`; 0515 supplies `real_tcp_T_camera`. Current tuning estimates missing mechanical extrinsics and is not a physical recalibration.
 - The debug recorder uses VS Code-compatible H.264/yuv420p/faststart. The formal wrapper accepts four `WRIST_*` environment variables for headless tuning overrides.
+- The viewer adds `--show_camera_frustums 1` to explicitly draw and verify `left_camera`, `right_camera`, and `head_camera`, and fixes the previously ineffective `--hold 1` behavior.

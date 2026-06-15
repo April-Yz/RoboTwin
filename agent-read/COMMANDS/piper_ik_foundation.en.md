@@ -136,3 +136,21 @@ WRIST_RIGHT_ROLL_DEG=-60 \
 timeout 600s bash collect_foundation_piper_ik.sh \
   v1 0 0 0 o1.2 wrist_left125_right110_roll_m15_m60
 ```
+
+## Viewer With Camera Frustums
+
+```bash
+export DISPLAY=:1.0
+TAG="o121_v1_viewer_$(date +%Y%m%d_%H%M%S)"
+python view_pick_diverse_bottles_piper_ik_motion.py \
+  --task_name pick_diverse_bottles_piper_ik_foundation \
+  --ik_version v1 --foundation_id 0 --foundation_mode o1.2 \
+  --render_freq 1 --show_axes 1 --show_camera_frustums 1 \
+  --wrist_preview 1 --hold 1 \
+  --wrist_left_forward_offset_m 0.125 --wrist_right_forward_offset_m 0.11 \
+  --wrist_left_roll_deg -15 --wrist_right_roll_deg -60 \
+  --wrist_debug_record 1 --wrist_debug_tag "$TAG" \
+  --max_seed_tries 1 --require_success 1
+```
+
+`--show_camera_frustums 1` enables SAPIEN camera frustums and verifies that `left_camera`, `right_camera`, and `head_camera` are present. `--wrist_preview 1` is the separate dual-wrist RGB window, while `--hold 1` keeps the final viewer open. After `unset DISPLAY`, restore the GUI with `export DISPLAY=:1.0`; `set DISPLAY` is ineffective. The timestamped tag avoids `FileExistsError` from an existing non-empty output directory.

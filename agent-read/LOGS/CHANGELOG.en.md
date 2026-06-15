@@ -2799,3 +2799,10 @@
 - `collect_foundation_piper_ik.sh` now accepts four all-or-none environment overrides and writes them into generated YAML. Missing or invalid values fail immediately.
 - Validation: the new three debug videos each contain 511 H.264 frames with front-loaded `moov`. A full headless V1 ID 0 O.1.2 formal collection succeeded; both wrist videos contain 38 H.264 frames and generated YAML contains left `0.125/-15`, right `0.11/-60`.
 - Cleanup: removed the duplicate `o121_h264_smoke_0615` output while retaining the converted original debug directories and the formal collection validation result.
+
+## 2026-06-15 (Viewer Wrist/Head Camera Frustums)
+
+- `view_pick_diverse_bottles_piper_ik_motion.py` adds `--show_camera_frustums`, using SAPIEN `show_camera_linesets` and verifying that both wrist cameras and the head camera are loaded.
+- Fixed the unused `--hold 1` option; a single episode now retains the final window until it is closed or interrupted.
+- `gen1` failures came from two reused non-empty debug tags, followed by a successful new-tag viewer run, then `unset DISPLAY` and an ineffective `set DISPLAY`. The correct recovery is `export DISPLAY=:1.0`.
+- Validation: `xdpyinfo` connected to `:1.0`; the V1/O.1.2 ID 0 viewer listed `left_camera/right_camera/head_camera` and finished with `physical_success=True`; `hold=1` retained the viewer and exited via `Ctrl-C` without a traceback.

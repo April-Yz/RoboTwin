@@ -2113,3 +2113,9 @@
 - 正式 wrapper 支持 `WRIST_LEFT_FORWARD_OFFSET_M`、`WRIST_RIGHT_FORWARD_OFFSET_M`、`WRIST_LEFT_ROLL_DEG`、`WRIST_RIGHT_ROLL_DEG`。
 - 四个变量必须同时设置；命令继续使用原参数顺序 `version id frame gpu mode run_tag`。
 - Debug recorder 输出改为 H.264/yuv420p/faststart，可直接在 VS Code 打开。
+
+## 2026-06-15（带 wrist/head 框线的 Viewer 命令）
+
+- 新增 `--show_camera_frustums 1`；推荐与 `--render_freq 1 --show_axes 1 --wrist_preview 1 --hold 1` 配合。
+- tmux `gen1` 在执行过 `unset DISPLAY` 后使用 `export DISPLAY=:1.0` 恢复图形环境。
+- Debug tag 推荐使用 `TAG="o121_v1_viewer_$(date +%Y%m%d_%H%M%S)"`，避免覆盖拒绝。

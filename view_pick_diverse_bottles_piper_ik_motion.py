@@ -23,8 +23,38 @@ from envs import CONFIGS_PATH
 from view_pick_diverse_bottles_piper_scene import add_scene_debug_axes
 
 
+def configure_camera_frustums(task, enabled):
+    """Toggle SAPIEN camera frustums and report the debug cameras being drawn."""
+    viewer = getattr(task, "viewer", None)
+    if viewer is None:
+        if enabled:
+            raise RuntimeError("--show_camera_frustums requires --render_freq > 0")
+        return
+
+    viewer.control_window.show_camera_linesets = bool(enabled)
+    if not enabled:
+        return
+
+    camera_names = []
+    for camera in viewer.cameras:
+        entity = getattr(camera, "entity", None)
+        camera_names.append(getattr(entity, "name", "<unnamed>"))
+    required = {"left_camera", "right_camera", "head_camera"}
+    missing = required.difference(camera_names)
+    if missing:
+        raise RuntimeError(
+            "Camera frustums are enabled but required cameras are missing: "
+            + ", ".join(sorted(missing))
+        )
+    print(
+        "[motion-viewer] camera frustums enabled: "
+        "left_camera, right_camera, head_camera "
+        f"(all viewer cameras={camera_names})"
+    )
+
+
 def run_one_episode(task_cls, build_args, seed_start, max_tries, show_axes, ik_version,
-                    step_mode=False, require_success=True):
+                    show_camera_frustums=False, step_mode=False, require_success=True):
     """Load stable scenes until one completes and, by default, physically succeeds."""
     task = None
     for seed in range(seed_start, seed_start + max_tries):
@@ -33,6 +63,7 @@ def run_one_episode(task_cls, build_args, seed_start, max_tries, show_axes, ik_v
             task.setup_demo(now_ep_num=0, seed=seed, **build_args)
             if show_axes:
                 add_scene_debug_axes(task)
+            configure_camera_frustums(task, show_camera_frustums)
             if build_args["render_freq"]:
                 print("[motion-viewer] waiting for viewer window to open...")
                 viewer_ready = False
@@ -85,6 +116,12 @@ def main() -> None:
                         help="episode 间保持 viewer 的秒数")
     parser.add_argument("--render_freq", type=int, default=1)
     parser.add_argument("--show_axes", type=int, default=1)
+    parser.add_argument(
+        "--show_camera_frustums",
+        type=int,
+        default=0,
+        help="1=在 SAPIEN viewer 中显示所有相机框线（含左右 wrist 和 head）",
+    )
     parser.add_argument("--hold", type=int, default=1)
     parser.add_argument("--step_mode", type=int, default=0,
                         help="逐步确认模式：每个动作后等待终端回车才继续（1=启用）")
@@ -247,7 +284,8 @@ def main() -> None:
 
         ok, used_seed, task = run_one_episode(
             task_cls, build_args, next_seed, args_cli.max_seed_tries,
-            args_cli.show_axes, args_cli.ik_version, args_cli.step_mode,
+            args_cli.show_axes, args_cli.ik_version,
+            bool(args_cli.show_camera_frustums), args_cli.step_mode,
             bool(args_cli.require_success),
         )
 
@@ -259,30 +297,39 @@ def main() -> None:
         next_seed = used_seed + 1
         print(f"[motion-viewer] Episode {ep+1}: seed={used_seed} FINISHED (total_ok={success_count})")
 
-        # 短暂保持 viewer 显示结果
+        # 单 episode 的 hold=1 会保留最终状态，直到用户关窗或 Ctrl-C。
+        hold_forever = bool(
+            args_cli.hold and args_cli.num_episodes == 1 and args_cli.render_freq
+        )
         hold_start = time.time()
-        while time.time() - hold_start < args_cli.episode_delay:
-            task._update_render()
-            viewer = getattr(task, "viewer", None)
-            if viewer is None or getattr(viewer, "window", None) is None:
-                break
-            try:
-                viewer.render()
-            except AttributeError:
-                break
-            time.sleep(0.02)
+        if hold_forever:
+            print("[motion-viewer] hold=1; close the SAPIEN window or press Ctrl-C to exit")
+        try:
+            while hold_forever or time.time() - hold_start < args_cli.episode_delay:
+                task._update_render()
+                viewer = getattr(task, "viewer", None)
+                if viewer is None or getattr(viewer, "window", None) is None:
+                    break
+                try:
+                    viewer.render()
+                except AttributeError:
+                    break
+                time.sleep(0.02)
+        except KeyboardInterrupt:
+            print("[motion-viewer] interrupted; closing viewer")
 
         # 关闭当前 episode 的 viewer
         try:
             task.close_env()
+        except KeyboardInterrupt:
+            print("[motion-viewer] cleanup interrupted; viewer process is exiting")
         except Exception:
             pass
 
     print(f"\n[motion-viewer] DONE: {success_count}/{args_cli.num_episodes} episodes succeeded")
 
-    # 最后一个 episode 保持 viewer（如果 hold=1 且只有 1 个 episode）
     if args_cli.num_episodes == 1 and success_count == 1:
-        print("[motion-viewer] single-episode mode: viewer already closed")
+        print("[motion-viewer] single-episode viewer closed")
 
 
 if __name__ == "__main__":

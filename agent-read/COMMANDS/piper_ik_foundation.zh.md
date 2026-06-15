@@ -142,3 +142,21 @@ WRIST_RIGHT_ROLL_DEG=-60 \
 timeout 600s bash collect_foundation_piper_ik.sh \
   v1 0 0 0 o1.2 wrist_left125_right110_roll_m15_m60
 ```
+
+## 带相机框线的 Viewer
+
+```bash
+export DISPLAY=:1.0
+TAG="o121_v1_viewer_$(date +%Y%m%d_%H%M%S)"
+python view_pick_diverse_bottles_piper_ik_motion.py \
+  --task_name pick_diverse_bottles_piper_ik_foundation \
+  --ik_version v1 --foundation_id 0 --foundation_mode o1.2 \
+  --render_freq 1 --show_axes 1 --show_camera_frustums 1 \
+  --wrist_preview 1 --hold 1 \
+  --wrist_left_forward_offset_m 0.125 --wrist_right_forward_offset_m 0.11 \
+  --wrist_left_roll_deg -15 --wrist_right_roll_deg -60 \
+  --wrist_debug_record 1 --wrist_debug_tag "$TAG" \
+  --max_seed_tries 1 --require_success 1
+```
+
+`--show_camera_frustums 1` 启用 SAPIEN 相机视锥，并验证 `left_camera`、`right_camera`、`head_camera` 都存在。`--wrist_preview 1` 是独立的双腕 RGB 窗口；`--hold 1` 会保持最终 viewer。执行过 `unset DISPLAY` 后必须用 `export DISPLAY=:1.0` 恢复，`set DISPLAY` 无效。时间戳 tag 避免已有非空输出目录导致 `FileExistsError`。
