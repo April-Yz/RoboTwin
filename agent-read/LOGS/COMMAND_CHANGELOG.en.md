@@ -2132,3 +2132,9 @@
 
 - Added `python script/diagnose_piper_wrist_camera_axes.py`.
 - It reports per-side camera forward, opening-plane error, angles to Pika physical `+X` and legacy debug `+Z`, plus the tiny yaw needed to zero only the `Y` component.
+
+## 2026-06-16 (Viewer Wrist Yaw Parameters)
+
+- Added viewer parameters: `--wrist_left_yaw_deg` and `--wrist_right_yaw_deg`.
+- Current values for zeroing the finger-opening `Y` component are `--wrist_left_yaw_deg 0.182 --wrist_right_yaw_deg 0.840`.
+- `roll_deg` still rotates the image about the optical axis; `yaw_deg` adjusts extrinsic orientation about parent-frame `+Z`.

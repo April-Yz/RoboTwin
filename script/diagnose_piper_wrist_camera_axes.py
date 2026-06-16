@@ -78,6 +78,7 @@ def main() -> None:
     print("  Pika CAD / Robot TCP physical forward = gripper local +X")
     print("  legacy debug blue axis forward label = gripper local +Z")
     print("  finger opening axis = gripper local Y")
+    viewer_yaw_args = {}
 
     for side, key in (
         ("left", "left_gripper_T_camera"),
@@ -94,6 +95,7 @@ def main() -> None:
             math.asin(float(np.clip(np.dot(forward, finger_open_y), -1.0, 1.0)))
         )
         rotate_about_debug_z = math.degrees(math.atan2(-forward[1], forward[0]))
+        viewer_yaw_args[side] = rotate_about_debug_z
         pitch_projected_to_debug_z = signed_angle_about_axis(
             projected, debug_forward_z, finger_open_y
         )
@@ -123,6 +125,14 @@ def main() -> None:
             "  if forcing forward to legacy +Z, pitch about gripper Y = "
             f"{pitch_projected_to_debug_z:.3f} deg (not recommended unless frame convention changes)"
         )
+
+    print("\nviewer yaw args to zero only the opening-axis Y component:")
+    print(
+        "  --wrist_left_yaw_deg "
+        f"{viewer_yaw_args['left']:.3f} "
+        "--wrist_right_yaw_deg "
+        f"{viewer_yaw_args['right']:.3f}"
+    )
 
 
 if __name__ == "__main__":

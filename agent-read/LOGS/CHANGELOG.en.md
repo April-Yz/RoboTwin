@@ -2820,3 +2820,10 @@
 - Current results: left forward `[0.999974, -0.003184, 0.006511]`, right forward `[0.999622, -0.014664, 0.023248]`, both close to Pika physical `+X` in the gripper frame.
 - Finger-opening `Y` plane error is left `-0.182 deg`, right `-0.840 deg`; zeroing only the `Y` component would require tiny gripper-`+Z` yaw corrections of left `+0.182 deg`, right `+0.840 deg`.
 - Recorded conclusion: legacy debug blue `+Z` is an IK/debug target-pose convention, not the Pika physical forward axis. Using it directly would incorrectly suggest an about `-89 deg` large rotation.
+
+## 2026-06-16 (Wrist Parent-Yaw Parameters)
+
+- `envs/camera/camera.py` adds `parent_yaw_deg` tuning, rotating wrist camera orientation about gripper/link6 parent `+Z`; this is distinct from optical-axis `image_roll_deg`.
+- `view_pick_diverse_bottles_piper_ik_motion.py` adds `--wrist_left_yaw_deg` and `--wrist_right_yaw_deg` for temporary viewer overrides.
+- `script/diagnose_piper_wrist_camera_axes.py` now prints ready-to-copy yaw arguments; current values are left `0.182 deg`, right `0.840 deg`.
+- Validation: the V1/O.1.2 live SAPIEN plus wrist viewer run with yaw completed 510 live frames, `physical_success=True`, and logs confirmed `parent_yaw_deg` in tuning.

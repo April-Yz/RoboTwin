@@ -2130,3 +2130,9 @@
 
 - 新增命令：`python script/diagnose_piper_wrist_camera_axes.py`。
 - 输出左右相机 forward、开合轴平面误差、到 Pika 物理 `+X` 和旧 debug `+Z` 的角度，以及仅消除 `Y` 分量所需的小 yaw。
+
+## 2026-06-16（Viewer wrist yaw 参数）
+
+- 新增 viewer 参数：`--wrist_left_yaw_deg`、`--wrist_right_yaw_deg`。
+- 当前用于消除开合轴 `Y` 分量的命令值：`--wrist_left_yaw_deg 0.182 --wrist_right_yaw_deg 0.840`。
+- `roll_deg` 仍用于画面绕光轴旋转；`yaw_deg` 用于父坐标系 `+Z` 外参朝向微调。

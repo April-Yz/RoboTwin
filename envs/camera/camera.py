@@ -173,11 +173,23 @@ class Camera:
                 raise ValueError(f"wrist_camera_tuning.{side} must be a mapping")
             forward_offset = float(tuning.get("forward_offset_m", 0.0))
             image_roll_deg = float(tuning.get("image_roll_deg", 0.0))
-            if not np.isfinite([forward_offset, image_roll_deg]).all():
+            parent_yaw_deg = float(tuning.get("parent_yaw_deg", 0.0))
+            if not np.isfinite([forward_offset, image_roll_deg, parent_yaw_deg]).all():
                 raise ValueError(f"Invalid wrist camera tuning for {side}: {tuning!r}")
 
-            # SAPIEN cameras look along local +X. Move along that optical axis so the
-            # correction remains meaningful even when left/right calibration differs.
+            yaw_rad = np.deg2rad(parent_yaw_deg)
+            yaw_about_parent_z = np.array(
+                [
+                    [np.cos(yaw_rad), -np.sin(yaw_rad), 0.0],
+                    [np.sin(yaw_rad), np.cos(yaw_rad), 0.0],
+                    [0.0, 0.0, 1.0],
+                ],
+                dtype=np.float64,
+            )
+            render_rotation = yaw_about_parent_z @ render_rotation
+
+            # SAPIEN cameras look along local +X. Move along that optical axis after
+            # parent-frame yaw so the offset follows the corrected viewing direction.
             matrix[:3, 3] += render_rotation[:, 0] * forward_offset
             roll_rad = np.deg2rad(image_roll_deg)
             roll_about_forward = np.array(

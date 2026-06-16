@@ -7091,6 +7091,8 @@ python view_pick_diverse_bottles_piper_ik_motion.py \
   --wrist_right_forward_offset_m 0.11 \
   --wrist_left_roll_deg -15 \
   --wrist_right_roll_deg -60 \
+  --wrist_left_yaw_deg 0.182 \
+  --wrist_right_yaw_deg 0.840 \
   --max_seed_tries 1 --require_success 1
 ```
 
@@ -7115,10 +7117,12 @@ python view_pick_diverse_bottles_piper_ik_motion.py \
   --wrist_right_forward_offset_m 0.11 \
   --wrist_left_roll_deg -15 \
   --wrist_right_roll_deg -60 \
+  --wrist_left_yaw_deg 0.182 \
+  --wrist_right_yaw_deg 0.840 \
   --max_seed_tries 1 --require_success 1
 ```
 
-这两条都不录像，因此不需要 `TAG`、`--wrist_debug_record` 或 `--wrist_debug_tag`。若需要动作结束后自动退出，把 `--hold 1` 改为 `--hold 0 --episode_delay 0`。
+这两条都不录像，因此不需要 `TAG`、`--wrist_debug_record` 或 `--wrist_debug_tag`。`--wrist_left_yaw_deg 0.182` 和 `--wrist_right_yaw_deg 0.840` 是把相机 forward 的开合轴 `Y` 分量压到 0 的小 yaw；如果只想使用旧默认相机朝向，可以删掉这两行。若需要动作结束后自动退出，把 `--hold 1` 改为 `--hold 0 --episode_delay 0`。
 
 验证结果：模式 1 在运动执行期间检测到 1920x1080 的 `SAPIEN` 窗口；模式 2 同时检测到 `SAPIEN` 和 640x299 的 `RoboTwin wrist cameras`。两种模式均实时绘制 510 个 SAPIEN 运动帧，V1/O.1.2 ID 0 均为 `physical_success=True`。
 
@@ -7131,7 +7135,7 @@ python view_pick_diverse_bottles_piper_ik_motion.py \
 - 旧 debug 轴图例把蓝色 local `+Z` 标成“夹爪前进方向”，这是 IK/debug 目标姿态约定，不等价于 Pika CAD 的物理手指长度方向。
 - Pika 手指开合方向是 gripper local `Y`；URDF 中两指关节和 mesh bounds 都支持这个判断。
 
-复算命令：
+复算命令会在末尾输出可直接加入 viewer 的 yaw 参数，例如当前输出为 `--wrist_left_yaw_deg 0.182 --wrist_right_yaw_deg 0.840`。
 
 ```bash
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
@@ -7150,7 +7154,7 @@ python script/diagnose_piper_wrist_camera_axes.py
 - 如果以 Pika CAD / Robot TCP 的物理 `+X` 为夹爪前向，当前 wrist camera 前向轴已经基本正确：左约 `0.4 deg`，右约 `1.6 deg`；它也基本落在“垂直于开合方向 Y”的平面内。此时没有证据支持再做 90 度大旋转。
 - 如果把旧 debug 蓝色 `+Z` 当成物理前向，会计算出约 `-89 deg` 绕 gripper `Y` 的大旋转需求；这更像坐标约定混淆，而不是 wrist 外参错误。不要直接按这个量改相机。
 - `image_roll_deg` 只绕相机自己的前向轴旋转画面，不能改变相机前向轴；它适合调画面水平/倾斜，不适合把 `+X` 前向改成 `+Z` 前向。
-- 真正可作为外参微调的是“开合平面误差”：若希望相机 forward 的 `Y` 分量严格为 0，可对左/右分别增加一个很小的绕 gripper `+Z` yaw（当前估计左 `+0.18 deg`、右 `+0.84 deg`）。这个量远小于目前画面 roll 调参，不应作为主要视觉偏差来源。
+- 真正可作为外参微调的是“开合平面误差”：若希望相机 forward 的 `Y` 分量严格为 0，可对左/右分别增加一个很小的绕 gripper `+Z` yaw（当前估计左 `+0.18 deg`、右 `+0.84 deg`），现在可用 `--wrist_left_yaw_deg` / `--wrist_right_yaw_deg` 应用。这个量远小于目前画面 roll 调参，不应作为主要视觉偏差来源。
 
 建议校准流程：
 

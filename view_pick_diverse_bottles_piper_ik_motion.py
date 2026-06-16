@@ -147,6 +147,10 @@ def main() -> None:
                         help="覆盖左 wrist 绕光轴的有符号校正角（度）")
     parser.add_argument("--wrist_right_roll_deg", type=float, default=None,
                         help="覆盖右 wrist 绕光轴的有符号校正角（度）")
+    parser.add_argument("--wrist_left_yaw_deg", type=float, default=None,
+                        help="覆盖左 wrist 在 gripper/link6 父坐标系绕 +Z 的外参 yaw（度）")
+    parser.add_argument("--wrist_right_yaw_deg", type=float, default=None,
+                        help="覆盖右 wrist 在 gripper/link6 父坐标系绕 +Z 的外参 yaw（度）")
     parser.add_argument("--wrist_debug_record", type=int, default=0,
                         help="1=保存左右 wrist 原始视频、带标签拼接视频和参数 JSON")
     parser.add_argument("--wrist_debug_tag", type=str, default="",
@@ -197,15 +201,27 @@ def main() -> None:
         args_cli.wrist_preview
     )
     tuning = build_args["camera"].setdefault("wrist_camera_tuning", {})
-    for side, forward_offset, roll_deg in (
-        ("left", args_cli.wrist_left_forward_offset_m, args_cli.wrist_left_roll_deg),
-        ("right", args_cli.wrist_right_forward_offset_m, args_cli.wrist_right_roll_deg),
+    for side, forward_offset, roll_deg, yaw_deg in (
+        (
+            "left",
+            args_cli.wrist_left_forward_offset_m,
+            args_cli.wrist_left_roll_deg,
+            args_cli.wrist_left_yaw_deg,
+        ),
+        (
+            "right",
+            args_cli.wrist_right_forward_offset_m,
+            args_cli.wrist_right_roll_deg,
+            args_cli.wrist_right_yaw_deg,
+        ),
     ):
         side_tuning = tuning.setdefault(side, {})
         if forward_offset is not None:
             side_tuning["forward_offset_m"] = forward_offset
         if roll_deg is not None:
             side_tuning["image_roll_deg"] = roll_deg
+        if yaw_deg is not None:
+            side_tuning["parent_yaw_deg"] = yaw_deg
     if args_cli.wrist_preview and not build_args["camera"].get(
         "collect_wrist_camera", False
     ):

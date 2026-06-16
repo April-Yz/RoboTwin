@@ -2818,3 +2818,10 @@
 - 当前结果：左 forward `[0.999974, -0.003184, 0.006511]`，右 forward `[0.999622, -0.014664, 0.023248]`，均在 gripper frame 中接近 Pika 物理 `+X`。
 - 开合轴 `Y` 平面误差：左 `-0.182 deg`、右 `-0.840 deg`；若只消除 `Y` 分量，需要绕 gripper `+Z` 的微小 yaw 左 `+0.182 deg`、右 `+0.840 deg`。
 - 记录结论：旧 debug 蓝色 `+Z` 是 IK/debug 目标姿态约定，不应直接作为 Pika 物理前向；否则会误算出约 `-89 deg` 的大旋转。
+
+## 2026-06-16（Wrist parent yaw 参数）
+
+- `envs/camera/camera.py` 新增 `parent_yaw_deg` tuning，在 gripper/link6 父坐标系绕 `+Z` 微调 wrist camera 朝向；它不同于绕光轴的 `image_roll_deg`。
+- `view_pick_diverse_bottles_piper_ik_motion.py` 新增 `--wrist_left_yaw_deg` 与 `--wrist_right_yaw_deg`，用于 viewer 临时覆盖。
+- `script/diagnose_piper_wrist_camera_axes.py` 现在在末尾输出可直接复制的 yaw 参数；当前为左 `0.182 deg`、右 `0.840 deg`。
+- 验证：带 yaw 的 V1/O.1.2 实时 SAPIEN + wrist viewer 完成 510 帧实时绘制，`physical_success=True`，日志确认 tuning 含 `parent_yaw_deg`。

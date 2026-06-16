@@ -23,7 +23,7 @@ The trajectory pickle stores schema, version, IK version, action names, Cartesia
 ## Known Boundaries
 
 - V3 MotionGen optimization may fail in the current scene, but the fallback path has been validated successfully.
-- Viewer and collection use the same trajectory logic; collection adds pickle-schema validation and observation recording. The custom Piper IK execution loop must call `viewer.render()` after `_update_render()` for live main-window updates; move, settle, and gripper paths now follow that order. The motion viewer can concurrently show dynamic wrist/static head frustums and dual-wrist RGB. Wrist forward diagnosis distinguishes Pika physical/CAD `+X` from legacy debug `+Z` so frame-convention differences are not mistaken for 90-degree extrinsic errors.
+- Viewer and collection use the same trajectory logic; collection adds pickle-schema validation and observation recording. The custom Piper IK execution loop must call `viewer.render()` after `_update_render()` for live main-window updates; move, settle, and gripper paths now follow that order. The motion viewer can concurrently show dynamic wrist/static head frustums and dual-wrist RGB. Wrist forward diagnosis distinguishes Pika physical/CAD `+X` from legacy debug `+Z` so frame-convention differences are not mistaken for 90-degree extrinsic errors; viewer yaw adjusts parent-frame `+Z` orientation, while roll only rotates the image about the optical axis.
 - `save_all_episodes` is for debugging and should not be used for formal successful-data filtering.
 
 ## O.1 Foundation OBJ Data Flow

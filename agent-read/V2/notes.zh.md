@@ -32,4 +32,4 @@
 - Debug recorder 使用 VS Code 兼容的 H.264/yuv420p/faststart；正式 wrapper 支持四个 `WRIST_*` 环境变量进行无 viewer 参数覆盖。
 - Viewer 新增 `--show_camera_frustums 1`，显式显示并校验 `left_camera`、`right_camera`、`head_camera`；修复 `--hold 1` 过去未生效的问题。
 - 修复 Piper IK move/settle/gripper 循环只更新 wrist 图像但不调用 `viewer.render()` 的问题；实时 SAPIEN 与双腕预览可独立或同时运行。
-- 新增 `script/diagnose_piper_wrist_camera_axes.py`，用于区分 Pika 物理 `+X` 与旧 debug `+Z` 前向约定；当前 wrist forward 与物理 `+X` 基本对齐。
+- 新增 `script/diagnose_piper_wrist_camera_axes.py`，用于区分 Pika 物理 `+X` 与旧 debug `+Z` 前向约定；当前 wrist forward 与物理 `+X` 基本对齐，并可把微小开合平面误差作为 viewer yaw 参数输出。
