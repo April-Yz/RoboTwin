@@ -38,3 +38,8 @@
 ## 2026-06-16：Foundation 抓取深度默认值
 
 O.1/O.1.2 Foundation Piper IK 的 `foundation_grasp_standoff` 默认值现在是 `0.105m`。旧值 `0.085m` 容易让瓶子看起来进入夹爪根部；新值让 EE/gripper base 目标后退 2cm，使瓶子更靠近夹爪指尖闭合区域。调试入口：viewer `--foundation_grasp_standoff_m`，采集 wrapper `FOUNDATION_GRASP_STANDOFF_M`。
+
+
+## 2026-06-16：Wrist 相机俯视与右手偏心
+
+0515 wrist 标定与 `piper_pika_agx` adapter 的结果是 camera forward 基本沿 gripper `+X` 平视，而不是俯视夹爪；右手相机中心 `Y=-2.74cm`，左手 `Y=+2.07cm`。Viewer 已增加 pitch/lateral 调参入口，先用左右 pitch `15deg`、右手 lateral `+0.0067m` 观察 wrist 画面。

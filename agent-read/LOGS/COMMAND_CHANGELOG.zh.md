@@ -2143,3 +2143,11 @@
 - Viewer 新参数：`--foundation_grasp_standoff_m <M>`，例如 `--foundation_grasp_standoff_m 0.105`。
 - 采集 wrapper 新环境变量：`FOUNDATION_GRASP_STANDOFF_M=0.105 bash collect_foundation_piper_ik.sh v1 0 0 0 o1.2 standoff105`。
 - 默认 Foundation V1-V4 YAML 已改为 `foundation_grasp_standoff: 0.105`；不显式传参时也使用新距离。
+
+
+## 2026-06-16（Viewer wrist pitch/lateral 命令）
+
+- 新增 viewer 参数：`--wrist_left_pitch_deg`、`--wrist_right_pitch_deg`、`--wrist_left_lateral_offset_m`、`--wrist_right_lateral_offset_m`。
+- pitch 为绕 gripper/link6 父坐标系 `+Y`；正值让相机前向朝 nominal tip 下俯。
+- lateral 为沿 gripper/link6 父坐标系 `+Y` 平移；右手当前偏负 Y，向中心修用正值。
+- 推荐起步：`--wrist_left_pitch_deg 15 --wrist_right_pitch_deg 15 --wrist_right_lateral_offset_m 0.0067`。

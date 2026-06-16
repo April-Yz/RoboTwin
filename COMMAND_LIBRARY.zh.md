@@ -7251,3 +7251,88 @@ bash collect_foundation_piper_ik.sh v1 0 0 0 o1.2 standoff105
 ```
 
 判断方法：看 SAPIEN 里 `plan_grasp_*` 坐标轴和瓶子的相对位置。`foundation_grasp_standoff` 增大时，gripper base 会离瓶子更远；如果 gripper 前向/TCP 方向是对的，瓶子会从根部区域移动到更靠近指尖闭合区域。若仍然根部碰撞，下一步应继续调 standoff 或检查 gripper/TCP 前向，而不是调 wrist camera。
+
+
+### O.1.2.3 补充：0515 原始 wrist 标定朝向、俯视角和右手 Y 偏心（2026-06-16）
+
+这次只讨论 wrist camera 外参，不再混入 gripper 抓取深度。前一次 `foundation_grasp_standoff=0.105` 已经解决“夹爪根部抓取”问题；下面是相机是否俯视夹爪、是否共面、右手是否偏右。
+
+#### 1. 原始标定是否已经处理“共面/俯视”
+
+0515 bundle 中 wrist 的记录是：
+
+- `parent_frame=urdf_end_pose_orient_tcp`
+- `camera_frame=opencv_color_optical`
+- `axis_conversion=render_camera = raw_optical @ legacy_r1.T`
+- `piper_pika_agx` adapter 只有平移：`+0.075m X`、`+0.050m Z`，不改变朝向。
+
+也就是说：原始标定 + 现有 adapter/axis conversion **有处理相机前向轴和 gripper 前向轴的坐标约定**，但它处理出来的是“接近 gripper `+X` 平视”，不是“明显俯视夹爪”。
+
+角度表如下。`plane_err_y` 表示 camera forward 是否偏出“夹爪前向 +X 与上下 +Z 组成的平面”；越接近 0 越共面。`pitch_xz` 是 forward 在 X-Z 平面内相对 gripper `+X` 的俯仰角；当前只有约 `0-1deg`，所以不是俯视。
+
+| side | 阶段 | forward in gripper frame | plane_err_y | 到 gripper +X | pitch_xz | yaw_xy | 到 nominal tip 视线夹角 |
+|---|---|---:|---:|---:|---:|---:|---:|
+| left | 0515 raw + legacy_r1，未加 adapter | `[0.999974,-0.003184,0.006511]` | `-0.182deg` | `0.415deg` | `+0.373deg` | `-0.182deg` | `10.427deg` |
+| left | adapter 后，当前基础外参 | `[0.999974,-0.003184,0.006511]` | `-0.182deg` | `0.415deg` | `+0.373deg` | `-0.182deg` | `26.588deg` |
+| left | 当前 viewer yaw/offset/roll 后 | `[0.999979,-0.000007,0.006511]` | `~0deg` | `0.373deg` | `+0.373deg` | `~0deg` | `54.722deg` |
+| right | 0515 raw + legacy_r1，未加 adapter | `[0.999622,-0.014664,0.023248]` | `-0.840deg` | `1.575deg` | `+1.332deg` | `-0.840deg` | `12.233deg` |
+| right | adapter 后，当前基础外参 | `[0.999622,-0.014664,0.023248]` | `-0.840deg` | `1.575deg` | `+1.332deg` | `-0.840deg` | `28.975deg` |
+| right | 当前 viewer yaw/offset/roll 后 | `[0.999730,-0.000007,0.023248]` | `~0deg` | `1.332deg` | `+1.332deg` | `~0deg` | `55.154deg` |
+
+结论：
+
+- 原始标定确实和 gripper 前向轴基本共面，右手偏出也只有 `0.84deg`，不是“大角度不共面”。
+- 原始标定没有提供明显俯视夹爪的角度；forward 基本平行于 gripper `+X`。
+- 当前 `--wrist_left_yaw_deg 0.182 --wrist_right_yaw_deg 0.840` 只是把 `Y` 分量归零，使它更共面；不会让相机低头。
+- 当前 `--wrist_left_roll_deg -15 --wrist_right_roll_deg -60` 只旋转图像画面，不改变相机 forward。
+
+#### 2. 原始/当前位置和右手偏心
+
+按 nominal tip `[0.12,0,0]` 估算：
+
+| side | 阶段 | camera center in gripper frame | camera Y | camera Z | 到 tip 欧氏距离 | 沿 forward 到 tip | 到 tip 横向误差 |
+|---|---|---:|---:|---:|---:|---:|---:|
+| left | 0515 raw | `[-0.1493,0.0207,0.0436]` | `+2.07cm` | `4.36cm` | `27.36cm` | `26.91cm` | `4.95cm` |
+| left | adapter 后 | `[-0.0743,0.0207,0.0936]` | `+2.07cm` | `9.36cm` | `21.67cm` | `19.38cm` | `9.70cm` |
+| left | 当前 viewer | `[0.0507,0.0207,0.0944]` | `+2.07cm` | `9.44cm` | `11.90cm` | `6.87cm` | `9.71cm` |
+| right | 0515 raw | `[-0.1350,-0.0274,0.0394]` | `-2.74cm` | `3.94cm` | `25.95cm` | `25.36cm` | `5.50cm` |
+| right | adapter 后 | `[-0.0600,-0.0274,0.0894]` | `-2.74cm` | `8.94cm` | `20.29cm` | `17.75cm` | `9.83cm` |
+| right | 当前 viewer | `[0.0500,-0.0274,0.0920]` | `-2.74cm` | `9.20cm` | `11.88cm` | `6.79cm` | `9.75cm` |
+
+右手“偏右”的感觉有几何来源：右相机 `Y=-2.74cm`，左相机 `Y=+2.07cm`。如果只要求左右镜像对称，右手需要沿 gripper 父坐标系 `+Y` 平移约 `+0.0067m`，让它从 `-2.74cm` 变成 `-2.07cm`。如果要求右手直接回到中心线 `Y=0`，则需要 `+0.0274m`，这个量偏大，建议先不要一步到位。
+
+#### 3. 后续角度/偏移怎么改
+
+现在 viewer 已支持两个新调参：
+
+- `--wrist_left_pitch_deg` / `--wrist_right_pitch_deg`：绕 gripper/link6 父坐标系 `+Y` 调俯仰。正值会让 camera forward 从近似 `+X` 向 nominal tip 方向下俯。
+- `--wrist_left_lateral_offset_m` / `--wrist_right_lateral_offset_m`：沿 gripper/link6 父坐标系 `+Y` 平移相机中心。右手当前 `Y` 为负，想往中心/左侧修就用正值。
+
+如果严格让相机 forward 看向 nominal tip，按当前外参大约需要：left `+54.1deg`、right `+54.0deg`。这个角度太大，不建议直接作为默认；它说明当前标定不是“俯看夹爪”的相机模型。实际调试建议先试小角度：`10deg`、`15deg`、`20deg`。
+
+保守试调命令：给左右各加 `15deg` 下俯，同时把右手 Y 偏心先修到和左手镜像对称（`+0.0067m`）：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+export DISPLAY=:1.0
+xdpyinfo >/dev/null || { echo "DISPLAY=:1.0 不可用"; exit 1; }
+
+python view_pick_diverse_bottles_piper_ik_motion.py \
+  --task_name pick_diverse_bottles_piper_ik_foundation \
+  --ik_version v1 --foundation_id 0 --foundation_mode o1.2 \
+  --foundation_grasp_standoff_m 0.105 \
+  --render_freq 1 --show_axes 1 --show_camera_frustums 1 \
+  --wrist_preview 1 --hold 1 \
+  --wrist_left_forward_offset_m 0.125 \
+  --wrist_right_forward_offset_m 0.11 \
+  --wrist_left_roll_deg -15 \
+  --wrist_right_roll_deg -60 \
+  --wrist_left_yaw_deg 0.182 \
+  --wrist_right_yaw_deg 0.840 \
+  --wrist_left_pitch_deg 15 \
+  --wrist_right_pitch_deg 15 \
+  --wrist_right_lateral_offset_m 0.0067 \
+  --max_seed_tries 1 --require_success 1
+```
+
+若画面里夹爪仍然太少：把 pitch 从 `15` 加到 `20`。若右手仍偏右：把 `--wrist_right_lateral_offset_m` 从 `0.0067` 小步加到 `0.010`、`0.015`。若右手过度偏左，则减小该值。不要用 `roll` 修 lateral 偏心；roll 只改变画面旋转。

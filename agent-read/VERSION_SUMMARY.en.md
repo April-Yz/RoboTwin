@@ -32,3 +32,8 @@ The same date adds a wrist forward-axis diagnostic script. Current results show 
 ## 2026-06-16: Foundation O.1/O.1.2 Gripper Standoff
 
 The default `foundation_grasp_standoff` for Foundation Piper IK V1-V4 changed from `0.085m` to `0.105m`. This is a default grasp-depth update for O.1/O.1.2: the gripper-base/EE grasp target stays 2cm farther from the bottle center so the object sits closer to the fingertip/scissor region. Interfaces remain compatible and can be overridden with viewer `--foundation_grasp_standoff_m` or collection-wrapper `FOUNDATION_GRASP_STANDOFF_M`.
+
+
+## 2026-06-16: Wrist Pitch/Lateral Debug Interface
+
+The Foundation Piper IK viewer now exposes temporary wrist-camera `parent_pitch_deg` and `parent_lateral_offset_m` overrides to test the 0515 wrist calibration issue: the cameras are nearly coplanar with the gripper forward plane but not downward-looking. The recommended first trial is left/right pitch `15deg` and right lateral `+0.0067m`. These are viewer/debug parameters and do not change gripper grasp planning.

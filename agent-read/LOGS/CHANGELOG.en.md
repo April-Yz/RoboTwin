@@ -2844,3 +2844,13 @@
 - Corrected the semantics: this is the gripper-base/EE grasp-target standoff from the object center. Wrist-camera `forward_offset_m` only changes camera extrinsics and does not change grasp depth.
 
 Validation: `py_compile` passed; `bash -n collect_foundation_piper_ik.sh` passed; `view_pick_diverse_bottles_piper_ik_motion.py --help` shows `--foundation_grasp_standoff_m`; a minimal V1/O.1.2 headless run with `--foundation_grasp_standoff_m 0.105` completed, logged `grasp_standoff=0.105m`, and reported `physical_success=True`.
+
+
+## 2026-06-16 (Wrist Raw-Calibration Angle Table And Pitch/Lateral Tuning)
+
+- Rechecked the 0515 wrist calibration: raw/adapter forward axes are already nearly in the gripper `X-Z` plane, with left `plane_err_y=-0.182deg` and right `-0.840deg`.
+- The raw calibration is not visibly downward-looking: forward is only left `0.415deg` and right `1.575deg` from gripper `+X`; after current viewer yaw it is left `0.373deg`, right `1.332deg`.
+- Added viewer tuning options: `--wrist_left_pitch_deg`, `--wrist_right_pitch_deg`, `--wrist_left_lateral_offset_m`, and `--wrist_right_lateral_offset_m`.
+- First recommended trial: left/right pitch `15deg`, right lateral `+0.0067m`.
+
+Validation: `py_compile envs/camera/camera.py view_pick_diverse_bottles_piper_ik_motion.py` passed; viewer `--help` shows the new pitch/lateral options; a minimal V1/O.1.2 headless run with `--wrist_left_pitch_deg 15 --wrist_right_pitch_deg 15 --wrist_right_lateral_offset_m 0.0067` completed, logged `parent_pitch_deg` and `parent_lateral_offset_m` in camera tuning, and reported `physical_success=True`.

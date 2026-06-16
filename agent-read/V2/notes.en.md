@@ -38,3 +38,8 @@
 ## 2026-06-16: Foundation Grasp-Depth Default
 
 O.1/O.1.2 Foundation Piper IK now defaults `foundation_grasp_standoff` to `0.105m`. The old `0.085m` value could make the bottle appear to enter the gripper root; the new value moves the EE/gripper-base target 2cm back so the bottle sits closer to the fingertip closing region. Debug entrypoints: viewer `--foundation_grasp_standoff_m`, collection wrapper `FOUNDATION_GRASP_STANDOFF_M`.
+
+
+## 2026-06-16: Wrist Downward View And Right-Side Lateral Bias
+
+The 0515 wrist calibration plus `piper_pika_agx` adapter makes camera forward nearly parallel to gripper `+X`, not downward-looking at the fingers. The right camera center is `Y=-2.74cm`, while the left is `Y=+2.07cm`. The viewer now exposes pitch/lateral tuning; start with left/right pitch `15deg` and right lateral `+0.0067m` when inspecting wrist images.

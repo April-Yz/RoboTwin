@@ -181,3 +181,10 @@ python script/diagnose_piper_wrist_camera_axes.py
 ### Foundation Gripper Standoff 调参
 
 O.1/O.1.2 的抓取深度由 `foundation_grasp_standoff` 控制，不是 wrist camera 的 `forward_offset_m`。默认已从 `0.085m` 调到 `0.105m`，让 gripper base 离瓶子中心更远 2cm，使物体更靠近夹爪指尖/剪刀口。Viewer 可用 `--foundation_grasp_standoff_m 0.105` 临时覆盖；采集 wrapper 可用 `FOUNDATION_GRASP_STANDOFF_M=0.105 bash collect_foundation_piper_ik.sh ...` 临时覆盖。
+
+
+### Wrist 原始标定角度与 pitch/lateral 调参
+
+0515 wrist 标定经过 `legacy_r1` 轴转换和 `piper_pika_agx` adapter 后，camera forward 与 gripper `+X` 基本共面：left `plane_err_y=-0.182deg`，right `-0.840deg`。它不是明显俯视夹爪的外参，forward 到 gripper `+X` 只有 left `0.415deg`、right `1.575deg`；当前 viewer yaw 后仍只有 left `0.373deg`、right `1.332deg`，所以看不到两个夹爪的主要原因是缺少绕 gripper `Y` 的下俯 pitch。
+
+Viewer 新增：`--wrist_left_pitch_deg`、`--wrist_right_pitch_deg`、`--wrist_left_lateral_offset_m`、`--wrist_right_lateral_offset_m`。建议先试 `--wrist_left_pitch_deg 15 --wrist_right_pitch_deg 15 --wrist_right_lateral_offset_m 0.0067`。右手当前 Y 约 `-2.74cm`，左手为 `+2.07cm`；右手加 `+0.0067m` 可先调到镜像对称约 `-2.07cm`。

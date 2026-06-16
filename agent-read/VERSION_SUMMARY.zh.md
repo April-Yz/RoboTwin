@@ -32,3 +32,8 @@ Viewer 可用 `--show_camera_frustums 1` 校验并显示 wrist/head camera lines
 ## 2026-06-16：Foundation O.1/O.1.2 gripper standoff
 
 Foundation Piper IK V1-V4 的默认 `foundation_grasp_standoff` 从 `0.085m` 改为 `0.105m`。这属于 O.1/O.1.2 抓取深度默认值调整：gripper base/EE grasp 目标离瓶子中心更远 2cm，使物体更靠近夹爪指尖/剪刀口；接口仍兼容，可用 viewer `--foundation_grasp_standoff_m` 或采集环境变量 `FOUNDATION_GRASP_STANDOFF_M` 覆盖。
+
+
+## 2026-06-16：Wrist pitch/lateral 调试接口
+
+Foundation Piper IK viewer 新增 wrist 相机 `parent_pitch_deg` 与 `parent_lateral_offset_m` 临时覆盖入口，用于验证 0515 wrist 标定“共面但不俯视”的问题。当前推荐起步值是左右 pitch `15deg`、右手 lateral `+0.0067m`；这些是 viewer/debug 参数，不改变 gripper 抓取规划。

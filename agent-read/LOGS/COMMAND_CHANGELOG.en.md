@@ -2145,3 +2145,11 @@
 - New viewer option: `--foundation_grasp_standoff_m <M>`, for example `--foundation_grasp_standoff_m 0.105`.
 - New collection-wrapper environment variable: `FOUNDATION_GRASP_STANDOFF_M=0.105 bash collect_foundation_piper_ik.sh v1 0 0 0 o1.2 standoff105`.
 - Default Foundation V1-V4 YAML files now use `foundation_grasp_standoff: 0.105`, so the new distance is active without explicit overrides.
+
+
+## 2026-06-16 (Viewer Wrist Pitch/Lateral Command)
+
+- Added viewer options: `--wrist_left_pitch_deg`, `--wrist_right_pitch_deg`, `--wrist_left_lateral_offset_m`, and `--wrist_right_lateral_offset_m`.
+- Pitch rotates about gripper/link6 parent-frame `+Y`; positive values tilt the camera forward axis downward toward the nominal tip.
+- Lateral offset translates along gripper/link6 parent-frame `+Y`; the right camera is currently negative in Y, so use positive values to move it toward center.
+- Recommended first trial: `--wrist_left_pitch_deg 15 --wrist_right_pitch_deg 15 --wrist_right_lateral_offset_m 0.0067`.

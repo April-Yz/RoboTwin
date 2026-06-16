@@ -2842,3 +2842,13 @@
 - 语义更正：这是 gripper base/EE grasp 目标相对物体中心的 standoff；wrist camera `forward_offset_m` 只调相机外参，不改变抓取深度。
 
 验证：`py_compile` 通过；`bash -n collect_foundation_piper_ik.sh` 通过；`view_pick_diverse_bottles_piper_ik_motion.py --help` 显示 `--foundation_grasp_standoff_m`；V1/O.1.2 headless 最小运行使用 `--foundation_grasp_standoff_m 0.105` 完成，日志确认 `grasp_standoff=0.105m` 且 `physical_success=True`。
+
+
+## 2026-06-16（Wrist 原始标定角度表与 pitch/lateral 调参）
+
+- 复查 0515 wrist 标定：原始/adapter 后 forward 均基本与 gripper `+X` 共面，left `plane_err_y=-0.182deg`，right `-0.840deg`。
+- 原始标定没有明显俯视夹爪：forward 到 gripper `+X` 仅 left `0.415deg`、right `1.575deg`；当前 viewer yaw 后为 left `0.373deg`、right `1.332deg`。
+- 新增 viewer 调参：`--wrist_left_pitch_deg`、`--wrist_right_pitch_deg`、`--wrist_left_lateral_offset_m`、`--wrist_right_lateral_offset_m`。
+- 建议第一轮试调：左右 pitch `15deg`，右手 lateral `+0.0067m`。
+
+验证：`py_compile envs/camera/camera.py view_pick_diverse_bottles_piper_ik_motion.py` 通过；viewer `--help` 显示 pitch/lateral 新参数；带 `--wrist_left_pitch_deg 15 --wrist_right_pitch_deg 15 --wrist_right_lateral_offset_m 0.0067` 的 V1/O.1.2 headless 最小运行完成，日志确认 camera tuning 含 `parent_pitch_deg` 与 `parent_lateral_offset_m`，并报告 `physical_success=True`。

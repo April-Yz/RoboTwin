@@ -151,6 +151,14 @@ def main() -> None:
                         help="覆盖左 wrist 在 gripper/link6 父坐标系绕 +Z 的外参 yaw（度）")
     parser.add_argument("--wrist_right_yaw_deg", type=float, default=None,
                         help="覆盖右 wrist 在 gripper/link6 父坐标系绕 +Z 的外参 yaw（度）")
+    parser.add_argument("--wrist_left_pitch_deg", type=float, default=None,
+                        help="覆盖左 wrist 在 gripper/link6 父坐标系绕 +Y 的外参 pitch；正值让相机前向朝 nominal tip 下俯")
+    parser.add_argument("--wrist_right_pitch_deg", type=float, default=None,
+                        help="覆盖右 wrist 在 gripper/link6 父坐标系绕 +Y 的外参 pitch；正值让相机前向朝 nominal tip 下俯")
+    parser.add_argument("--wrist_left_lateral_offset_m", type=float, default=None,
+                        help="覆盖左 wrist 沿 gripper/link6 父坐标系 +Y 的平移（米）")
+    parser.add_argument("--wrist_right_lateral_offset_m", type=float, default=None,
+                        help="覆盖右 wrist 沿 gripper/link6 父坐标系 +Y 的平移（米）")
     parser.add_argument("--wrist_debug_record", type=int, default=0,
                         help="1=保存左右 wrist 原始视频、带标签拼接视频和参数 JSON")
     parser.add_argument("--wrist_debug_tag", type=str, default="",
@@ -207,18 +215,22 @@ def main() -> None:
         args_cli.wrist_preview
     )
     tuning = build_args["camera"].setdefault("wrist_camera_tuning", {})
-    for side, forward_offset, roll_deg, yaw_deg in (
+    for side, forward_offset, roll_deg, yaw_deg, pitch_deg, lateral_offset in (
         (
             "left",
             args_cli.wrist_left_forward_offset_m,
             args_cli.wrist_left_roll_deg,
             args_cli.wrist_left_yaw_deg,
+            args_cli.wrist_left_pitch_deg,
+            args_cli.wrist_left_lateral_offset_m,
         ),
         (
             "right",
             args_cli.wrist_right_forward_offset_m,
             args_cli.wrist_right_roll_deg,
             args_cli.wrist_right_yaw_deg,
+            args_cli.wrist_right_pitch_deg,
+            args_cli.wrist_right_lateral_offset_m,
         ),
     ):
         side_tuning = tuning.setdefault(side, {})
@@ -228,6 +240,10 @@ def main() -> None:
             side_tuning["image_roll_deg"] = roll_deg
         if yaw_deg is not None:
             side_tuning["parent_yaw_deg"] = yaw_deg
+        if pitch_deg is not None:
+            side_tuning["parent_pitch_deg"] = pitch_deg
+        if lateral_offset is not None:
+            side_tuning["parent_lateral_offset_m"] = lateral_offset
     if args_cli.wrist_preview and not build_args["camera"].get(
         "collect_wrist_camera", False
     ):

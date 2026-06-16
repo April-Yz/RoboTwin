@@ -175,3 +175,10 @@ Current forward offsets are left `0.125m` and right `0.11m`; moving 2cm further 
 ### Foundation Gripper Standoff Tuning
 
 O.1/O.1.2 grasp depth is controlled by `foundation_grasp_standoff`, not wrist-camera `forward_offset_m`. The default is now `0.105m` instead of `0.085m`, moving the gripper-base target 2cm farther from the bottle center so the object sits closer to the fingertip/scissor region. The viewer can override it with `--foundation_grasp_standoff_m 0.105`; the collection wrapper can override it with `FOUNDATION_GRASP_STANDOFF_M=0.105 bash collect_foundation_piper_ik.sh ...`.
+
+
+### Wrist Raw-Calibration Angles And Pitch/Lateral Tuning
+
+After the `legacy_r1` axis conversion and `piper_pika_agx` adapter, the 0515 wrist camera forward axes are almost in the gripper `X-Z` plane: left `plane_err_y=-0.182deg`, right `-0.840deg`. They are not downward-looking extrinsics: the forward axis is only left `0.415deg` and right `1.575deg` away from gripper `+X`; after current viewer yaw it remains left `0.373deg`, right `1.332deg`. The main reason the fingers are not visible is the lack of a parent-frame pitch about gripper `Y`.
+
+The viewer now supports `--wrist_left_pitch_deg`, `--wrist_right_pitch_deg`, `--wrist_left_lateral_offset_m`, and `--wrist_right_lateral_offset_m`. Start with `--wrist_left_pitch_deg 15 --wrist_right_pitch_deg 15 --wrist_right_lateral_offset_m 0.0067`. The current right camera Y is about `-2.74cm`, while the left camera is `+2.07cm`; adding `+0.0067m` on the right first brings it to the mirrored value around `-2.07cm`.
