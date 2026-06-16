@@ -2813,3 +2813,10 @@
 - Added `_render_execution_step()` to always refresh observation cameras and draw SAPIEN according to `render_freq`; viewer runs now validate and report the number of live motion frames.
 - Mode 1 validation: a 1920x1080 `SAPIEN` window existed during execution, rendered 510 live frames, and finished with `physical_success=True`.
 - Mode 2 validation: `SAPIEN` and the 640x299 `RoboTwin wrist cameras` window coexisted during execution, rendered 510 live SAPIEN frames, and finished with `physical_success=True`.
+
+## 2026-06-16 (Wrist Camera Forward-Axis Diagnosis)
+
+- Added `script/diagnose_piper_wrist_camera_axes.py`, reusing the `legacy_r1` axis conversion and `piper_pika_agx` adapter from `envs/camera/camera.py` to compute wrist camera forward axes offline.
+- Current results: left forward `[0.999974, -0.003184, 0.006511]`, right forward `[0.999622, -0.014664, 0.023248]`, both close to Pika physical `+X` in the gripper frame.
+- Finger-opening `Y` plane error is left `-0.182 deg`, right `-0.840 deg`; zeroing only the `Y` component would require tiny gripper-`+Z` yaw corrections of left `+0.182 deg`, right `+0.840 deg`.
+- Recorded conclusion: legacy debug blue `+Z` is an IK/debug target-pose convention, not the Pika physical forward axis. Using it directly would incorrectly suggest an about `-89 deg` large rotation.

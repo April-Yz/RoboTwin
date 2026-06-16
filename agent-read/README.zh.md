@@ -10,7 +10,7 @@
 - 数据流程：Phase 1 找稳定且真实成功的 seed 并保存版本化轨迹；Phase 2 在相同 seed 场景中校验、回放并保存 HDF5/视频/instruction。
 - 相机：head、front、side、右侧 `third_camera`、对向俯视 `opposite_top_camera`、top-level `third_view`；Foundation 配置使用 0515 左右手眼标定、Pika 基础 adapter 和逐侧 wrist 前移/roll tuning 输出独立腕视频，并支持 viewer 实时双腕拼接。
 - Foundation 抓取默认使用底部 `support_proxy` 和 close 后几何状态门控；不会通过 `set_pose` 把倾倒物体瞬移回夹爪。
-- Foundation 批采集推荐使用独立 run tag、每 ID 一个 episode、最多三次 seed 和外层 timeout，避免复用旧 head-only HDF5 或无限重试。Wrist debug recorder 保存 VS Code 兼容的 H.264 左右/拼接 MP4 和参数 JSON；正式 wrapper 可用四个 `WRIST_*` 环境变量无 viewer 覆盖 tuning。Motion viewer 支持 `--show_camera_frustums 1` 显示并校验左右 wrist/head 相机框线，Piper IK 执行期间逐步刷新 SAPIEN 主窗口，并可与实时双腕 RGB 窗口同时运行。
+- Foundation 批采集推荐使用独立 run tag、每 ID 一个 episode、最多三次 seed 和外层 timeout，避免复用旧 head-only HDF5 或无限重试。Wrist debug recorder 保存 VS Code 兼容的 H.264 左右/拼接 MP4 和参数 JSON；正式 wrapper 可用四个 `WRIST_*` 环境变量无 viewer 覆盖 tuning。Motion viewer 支持 `--show_camera_frustums 1` 显示并校验左右 wrist/head 相机框线，Piper IK 执行期间逐步刷新 SAPIEN 主窗口，并可与实时双腕 RGB 窗口同时运行。`script/diagnose_piper_wrist_camera_axes.py` 可复算 wrist camera forward 与 Pika 物理 `+X`、旧 debug `+Z` 和开合轴 `Y` 的关系。
 - `script/index_foundation_piper_ik_videos.py` 可把独立输出中的 Foundation ID N 安全映射为聚合目录的 `episodeN_*`；默认软链接并拒绝覆盖已有 episode。
 
 ## 环境与入口

@@ -2127,3 +2127,8 @@
 - Mode 1: `--render_freq 1 --show_camera_frustums 1 --wrist_preview 0` for live SAPIEN plus camera frustums only.
 - Mode 2: switch to `--wrist_preview 1` to show live SAPIEN and dual-wrist RGB concurrently.
 - When not recording, both modes omit `TAG`, `--wrist_debug_record`, and `--wrist_debug_tag`.
+
+## 2026-06-16 (Wrist Forward-Axis Diagnostic Command)
+
+- Added `python script/diagnose_piper_wrist_camera_axes.py`.
+- It reports per-side camera forward, opening-plane error, angles to Pika physical `+X` and legacy debug `+Z`, plus the tiny yaw needed to zero only the `Y` component.

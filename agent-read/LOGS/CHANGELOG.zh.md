@@ -2811,3 +2811,10 @@
 - 新增统一 `_render_execution_step()`：始终刷新 observation cameras，并按 `render_freq` 实时绘制 SAPIEN；viewer 模式结束后校验并打印实时运动帧数。
 - 模式 1 验证：运动期间检测到 1920x1080 `SAPIEN` 窗口，实时绘制 510 帧，`physical_success=True`。
 - 模式 2 验证：运动期间同时检测到 `SAPIEN` 和 640x299 `RoboTwin wrist cameras`，实时绘制 510 帧，`physical_success=True`。
+
+## 2026-06-16（Wrist 相机前向轴诊断）
+
+- 新增 `script/diagnose_piper_wrist_camera_axes.py`，复用 `envs/camera/camera.py` 的 `legacy_r1` axis conversion 和 `piper_pika_agx` adapter，离线计算左右 wrist camera forward。
+- 当前结果：左 forward `[0.999974, -0.003184, 0.006511]`，右 forward `[0.999622, -0.014664, 0.023248]`，均在 gripper frame 中接近 Pika 物理 `+X`。
+- 开合轴 `Y` 平面误差：左 `-0.182 deg`、右 `-0.840 deg`；若只消除 `Y` 分量，需要绕 gripper `+Z` 的微小 yaw 左 `+0.182 deg`、右 `+0.840 deg`。
+- 记录结论：旧 debug 蓝色 `+Z` 是 IK/debug 目标姿态约定，不应直接作为 Pika 物理前向；否则会误算出约 `-89 deg` 的大旋转。

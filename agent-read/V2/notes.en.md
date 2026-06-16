@@ -32,3 +32,4 @@
 - The debug recorder uses VS Code-compatible H.264/yuv420p/faststart. The formal wrapper accepts four `WRIST_*` environment variables for headless tuning overrides.
 - The viewer adds `--show_camera_frustums 1` to explicitly draw and verify `left_camera`, `right_camera`, and `head_camera`, and fixes the previously ineffective `--hold 1` behavior.
 - Fixed Piper IK move/settle/gripper loops that updated wrist images without calling `viewer.render()`; live SAPIEN and dual-wrist preview can now run independently or together.
+- Added `script/diagnose_piper_wrist_camera_axes.py` to distinguish Pika physical `+X` from the legacy debug `+Z` forward convention; current wrist forward axes are close to physical `+X`.

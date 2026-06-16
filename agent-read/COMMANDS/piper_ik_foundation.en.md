@@ -158,3 +158,11 @@ python view_pick_diverse_bottles_piper_ik_motion.py \
 ### Live Motion Modes
 
 The Piper IK executor now refreshes both observation cameras and `viewer.render()` during move, settle, and gripper steps. Mode 1 uses `--wrist_preview 0` for live SAPIEN robot motion plus camera frustums only. Mode 2 uses `--wrist_preview 1` to show SAPIEN and the dual-wrist RGB window concurrently. Neither mode needs a debug tag; complete commands are in the 2026-06-16 O.1.2.1 addition to `COMMAND_LIBRARY.zh.md`.
+
+### Wrist Forward-Axis Diagnosis
+
+```bash
+python script/diagnose_piper_wrist_camera_axes.py
+```
+
+The script reuses the axis conversion from `envs/camera/camera.py` and reports the SAPIEN camera `+X` forward direction in the gripper frame, the error against the plane perpendicular to finger-opening `Y`, and angles to both the Pika physical `+X` and legacy debug `+Z` conventions. Current conclusion: the camera forward axis is already close to Pika physical `+X` and almost in the `X-Z` plane perpendicular to finger opening. The roughly 90-degree error against legacy debug `+Z` is a frame-convention mismatch, not a camera-extrinsic correction to apply directly.

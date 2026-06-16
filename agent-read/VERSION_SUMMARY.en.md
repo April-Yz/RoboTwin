@@ -26,3 +26,4 @@ O.1.2.1 separates the confirmed parent-frame composition error from the still-un
 Debug videos now use H.264/faststart. The formal collection wrapper accepts four `WRIST_*` environment variables for headless camera overrides.
 The viewer can validate and draw wrist/head camera linesets with `--show_camera_frustums 1`; `--hold 1` now retains the final window until the user exits.
 The 2026-06-16 fix restores per-step `viewer.render()` in the custom Piper IK executor, supporting both live SAPIEN-only and live SAPIEN-plus-wrist-RGB modes.
+The same date adds a wrist forward-axis diagnostic script. Current results show camera forward is close to Pika physical `+X`, with less than one degree of opening-plane error; the roughly 90-degree difference to legacy debug `+Z` should not be applied directly as an extrinsic correction.

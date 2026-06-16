@@ -164,3 +164,11 @@ python view_pick_diverse_bottles_piper_ik_motion.py \
 ### 实时运动模式
 
 Piper IK 执行器现在在 move、settle、gripper 每个可视化步同时刷新 observation cameras 和 `viewer.render()`。模式 1 使用 `--wrist_preview 0`，只显示实时 SAPIEN 机器人运动和 camera frustums；模式 2 使用 `--wrist_preview 1`，同时显示 SAPIEN 与左右 wrist RGB。两种模式无需 debug tag，完整命令见 `COMMAND_LIBRARY.zh.md` O.1.2.1 的 2026-06-16 补充。
+
+### Wrist 前向轴诊断
+
+```bash
+python script/diagnose_piper_wrist_camera_axes.py
+```
+
+该脚本复用 `envs/camera/camera.py` 的 axis conversion，输出 SAPIEN camera `+X` forward 在 gripper frame 中的方向、对开合轴 `Y` 的平面误差、到 Pika 物理 `+X` 和旧 debug `+Z` 的角度。当前结论是：相机 forward 与 Pika 物理 `+X` 基本对齐，且几乎位于垂直开合轴的 `X-Z` 平面内；按旧 debug `+Z` 计算出的约 90 度偏差属于坐标约定差异，不应直接作为相机外参修正。

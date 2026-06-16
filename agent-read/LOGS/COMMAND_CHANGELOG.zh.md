@@ -2125,3 +2125,8 @@
 - 模式 1：`--render_freq 1 --show_camera_frustums 1 --wrist_preview 0`，只看实时 SAPIEN 和相机框线。
 - 模式 2：将上面改为 `--wrist_preview 1`，同时显示实时 SAPIEN 和左右 wrist RGB。
 - 两种模式不录像时均省略 `TAG`、`--wrist_debug_record`、`--wrist_debug_tag`。
+
+## 2026-06-16（Wrist 前向轴诊断命令）
+
+- 新增命令：`python script/diagnose_piper_wrist_camera_axes.py`。
+- 输出左右相机 forward、开合轴平面误差、到 Pika 物理 `+X` 和旧 debug `+Z` 的角度，以及仅消除 `Y` 分量所需的小 yaw。
