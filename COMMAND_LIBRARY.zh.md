@@ -7405,6 +7405,183 @@ python view_pick_diverse_bottles_piper_ik_motion.py \
   --max_seed_tries 1 --require_success 1
 ```
 
+
+#### 已验证推荐版本：`o1.2_verified_grasp_wrist_v2`
+
+这组是当前你实测效果好的 viewer 参数。它同时包含抓取深度和 wrist 相机外参修正：
+
+| 参数 | 当前值 | 含义 |
+|---|---:|---|
+| `--foundation_grasp_standoff_m` | `0.14` | gripper base / EE grasp 目标离物体中心更远，物体更靠近夹爪指尖/剪刀口，减少根部抓取感 |
+| `--wrist_left_forward_offset_m` | `0.145` | 左 wrist 相机沿自身光轴前移；比 `0.125` 多 `2cm` |
+| `--wrist_right_forward_offset_m` | `0.13` | 右 wrist 相机沿自身光轴前移；比 `0.11` 多 `2cm` |
+| `--wrist_left_pitch_deg` / `--wrist_right_pitch_deg` | `15` | 绕 gripper/link6 父坐标系 `+Y` 下俯，让 wrist 画面能看到更多夹爪 |
+| `--wrist_left_lateral_offset_m` | `-0.0207` | 左相机移到 gripper 开合中线 `Y≈0` |
+| `--wrist_right_lateral_offset_m` | `0.0274` | 右相机移到 gripper 开合中线 `Y≈0` |
+| `--wrist_left/right_yaw_deg` | `0.182 / 0.840` | 消除相机 forward 的开合轴 `Y` 分量，使光轴回到 gripper `X-Z` 平面 |
+| `--wrist_left/right_roll_deg` | `-15 / -60` | 只修正画面水平/旋转，不改变 forward |
+| `--foundation_capture_radial_tolerance_m` | `0.08` | 适配 `standoff=0.14` 后的几何门控；默认 `0.065` 会偏严格 |
+| `--foundation_grasp_assist_max_distance_m` | `0.16` | 适配 `standoff=0.14` 后的 EE-物体中心距离；默认 `0.14` 会贴边 |
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+export DISPLAY=:1.0
+xdpyinfo >/dev/null || { echo "DISPLAY=:1.0 不可用"; exit 1; }
+
+python view_pick_diverse_bottles_piper_ik_motion.py \
+  --task_name pick_diverse_bottles_piper_ik_foundation \
+  --ik_version v1 --foundation_id 0 --foundation_mode o1.2 \
+  --foundation_grasp_standoff_m 0.14 \
+  --foundation_capture_radial_tolerance_m 0.08 \
+  --foundation_grasp_assist_max_distance_m 0.16 \
+  --render_freq 1 --show_axes 1 --show_camera_frustums 1 \
+  --wrist_preview 1 --hold 1 \
+  --wrist_left_forward_offset_m 0.145 \
+  --wrist_right_forward_offset_m 0.13 \
+  --wrist_left_roll_deg -15 \
+  --wrist_right_roll_deg -60 \
+  --wrist_left_yaw_deg 0.182 \
+  --wrist_right_yaw_deg 0.840 \
+  --wrist_left_pitch_deg 15 \
+  --wrist_right_pitch_deg 15 \
+  --wrist_left_lateral_offset_m -0.0207 \
+  --wrist_right_lateral_offset_m 0.0274 \
+  --max_seed_tries 1 --require_success 1
+```
+
 如果你想看“纯标定位置”对照，不要传 `--wrist_left_lateral_offset_m` / `--wrist_right_lateral_offset_m`，也不要传 `--wrist_left_pitch_deg` / `--wrist_right_pitch_deg`。保留 yaw/roll/forward 只是当前模拟调参；完全回到 YAML 默认则连命令行的 wrist override 都可以省略。
 
 验证：带中线修正 `left=-0.0207`、`right=+0.0274`、左右 pitch `15deg` 的 V1/O.1.2 headless 最小运行完成，日志确认 `parent_lateral_offset_m` 进入 camera tuning，且 `physical_success=True`。
+
+
+### O.1.2.5 抓取真实性与 OBJ/Gripper 碰撞 debug（2026-06-16）
+
+当前 O.1.2 的默认成功路径不是“完全纯物理抓取”。它的逻辑是：
+
+1. `pregrasp/grasp` 由 IK 移到目标位置。
+2. `close_gripper` 后先做 grasp-state validation：检查物体位移/旋转是否没有被撞飞、EE 到物体中心距离、物体中心到两指连线的径向距离、两指接触列表。
+3. validation 通过后，如果 `foundation_grasp_assist=true`，才在 **当前物体 pose** 上建立 gripper-object drive。它不会把物体瞬移到夹爪中心，但 drive 仍然是辅助约束，不是纯接触摩擦抓取。
+
+因此要 debug “更真实的抓取”，建议分三档：
+
+| 档位 | 目的 | 关键参数 | 预期 |
+|---|---|---|---|
+| A. 已验证成功档 | 保持你当前看到的好效果 | `support_proxy + grasp_assist=1 + require_contact=0 + radial=0.08 + max_dist=0.16` | 稳定生成动作和 wrist 画面 |
+| B. 接触门控档 | 检查两指是否真的碰到 OBJ collision | `cylinder_proxy` 或 `exact_convex`，`grasp_require_contact=1` | 若 contacts 为空会 fail-fast，暴露假抓取 |
+| C. 纯物理观察档 | 关闭 drive，看物体是否靠接触/摩擦被带走 | `grasp_assist=0`，通常 `require_success=0` | 物体可能掉落或不跟随，这是有效信息 |
+
+#### 新增 viewer debug 参数
+
+这些参数已经可以直接从 viewer 命令行覆盖，不需要改 YAML：
+
+| 参数 | 含义 |
+|---|---|
+| `--foundation_collision_mode support_proxy|cylinder_proxy|exact_convex` | OBJ 碰撞模型。`support_proxy` 稳定但只保底部支撑；`cylinder_proxy` 更适合瓶子接触调试；`exact_convex` 更接近 mesh，但可能更慢或更不稳定 |
+| `--foundation_collision_radius_padding_m` | 给 proxy collision 半径加 padding，正值更容易接触，负值更严格 |
+| `--foundation_grasp_assist 0|1` | 是否在 validation 后创建 object-gripper drive；`0` 是纯物理观察档 |
+| `--foundation_grasp_require_contact 0|1` | validation 是否要求两指都接触物体 collision |
+| `--foundation_capture_radial_tolerance_m` | 物体中心到两指连线的最大径向距离；越小越严格 |
+| `--foundation_grasp_assist_max_distance_m` | EE 到物体中心的最大距离；越小越严格 |
+
+#### A. 当前已验证成功档（推荐日常 viewer）
+
+这就是你刚测试效果好的版本。注意：`standoff=0.14` 会让默认几何门控略严格；headless 验证中默认 `radial_tolerance=0.065` 会因 left `radial=0.071m` 失败，所以这里显式设置 `0.08/0.16`：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+export DISPLAY=:1.0
+xdpyinfo >/dev/null || { echo "DISPLAY=:1.0 不可用"; exit 1; }
+
+python view_pick_diverse_bottles_piper_ik_motion.py \
+  --task_name pick_diverse_bottles_piper_ik_foundation \
+  --ik_version v1 --foundation_id 0 --foundation_mode o1.2 \
+  --foundation_grasp_standoff_m 0.14 \
+  --foundation_capture_radial_tolerance_m 0.08 \
+  --foundation_grasp_assist_max_distance_m 0.16 \
+  --render_freq 1 --show_axes 1 --show_camera_frustums 1 \
+  --wrist_preview 1 --hold 1 \
+  --wrist_left_forward_offset_m 0.145 \
+  --wrist_right_forward_offset_m 0.13 \
+  --wrist_left_roll_deg -15 \
+  --wrist_right_roll_deg -60 \
+  --wrist_left_yaw_deg 0.182 \
+  --wrist_right_yaw_deg 0.840 \
+  --wrist_left_pitch_deg 15 \
+  --wrist_right_pitch_deg 15 \
+  --wrist_left_lateral_offset_m -0.0207 \
+  --wrist_right_lateral_offset_m 0.0274 \
+  --max_seed_tries 1 --require_success 1
+```
+
+#### B. 接触门控档：要求两指接触
+
+先用 `cylinder_proxy`，因为瓶子类 OBJ 比较适合圆柱近似；`require_contact=1` 会让没有两指接触的抓取直接失败。失败时看终端里的：
+
+- `contacts=[]`：没有真实接触，说明只是几何门控/assist 成功。
+- `radial=...` 大：物体中心不在两指之间。
+- `projection=...` 超出 `[0,1]` 附近：物体不在两指连线段内。
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+export DISPLAY=:1.0
+xdpyinfo >/dev/null || { echo "DISPLAY=:1.0 不可用"; exit 1; }
+
+python view_pick_diverse_bottles_piper_ik_motion.py \
+  --task_name pick_diverse_bottles_piper_ik_foundation \
+  --ik_version v1 --foundation_id 0 --foundation_mode o1.2 \
+  --foundation_grasp_standoff_m 0.14 \
+  --foundation_collision_mode cylinder_proxy \
+  --foundation_grasp_require_contact 1 \
+  --foundation_capture_radial_tolerance_m 0.05 \
+  --render_freq 1 --show_axes 1 --show_camera_frustums 1 \
+  --wrist_preview 1 --hold 1 \
+  --wrist_left_forward_offset_m 0.145 \
+  --wrist_right_forward_offset_m 0.13 \
+  --wrist_left_roll_deg -15 \
+  --wrist_right_roll_deg -60 \
+  --wrist_left_yaw_deg 0.182 \
+  --wrist_right_yaw_deg 0.840 \
+  --wrist_left_pitch_deg 15 \
+  --wrist_right_pitch_deg 15 \
+  --wrist_left_lateral_offset_m -0.0207 \
+  --wrist_right_lateral_offset_m 0.0274 \
+  --max_seed_tries 1 --require_success 0
+```
+
+#### C. 纯物理观察档：关闭 grasp-assist
+
+这条用来回答“如果没有 drive，OBJ 是否真的被夹爪带走”。这里 `--require_success 0` 是故意的，因为纯物理下物体不跟随也不是程序失败，而是说明当前碰撞/摩擦/闭合深度还不够真实。
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+export DISPLAY=:1.0
+xdpyinfo >/dev/null || { echo "DISPLAY=:1.0 不可用"; exit 1; }
+
+python view_pick_diverse_bottles_piper_ik_motion.py \
+  --task_name pick_diverse_bottles_piper_ik_foundation \
+  --ik_version v1 --foundation_id 0 --foundation_mode o1.2 \
+  --foundation_grasp_standoff_m 0.14 \
+  --foundation_collision_mode cylinder_proxy \
+  --foundation_grasp_assist 0 \
+  --foundation_grasp_require_contact 0 \
+  --render_freq 1 --show_axes 1 --show_camera_frustums 1 \
+  --wrist_preview 1 --hold 1 \
+  --wrist_left_forward_offset_m 0.145 \
+  --wrist_right_forward_offset_m 0.13 \
+  --wrist_left_roll_deg -15 \
+  --wrist_right_roll_deg -60 \
+  --wrist_left_yaw_deg 0.182 \
+  --wrist_right_yaw_deg 0.840 \
+  --wrist_left_pitch_deg 15 \
+  --wrist_right_pitch_deg 15 \
+  --wrist_left_lateral_offset_m -0.0207 \
+  --wrist_right_lateral_offset_m 0.0274 \
+  --max_seed_tries 1 --require_success 0
+```
+
+如果 C 档物体不跟随，按这个顺序 debug：
+
+1. 先看 B 档 `contacts` 是否为空；为空就不是摩擦问题，是 collision/抓取深度没真正接触。
+2. 若有单指接触，调 `foundation_grasp_standoff_m` 或 `foundation_grasp_lateral_offset`，让物体中心落在两指之间。
+3. 若两指有接触但 lift 掉落，再调 OBJ collision/friction/质量，或检查 Pika finger collision 是否太薄/位置不准。
+4. `exact_convex` 可作为最后对照：更接近 OBJ，但可能把 mesh 分解/凸包误差和性能问题引入 debug。

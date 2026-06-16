@@ -179,6 +179,19 @@ def main() -> None:
                         help="O.1 mode: frame 0, annotated object frame, or annotated EE action")
     parser.add_argument("--foundation_grasp_standoff_m", type=float, default=None,
                         help="覆盖 Foundation grasp 时 gripper base 到物体中心的后退距离；增大可让物体更靠近夹爪指尖")
+    parser.add_argument("--foundation_collision_mode", default=None,
+                        choices=["support_proxy", "cylinder_proxy", "exact_convex"],
+                        help="覆盖 Foundation OBJ 碰撞模型：support_proxy 默认稳定，cylinder/exact 更适合接触调试")
+    parser.add_argument("--foundation_collision_radius_padding_m", type=float, default=None,
+                        help="覆盖 Foundation 碰撞代理半径 padding（米）")
+    parser.add_argument("--foundation_grasp_assist", type=int, choices=[0, 1], default=None,
+                        help="覆盖 O.1.2 grasp-assist drive；0=关闭，用纯物理观察是否真实夹住")
+    parser.add_argument("--foundation_grasp_require_contact", type=int, choices=[0, 1], default=None,
+                        help="覆盖抓取门控是否要求两指均与物体发生接触")
+    parser.add_argument("--foundation_capture_radial_tolerance_m", type=float, default=None,
+                        help="覆盖物体中心到两指连线的最大径向距离门控（米）")
+    parser.add_argument("--foundation_grasp_assist_max_distance_m", type=float, default=None,
+                        help="覆盖 EE 到物体中心的最大距离门控（米）")
     args_cli = parser.parse_args()
 
     if args_cli.task_config:
@@ -211,6 +224,30 @@ def main() -> None:
         if args_cli.foundation_grasp_standoff_m <= 0:
             raise ValueError("--foundation_grasp_standoff_m must be positive")
         build_args["foundation_grasp_standoff"] = args_cli.foundation_grasp_standoff_m
+    if args_cli.foundation_collision_mode is not None:
+        build_args["foundation_collision_mode"] = args_cli.foundation_collision_mode
+    if args_cli.foundation_collision_radius_padding_m is not None:
+        build_args["foundation_collision_radius_padding"] = (
+            args_cli.foundation_collision_radius_padding_m
+        )
+    if args_cli.foundation_grasp_assist is not None:
+        build_args["foundation_grasp_assist"] = bool(args_cli.foundation_grasp_assist)
+    if args_cli.foundation_grasp_require_contact is not None:
+        build_args["foundation_grasp_require_contact"] = bool(
+            args_cli.foundation_grasp_require_contact
+        )
+    if args_cli.foundation_capture_radial_tolerance_m is not None:
+        if args_cli.foundation_capture_radial_tolerance_m <= 0:
+            raise ValueError("--foundation_capture_radial_tolerance_m must be positive")
+        build_args["foundation_capture_radial_tolerance"] = (
+            args_cli.foundation_capture_radial_tolerance_m
+        )
+    if args_cli.foundation_grasp_assist_max_distance_m is not None:
+        if args_cli.foundation_grasp_assist_max_distance_m <= 0:
+            raise ValueError("--foundation_grasp_assist_max_distance_m must be positive")
+        build_args["foundation_grasp_assist_max_distance"] = (
+            args_cli.foundation_grasp_assist_max_distance_m
+        )
     build_args.setdefault("camera", {})["wrist_camera_preview"] = bool(
         args_cli.wrist_preview
     )
@@ -313,6 +350,22 @@ def main() -> None:
         print("[motion-viewer] wrist preview enabled: left/right RGB mosaic")
     if tuning:
         print(f"[motion-viewer] wrist tuning={tuning}")
+    foundation_debug_keys = (
+        "foundation_collision_mode",
+        "foundation_collision_radius_padding",
+        "foundation_grasp_assist",
+        "foundation_grasp_require_contact",
+        "foundation_capture_radial_tolerance",
+        "foundation_grasp_assist_max_distance",
+        "foundation_grasp_standoff",
+    )
+    foundation_debug = {
+        key: build_args[key]
+        for key in foundation_debug_keys
+        if key in build_args
+    }
+    if foundation_debug:
+        print(f"[motion-viewer] foundation debug={foundation_debug}")
 
     if args_cli.wrist_debug_record:
         print(

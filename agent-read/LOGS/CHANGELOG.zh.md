@@ -2860,3 +2860,12 @@
 - 若目标是 gripper 中线，相机 lateral 应设为 left `-0.0207m`、right `+0.0274m`。
 - 坐标约定：gripper `+X` 是 wrist 到 tip 的前进轴，`+Y` 是夹爪开合/左右偏心方向。
 - 验证：带中线修正和左右 pitch `15deg` 的 V1/O.1.2 headless 最小运行成功，日志确认 `parent_lateral_offset_m` 进入 camera tuning，`physical_success=True`。
+
+
+## 2026-06-16（O.1.2 verified grasp/wrist v2 与真实抓取 debug）
+
+- 记录用户实测效果好的 viewer 参数：`foundation_grasp_standoff_m=0.14`、wrist forward left/right `0.145/0.13`、pitch `15deg`、lateral left/right `-0.0207/0.0274`。
+- `view_pick_diverse_bottles_piper_ik_motion.py` 新增 Foundation debug 覆盖参数：collision mode、collision padding、grasp assist、require contact、radial tolerance、assist max distance。
+- O.1.2 grasp-assist 关闭时现在仍会执行 grasp-state validation 并打印 `contacts/projection/radial`，但不会创建 object-gripper drive。
+
+验证：`py_compile` 通过；viewer `--help` 显示新增 Foundation debug 参数；verified v2 headless 在 `radial_tolerance=0.08`、`assist_max_distance=0.16` 下完成并 `physical_success=True`。默认门控 `0.065/0.14` 会因 left `radial=0.071m` / `ee_distance=0.143m` 失败，因此文档命令已显式加入门控阈值。纯物理档 `--foundation_grasp_assist 0 --foundation_collision_mode cylinder_proxy` 能运行到 validation 并打印 contacts/projection/radial；当前 seed 0 会失败，说明纯接触还没真实夹住。

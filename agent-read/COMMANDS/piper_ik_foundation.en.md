@@ -187,3 +187,13 @@ The viewer now supports `--wrist_left_pitch_deg`, `--wrist_right_pitch_deg`, `--
 ### Wrist Centerline Correction Note
 
 The right-side `+0.0067m` value in O.1.2.3 is a mirror-symmetry correction, not a gripper-centerline correction. If the target is a camera near the gripper opening centerline `Y=0`, use left `--wrist_left_lateral_offset_m -0.0207` and right `--wrist_right_lateral_offset_m 0.0274`. Current convention: gripper `+X` is the wrist-to-tip forward axis, while `+Y` is the finger-opening/lateral direction. The 0515 raw calibration itself is not at `Y=0`: left `+2.07cm`, right `-2.74cm`.
+
+
+### O.1.2 Verified Grasp/Wrist V2 And Real-Grasp Debugging
+
+The currently validated viewer version uses `foundation_grasp_standoff_m=0.14`, wrist forward left/right `0.145/0.13`, pitch `15deg`, and lateral left/right `-0.0207/0.0274`. Use it as the daily O.1.2 viewer baseline.
+
+Real-grasp debugging has three tiers: tier A keeps the default `support_proxy + grasp_assist=1`; tier B uses `--foundation_collision_mode cylinder_proxy --foundation_grasp_require_contact 1` to check whether both fingers actually contact the object; tier C uses `--foundation_grasp_assist 0 --require_success 0` to disable the drive and observe pure physics. Relevant viewer overrides are `--foundation_collision_mode`, `--foundation_collision_radius_padding_m`, `--foundation_grasp_assist`, `--foundation_grasp_require_contact`, `--foundation_capture_radial_tolerance_m`, and `--foundation_grasp_assist_max_distance_m`.
+
+
+Note: the verified-v2 daily success tier with `foundation_grasp_standoff_m=0.14` should also pass `--foundation_capture_radial_tolerance_m 0.08 --foundation_grasp_assist_max_distance_m 0.16`. The default `0.065/0.14` gate is slightly too strict for the current fingertip grasp geometry; headless validation fails near left `radial≈0.071m` and `ee_distance≈0.143m`.

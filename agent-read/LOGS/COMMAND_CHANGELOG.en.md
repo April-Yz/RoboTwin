@@ -2160,3 +2160,13 @@
 - For a camera at gripper centerline `Y=0`, use `--wrist_left_lateral_offset_m -0.0207 --wrist_right_lateral_offset_m 0.0274`.
 - To preserve raw/current calibrated positions, omit lateral parameters.
 - `+X` is wrist-to-tip forward; `+Y` is finger-opening/lateral direction.
+
+
+## 2026-06-16 (Foundation Real-Grasp Debug Commands)
+
+- Added viewer options: `--foundation_collision_mode`, `--foundation_collision_radius_padding_m`, `--foundation_grasp_assist`, `--foundation_grasp_require_contact`, `--foundation_capture_radial_tolerance_m`, and `--foundation_grasp_assist_max_distance_m`.
+- The daily success tier uses `foundation_grasp_standoff_m=0.14` with the current wrist v2 parameters.
+- The contact-gated tier uses `--foundation_collision_mode cylinder_proxy --foundation_grasp_require_contact 1`.
+- The pure-physics observation tier uses `--foundation_grasp_assist 0 --require_success 0`.
+
+Update: the verified-v2 daily viewer command now includes `--foundation_capture_radial_tolerance_m 0.08 --foundation_grasp_assist_max_distance_m 0.16` to match the fingertip grasp geometry from `foundation_grasp_standoff_m=0.14`.

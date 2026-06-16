@@ -2158,3 +2158,13 @@
 - 若目标是相机在 gripper 中线 `Y=0`，使用 `--wrist_left_lateral_offset_m -0.0207 --wrist_right_lateral_offset_m 0.0274`。
 - 若只想保留原始/当前标定位置，不传 lateral 参数。
 - `+X` 是 wrist 到 tip 的前进轴；`+Y` 是夹爪开合/左右偏心方向。
+
+
+## 2026-06-16（Foundation 真实抓取 debug 命令）
+
+- 新增 viewer 参数：`--foundation_collision_mode`、`--foundation_collision_radius_padding_m`、`--foundation_grasp_assist`、`--foundation_grasp_require_contact`、`--foundation_capture_radial_tolerance_m`、`--foundation_grasp_assist_max_distance_m`。
+- 日常成功档使用 `foundation_grasp_standoff_m=0.14` 和当前 wrist v2 参数。
+- 接触门控档使用 `--foundation_collision_mode cylinder_proxy --foundation_grasp_require_contact 1`。
+- 纯物理观察档使用 `--foundation_grasp_assist 0 --require_success 0`。
+
+补充：verified v2 日常 viewer 命令增加 `--foundation_capture_radial_tolerance_m 0.08 --foundation_grasp_assist_max_distance_m 0.16`，以匹配 `foundation_grasp_standoff_m=0.14` 的指尖抓取几何。

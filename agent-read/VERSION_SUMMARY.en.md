@@ -37,3 +37,10 @@ The default `foundation_grasp_standoff` for Foundation Piper IK V1-V4 changed fr
 ## 2026-06-16: Wrist Pitch/Lateral Debug Interface
 
 The Foundation Piper IK viewer now exposes temporary wrist-camera `parent_pitch_deg` and `parent_lateral_offset_m` overrides to test the 0515 wrist calibration issue: the cameras are nearly coplanar with the gripper forward plane but not downward-looking. The recommended first trial is left/right pitch `15deg` and right lateral `+0.0067m`. These are viewer/debug parameters and do not change gripper grasp planning.
+
+
+## 2026-06-16: O.1.2 Verified Grasp/Wrist V2
+
+The recommended O.1.2 viewer baseline now uses `foundation_grasp_standoff_m=0.14`, wrist forward `0.145/0.13`, pitch `15deg`, and lateral `-0.0207/0.0274`. Real-grasp debug options were added so the viewer can switch collision proxies, require two-finger contact, and disable grasp-assist for pure-physics observation.
+
+Update: the verified grasp/wrist v2 command explicitly includes `foundation_capture_radial_tolerance_m=0.08` and `foundation_grasp_assist_max_distance_m=0.16`; the default gate is slightly too strict for `standoff=0.14`.

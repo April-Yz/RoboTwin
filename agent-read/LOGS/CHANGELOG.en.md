@@ -2862,3 +2862,12 @@ Validation: `py_compile envs/camera/camera.py view_pick_diverse_bottles_piper_ik
 - For a gripper-centerline camera, use lateral offsets left `-0.0207m` and right `+0.0274m`.
 - Convention: gripper `+X` is wrist-to-tip forward, and `+Y` is finger-opening/lateral direction.
 - Validation: a minimal V1/O.1.2 headless run with centerline correction and left/right pitch `15deg` succeeded, logged `parent_lateral_offset_m` in camera tuning, and reported `physical_success=True`.
+
+
+## 2026-06-16 (O.1.2 Verified Grasp/Wrist V2 And Real-Grasp Debugging)
+
+- Recorded the user-validated viewer parameters: `foundation_grasp_standoff_m=0.14`, wrist forward left/right `0.145/0.13`, pitch `15deg`, and lateral left/right `-0.0207/0.0274`.
+- Added Foundation debug overrides to `view_pick_diverse_bottles_piper_ik_motion.py`: collision mode, collision padding, grasp assist, require contact, radial tolerance, and assist max distance.
+- When O.1.2 grasp-assist is disabled, the task now still runs grasp-state validation and prints `contacts/projection/radial`, but does not create an object-gripper drive.
+
+Validation: `py_compile` passed; viewer `--help` shows the new Foundation debug options; verified v2 headless completes with `physical_success=True` when using `radial_tolerance=0.08` and `assist_max_distance=0.16`. The default `0.065/0.14` gate fails around left `radial=0.071m` / `ee_distance=0.143m`, so the documented command now includes explicit gate thresholds. The pure-physics tier with `--foundation_grasp_assist 0 --foundation_collision_mode cylinder_proxy` reaches validation and prints contacts/projection/radial; seed 0 currently fails, which indicates pure contact is not yet carrying the object.

@@ -593,7 +593,7 @@ class pick_diverse_bottles_piper_ik_foundation(pick_diverse_bottles_piper_ik):
         return current_pose, ee_joint.child_link.get_pose()
 
     def _attach_foundation_grasp_drives(self):
-        if not self._foundation_grasp_assist or self._foundation_grasp_drives:
+        if self._foundation_grasp_drives:
             return
         validated = []
         for side, actor, ee_joint, gripper_joints in (
@@ -604,6 +604,10 @@ class pick_diverse_bottles_piper_ik_foundation(pick_diverse_bottles_piper_ik):
                 side, actor, ee_joint, gripper_joints
             )
             validated.append((side, actor, ee_joint.child_link, actor_pose, ee_pose))
+        self._foundation_grasp_valid = True
+        if not self._foundation_grasp_assist:
+            print("[piper-ik-foundation] grasp-assist disabled; validation only")
+            return
         for side, actor, ee_link, actor_pose, ee_pose in validated:
             object_anchor = actor_pose.inv() * ee_pose
             drive = self.scene.create_drive(
@@ -622,7 +626,6 @@ class pick_diverse_bottles_piper_ik_foundation(pick_diverse_bottles_piper_ik):
             print(
                 f"[piper-ik-foundation] grasp-assist attached {side} at current object pose"
             )
-        self._foundation_grasp_valid = True
 
     def _release_foundation_grasp_drives(self):
         for drive in self._foundation_grasp_drives:

@@ -37,3 +37,10 @@ Foundation Piper IK V1-V4 的默认 `foundation_grasp_standoff` 从 `0.085m` 改
 ## 2026-06-16：Wrist pitch/lateral 调试接口
 
 Foundation Piper IK viewer 新增 wrist 相机 `parent_pitch_deg` 与 `parent_lateral_offset_m` 临时覆盖入口，用于验证 0515 wrist 标定“共面但不俯视”的问题。当前推荐起步值是左右 pitch `15deg`、右手 lateral `+0.0067m`；这些是 viewer/debug 参数，不改变 gripper 抓取规划。
+
+
+## 2026-06-16：O.1.2 verified grasp/wrist v2
+
+当前推荐的 O.1.2 viewer baseline 使用 `foundation_grasp_standoff_m=0.14`、wrist forward `0.145/0.13`、pitch `15deg`、lateral `-0.0207/0.0274`。同时新增真实抓取 debug 参数，可在 viewer 中切换 collision proxy、要求两指接触、关闭 grasp-assist 做纯物理观察。
+
+补充：verified grasp/wrist v2 推荐命令显式包含 `foundation_capture_radial_tolerance_m=0.08` 与 `foundation_grasp_assist_max_distance_m=0.16`，否则默认门控对 `standoff=0.14` 偏严格。

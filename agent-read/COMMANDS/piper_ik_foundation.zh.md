@@ -193,3 +193,13 @@ Viewer 新增：`--wrist_left_pitch_deg`、`--wrist_right_pitch_deg`、`--wrist_
 ### Wrist 中线修正说明
 
 O.1.2.3 中的右手 `+0.0067m` 是镜像对称修正，不是 gripper 中线修正。若目标是相机位于 gripper 开合中线 `Y=0`，应使用 left `--wrist_left_lateral_offset_m -0.0207`、right `--wrist_right_lateral_offset_m 0.0274`。当前约定：gripper `+X` 是 wrist 到 tip 的前进轴，`+Y` 是夹爪开合/左右偏心方向。0515 原始标定本身并不在 `Y=0`：left `+2.07cm`、right `-2.74cm`。
+
+
+### O.1.2 verified grasp/wrist v2 与真实抓取 debug
+
+当前实测好的 viewer 版本使用 `foundation_grasp_standoff_m=0.14`、wrist forward left/right `0.145/0.13`、pitch `15deg`、lateral left/right `-0.0207/0.0274`。这组用于日常 O.1.2 viewer。
+
+真实抓取 debug 分三档：A 档保留默认 `support_proxy + grasp_assist=1`；B 档用 `--foundation_collision_mode cylinder_proxy --foundation_grasp_require_contact 1` 检查两指是否真实接触；C 档用 `--foundation_grasp_assist 0 --require_success 0` 关闭 drive，观察纯物理是否能带动物体。相关 viewer 覆盖参数包括 `--foundation_collision_mode`、`--foundation_collision_radius_padding_m`、`--foundation_grasp_assist`、`--foundation_grasp_require_contact`、`--foundation_capture_radial_tolerance_m`、`--foundation_grasp_assist_max_distance_m`。
+
+
+补充：`foundation_grasp_standoff_m=0.14` 的 verified v2 日常成功档应同时传 `--foundation_capture_radial_tolerance_m 0.08 --foundation_grasp_assist_max_distance_m 0.16`。原因是默认 `0.065/0.14` 对当前指尖抓取几何偏严格，headless 验证会在 left `radial≈0.071m`、`ee_distance≈0.143m` 附近失败。
