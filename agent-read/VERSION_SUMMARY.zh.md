@@ -48,6 +48,6 @@ Foundation Piper IK viewer 新增 wrist 相机 `parent_pitch_deg` 与 `parent_la
 
 ## 2026-06-16：O.2 pnp_tray Foundation IK
 
-O.2 是 O.1.2 Foundation IK 的任务扩展，不改变 V1-V4 IK 语义。新增 `pnp_tray_piper_ik_foundation`，将 Foundation NPZ 对象映射为左 `left_dark_red_cup`、右 `right_bottle`，使用 pnp_tray 的手工关键帧和 `h2_pure_d435` EE target。动作顺序为 `pregrasp -> grasp -> close -> second-keyframe action -> open_gripper`。
+O.2 是 O.1.2 Foundation IK 的任务扩展，不改变 V1-V4 IK 语义。新增 `pnp_tray_piper_ik_foundation`，将 Foundation NPZ 对象映射为左 `left_dark_red_cup`、右 `right_bottle`，使用 pnp_tray 的手工关键帧。默认 action target 来源为 Foundation 第二关键帧 OBJ center，而不是 `h2_pure_d435` EE target。动作顺序为 `pregrasp -> grasp -> close -> object-keyframe action -> open_gripper`。
 
-推荐 O.2 从 V1 开始验证；pnp_tray 使用 `foundation_grasp_standoff=0.105`，因为 pick_diverse verified v2 的 `0.14` 会在 ID0 上推偏左杯。正式采集使用 `collect_foundation_piper_ik_verified.sh pnp_tray ...`，仍保存 head 和左右 wrist 视频。
+推荐 O.2 从 V1 开始验证；pnp_tray 使用 `foundation_grasp_standoff=0.105`，因为 pick_diverse verified v2 的 `0.14` 会在 ID0 上推偏左杯。可选 `foundation_pregrasp_clearance=0.06` 可用于抬高 pregrasp 的避障试验，默认不启用。正式采集使用 `collect_foundation_piper_ik_verified.sh pnp_tray ...`，仍保存 head 和左右 wrist 视频。

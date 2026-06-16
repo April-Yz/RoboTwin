@@ -33,6 +33,8 @@ foundation_capture_radial_tolerance: 0.08
 foundation_capture_segment_margin: 0.15
 foundation_grasp_require_contact: false
 foundation_open_after_action: true
+foundation_action_target_source: "object_keyframe"
+foundation_pregrasp_clearance: 0.0
 foundation_left_description: "left dark red cup"
 foundation_right_description: "right bottle"
 domain_randomization:

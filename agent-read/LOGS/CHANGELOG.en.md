@@ -2883,3 +2883,13 @@ Validation: `py_compile` passed; viewer `--help` shows the new Foundation debug 
 - AB/C conclusion: tier A is the stable collection mode; tier B needs full side-body collision to make contact gating meaningful; tier C disables assist and exposes current pregrasp/grasp object-collision issues.
 
 Validation: `py_compile` passed; `DRY_RUN=1` generated configs for both pick_diverse_bottles and pnp_tray; pick_diverse V1/O.1.2 headless succeeded with `standoff=0.14` and relaxed gates; pnp_tray V1/ID0/O.2 headless succeeded with `standoff=0.105`, including `open_after_action=True` and `open_gripper` in the log.
+
+
+## 2026-06-17 (O.2 pnp_tray Action Target Fix And Pregrasp Avoidance Trial)
+
+- Root cause: the old O.2 reused the O.1.2 second-keyframe EE target. On ID0, that EE target is around `Y=0.266`, farther forward than the Foundation second-keyframe object centers around `Y=0.18`, so the grippers moved too far forward after close.
+- Fix: `pnp_tray_piper_ik_foundation` now defaults to `foundation_action_target_source=object_keyframe`; the action gripper target is computed from the second-keyframe OBJ center plus the current grasp-relative offset.
+- Added viewer options `--foundation_action_target_source` and `--foundation_pregrasp_clearance_m`; the wrapper supports `FOUNDATION_PREGRASP_CLEARANCE_M` to generate an isolated avoidance-trial config.
+- Optional avoidance: `foundation_pregrasp_clearance=0.06m` inserts a lifted waypoint before pregrasp. The default remains `0`, so existing no-avoidance commands are unchanged.
+
+Validation: O.2 V1/ID0 headless with default object-keyframe succeeded. The action target changed from the old EE `Y≈0.266` to gripper `Y≈0.075/0.069`, with object error about `4.2cm/3.3cm`; `foundation_pregrasp_clearance=0.06` succeeded; `0.10` failed because the left cup rotated about `16.3deg`, exceeding the gate.

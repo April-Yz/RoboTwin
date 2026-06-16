@@ -2881,3 +2881,13 @@
 - AB/C 结论：A 档是当前可稳定采集模式；B 档需要完整侧面 collision 才有接触意义；C 档关闭 assist 后会暴露当前 pregrasp/grasp 与物体碰撞的问题。
 
 验证：`py_compile` 通过；`DRY_RUN=1` 对 pick_diverse_bottles 和 pnp_tray 均能生成 config；pick_diverse V1/O.1.2 headless 使用 `standoff=0.14` 和放宽门控成功；pnp_tray V1/ID0/O.2 headless 使用 `standoff=0.105` 成功，日志包含 `open_after_action=True` 和 `open_gripper`。
+
+
+## 2026-06-17（O.2 pnp_tray action 目标修正与预抓取避障试验）
+
+- 根因：旧 O.2 沿用 O.1.2 的第二关键帧 EE target，ID0 的 EE target `Y≈0.266`，比 Foundation 第二关键帧物体中心 `Y≈0.18` 更靠前，导致 close 后 gripper 看起来向前移动过远。
+- 修正：`pnp_tray_piper_ik_foundation` 默认 `foundation_action_target_source=object_keyframe`，action gripper target 由第二关键帧 OBJ center 加当前 grasp 相对偏移得到。
+- 新增 viewer 参数 `--foundation_action_target_source` 与 `--foundation_pregrasp_clearance_m`；wrapper 支持 `FOUNDATION_PREGRASP_CLEARANCE_M` 生成独立避障试验 config。
+- 可选避障：`foundation_pregrasp_clearance=0.06m` 在 pregrasp 前插入抬高 waypoint；默认仍为 `0`，不影响无避障命令。
+
+验证：O.2 V1/ID0 headless 默认 object-keyframe 成功，action target 从旧 EE `Y≈0.266` 改为 gripper `Y≈0.075/0.069`，object error 约 `4.2cm/3.3cm`；`foundation_pregrasp_clearance=0.06` 成功；`0.10` 失败，左杯旋转约 `16.3deg` 超过门限。

@@ -7676,10 +7676,31 @@ O.2 复用 O.1.2 的 Foundation/关键帧逻辑，但任务对象和动作语义
 | 右手对象 | `right_bottle` | `right_bottle` |
 | Foundation 输入 | `data/piper/hand/pick_diverse_bottles/foundation_replay_d435/foundation_input_<ID>` | `data/piper/hand/pnp_tray/foundation_replay_d435/foundation_input_<ID>` |
 | 关键帧标注 | `code_painting/h2o_manual_review/pick_diverse_bottles/hand_keyframes_all.json` | `code_painting/h2o_manual_review/pnp_tray/hand_keyframes_all.json` |
-| 第二关键帧 EE 目标 | `code_painting/human_replay/pick_diverse_bottles/id_<ID>/world_targets_and_status.npz` | `code_painting/human_replay/h2_pure_d435/pnp_tray/id<ID>_d435_z005/world_targets_and_status.npz` |
-| 动作 | pregrasp -> grasp -> close -> second-keyframe action | pregrasp -> grasp -> close -> second-keyframe action -> open gripper |
+| 第二关键帧目标 | `code_painting/human_replay/pick_diverse_bottles/id_<ID>/world_targets_and_status.npz` 的 EE xyz | Foundation NPZ 中第二关键帧 OBJ center；不是 `h2_pure_d435` 的 EE xyz |
+| 动作 | pregrasp -> grasp -> close -> second-keyframe action | pregrasp -> grasp -> close -> object-keyframe action -> open gripper |
 
 注意：pnp_tray 不能直接沿用 pick_diverse 的 `foundation_grasp_standoff=0.14`。ID0 验证中，`0.14` 会在 close 前把左手 cup 推偏，validation 失败；`0.105` 成功。因此 O.2 config 和采集脚本对 pnp_tray 固定使用 `0.105`。
+
+#### O.2 修正说明（2026-06-17）
+
+gen1 中看到 close 后夹爪继续往前很远，根因是旧 O.2 逻辑沿用了 O.1.2 的“第二关键帧 EE target”。ID0 中第二关键帧 EE target 是：
+
+- left EE `[0.0236, 0.2666, 0.9180]`
+- right EE `[0.1932, 0.2651, 0.9335]`
+
+但 Foundation 第二关键帧物体中心是：
+
+- left cup center `[0.0592, 0.1799, 0.8343]`
+- right bottle center `[0.1846, 0.1740, 0.8780]`
+
+所以旧逻辑会把 gripper target 推到 `Y≈0.266`，看起来比物体第二关键帧位置更靠前。现在 O.2 默认使用 `foundation_action_target_source=object_keyframe`：先取第二关键帧 OBJ center，再加上当前 grasp 时 gripper 相对物体中心的偏移，得到 action gripper target。ID0 新验证 action target 为：
+
+- left gripper `[0.0592, 0.0749, 0.8343]`
+- right gripper `[0.1846, 0.0690, 0.8780]`
+
+这样 object center 会跟随到第二关键帧附近；headless 验证 object error 约 left `4.2cm`、right `3.3cm`，`physical_success=True`。
+
+关于 open：gen1 里第一次 O.2 完整运行已经执行 `open_gripper`；第二次是在 `open_gripper` settle 过程中按了 `Ctrl-C`，所以看起来像没完全打开。
 
 #### O.2 viewer 验证命令
 
@@ -7692,6 +7713,7 @@ python view_pick_diverse_bottles_piper_ik_motion.py \
   --task_name pnp_tray_piper_ik_foundation \
   --ik_version v1 --foundation_id 0 --foundation_mode o1.2 \
   --foundation_grasp_standoff_m 0.105 \
+  --foundation_action_target_source object_keyframe \
   --foundation_capture_radial_tolerance_m 0.08 \
   --foundation_grasp_assist_max_distance_m 0.16 \
   --render_freq 1 --show_axes 1 --show_camera_frustums 1 \
@@ -7708,6 +7730,7 @@ python view_pick_diverse_bottles_piper_ik_motion.py \
   --task_name pnp_tray_piper_ik_foundation \
   --ik_version v1 --foundation_id 0 --foundation_mode o1.2 \
   --foundation_grasp_standoff_m 0.105 \
+  --foundation_action_target_source object_keyframe \
   --foundation_capture_radial_tolerance_m 0.08 \
   --foundation_grasp_assist_max_distance_m 0.16 \
   --render_freq 0 --show_axes 0 --wrist_preview 0 --hold 0 \
@@ -7715,6 +7738,42 @@ python view_pick_diverse_bottles_piper_ik_motion.py \
 ```
 
 已验证结果：V1 / ID0 / O.2 headless 成功，日志中 `open_after_action=True`，并执行了 `open_gripper`；最终 `physical_success=True`。
+
+#### O.2 可选避障试验：抬高 pregrasp waypoint
+
+这不是完整动态物体碰撞规划；它是一个不改变默认无避障命令的 waypoint 版本：在 `pregrasp` 前插入 `approach_clearance`，位置等于 pregrasp 的 z 再抬高指定米数。用途是避免从 home 横向扫过物体高度。
+
+ID0 验证结论：
+
+- `--foundation_pregrasp_clearance_m 0.10`：失败，左杯旋转约 `16.3deg`，略超 `15deg` 门限。
+- `--foundation_pregrasp_clearance_m 0.06`：成功，`physical_success=True`。
+
+viewer/headless 可这样试，不覆盖默认命令：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+
+python view_pick_diverse_bottles_piper_ik_motion.py \
+  --task_name pnp_tray_piper_ik_foundation \
+  --ik_version v1 --foundation_id 0 --foundation_mode o1.2 \
+  --foundation_grasp_standoff_m 0.105 \
+  --foundation_action_target_source object_keyframe \
+  --foundation_pregrasp_clearance_m 0.06 \
+  --foundation_capture_radial_tolerance_m 0.08 \
+  --foundation_grasp_assist_max_distance_m 0.16 \
+  --render_freq 1 --show_axes 1 --show_camera_frustums 1 \
+  --wrist_preview 1 --hold 1 \
+  --max_seed_tries 1 --require_success 1
+```
+
+正式采集的避障试验版本使用环境变量生成独立 tag：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+
+FOUNDATION_PREGRASP_CLEARANCE_M=0.06 \
+bash collect_foundation_piper_ik_verified.sh pnp_tray v1 0 0 o2_pregrasp_clearance006
+```
 
 #### O.2 采集命令
 

@@ -5,7 +5,7 @@ This repository extends RoboTwin simulation, collection, and policy workflows wi
 ## Current Recommended Workflow
 
 - Piper IK dual-bottle task: use `pick_diverse_bottles_piper_ik` with `demo_piper_ik_seq_v1..v4`.
-- Foundation OBJ comparison: use `pick_diverse_bottles_piper_ik_foundation` with `demo_piper_ik_foundation_v1..v4`. O.1 uses an explicit frame, O.1.1 sets up from the first annotated keyframe, and O.1.2 replaces lift/place with second-keyframe EE positions. O.2 adds `pnp_tray_piper_ik_foundation`, picking `left_dark_red_cup` with the left arm and `right_bottle` with the right arm, then opening the grippers after the second keyframe.
+- Foundation OBJ comparison: use `pick_diverse_bottles_piper_ik_foundation` with `demo_piper_ik_foundation_v1..v4`. O.1 uses an explicit frame, O.1.1 sets up from the first annotated keyframe, and O.1.2 replaces lift/place with second-keyframe EE positions. O.2 adds `pnp_tray_piper_ik_foundation`, picking `left_dark_red_cup` with the left arm and `right_bottle` with the right arm, placing by the second-keyframe OBJ center by default, then opening the grippers.
 - Default IK: V1. V2 uses cubic interpolation, V3 uses MotionGen with an IK-interpolation fallback, and V4 uses multi-seed IK.
 - Data flow: Phase 1 finds stable, physically successful seeds and saves versioned trajectories. Phase 2 validates and replays them in the same seeded scene, producing HDF5, videos, and instructions.
 - Cameras: head, front, side, right-side `third_camera`, opposite overhead `opposite_top_camera`, and top-level `third_view`. Foundation configs export distinct 0515 left/right wrist views through a base Pika adapter plus per-side forward/roll tuning, and support a live dual-wrist viewer mosaic.

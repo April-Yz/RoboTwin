@@ -24,3 +24,4 @@ class pnp_tray_piper_ik_foundation(pick_diverse_bottles_piper_ik_foundation):
     FOUNDATION_DEFAULT_LEFT_DESCRIPTION = "left dark red cup"
     FOUNDATION_DEFAULT_RIGHT_DESCRIPTION = "right bottle"
     FOUNDATION_DEFAULT_OPEN_AFTER_ACTION = True
+    FOUNDATION_DEFAULT_ACTION_TARGET_SOURCE = "object_keyframe"

@@ -192,6 +192,11 @@ def main() -> None:
                         help="覆盖物体中心到两指连线的最大径向距离门控（米）")
     parser.add_argument("--foundation_grasp_assist_max_distance_m", type=float, default=None,
                         help="覆盖 EE 到物体中心的最大距离门控（米）")
+    parser.add_argument("--foundation_action_target_source", default=None,
+                        choices=["hand_ee", "object_keyframe"],
+                        help="O.1.2 action 目标来源：hand_ee=第二关键帧 EE；object_keyframe=第二关键帧物体中心")
+    parser.add_argument("--foundation_pregrasp_clearance_m", type=float, default=None,
+                        help="在 pregrasp 前插入一个抬高 waypoint；0=关闭，正值为抬高米数")
     args_cli = parser.parse_args()
 
     if args_cli.task_config:
@@ -250,6 +255,12 @@ def main() -> None:
         build_args["foundation_grasp_assist_max_distance"] = (
             args_cli.foundation_grasp_assist_max_distance_m
         )
+    if args_cli.foundation_action_target_source is not None:
+        build_args["foundation_action_target_source"] = args_cli.foundation_action_target_source
+    if args_cli.foundation_pregrasp_clearance_m is not None:
+        if args_cli.foundation_pregrasp_clearance_m < 0:
+            raise ValueError("--foundation_pregrasp_clearance_m must be non-negative")
+        build_args["foundation_pregrasp_clearance"] = args_cli.foundation_pregrasp_clearance_m
     build_args.setdefault("camera", {})["wrist_camera_preview"] = bool(
         args_cli.wrist_preview
     )
@@ -360,6 +371,8 @@ def main() -> None:
         "foundation_capture_radial_tolerance",
         "foundation_grasp_assist_max_distance",
         "foundation_grasp_standoff",
+        "foundation_action_target_source",
+        "foundation_pregrasp_clearance",
     )
     foundation_debug = {
         key: build_args[key]

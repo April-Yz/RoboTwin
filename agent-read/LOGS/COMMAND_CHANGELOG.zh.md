@@ -2177,3 +2177,11 @@
 - pick_diverse_bottles 使用 `foundation_grasp_standoff=0.14`；pnp_tray 使用 `foundation_grasp_standoff=0.105`。
 - 新增 viewer/采集任务名：`pnp_tray_piper_ik_foundation`。
 - O.2 viewer 最小命令使用 `--task_name pnp_tray_piper_ik_foundation --foundation_mode o1.2 --foundation_grasp_standoff_m 0.105`。
+
+
+## 2026-06-17（O.2 object-keyframe 与 pregrasp clearance 命令）
+
+- 新增 viewer 参数：`--foundation_action_target_source hand_ee|object_keyframe`。
+- 新增 viewer 参数：`--foundation_pregrasp_clearance_m <M>`；`0` 为默认无避障，正值在 pregrasp 前插入抬高 waypoint。
+- `pnp_tray_piper_ik_foundation` 默认使用 `object_keyframe`；pick_diverse 默认仍为 `hand_ee`。
+- wrapper 新增环境变量：`FOUNDATION_PREGRASP_CLEARANCE_M=0.06 bash collect_foundation_piper_ik_verified.sh pnp_tray v1 0 0 o2_pregrasp_clearance006`。

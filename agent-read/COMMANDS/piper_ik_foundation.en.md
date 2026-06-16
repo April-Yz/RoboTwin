@@ -224,9 +224,11 @@ AB/C conclusion: tier A is the stable controlled-assist collection mode; tier B 
 
 ### O.2 pnp_tray Foundation IK
 
-New task `pnp_tray_piper_ik_foundation` reuses the Foundation base class but maps the left object to `left_dark_red_cup` and the right object to `right_bottle`. Keyframes come from `code_painting/h2o_manual_review/pnp_tray/hand_keyframes_all.json`, and second-keyframe EE targets come from `code_painting/human_replay/h2_pure_d435/pnp_tray/id<ID>_d435_z005/world_targets_and_status.npz`. The action order is `pregrasp -> grasp -> close -> action -> open_gripper`.
+New task `pnp_tray_piper_ik_foundation` reuses the Foundation base class but maps the left object to `left_dark_red_cup` and the right object to `right_bottle`. Keyframes come from `code_painting/h2o_manual_review/pnp_tray/hand_keyframes_all.json`. O.2 defaults to `foundation_action_target_source=object_keyframe`, so the action uses the Foundation second-keyframe OBJ center instead of the `h2_pure_d435` EE xyz. The action order is `pregrasp -> grasp -> close -> object-keyframe action -> open_gripper`.
 
 `pnp_tray` should not reuse pick_diverse's `standoff=0.14`; ID0 validation showed that it pushes the left cup. O.2 configs and the wrapper use `foundation_grasp_standoff=0.105`.
+
+2026-06-17 fix: the old O.2 used second-keyframe EE targets, which are at about `Y=0.266` on ID0 and made the grippers move too far forward after close. The new logic uses second-keyframe object centers; ID0 action gripper targets are now left `[0.0592,0.0749,0.8343]` and right `[0.1846,0.0690,0.8780]`, with object error about `4.2cm/3.3cm`.
 
 Viewer validation:
 
@@ -235,6 +237,7 @@ python view_pick_diverse_bottles_piper_ik_motion.py \
   --task_name pnp_tray_piper_ik_foundation \
   --ik_version v1 --foundation_id 0 --foundation_mode o1.2 \
   --foundation_grasp_standoff_m 0.105 \
+  --foundation_action_target_source object_keyframe \
   --foundation_capture_radial_tolerance_m 0.08 \
   --foundation_grasp_assist_max_distance_m 0.16 \
   --render_freq 1 --show_axes 1 --show_camera_frustums 1 \
@@ -247,3 +250,5 @@ Collection:
 ```bash
 bash collect_foundation_piper_ik_verified.sh pnp_tray v1 0 0 o2_verified_v1
 ```
+
+Optional avoidance trial without changing the default command: pass `--foundation_pregrasp_clearance_m 0.06` to insert a lifted waypoint before pregrasp. ID0 validation succeeded with `0.06m`; `0.10m` rotates the left cup by about `16.3deg` and fails. Formal collection can use `FOUNDATION_PREGRASP_CLEARANCE_M=0.06 bash collect_foundation_piper_ik_verified.sh pnp_tray v1 0 0 o2_pregrasp_clearance006`.

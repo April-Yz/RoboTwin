@@ -2179,3 +2179,11 @@ Update: the verified-v2 daily viewer command now includes `--foundation_capture_
 - `pick_diverse_bottles` uses `foundation_grasp_standoff=0.14`; `pnp_tray` uses `foundation_grasp_standoff=0.105`.
 - Added viewer/collection task name: `pnp_tray_piper_ik_foundation`.
 - The minimal O.2 viewer command uses `--task_name pnp_tray_piper_ik_foundation --foundation_mode o1.2 --foundation_grasp_standoff_m 0.105`.
+
+
+## 2026-06-17 (O.2 object-keyframe And Pregrasp Clearance Commands)
+
+- Added viewer option: `--foundation_action_target_source hand_ee|object_keyframe`.
+- Added viewer option: `--foundation_pregrasp_clearance_m <M>`; `0` is the default no-avoidance path, and a positive value inserts a lifted waypoint before pregrasp.
+- `pnp_tray_piper_ik_foundation` defaults to `object_keyframe`; pick_diverse still defaults to `hand_ee`.
+- Wrapper environment variable: `FOUNDATION_PREGRASP_CLEARANCE_M=0.06 bash collect_foundation_piper_ik_verified.sh pnp_tray v1 0 0 o2_pregrasp_clearance006`.

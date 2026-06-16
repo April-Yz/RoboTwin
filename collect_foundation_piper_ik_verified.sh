@@ -8,12 +8,18 @@ foundation_id=${3:-}
 gpu_id=${4:-0}
 run_tag=${5:-verified_v2}
 dry_run=${DRY_RUN:-0}
+pregrasp_clearance=${FOUNDATION_PREGRASP_CLEARANCE_M:-0}
 
 if [[ ! "$foundation_task" =~ ^(pick_diverse_bottles|pnp_tray)$ ]] || \
    [[ ! "$version" =~ ^v[1-4]$ ]] || [[ ! "$foundation_id" =~ ^[0-9]+$ ]] || \
    [[ ! "$gpu_id" =~ ^[0-9]+$ ]] || [[ ! "$run_tag" =~ ^[A-Za-z0-9_-]+$ ]]; then
   echo "Usage: $0 <pick_diverse_bottles|pnp_tray> <v1|v2|v3|v4> <foundation_id> [gpu_id] [run_tag]" >&2
   echo "Optional: DRY_RUN=1 $0 ..." >&2
+  exit 2
+fi
+number_re='^-?([0-9]+([.][0-9]*)?|[.][0-9]+)$'
+if [[ ! "$pregrasp_clearance" =~ $number_re ]]; then
+  echo "Invalid FOUNDATION_PREGRASP_CLEARANCE_M: ${pregrasp_clearance}" >&2
   exit 2
 fi
 
@@ -48,6 +54,7 @@ export BASE_CONFIG="${base_config}"
 export GENERATED_CONFIG="${generated_config}"
 export INPUT_DIR="${input_dir}"
 export FOUNDATION_TASK="${foundation_task}"
+export FOUNDATION_PREGRASP_CLEARANCE="${pregrasp_clearance}"
 python - <<'PY'
 import os
 import yaml
@@ -56,6 +63,9 @@ base_config = os.environ["BASE_CONFIG"]
 generated_config = os.environ["GENERATED_CONFIG"]
 input_dir = os.environ["INPUT_DIR"]
 foundation_task = os.environ["FOUNDATION_TASK"]
+pregrasp_clearance = float(os.environ["FOUNDATION_PREGRASP_CLEARANCE"])
+if pregrasp_clearance < 0:
+    raise ValueError("FOUNDATION_PREGRASP_CLEARANCE_M must be non-negative")
 
 with open(base_config, "r", encoding="utf-8") as file:
     config = yaml.load(file, Loader=yaml.FullLoader)
@@ -79,6 +89,7 @@ config.update(
         "foundation_grasp_assist_max_distance": 0.16,
         "foundation_capture_radial_tolerance": 0.08,
         "foundation_grasp_require_contact": False,
+        "foundation_pregrasp_clearance": pregrasp_clearance,
         "collect_data": True,
         "eval_video_log": True,
         "skip_planner": True,
@@ -87,6 +98,9 @@ config.update(
 )
 if foundation_task == "pnp_tray":
     config["foundation_open_after_action"] = True
+    config["foundation_action_target_source"] = "object_keyframe"
+else:
+    config["foundation_action_target_source"] = "hand_ee"
 
 camera = config.setdefault("camera", {})
 camera.update(
@@ -123,6 +137,7 @@ print(f"[foundation-verified-collect] wrote {generated_config}")
 print(
     "[foundation-verified-collect] verified params: "
     f"standoff={grasp_standoff}, radial=0.08, assist_max_distance=0.16, "
+    f"pregrasp_clearance={pregrasp_clearance}, "
     "support_proxy+assist, calibrated head+wrist videos"
 )
 PY
