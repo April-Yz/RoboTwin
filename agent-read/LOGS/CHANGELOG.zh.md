@@ -2852,3 +2852,11 @@
 - 建议第一轮试调：左右 pitch `15deg`，右手 lateral `+0.0067m`。
 
 验证：`py_compile envs/camera/camera.py view_pick_diverse_bottles_piper_ik_motion.py` 通过；viewer `--help` 显示 pitch/lateral 新参数；带 `--wrist_left_pitch_deg 15 --wrist_right_pitch_deg 15 --wrist_right_lateral_offset_m 0.0067` 的 V1/O.1.2 headless 最小运行完成，日志确认 camera tuning 含 `parent_pitch_deg` 与 `parent_lateral_offset_m`，并报告 `physical_success=True`。
+
+
+## 2026-06-16（Wrist gripper 中线修正说明）
+
+- 明确区分 mirror correction 与 centerline correction：右手 `+0.0067m` 只让 right `Y=-2.74cm` 接近 left 的镜像 `-2.07cm`；不是把相机放到 `Y=0`。
+- 若目标是 gripper 中线，相机 lateral 应设为 left `-0.0207m`、right `+0.0274m`。
+- 坐标约定：gripper `+X` 是 wrist 到 tip 的前进轴，`+Y` 是夹爪开合/左右偏心方向。
+- 验证：带中线修正和左右 pitch `15deg` 的 V1/O.1.2 headless 最小运行成功，日志确认 `parent_lateral_offset_m` 进入 camera tuning，`physical_success=True`。

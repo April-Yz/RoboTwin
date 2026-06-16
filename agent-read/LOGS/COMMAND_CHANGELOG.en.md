@@ -2153,3 +2153,10 @@
 - Pitch rotates about gripper/link6 parent-frame `+Y`; positive values tilt the camera forward axis downward toward the nominal tip.
 - Lateral offset translates along gripper/link6 parent-frame `+Y`; the right camera is currently negative in Y, so use positive values to move it toward center.
 - Recommended first trial: `--wrist_left_pitch_deg 15 --wrist_right_pitch_deg 15 --wrist_right_lateral_offset_m 0.0067`.
+
+
+## 2026-06-16 (Viewer Wrist Centerline Command)
+
+- For a camera at gripper centerline `Y=0`, use `--wrist_left_lateral_offset_m -0.0207 --wrist_right_lateral_offset_m 0.0274`.
+- To preserve raw/current calibrated positions, omit lateral parameters.
+- `+X` is wrist-to-tip forward; `+Y` is finger-opening/lateral direction.

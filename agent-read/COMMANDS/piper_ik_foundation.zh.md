@@ -188,3 +188,8 @@ O.1/O.1.2 的抓取深度由 `foundation_grasp_standoff` 控制，不是 wrist c
 0515 wrist 标定经过 `legacy_r1` 轴转换和 `piper_pika_agx` adapter 后，camera forward 与 gripper `+X` 基本共面：left `plane_err_y=-0.182deg`，right `-0.840deg`。它不是明显俯视夹爪的外参，forward 到 gripper `+X` 只有 left `0.415deg`、right `1.575deg`；当前 viewer yaw 后仍只有 left `0.373deg`、right `1.332deg`，所以看不到两个夹爪的主要原因是缺少绕 gripper `Y` 的下俯 pitch。
 
 Viewer 新增：`--wrist_left_pitch_deg`、`--wrist_right_pitch_deg`、`--wrist_left_lateral_offset_m`、`--wrist_right_lateral_offset_m`。建议先试 `--wrist_left_pitch_deg 15 --wrist_right_pitch_deg 15 --wrist_right_lateral_offset_m 0.0067`。右手当前 Y 约 `-2.74cm`，左手为 `+2.07cm`；右手加 `+0.0067m` 可先调到镜像对称约 `-2.07cm`。
+
+
+### Wrist 中线修正说明
+
+O.1.2.3 中的右手 `+0.0067m` 是镜像对称修正，不是 gripper 中线修正。若目标是相机位于 gripper 开合中线 `Y=0`，应使用 left `--wrist_left_lateral_offset_m -0.0207`、right `--wrist_right_lateral_offset_m 0.0274`。当前约定：gripper `+X` 是 wrist 到 tip 的前进轴，`+Y` 是夹爪开合/左右偏心方向。0515 原始标定本身并不在 `Y=0`：left `+2.07cm`、right `-2.74cm`。

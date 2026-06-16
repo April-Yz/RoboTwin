@@ -2151,3 +2151,10 @@
 - pitch 为绕 gripper/link6 父坐标系 `+Y`；正值让相机前向朝 nominal tip 下俯。
 - lateral 为沿 gripper/link6 父坐标系 `+Y` 平移；右手当前偏负 Y，向中心修用正值。
 - 推荐起步：`--wrist_left_pitch_deg 15 --wrist_right_pitch_deg 15 --wrist_right_lateral_offset_m 0.0067`。
+
+
+## 2026-06-16（Viewer wrist 中线修正命令）
+
+- 若目标是相机在 gripper 中线 `Y=0`，使用 `--wrist_left_lateral_offset_m -0.0207 --wrist_right_lateral_offset_m 0.0274`。
+- 若只想保留原始/当前标定位置，不传 lateral 参数。
+- `+X` 是 wrist 到 tip 的前进轴；`+Y` 是夹爪开合/左右偏心方向。

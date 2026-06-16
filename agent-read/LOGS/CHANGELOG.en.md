@@ -2854,3 +2854,11 @@ Validation: `py_compile` passed; `bash -n collect_foundation_piper_ik.sh` passed
 - First recommended trial: left/right pitch `15deg`, right lateral `+0.0067m`.
 
 Validation: `py_compile envs/camera/camera.py view_pick_diverse_bottles_piper_ik_motion.py` passed; viewer `--help` shows the new pitch/lateral options; a minimal V1/O.1.2 headless run with `--wrist_left_pitch_deg 15 --wrist_right_pitch_deg 15 --wrist_right_lateral_offset_m 0.0067` completed, logged `parent_pitch_deg` and `parent_lateral_offset_m` in camera tuning, and reported `physical_success=True`.
+
+
+## 2026-06-16 (Wrist Gripper-Centerline Correction Note)
+
+- Clarified mirror correction versus centerline correction: right `+0.0067m` only moves right `Y=-2.74cm` toward the mirror of left `-2.07cm`; it does not place the camera at `Y=0`.
+- For a gripper-centerline camera, use lateral offsets left `-0.0207m` and right `+0.0274m`.
+- Convention: gripper `+X` is wrist-to-tip forward, and `+Y` is finger-opening/lateral direction.
+- Validation: a minimal V1/O.1.2 headless run with centerline correction and left/right pitch `15deg` succeeded, logged `parent_lateral_offset_m` in camera tuning, and reported `physical_success=True`.

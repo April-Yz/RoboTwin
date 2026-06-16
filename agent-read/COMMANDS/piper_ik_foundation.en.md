@@ -182,3 +182,8 @@ O.1/O.1.2 grasp depth is controlled by `foundation_grasp_standoff`, not wrist-ca
 After the `legacy_r1` axis conversion and `piper_pika_agx` adapter, the 0515 wrist camera forward axes are almost in the gripper `X-Z` plane: left `plane_err_y=-0.182deg`, right `-0.840deg`. They are not downward-looking extrinsics: the forward axis is only left `0.415deg` and right `1.575deg` away from gripper `+X`; after current viewer yaw it remains left `0.373deg`, right `1.332deg`. The main reason the fingers are not visible is the lack of a parent-frame pitch about gripper `Y`.
 
 The viewer now supports `--wrist_left_pitch_deg`, `--wrist_right_pitch_deg`, `--wrist_left_lateral_offset_m`, and `--wrist_right_lateral_offset_m`. Start with `--wrist_left_pitch_deg 15 --wrist_right_pitch_deg 15 --wrist_right_lateral_offset_m 0.0067`. The current right camera Y is about `-2.74cm`, while the left camera is `+2.07cm`; adding `+0.0067m` on the right first brings it to the mirrored value around `-2.07cm`.
+
+
+### Wrist Centerline Correction Note
+
+The right-side `+0.0067m` value in O.1.2.3 is a mirror-symmetry correction, not a gripper-centerline correction. If the target is a camera near the gripper opening centerline `Y=0`, use left `--wrist_left_lateral_offset_m -0.0207` and right `--wrist_right_lateral_offset_m 0.0274`. Current convention: gripper `+X` is the wrist-to-tip forward axis, while `+Y` is the finger-opening/lateral direction. The 0515 raw calibration itself is not at `Y=0`: left `+2.07cm`, right `-2.74cm`.

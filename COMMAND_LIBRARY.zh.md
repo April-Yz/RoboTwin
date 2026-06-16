@@ -7336,3 +7336,75 @@ python view_pick_diverse_bottles_piper_ik_motion.py \
 ```
 
 若画面里夹爪仍然太少：把 pitch 从 `15` 加到 `20`。若右手仍偏右：把 `--wrist_right_lateral_offset_m` 从 `0.0067` 小步加到 `0.010`、`0.015`。若右手过度偏左，则减小该值。不要用 `roll` 修 lateral 偏心；roll 只改变画面旋转。
+
+
+### O.1.2.4 更正：wrist camera 的 gripper 中线修正与坐标轴定义（2026-06-16）
+
+这节更正 O.1.2.3 里的一个容易混淆点：`+0.0067m` 是“右手调到和左手镜像对称”的保守修正，不是“把相机放到 gripper 中点”。如果目标是相机在 gripper 开合中线附近，应按 `Y=0` 修正。
+
+#### 坐标轴定义
+
+在当前 `piper_pika_agx` / 0515 wrist 标定诊断里采用的 gripper frame 约定是：
+
+- `gripper +X`：物理前进轴，约等于 wrist 到 tip / 指尖方向。
+- `gripper +Y`：夹爪开合方向，也是 wrist camera 的左右偏心方向。
+- `gripper +Z`：与 `X-Y` 垂直的方向；旧 viewer/debug 里蓝轴曾被标成“夹爪前进方向”，这是旧 debug 标签约定，不应再拿来解释 wrist camera 物理前向。
+
+因此：
+
+- 调“相机是否靠 gripper 中点”，看 camera center 的 `Y`。
+- 调“相机是否俯视夹爪”，看 camera forward 相对 `+X` 的 pitch。
+- `+X` 不是开合方向；开合方向是 `+Y`。
+
+#### 原始标定位置是否在 gripper 中线
+
+不在。按 0515 bundle 原始标定位置：
+
+| side | 0515 raw camera center | Y 偏心 | 若要到 gripper 中线 Y=0 |
+|---|---:|---:|---:|
+| left | `[-0.1493, +0.0207, 0.0436]` | `+2.07cm` | `--wrist_left_lateral_offset_m -0.0207` |
+| right | `[-0.1350, -0.0274, 0.0394]` | `-2.74cm` | `--wrist_right_lateral_offset_m +0.0274` |
+
+`piper_pika_agx` adapter 只加 `X=+0.075m`、`Z=+0.050m`，不改 `Y`；`forward_offset_m` 沿相机光轴前移，在当前 yaw 后也几乎不改 `Y`。所以当前 viewer 下仍然是：left `Y=+2.07cm`、right `Y=-2.74cm`。
+
+这说明：原始标定的相机光轴方向基本和 gripper 前进轴共面，但相机中心并没有落在 gripper 开合中线 `Y=0`。如果真实硬件相机确实安装在 gripper 中点附近，则需要 lateral offset 或重新修 wrist 外参位置。
+
+#### 两种不同修正目标
+
+| 目标 | left lateral | right lateral | 含义 |
+|---|---:|---:|---|
+| 回到当前标定/不修 Y | 不传 | 不传 | 使用 0515 标定 + adapter + 当前 forward/yaw/roll，保留 left `+2.07cm`、right `-2.74cm` |
+| 只让左右镜像更对称 | 不传 | `+0.0067` | right 从 `-2.74cm` 调到约 `-2.07cm`，和 left `+2.07cm` 镜像 |
+| 相机放到 gripper 中线 | `-0.0207` | `+0.0274` | left/right 都调到 `Y≈0`，更符合“中点附近 camera”的假设 |
+
+#### 中线 + 俯视试调 viewer 命令
+
+如果你的目标是“相机在 gripper 中点附近，并且能略微看到两个夹爪”，建议先用下面这条，而不是只调右手 `+0.0067`：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+export DISPLAY=:1.0
+xdpyinfo >/dev/null || { echo "DISPLAY=:1.0 不可用"; exit 1; }
+
+python view_pick_diverse_bottles_piper_ik_motion.py \
+  --task_name pick_diverse_bottles_piper_ik_foundation \
+  --ik_version v1 --foundation_id 0 --foundation_mode o1.2 \
+  --foundation_grasp_standoff_m 0.105 \
+  --render_freq 1 --show_axes 1 --show_camera_frustums 1 \
+  --wrist_preview 1 --hold 1 \
+  --wrist_left_forward_offset_m 0.125 \
+  --wrist_right_forward_offset_m 0.11 \
+  --wrist_left_roll_deg -15 \
+  --wrist_right_roll_deg -60 \
+  --wrist_left_yaw_deg 0.182 \
+  --wrist_right_yaw_deg 0.840 \
+  --wrist_left_pitch_deg 15 \
+  --wrist_right_pitch_deg 15 \
+  --wrist_left_lateral_offset_m -0.0207 \
+  --wrist_right_lateral_offset_m 0.0274 \
+  --max_seed_tries 1 --require_success 1
+```
+
+如果你想看“纯标定位置”对照，不要传 `--wrist_left_lateral_offset_m` / `--wrist_right_lateral_offset_m`，也不要传 `--wrist_left_pitch_deg` / `--wrist_right_pitch_deg`。保留 yaw/roll/forward 只是当前模拟调参；完全回到 YAML 默认则连命令行的 wrist override 都可以省略。
+
+验证：带中线修正 `left=-0.0207`、`right=+0.0274`、左右 pitch `15deg` 的 V1/O.1.2 headless 最小运行完成，日志确认 `parent_lateral_offset_m` 进入 camera tuning，且 `physical_success=True`。
