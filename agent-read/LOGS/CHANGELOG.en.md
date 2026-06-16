@@ -2871,3 +2871,15 @@ Validation: `py_compile envs/camera/camera.py view_pick_diverse_bottles_piper_ik
 - When O.1.2 grasp-assist is disabled, the task now still runs grasp-state validation and prints `contacts/projection/radial`, but does not create an object-gripper drive.
 
 Validation: `py_compile` passed; viewer `--help` shows the new Foundation debug options; verified v2 headless completes with `physical_success=True` when using `radial_tolerance=0.08` and `assist_max_distance=0.16`. The default `0.065/0.14` gate fails around left `radial=0.071m` / `ee_distance=0.143m`, so the documented command now includes explicit gate thresholds. The pure-physics tier with `--foundation_grasp_assist 0 --foundation_collision_mode cylinder_proxy` reaches validation and prints contacts/projection/radial; seed 0 currently fails, which indicates pure contact is not yet carrying the object.
+
+
+## 2026-06-16 (Verified Collection Wrapper And O.2 pnp_tray)
+
+- Added `collect_foundation_piper_ik_verified.sh`, which writes a verified-v2 task config and calls `collect_data.sh`; it supports `pick_diverse_bottles` and `pnp_tray`, plus `DRY_RUN=1`.
+- For `pick_diverse_bottles`, collection uses the stable tier A settings: `support_proxy + grasp_assist=true + require_contact=false + standoff=0.14 + radial=0.08 + assist_max_distance=0.16`, and writes the current head/wrist camera parameters.
+- Added `envs/pnp_tray_piper_ik_foundation.py`, reusing the Foundation IK base class with left `left_dark_red_cup`, right `right_bottle`, and an open-gripper stage after the action.
+- Refactored the Foundation base class to expose object keys, actor IDs, annotation path, hand-target pattern, and `foundation_open_after_action`; O.1 keeps open-after-action disabled by default.
+- Added `task_config/demo_pnp_tray_piper_ik_foundation_v1-v4.yml` and `description/task_instruction/pnp_tray_piper_ik_foundation.json`.
+- AB/C conclusion: tier A is the stable collection mode; tier B needs full side-body collision to make contact gating meaningful; tier C disables assist and exposes current pregrasp/grasp object-collision issues.
+
+Validation: `py_compile` passed; `DRY_RUN=1` generated configs for both pick_diverse_bottles and pnp_tray; pick_diverse V1/O.1.2 headless succeeded with `standoff=0.14` and relaxed gates; pnp_tray V1/ID0/O.2 headless succeeded with `standoff=0.105`, including `open_after_action=True` and `open_gripper` in the log.

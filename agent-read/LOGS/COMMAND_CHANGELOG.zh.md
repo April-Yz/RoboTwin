@@ -2168,3 +2168,12 @@
 - 纯物理观察档使用 `--foundation_grasp_assist 0 --require_success 0`。
 
 补充：verified v2 日常 viewer 命令增加 `--foundation_capture_radial_tolerance_m 0.08 --foundation_grasp_assist_max_distance_m 0.16`，以匹配 `foundation_grasp_standoff_m=0.14` 的指尖抓取几何。
+
+
+## 2026-06-16（Verified 采集与 O.2 pnp_tray 命令）
+
+- 新增正式采集 wrapper：`bash collect_foundation_piper_ik_verified.sh <pick_diverse_bottles|pnp_tray> <v1|v2|v3|v4> <foundation_id> [gpu_id] [run_tag]`。
+- 支持 `DRY_RUN=1` 只生成 config，不执行采集。
+- pick_diverse_bottles 使用 `foundation_grasp_standoff=0.14`；pnp_tray 使用 `foundation_grasp_standoff=0.105`。
+- 新增 viewer/采集任务名：`pnp_tray_piper_ik_foundation`。
+- O.2 viewer 最小命令使用 `--task_name pnp_tray_piper_ik_foundation --foundation_mode o1.2 --foundation_grasp_standoff_m 0.105`。

@@ -39,3 +39,9 @@ Foundation 的左右腕相机从 `calibration_bundle_piper_new_table_0515.json` 
 Foundation 数据按 ID 写入独立目录，每个目录内部从 `episode0` 开始。`script/index_foundation_piper_ik_videos.py` 负责在不改源数据的前提下把 ID N 映射为聚合目录中的 `episodeN`，并用 manifest 记录来源；已有目标 episode 默认视为冲突。
 
 批采集 wrapper 强制每 ID 一个 episode并支持 run tag。`script/collect_data.py` 的 `max_seed_tries` 给 seed 搜索设置硬上限；这是针对几何确定性失败的终止条件，不把失败 episode 伪装成成功数据。
+
+## O.2 pnp_tray Foundation OBJ 数据流
+
+O.2 复用 O.1.2 Foundation IK 基类，但通过 `pnp_tray_piper_ik_foundation` 覆盖对象和关键帧路径：左手对象是 `left_dark_red_cup`，右手对象是 `right_bottle`；Foundation 输入来自 `data/piper/hand/pnp_tray/foundation_replay_d435/foundation_input_<ID>`；第二关键帧 EE target 来自 `code_painting/human_replay/h2_pure_d435/pnp_tray/id<ID>_d435_z005/world_targets_and_status.npz`。
+
+O.2 的动作顺序为 `pregrasp -> grasp -> close -> action -> open_gripper`，其中 `action` 是第二关键帧 EE xyz，朝向沿用 grasp 朝向。pnp_tray 的左杯比瓶子更矮更小，实测 `foundation_grasp_standoff=0.14` 会在 ID0 把杯子推偏；当前 O.2 默认使用 `0.105`。正式采集使用 `collect_foundation_piper_ik_verified.sh pnp_tray ...`，仍保存 head 和左右 wrist 视频。

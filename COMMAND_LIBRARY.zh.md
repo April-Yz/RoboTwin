@@ -7585,3 +7585,171 @@ python view_pick_diverse_bottles_piper_ik_motion.py \
 2. 若有单指接触，调 `foundation_grasp_standoff_m` 或 `foundation_grasp_lateral_offset`，让物体中心落在两指之间。
 3. 若两指有接触但 lift 掉落，再调 OBJ collision/friction/质量，或检查 Pika finger collision 是否太薄/位置不准。
 4. `exact_convex` 可作为最后对照：更接近 OBJ，但可能把 mesh 分解/凸包误差和性能问题引入 debug。
+
+#### AB/C 现象结论（2026-06-16）
+
+你观察到的“AB 看起来没效果，C 一开始把瓶子碰倒”基本符合现在的实现逻辑：
+
+| 档位 | 现象 | 原因 |
+|---|---|---|
+| A | 看起来稳定，但不是真正两指物理夹住 | `support_proxy` 只给 OBJ 底部一个很薄的支撑碰撞，不提供完整侧面碰撞；`grasp_assist=1` 在 validation 通过后用 drive 带着物体走 |
+| B | 如果仍用 support proxy，效果也不明显 | `require_contact=1` 只有在 OBJ 有侧面 collision 时才有意义；support proxy 下 fingers 常常接触不到物体侧面，`contacts=[]` |
+| C | `cylinder_proxy + grasp_assist=0` 容易在 pregrasp/grasp 或 close 前把瓶子碰倒 | 完整圆柱侧面 collision 暴露了真实碰撞：当前抓取路径/目标深度会先顶到物体，纯物理下没有 drive 帮忙，所以物体会倒或不跟随 |
+
+所以当前可稳定采集的数据应使用 A 档：`support_proxy + assist + validation gate`。它适合生成干净轨迹和 calibrated head/wrist 视频；如果要追求严格真实抓取，需要另开接触调试线：用 `cylinder_proxy/exact_convex`，先让 pregrasp/grasp 不碰倒，再要求 contacts，最后再关闭 assist。
+
+### O.1.2.6 稳定采集脚本：无 viewer，保存 head + wrist 视频（2026-06-16）
+
+新增脚本：
+
+```bash
+/home/zaijia001/ssd/RoboTwin/collect_foundation_piper_ik_verified.sh
+```
+
+它固定使用当前验证过的无碰撞/稳定采集参数：
+
+- `foundation_mode=o1.2`
+- `foundation_collision_mode=support_proxy`
+- `foundation_grasp_assist=true`
+- `foundation_grasp_require_contact=false`
+- `foundation_grasp_standoff=0.14`（pick_diverse_bottles）
+- `foundation_capture_radial_tolerance=0.08`
+- `foundation_grasp_assist_max_distance=0.16`
+- `collect_head_camera=true`
+- `collect_wrist_camera=true`
+- wrist tuning：`left forward=0.145, roll=-15, yaw=0.182, pitch=15, lateral=-0.0207`；`right forward=0.13, roll=-60, yaw=0.840, pitch=15, lateral=0.0274`
+
+单个 ID dry-run，只生成临时 config，不采集：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+
+DRY_RUN=1 bash collect_foundation_piper_ik_verified.sh pick_diverse_bottles v1 0 0 verified_v2
+```
+
+单个 ID 正式采集：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+
+bash collect_foundation_piper_ik_verified.sh pick_diverse_bottles v1 0 0 verified_v2
+```
+
+V1-V4 批量采集：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+
+for id in $(seq 0 120); do
+  bash collect_foundation_piper_ik_verified.sh pick_diverse_bottles v1 $id 0 verified_v2
+done
+
+for id in $(seq 0 120); do
+  bash collect_foundation_piper_ik_verified.sh pick_diverse_bottles v2 $id 1 verified_v2
+done
+
+for id in $(seq 0 120); do
+  bash collect_foundation_piper_ik_verified.sh pick_diverse_bottles v3 $id 2 verified_v2
+done
+
+for id in $(seq 0 120); do
+  bash collect_foundation_piper_ik_verified.sh pick_diverse_bottles v4 $id 3 verified_v2
+done
+```
+
+输出位于：
+
+```text
+/home/zaijia001/ssd/RoboTwin/data/pick_diverse_bottles_piper_ik_foundation/<generated_task_config>/
+```
+
+其中视频由原 collect_data 流程生成，包含 head cam 和左右 wrist cam；不打开 SAPIEN viewer，也不打开 wrist preview 窗口。
+
+### O.2 新增：pnp_tray Foundation + Piper IK pick-and-place（2026-06-16）
+
+O.2 复用 O.1.2 的 Foundation/关键帧逻辑，但任务对象和动作语义不同：
+
+| 项 | O.1.2 pick_diverse_bottles | O.2 pnp_tray |
+|---|---|---|
+| env | `pick_diverse_bottles_piper_ik_foundation` | `pnp_tray_piper_ik_foundation` |
+| 左手对象 | `left_bottle` | `left_dark_red_cup` |
+| 右手对象 | `right_bottle` | `right_bottle` |
+| Foundation 输入 | `data/piper/hand/pick_diverse_bottles/foundation_replay_d435/foundation_input_<ID>` | `data/piper/hand/pnp_tray/foundation_replay_d435/foundation_input_<ID>` |
+| 关键帧标注 | `code_painting/h2o_manual_review/pick_diverse_bottles/hand_keyframes_all.json` | `code_painting/h2o_manual_review/pnp_tray/hand_keyframes_all.json` |
+| 第二关键帧 EE 目标 | `code_painting/human_replay/pick_diverse_bottles/id_<ID>/world_targets_and_status.npz` | `code_painting/human_replay/h2_pure_d435/pnp_tray/id<ID>_d435_z005/world_targets_and_status.npz` |
+| 动作 | pregrasp -> grasp -> close -> second-keyframe action | pregrasp -> grasp -> close -> second-keyframe action -> open gripper |
+
+注意：pnp_tray 不能直接沿用 pick_diverse 的 `foundation_grasp_standoff=0.14`。ID0 验证中，`0.14` 会在 close 前把左手 cup 推偏，validation 失败；`0.105` 成功。因此 O.2 config 和采集脚本对 pnp_tray 固定使用 `0.105`。
+
+#### O.2 viewer 验证命令
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+export DISPLAY=:1.0
+xdpyinfo >/dev/null || { echo "DISPLAY=:1.0 不可用"; exit 1; }
+
+python view_pick_diverse_bottles_piper_ik_motion.py \
+  --task_name pnp_tray_piper_ik_foundation \
+  --ik_version v1 --foundation_id 0 --foundation_mode o1.2 \
+  --foundation_grasp_standoff_m 0.105 \
+  --foundation_capture_radial_tolerance_m 0.08 \
+  --foundation_grasp_assist_max_distance_m 0.16 \
+  --render_freq 1 --show_axes 1 --show_camera_frustums 1 \
+  --wrist_preview 1 --hold 1 \
+  --max_seed_tries 1 --require_success 1
+```
+
+#### O.2 headless 最小验证命令
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+
+python view_pick_diverse_bottles_piper_ik_motion.py \
+  --task_name pnp_tray_piper_ik_foundation \
+  --ik_version v1 --foundation_id 0 --foundation_mode o1.2 \
+  --foundation_grasp_standoff_m 0.105 \
+  --foundation_capture_radial_tolerance_m 0.08 \
+  --foundation_grasp_assist_max_distance_m 0.16 \
+  --render_freq 0 --show_axes 0 --wrist_preview 0 --hold 0 \
+  --max_seed_tries 1 --require_success 1
+```
+
+已验证结果：V1 / ID0 / O.2 headless 成功，日志中 `open_after_action=True`，并执行了 `open_gripper`；最终 `physical_success=True`。
+
+#### O.2 采集命令
+
+单个 ID：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+
+bash collect_foundation_piper_ik_verified.sh pnp_tray v1 0 0 o2_verified_v1
+```
+
+V1-V4 批量：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+
+for id in $(seq 0 50); do
+  bash collect_foundation_piper_ik_verified.sh pnp_tray v1 $id 0 o2_verified_v1
+done
+
+for id in $(seq 0 50); do
+  bash collect_foundation_piper_ik_verified.sh pnp_tray v2 $id 1 o2_verified_v1
+done
+
+for id in $(seq 0 50); do
+  bash collect_foundation_piper_ik_verified.sh pnp_tray v3 $id 2 o2_verified_v1
+done
+
+for id in $(seq 0 50); do
+  bash collect_foundation_piper_ik_verified.sh pnp_tray v4 $id 3 o2_verified_v1
+done
+```
+
+输出位于：
+
+```text
+/home/zaijia001/ssd/RoboTwin/data/pnp_tray_piper_ik_foundation/<generated_task_config>/
+```

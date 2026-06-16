@@ -196,6 +196,8 @@ def main() -> None:
 
     if args_cli.task_config:
         task_config = args_cli.task_config
+    elif args_cli.task_name == "pnp_tray_piper_ik_foundation":
+        task_config = f"demo_pnp_tray_piper_ik_foundation_{args_cli.ik_version}"
     elif "foundation" in args_cli.task_name:
         task_config = f"demo_piper_ik_foundation_{args_cli.ik_version}"
     else:

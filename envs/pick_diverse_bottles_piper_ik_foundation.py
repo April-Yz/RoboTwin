@@ -19,24 +19,49 @@ from .utils.actor_utils import Actor
 class pick_diverse_bottles_piper_ik_foundation(pick_diverse_bottles_piper_ik):
     """Use FoundationPose positions and source visual meshes instead of random assets."""
 
+    FOUNDATION_OBJECT_KEYS = {
+        "left": "left_bottle",
+        "right": "right_bottle",
+    }
+    FOUNDATION_ACTOR_IDS = {
+        "left": "foundation_left_bottle",
+        "right": "foundation_right_bottle",
+    }
+    FOUNDATION_DEFAULT_ANNOTATION_JSON = (
+        "code_painting/h2o_manual_review/pick_diverse_bottles/hand_keyframes_all.json"
+    )
+    FOUNDATION_DEFAULT_HAND_TARGETS_ROOT = "code_painting/human_replay/pick_diverse_bottles"
+    FOUNDATION_DEFAULT_HAND_TARGETS_PATTERN = "id_{episode}/world_targets_and_status.npz"
+    FOUNDATION_DEFAULT_LEFT_DESCRIPTION = "left cola bottle"
+    FOUNDATION_DEFAULT_RIGHT_DESCRIPTION = "right bottle"
+    FOUNDATION_DEFAULT_OPEN_AFTER_ACTION = False
+
     def setup_demo(self, **kwargs):
         self._foundation_mode = str(kwargs.get("foundation_mode", "o1")).lower()
         if self._foundation_mode not in {"o1", "o1.1", "o1.2"}:
             raise ValueError(f"unsupported foundation_mode={self._foundation_mode!r}")
+        self._foundation_object_keys = dict(type(self).FOUNDATION_OBJECT_KEYS)
+        self._foundation_actor_ids = dict(type(self).FOUNDATION_ACTOR_IDS)
         self._foundation_input_dir = kwargs.get("foundation_input_dir")
         self._foundation_frame = int(kwargs.get("foundation_frame", 0))
         self._foundation_annotation_json = Path(
             kwargs.get(
                 "foundation_annotation_json",
-                "code_painting/h2o_manual_review/pick_diverse_bottles/hand_keyframes_all.json",
+                type(self).FOUNDATION_DEFAULT_ANNOTATION_JSON,
             )
         ).expanduser().resolve()
         self._foundation_hand_targets_root = Path(
             kwargs.get(
                 "foundation_hand_targets_root",
-                "code_painting/human_replay/pick_diverse_bottles",
+                type(self).FOUNDATION_DEFAULT_HAND_TARGETS_ROOT,
             )
         ).expanduser().resolve()
+        self._foundation_hand_targets_pattern = str(
+            kwargs.get(
+                "foundation_hand_targets_pattern",
+                type(self).FOUNDATION_DEFAULT_HAND_TARGETS_PATTERN,
+            )
+        )
         self._foundation_episode_id = kwargs.get("foundation_episode_id")
         self._foundation_keyframes = None
         self._foundation_action_positions = None
@@ -80,10 +105,16 @@ class pick_diverse_bottles_piper_ik_foundation(pick_diverse_bottles_piper_ik):
         ) <= 0:
             raise ValueError("Foundation grasp offset must be nonzero")
         self._foundation_left_description = kwargs.get(
-            "foundation_left_description", "left cola bottle"
+            "foundation_left_description", type(self).FOUNDATION_DEFAULT_LEFT_DESCRIPTION
         )
         self._foundation_right_description = kwargs.get(
-            "foundation_right_description", "right bottle"
+            "foundation_right_description", type(self).FOUNDATION_DEFAULT_RIGHT_DESCRIPTION
+        )
+        self._foundation_open_after_action = bool(
+            kwargs.get(
+                "foundation_open_after_action",
+                type(self).FOUNDATION_DEFAULT_OPEN_AFTER_ACTION,
+            )
         )
         self._foundation_grasp_drives = []
         self._foundation_data = None
@@ -123,31 +154,32 @@ class pick_diverse_bottles_piper_ik_foundation(pick_diverse_bottles_piper_ik):
             self.MOVE_ACTION_NAMES = type(self).MOVE_ACTION_NAMES
 
         self._foundation_data = dict(np.load(npz_path, allow_pickle=True))
-        required = (
-            "left_bottle__pose_world_wxyz",
-            "right_bottle__pose_world_wxyz",
-            "left_bottle__mesh_file",
-            "right_bottle__mesh_file",
+        required = tuple(
+            f"{object_key}__{suffix}"
+            for object_key in self._foundation_object_keys.values()
+            for suffix in ("pose_world_wxyz", "mesh_file")
         )
         missing = [key for key in required if key not in self._foundation_data]
         if missing:
             raise KeyError(f"Foundation NPZ is missing keys: {missing}")
         for side in ("left", "right"):
-            visible = self._foundation_data.get(f"{side}_bottle__visible")
-            poses = self._foundation_data[f"{side}_bottle__pose_world_wxyz"]
+            object_key = self._foundation_object_keys[side]
+            visible = self._foundation_data.get(f"{object_key}__visible")
+            poses = self._foundation_data[f"{object_key}__pose_world_wxyz"]
             if not 0 <= self._foundation_frame < len(poses):
                 raise IndexError(
                     f"foundation_frame={self._foundation_frame} is outside {side} pose count {len(poses)}"
                 )
             if visible is not None and not bool(visible[self._foundation_frame]):
-                raise ValueError(f"{side}_bottle is not visible at frame {self._foundation_frame}")
+                raise ValueError(f"{object_key} is not visible at frame {self._foundation_frame}")
 
         print(
             f"[piper-ik-foundation] mode={self._foundation_mode} source={npz_path} "
             f"episode={self._foundation_episode_id} frame={self._foundation_frame} "
             f"keyframes={self._foundation_keyframes} use_orientation={self._foundation_use_orientation} "
             f"grasp_standoff={self._foundation_grasp_standoff:.3f}m "
-            f"pregrasp_distance={self._foundation_pregrasp_distance:.3f}m"
+            f"pregrasp_distance={self._foundation_pregrasp_distance:.3f}m "
+            f"objects={self._foundation_object_keys}"
         )
         super().setup_demo(**kwargs)
 
@@ -170,11 +202,10 @@ class pick_diverse_bottles_piper_ik_foundation(pick_diverse_bottles_piper_ik):
         self._foundation_keyframes = (keyframes[0], keyframes[1])
 
     def _load_keyframe_action_positions(self):
-        target_path = (
-            self._foundation_hand_targets_root
-            / f"id_{self._foundation_episode_id}"
-            / "world_targets_and_status.npz"
+        relative_path = self._foundation_hand_targets_pattern.format(
+            episode=self._foundation_episode_id
         )
+        target_path = self._foundation_hand_targets_root / relative_path
         if not target_path.is_file():
             raise FileNotFoundError(f"O.1.2 hand target NPZ not found: {target_path}")
         data = np.load(target_path, allow_pickle=True)
@@ -311,7 +342,7 @@ class pick_diverse_bottles_piper_ik_foundation(pick_diverse_bottles_piper_ik):
                 f"unsupported foundation_collision_mode={self._foundation_collision_mode!r}"
             )
         builder.add_visual_from_file(filename=str(mesh_path), scale=[1, 1, 1])
-        entity = builder.build(name=f"foundation_{side}_bottle")
+        entity = builder.build(name=self._foundation_actor_ids.get(side, f"foundation_{side}_object"))
         entity.set_pose(sapien.Pose(position, quat))
         actor = Actor(entity, self._mesh_actor_data(bounds), mass=self._foundation_mesh_mass)
 
@@ -336,13 +367,15 @@ class pick_diverse_bottles_piper_ik_foundation(pick_diverse_bottles_piper_ik):
     def load_actors(self):
         frame = self._foundation_frame
         data = self._foundation_data
-        left_pose = np.asarray(data["left_bottle__pose_world_wxyz"][frame], dtype=np.float64)
-        right_pose = np.asarray(data["right_bottle__pose_world_wxyz"][frame], dtype=np.float64)
-        left_mesh = self._scalar_path(data["left_bottle__mesh_file"])
-        right_mesh = self._scalar_path(data["right_bottle__mesh_file"])
+        left_key = self._foundation_object_keys["left"]
+        right_key = self._foundation_object_keys["right"]
+        left_pose = np.asarray(data[f"{left_key}__pose_world_wxyz"][frame], dtype=np.float64)
+        right_pose = np.asarray(data[f"{right_key}__pose_world_wxyz"][frame], dtype=np.float64)
+        left_mesh = self._scalar_path(data[f"{left_key}__mesh_file"])
+        right_mesh = self._scalar_path(data[f"{right_key}__mesh_file"])
 
-        self.bottle1_id = "foundation_left_bottle"
-        self.bottle2_id = "foundation_right_bottle"
+        self.bottle1_id = self._foundation_actor_ids["left"]
+        self.bottle2_id = self._foundation_actor_ids["right"]
         self.bottle1 = self._create_foundation_mesh_actor("left", left_mesh, left_pose)
         self.bottle2 = self._create_foundation_mesh_actor("right", right_mesh, right_pose)
 
@@ -433,6 +466,14 @@ class pick_diverse_bottles_piper_ik_foundation(pick_diverse_bottles_piper_ik):
             Action(grasp[2].arm_tag, "move", target_pose=right_action_pose),
         )
         sequence = [pregrasp, grasp, close, action]
+        if self._foundation_open_after_action:
+            sequence.append(
+                (
+                    "open_gripper",
+                    Action(grasp[1].arm_tag, "open", target_gripper_pos=1.0),
+                    Action(grasp[2].arm_tag, "open", target_gripper_pos=1.0),
+                )
+            )
         self._trajectory_targets = {
             "left": {
                 "pregrasp": list(pregrasp[1].target_pose),
@@ -448,7 +489,8 @@ class pick_diverse_bottles_piper_ik_foundation(pick_diverse_bottles_piper_ik):
         print(
             "[piper-ik-foundation] O.1.2 replaces lift/place with action: "
             f"left={np.round(left_action_pose[:3], 4).tolist()} "
-            f"right={np.round(right_action_pose[:3], 4).tolist()}"
+            f"right={np.round(right_action_pose[:3], 4).tolist()} "
+            f"open_after_action={self._foundation_open_after_action}"
         )
         return sequence
 
@@ -495,6 +537,14 @@ class pick_diverse_bottles_piper_ik_foundation(pick_diverse_bottles_piper_ik):
                 Action(right_arm, "move", target_pose=targets["right"]["action"]),
             ),
         ]
+        if self._foundation_open_after_action:
+            sequence.append(
+                (
+                    "open_gripper",
+                    Action(left_arm, "open", target_gripper_pos=1.0),
+                    Action(right_arm, "open", target_gripper_pos=1.0),
+                )
+            )
         self._trajectory_targets = deepcopy(targets)
         return sequence
 
@@ -736,6 +786,9 @@ class pick_diverse_bottles_piper_ik_foundation(pick_diverse_bottles_piper_ik):
             "collision_radius_padding": self._foundation_collision_radius_padding,
             "pregrasp_distance": self._foundation_pregrasp_distance,
             "grasp_assist": self._foundation_grasp_assist,
+            "open_after_action": self._foundation_open_after_action,
+            "object_keys": deepcopy(self._foundation_object_keys),
+            "hand_targets_pattern": self._foundation_hand_targets_pattern,
             "grasp_state_limits": {
                 "max_displacement": self._foundation_grasp_max_displacement,
                 "max_rotation_deg": self._foundation_grasp_max_rotation_deg,

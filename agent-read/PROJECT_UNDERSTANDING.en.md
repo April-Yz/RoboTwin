@@ -39,3 +39,9 @@ Foundation wrist cameras load distinct gripper-to-camera extrinsics from `calibr
 Foundation collection writes one directory per source ID, with internal episode numbering starting at `episode0`. `script/index_foundation_piper_ik_videos.py` maps source ID N to aggregate `episodeN` files without modifying source data and records the mapping in a manifest. Existing destination episodes are conflicts by default.
 
 The batch wrapper forces one episode per ID and supports isolated run tags. `script/collect_data.py` applies `max_seed_tries` as a hard bound on seed search. This terminates deterministic geometry failures without treating them as successful episodes.
+
+## O.2 pnp_tray Foundation OBJ Data Flow
+
+O.2 reuses the O.1.2 Foundation IK base class, with `pnp_tray_piper_ik_foundation` overriding object and keyframe paths: the left object is `left_dark_red_cup`, the right object is `right_bottle`; Foundation inputs come from `data/piper/hand/pnp_tray/foundation_replay_d435/foundation_input_<ID>`; second-keyframe EE targets come from `code_painting/human_replay/h2_pure_d435/pnp_tray/id<ID>_d435_z005/world_targets_and_status.npz`.
+
+The O.2 action order is `pregrasp -> grasp -> close -> action -> open_gripper`, where `action` uses the second-keyframe EE xyz and retains the grasp orientation. The pnp_tray left cup is shorter and smaller than the bottles; validation showed `foundation_grasp_standoff=0.14` pushes the cup on ID0, so O.2 defaults to `0.105`. Formal collection uses `collect_foundation_piper_ik_verified.sh pnp_tray ...` and still saves head and both wrist videos.

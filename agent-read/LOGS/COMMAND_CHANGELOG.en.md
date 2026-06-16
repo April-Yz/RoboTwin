@@ -2170,3 +2170,12 @@
 - The pure-physics observation tier uses `--foundation_grasp_assist 0 --require_success 0`.
 
 Update: the verified-v2 daily viewer command now includes `--foundation_capture_radial_tolerance_m 0.08 --foundation_grasp_assist_max_distance_m 0.16` to match the fingertip grasp geometry from `foundation_grasp_standoff_m=0.14`.
+
+
+## 2026-06-16 (Verified Collection And O.2 pnp_tray Commands)
+
+- Added the formal collection wrapper: `bash collect_foundation_piper_ik_verified.sh <pick_diverse_bottles|pnp_tray> <v1|v2|v3|v4> <foundation_id> [gpu_id] [run_tag]`.
+- `DRY_RUN=1` writes the generated config without running collection.
+- `pick_diverse_bottles` uses `foundation_grasp_standoff=0.14`; `pnp_tray` uses `foundation_grasp_standoff=0.105`.
+- Added viewer/collection task name: `pnp_tray_piper_ik_foundation`.
+- The minimal O.2 viewer command uses `--task_name pnp_tray_piper_ik_foundation --foundation_mode o1.2 --foundation_grasp_standoff_m 0.105`.

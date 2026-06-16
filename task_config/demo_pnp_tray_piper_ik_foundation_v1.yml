@@ -1,0 +1,75 @@
+render_freq: 0
+episode_num: 1
+max_seed_tries: 3
+use_seed: false
+save_freq: 15
+embodiment: [piper_pika_agx_calibrated, piper_pika_agx_calibrated, 0.0]
+language_num: 100
+ik_version: "v1"
+ik_interp_steps: 50
+lift_height: 0.12
+move_settle_steps: 80
+gripper_settle_steps: 120
+foundation_input_dir: "/home/zaijia001/ssd/data/piper/hand/pnp_tray/foundation_replay_d435/foundation_input_0"
+foundation_frame: 0
+foundation_mode: "o1.2"
+foundation_annotation_json: "/home/zaijia001/ssd/RoboTwin/code_painting/h2o_manual_review/pnp_tray/hand_keyframes_all.json"
+foundation_hand_targets_root: "/home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure_d435/pnp_tray"
+foundation_hand_targets_pattern: "id{episode}_d435_z005/world_targets_and_status.npz"
+foundation_use_orientation: false
+foundation_table_clearance: 0.002
+foundation_mesh_mass: 0.05
+foundation_mesh_friction: 1.5
+foundation_collision_mode: "support_proxy"
+foundation_collision_radius_padding: 0.0
+foundation_grasp_standoff: 0.105
+foundation_grasp_lateral_offset: 0.0
+foundation_pregrasp_distance: 0.12
+foundation_grasp_assist: true
+foundation_grasp_assist_max_distance: 0.16
+foundation_grasp_max_displacement: 0.025
+foundation_grasp_max_rotation_deg: 15.0
+foundation_capture_radial_tolerance: 0.08
+foundation_capture_segment_margin: 0.15
+foundation_grasp_require_contact: false
+foundation_open_after_action: true
+foundation_left_description: "left dark red cup"
+foundation_right_description: "right bottle"
+domain_randomization:
+  random_background: false
+  cluttered_table: false
+  clean_background_rate: 1
+  random_head_camera_dis: 0
+  random_table_height: 0
+  random_light: false
+  crazy_random_light_rate: 0
+camera:
+  head_camera_type: D435
+  wrist_camera_type: D435
+  collect_head_camera: true
+  collect_wrist_camera: true
+  wrist_camera_calibration_bundle: "/home/zaijia001/ssd/RoboTwin/calibration_bundle_piper_new_table_0515.json"
+  wrist_camera_axis_mode: "legacy_r1"
+  wrist_camera_pose_reference: "urdf_end_link"
+  wrist_camera_simulation_adapter: "piper_pika_agx"
+  wrist_camera_tuning:
+    left: {forward_offset_m: 0.145, image_roll_deg: -15.0, parent_yaw_deg: 0.182, parent_pitch_deg: 15.0, parent_lateral_offset_m: -0.0207}
+    right: {forward_offset_m: 0.13, image_roll_deg: -60.0, parent_yaw_deg: 0.840, parent_pitch_deg: 15.0, parent_lateral_offset_m: 0.0274}
+data_type:
+  rgb: true
+  third_view: true
+  depth: false
+  pointcloud: false
+  observer: true
+  endpose: true
+  qpos: true
+  mesh_segmentation: false
+  actor_segmentation: false
+pcd_down_sample_num: 1024
+pcd_crop: true
+save_path: ./data
+clear_cache_freq: 5
+collect_data: true
+eval_video_log: true
+skip_planner: true
+save_all_episodes: false

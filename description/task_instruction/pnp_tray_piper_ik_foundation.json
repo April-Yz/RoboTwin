@@ -1,0 +1,24 @@
+{
+  "full_description": "pick up the cup and bottle, move them to the annotated tray placement keyframe, then release",
+  "schema": "{A} notifies the left cup to be placed,{B} notifies the right bottle to be placed. arm comes as a literal here",
+  "preference": "num of words should not exceed 12. Degree of detail avg 5",
+  "seen": [
+    "Pick {A} and {B}, then place them.",
+    "Move {A} and {B} to the tray.",
+    "Lift {A} and {B}, place, then release.",
+    "Place the {A} and {B} at their targets.",
+    "Use both arms to pick and place {A} and {B}.",
+    "Carry {A} and {B} to the tray.",
+    "Grab {A} and {B}, move them, then open.",
+    "Pick up {A} and {B} before setting them down.",
+    "Move each object to its annotated placement.",
+    "Place {A} with the left arm and {B} with the right arm."
+  ],
+  "unseen": [
+    "Pick and place both objects.",
+    "Put {A} and {B} on the tray.",
+    "Move the cup and bottle to their targets.",
+    "Lift both objects, place them, and release.",
+    "Use both grippers to relocate {A} and {B}."
+  ]
+}

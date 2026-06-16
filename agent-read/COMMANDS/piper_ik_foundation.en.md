@@ -197,3 +197,53 @@ Real-grasp debugging has three tiers: tier A keeps the default `support_proxy + 
 
 
 Note: the verified-v2 daily success tier with `foundation_grasp_standoff_m=0.14` should also pass `--foundation_capture_radial_tolerance_m 0.08 --foundation_grasp_assist_max_distance_m 0.16`. The default `0.065/0.14` gate is slightly too strict for the current fingertip grasp geometry; headless validation fails near left `radial≈0.071m` and `ee_distance≈0.143m`.
+
+### Verified-v2 Headless Collection Wrapper
+
+New generic wrapper:
+
+```bash
+bash collect_foundation_piper_ik_verified.sh <pick_diverse_bottles|pnp_tray> <v1|v2|v3|v4> <foundation_id> [gpu_id] [run_tag]
+```
+
+It writes an isolated task config and then calls `collect_data.sh`. It does not open a viewer; it saves the formal data, head camera video, and both wrist camera videos. `DRY_RUN=1` only writes/prints the generated config and does not start collection.
+
+For `pick_diverse_bottles`, the wrapper uses the current stable settings: `support_proxy + grasp_assist=true + require_contact=false + foundation_grasp_standoff=0.14 + radial=0.08 + assist_max_distance=0.16`, with wrist forward `0.145/0.13`, roll `-15/-60`, yaw `0.182/0.840`, pitch `15/15`, and lateral `-0.0207/+0.0274`.
+
+Example:
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw
+cd /home/zaijia001/ssd/RoboTwin
+
+DRY_RUN=1 bash collect_foundation_piper_ik_verified.sh pick_diverse_bottles v1 0 0 verified_v2
+bash collect_foundation_piper_ik_verified.sh pick_diverse_bottles v1 0 0 verified_v2
+```
+
+AB/C conclusion: tier A is the stable controlled-assist collection mode; tier B only has meaningful contact gating with side-body collision such as `cylinder_proxy` or `exact_convex`; tier C disables assist and exposes the current real pregrasp/grasp collision against OBJ collision, so ID0 knocks or fails validation.
+
+### O.2 pnp_tray Foundation IK
+
+New task `pnp_tray_piper_ik_foundation` reuses the Foundation base class but maps the left object to `left_dark_red_cup` and the right object to `right_bottle`. Keyframes come from `code_painting/h2o_manual_review/pnp_tray/hand_keyframes_all.json`, and second-keyframe EE targets come from `code_painting/human_replay/h2_pure_d435/pnp_tray/id<ID>_d435_z005/world_targets_and_status.npz`. The action order is `pregrasp -> grasp -> close -> action -> open_gripper`.
+
+`pnp_tray` should not reuse pick_diverse's `standoff=0.14`; ID0 validation showed that it pushes the left cup. O.2 configs and the wrapper use `foundation_grasp_standoff=0.105`.
+
+Viewer validation:
+
+```bash
+python view_pick_diverse_bottles_piper_ik_motion.py \
+  --task_name pnp_tray_piper_ik_foundation \
+  --ik_version v1 --foundation_id 0 --foundation_mode o1.2 \
+  --foundation_grasp_standoff_m 0.105 \
+  --foundation_capture_radial_tolerance_m 0.08 \
+  --foundation_grasp_assist_max_distance_m 0.16 \
+  --render_freq 1 --show_axes 1 --show_camera_frustums 1 \
+  --wrist_preview 1 --hold 1 \
+  --max_seed_tries 1 --require_success 1
+```
+
+Collection:
+
+```bash
+bash collect_foundation_piper_ik_verified.sh pnp_tray v1 0 0 o2_verified_v1
+```

@@ -44,3 +44,10 @@ Foundation Piper IK viewer 新增 wrist 相机 `parent_pitch_deg` 与 `parent_la
 当前推荐的 O.1.2 viewer baseline 使用 `foundation_grasp_standoff_m=0.14`、wrist forward `0.145/0.13`、pitch `15deg`、lateral `-0.0207/0.0274`。同时新增真实抓取 debug 参数，可在 viewer 中切换 collision proxy、要求两指接触、关闭 grasp-assist 做纯物理观察。
 
 补充：verified grasp/wrist v2 推荐命令显式包含 `foundation_capture_radial_tolerance_m=0.08` 与 `foundation_grasp_assist_max_distance_m=0.16`，否则默认门控对 `standoff=0.14` 偏严格。
+
+
+## 2026-06-16：O.2 pnp_tray Foundation IK
+
+O.2 是 O.1.2 Foundation IK 的任务扩展，不改变 V1-V4 IK 语义。新增 `pnp_tray_piper_ik_foundation`，将 Foundation NPZ 对象映射为左 `left_dark_red_cup`、右 `right_bottle`，使用 pnp_tray 的手工关键帧和 `h2_pure_d435` EE target。动作顺序为 `pregrasp -> grasp -> close -> second-keyframe action -> open_gripper`。
+
+推荐 O.2 从 V1 开始验证；pnp_tray 使用 `foundation_grasp_standoff=0.105`，因为 pick_diverse verified v2 的 `0.14` 会在 ID0 上推偏左杯。正式采集使用 `collect_foundation_piper_ik_verified.sh pnp_tray ...`，仍保存 head 和左右 wrist 视频。

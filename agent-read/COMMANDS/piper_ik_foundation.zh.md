@@ -203,3 +203,53 @@ O.1.2.3 中的右手 `+0.0067m` 是镜像对称修正，不是 gripper 中线修
 
 
 补充：`foundation_grasp_standoff_m=0.14` 的 verified v2 日常成功档应同时传 `--foundation_capture_radial_tolerance_m 0.08 --foundation_grasp_assist_max_distance_m 0.16`。原因是默认 `0.065/0.14` 对当前指尖抓取几何偏严格，headless 验证会在 left `radial≈0.071m`、`ee_distance≈0.143m` 附近失败。
+
+### Verified v2 无 viewer 正式采集脚本
+
+新增通用 wrapper：
+
+```bash
+bash collect_foundation_piper_ik_verified.sh <pick_diverse_bottles|pnp_tray> <v1|v2|v3|v4> <foundation_id> [gpu_id] [run_tag]
+```
+
+它生成隔离 task config，然后调用 `collect_data.sh`。默认不打开 viewer，只保存正式数据、head camera 和左右 wrist camera 视频。`DRY_RUN=1` 只生成/打印 config，不启动采集。
+
+pick_diverse_bottles 使用当前稳定参数：`support_proxy + grasp_assist=true + require_contact=false + foundation_grasp_standoff=0.14 + radial=0.08 + assist_max_distance=0.16`，wrist 使用 forward `0.145/0.13`、roll `-15/-60`、yaw `0.182/0.840`、pitch `15/15`、lateral `-0.0207/+0.0274`。
+
+示例：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw
+cd /home/zaijia001/ssd/RoboTwin
+
+DRY_RUN=1 bash collect_foundation_piper_ik_verified.sh pick_diverse_bottles v1 0 0 verified_v2
+bash collect_foundation_piper_ik_verified.sh pick_diverse_bottles v1 0 0 verified_v2
+```
+
+AB/C 结论：A 档是当前可稳定采集的受控辅助抓取；B 档只有在 `cylinder_proxy/exact_convex` 等侧面 collision 下才有接触门控意义；C 档关闭 assist 会暴露当前 pregrasp/grasp 与 OBJ collision 的真实碰撞，ID0 会把物体推倒或验证失败。
+
+### O.2 pnp_tray Foundation IK
+
+新增任务 `pnp_tray_piper_ik_foundation`，复用 Foundation 基类，但左对象为 `left_dark_red_cup`、右对象为 `right_bottle`，关键帧来自 `code_painting/h2o_manual_review/pnp_tray/hand_keyframes_all.json`，第二关键帧 EE 目标来自 `code_painting/human_replay/h2_pure_d435/pnp_tray/id<ID>_d435_z005/world_targets_and_status.npz`。动作顺序为 `pregrasp -> grasp -> close -> action -> open_gripper`。
+
+pnp_tray 不沿用 pick_diverse 的 `standoff=0.14`；ID0 验证显示它会推偏左杯。O.2 默认和 wrapper 都使用 `foundation_grasp_standoff=0.105`。
+
+Viewer 验证：
+
+```bash
+python view_pick_diverse_bottles_piper_ik_motion.py \
+  --task_name pnp_tray_piper_ik_foundation \
+  --ik_version v1 --foundation_id 0 --foundation_mode o1.2 \
+  --foundation_grasp_standoff_m 0.105 \
+  --foundation_capture_radial_tolerance_m 0.08 \
+  --foundation_grasp_assist_max_distance_m 0.16 \
+  --render_freq 1 --show_axes 1 --show_camera_frustums 1 \
+  --wrist_preview 1 --hold 1 \
+  --max_seed_tries 1 --require_success 1
+```
+
+采集：
+
+```bash
+bash collect_foundation_piper_ik_verified.sh pnp_tray v1 0 0 o2_verified_v1
+```

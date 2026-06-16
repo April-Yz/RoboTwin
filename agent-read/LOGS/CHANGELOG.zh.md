@@ -2869,3 +2869,15 @@
 - O.1.2 grasp-assist 关闭时现在仍会执行 grasp-state validation 并打印 `contacts/projection/radial`，但不会创建 object-gripper drive。
 
 验证：`py_compile` 通过；viewer `--help` 显示新增 Foundation debug 参数；verified v2 headless 在 `radial_tolerance=0.08`、`assist_max_distance=0.16` 下完成并 `physical_success=True`。默认门控 `0.065/0.14` 会因 left `radial=0.071m` / `ee_distance=0.143m` 失败，因此文档命令已显式加入门控阈值。纯物理档 `--foundation_grasp_assist 0 --foundation_collision_mode cylinder_proxy` 能运行到 validation 并打印 contacts/projection/radial；当前 seed 0 会失败，说明纯接触还没真实夹住。
+
+
+## 2026-06-16（Verified 采集 wrapper 与 O.2 pnp_tray）
+
+- 新增 `collect_foundation_piper_ik_verified.sh`，统一生成 verified v2 task config 并调用 `collect_data.sh`；支持 `pick_diverse_bottles` 和 `pnp_tray`，支持 `DRY_RUN=1`。
+- pick_diverse_bottles 采集固定使用稳定 A 档：`support_proxy + grasp_assist=true + require_contact=false + standoff=0.14 + radial=0.08 + assist_max_distance=0.16`，并写入当前确认的 head/wrist 相机参数。
+- 新增 `envs/pnp_tray_piper_ik_foundation.py`，复用 Foundation IK 基类，将对象映射为左 `left_dark_red_cup`、右 `right_bottle`，动作末尾打开夹爪。
+- Foundation 基类抽出对象 key、actor id、annotation path、hand target pattern 和 `foundation_open_after_action`，O.1 默认行为保持关闭 open-after-action。
+- 新增 `task_config/demo_pnp_tray_piper_ik_foundation_v1-v4.yml` 和 `description/task_instruction/pnp_tray_piper_ik_foundation.json`。
+- AB/C 结论：A 档是当前可稳定采集模式；B 档需要完整侧面 collision 才有接触意义；C 档关闭 assist 后会暴露当前 pregrasp/grasp 与物体碰撞的问题。
+
+验证：`py_compile` 通过；`DRY_RUN=1` 对 pick_diverse_bottles 和 pnp_tray 均能生成 config；pick_diverse V1/O.1.2 headless 使用 `standoff=0.14` 和放宽门控成功；pnp_tray V1/ID0/O.2 headless 使用 `standoff=0.105` 成功，日志包含 `open_after_action=True` 和 `open_gripper`。
