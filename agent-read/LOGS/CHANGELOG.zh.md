@@ -2825,3 +2825,20 @@
 - `view_pick_diverse_bottles_piper_ik_motion.py` 新增 `--wrist_left_yaw_deg` 与 `--wrist_right_yaw_deg`，用于 viewer 临时覆盖。
 - `script/diagnose_piper_wrist_camera_axes.py` 现在在末尾输出可直接复制的 yaw 参数；当前为左 `0.182 deg`、右 `0.840 deg`。
 - 验证：带 yaw 的 V1/O.1.2 实时 SAPIEN + wrist viewer 完成 510 帧实时绘制，`physical_success=True`，日志确认 tuning 含 `parent_yaw_deg`。
+## 2026-06-16（Wrist 距离与俯视角复查）
+
+- 当前 wrist forward offset：左 `0.125m`、右 `0.11m`；若沿光轴前移 2cm，viewer 参数为左 `0.145m`、右 `0.13m`。
+- 以 nominal tip `[0.12,0,0]` 估算，当前相机到 tip 欧氏距离约 `11.9cm`，沿相机 forward 到 tip 约 `6.8cm`；加 2cm 后沿 forward 到 tip 约 `4.8cm`。
+- 原始 0515 和 yaw 后 forward 都接近 Pika 物理 `+X`，不是明显俯视夹爪；若精确看向 nominal tip，需要约 `54deg` gripper-`Y` pitch，实际应小步试俯视 pitch。
+- 右相机中心 `Y=-2.74cm`，左相机 `Y=+2.07cm`，右侧偏心略大，yaw/roll 不能完全替代 lateral offset。
+
+
+
+## 2026-06-16（Foundation gripper 抓取距离 +2cm）
+
+- 将四份 `demo_piper_ik_foundation_v1-v4.yml` 的 `foundation_grasp_standoff` 默认值从 `0.085m` 改为 `0.105m`。
+- `view_pick_diverse_bottles_piper_ik_motion.py` 新增 `--foundation_grasp_standoff_m`，用于实时 viewer 临时覆盖抓取规划距离。
+- `collect_foundation_piper_ik.sh` 新增 `FOUNDATION_GRASP_STANDOFF_M` 环境变量覆盖，并在生成 config 时写入该值。
+- 语义更正：这是 gripper base/EE grasp 目标相对物体中心的 standoff；wrist camera `forward_offset_m` 只调相机外参，不改变抓取深度。
+
+验证：`py_compile` 通过；`bash -n collect_foundation_piper_ik.sh` 通过；`view_pick_diverse_bottles_piper_ik_motion.py --help` 显示 `--foundation_grasp_standoff_m`；V1/O.1.2 headless 最小运行使用 `--foundation_grasp_standoff_m 0.105` 完成，日志确认 `grasp_standoff=0.105m` 且 `physical_success=True`。

@@ -33,3 +33,8 @@
 - The viewer adds `--show_camera_frustums 1` to explicitly draw and verify `left_camera`, `right_camera`, and `head_camera`, and fixes the previously ineffective `--hold 1` behavior.
 - Fixed Piper IK move/settle/gripper loops that updated wrist images without calling `viewer.render()`; live SAPIEN and dual-wrist preview can now run independently or together.
 - Added `script/diagnose_piper_wrist_camera_axes.py` to distinguish Pika physical `+X` from the legacy debug `+Z` forward convention; current wrist forward axes are close to physical `+X`, and the tiny opening-plane correction can be emitted as viewer yaw arguments.
+
+
+## 2026-06-16: Foundation Grasp-Depth Default
+
+O.1/O.1.2 Foundation Piper IK now defaults `foundation_grasp_standoff` to `0.105m`. The old `0.085m` value could make the bottle appear to enter the gripper root; the new value moves the EE/gripper-base target 2cm back so the bottle sits closer to the fingertip closing region. Debug entrypoints: viewer `--foundation_grasp_standoff_m`, collection wrapper `FOUNDATION_GRASP_STANDOFF_M`.

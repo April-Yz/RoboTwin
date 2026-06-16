@@ -2827,3 +2827,20 @@
 - `view_pick_diverse_bottles_piper_ik_motion.py` adds `--wrist_left_yaw_deg` and `--wrist_right_yaw_deg` for temporary viewer overrides.
 - `script/diagnose_piper_wrist_camera_axes.py` now prints ready-to-copy yaw arguments; current values are left `0.182 deg`, right `0.840 deg`.
 - Validation: the V1/O.1.2 live SAPIEN plus wrist viewer run with yaw completed 510 live frames, `physical_success=True`, and logs confirmed `parent_yaw_deg` in tuning.
+## 2026-06-16 (Wrist Distance And Downward-View Review)
+
+- Current wrist forward offsets are left `0.125m` and right `0.11m`; moving 2cm further along the optical axis uses left `0.145m`, right `0.13m`.
+- With nominal tip `[0.12,0,0]`, current camera-to-tip Euclidean distance is about `11.9cm`, and the distance along camera forward is about `6.8cm`; after +2cm offset it becomes about `4.8cm` along forward.
+- Raw 0515 and yaw-corrected forward axes are both close to Pika physical `+X`, not visibly pitched down toward the fingers. A direct nominal-tip view would require about `54deg` gripper-`Y` pitch, so practical tuning should try smaller downward pitch steps.
+- The right camera center is `Y=-2.74cm`, while the left is `Y=+2.07cm`; the right side is slightly more laterally offset, which yaw/roll cannot fully replace.
+
+
+
+## 2026-06-16 (Foundation Gripper Standoff +2cm)
+
+- Changed the default `foundation_grasp_standoff` in `demo_piper_ik_foundation_v1-v4.yml` from `0.085m` to `0.105m`.
+- Added `--foundation_grasp_standoff_m` to `view_pick_diverse_bottles_piper_ik_motion.py` for live-viewer grasp-depth overrides.
+- Added `FOUNDATION_GRASP_STANDOFF_M` to `collect_foundation_piper_ik.sh`; generated configs now receive the override.
+- Corrected the semantics: this is the gripper-base/EE grasp-target standoff from the object center. Wrist-camera `forward_offset_m` only changes camera extrinsics and does not change grasp depth.
+
+Validation: `py_compile` passed; `bash -n collect_foundation_piper_ik.sh` passed; `view_pick_diverse_bottles_piper_ik_motion.py --help` shows `--foundation_grasp_standoff_m`; a minimal V1/O.1.2 headless run with `--foundation_grasp_standoff_m 0.105` completed, logged `grasp_standoff=0.105m`, and reported `physical_success=True`.

@@ -169,6 +169,8 @@ def main() -> None:
     parser.add_argument("--foundation_mode", default="",
                         choices=["", "o1", "o1.1", "o1.2"],
                         help="O.1 mode: frame 0, annotated object frame, or annotated EE action")
+    parser.add_argument("--foundation_grasp_standoff_m", type=float, default=None,
+                        help="覆盖 Foundation grasp 时 gripper base 到物体中心的后退距离；增大可让物体更靠近夹爪指尖")
     args_cli = parser.parse_args()
 
     if args_cli.task_config:
@@ -197,6 +199,10 @@ def main() -> None:
         build_args["foundation_frame"] = args_cli.foundation_frame
     if args_cli.foundation_mode:
         build_args["foundation_mode"] = args_cli.foundation_mode
+    if args_cli.foundation_grasp_standoff_m is not None:
+        if args_cli.foundation_grasp_standoff_m <= 0:
+            raise ValueError("--foundation_grasp_standoff_m must be positive")
+        build_args["foundation_grasp_standoff"] = args_cli.foundation_grasp_standoff_m
     build_args.setdefault("camera", {})["wrist_camera_preview"] = bool(
         args_cli.wrist_preview
     )

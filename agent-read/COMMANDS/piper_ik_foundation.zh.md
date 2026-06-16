@@ -172,3 +172,12 @@ python script/diagnose_piper_wrist_camera_axes.py
 ```
 
 该脚本复用 `envs/camera/camera.py` 的 axis conversion，输出 SAPIEN camera `+X` forward 在 gripper frame 中的方向、对开合轴 `Y` 的平面误差、到 Pika 物理 `+X` 和旧 debug `+Z` 的角度，并在末尾打印可直接加入 viewer 的 `--wrist_left_yaw_deg` / `--wrist_right_yaw_deg`。当前结论是：相机 forward 与 Pika 物理 `+X` 基本对齐，且几乎位于垂直开合轴的 `X-Z` 平面内；按旧 debug `+Z` 计算出的约 90 度偏差属于坐标约定差异，不应直接作为相机外参修正。
+### Wrist +2cm 与俯视角检查
+
+当前 forward offset 是左 `0.125m`、右 `0.11m`；若沿相机光轴前移 2cm，用左 `0.145m`、右 `0.13m`。这只改变相机位置，不改变俯视角。当前 0515 原始标定和 yaw 后 forward 都接近 Pika 物理 `+X`，不是明显俯看夹爪；要看到夹爪需要新增绕 gripper `Y` 的 pitch 调参。
+
+
+
+### Foundation Gripper Standoff 调参
+
+O.1/O.1.2 的抓取深度由 `foundation_grasp_standoff` 控制，不是 wrist camera 的 `forward_offset_m`。默认已从 `0.085m` 调到 `0.105m`，让 gripper base 离瓶子中心更远 2cm，使物体更靠近夹爪指尖/剪刀口。Viewer 可用 `--foundation_grasp_standoff_m 0.105` 临时覆盖；采集 wrapper 可用 `FOUNDATION_GRASP_STANDOFF_M=0.105 bash collect_foundation_piper_ik.sh ...` 临时覆盖。

@@ -27,3 +27,8 @@ Debug videos now use H.264/faststart. The formal collection wrapper accepts four
 The viewer can validate and draw wrist/head camera linesets with `--show_camera_frustums 1`; `--hold 1` now retains the final window until the user exits.
 The 2026-06-16 fix restores per-step `viewer.render()` in the custom Piper IK executor, supporting both live SAPIEN-only and live SAPIEN-plus-wrist-RGB modes.
 The same date adds a wrist forward-axis diagnostic script. Current results show camera forward is close to Pika physical `+X`, with less than one degree of opening-plane error; the roughly 90-degree difference to legacy debug `+Z` should not be applied directly as an extrinsic correction. The viewer can now apply this tiny parent-frame yaw through `--wrist_left_yaw_deg` / `--wrist_right_yaw_deg`.
+
+
+## 2026-06-16: Foundation O.1/O.1.2 Gripper Standoff
+
+The default `foundation_grasp_standoff` for Foundation Piper IK V1-V4 changed from `0.085m` to `0.105m`. This is a default grasp-depth update for O.1/O.1.2: the gripper-base/EE grasp target stays 2cm farther from the bottle center so the object sits closer to the fingertip/scissor region. Interfaces remain compatible and can be overridden with viewer `--foundation_grasp_standoff_m` or collection-wrapper `FOUNDATION_GRASP_STANDOFF_M`.

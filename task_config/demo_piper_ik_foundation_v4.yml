@@ -21,7 +21,7 @@ foundation_mesh_mass: 0.05
 foundation_mesh_friction: 1.5
 foundation_collision_mode: "support_proxy"
 foundation_collision_radius_padding: 0.0
-foundation_grasp_standoff: 0.085
+foundation_grasp_standoff: 0.105
 foundation_grasp_lateral_offset: 0.0
 foundation_pregrasp_distance: 0.12
 foundation_grasp_assist: true

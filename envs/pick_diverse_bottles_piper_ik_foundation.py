@@ -44,7 +44,7 @@ class pick_diverse_bottles_piper_ik_foundation(pick_diverse_bottles_piper_ik):
         self._foundation_table_clearance = float(kwargs.get("foundation_table_clearance", 0.002))
         self._foundation_mesh_mass = float(kwargs.get("foundation_mesh_mass", 0.05))
         self._foundation_mesh_friction = float(kwargs.get("foundation_mesh_friction", 1.5))
-        self._foundation_grasp_standoff = float(kwargs.get("foundation_grasp_standoff", 0.085))
+        self._foundation_grasp_standoff = float(kwargs.get("foundation_grasp_standoff", 0.105))
         self._foundation_grasp_lateral_offset = float(
             kwargs.get("foundation_grasp_lateral_offset", 0.0)
         )
@@ -145,7 +145,9 @@ class pick_diverse_bottles_piper_ik_foundation(pick_diverse_bottles_piper_ik):
         print(
             f"[piper-ik-foundation] mode={self._foundation_mode} source={npz_path} "
             f"episode={self._foundation_episode_id} frame={self._foundation_frame} "
-            f"keyframes={self._foundation_keyframes} use_orientation={self._foundation_use_orientation}"
+            f"keyframes={self._foundation_keyframes} use_orientation={self._foundation_use_orientation} "
+            f"grasp_standoff={self._foundation_grasp_standoff:.3f}m "
+            f"pregrasp_distance={self._foundation_pregrasp_distance:.3f}m"
         )
         super().setup_demo(**kwargs)
 

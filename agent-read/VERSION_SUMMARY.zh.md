@@ -27,3 +27,8 @@ Debug 视频现使用 H.264/faststart；正式采集 wrapper 可通过四个 `WR
 Viewer 可用 `--show_camera_frustums 1` 校验并显示 wrist/head camera linesets；`--hold 1` 已改为保持最终窗口直到用户退出。
 2026-06-16 修复 Piper IK 自定义执行器遗漏逐步 `viewer.render()` 的问题；现在支持“仅实时 SAPIEN”以及“实时 SAPIEN + wrist RGB”两个模式。
 同日新增 wrist 前向轴诊断脚本，当前结果显示相机 forward 与 Pika 物理 `+X` 基本对齐，开合平面误差小于 1 度；旧 debug `+Z` 的约 90 度差异不应直接作为外参修正。Viewer 现在可用 `--wrist_left_yaw_deg` / `--wrist_right_yaw_deg` 应用这个小的父坐标系 yaw。
+
+
+## 2026-06-16：Foundation O.1/O.1.2 gripper standoff
+
+Foundation Piper IK V1-V4 的默认 `foundation_grasp_standoff` 从 `0.085m` 改为 `0.105m`。这属于 O.1/O.1.2 抓取深度默认值调整：gripper base/EE grasp 目标离瓶子中心更远 2cm，使物体更靠近夹爪指尖/剪刀口；接口仍兼容，可用 viewer `--foundation_grasp_standoff_m` 或采集环境变量 `FOUNDATION_GRASP_STANDOFF_M` 覆盖。

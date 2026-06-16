@@ -2136,3 +2136,10 @@
 - 新增 viewer 参数：`--wrist_left_yaw_deg`、`--wrist_right_yaw_deg`。
 - 当前用于消除开合轴 `Y` 分量的命令值：`--wrist_left_yaw_deg 0.182 --wrist_right_yaw_deg 0.840`。
 - `roll_deg` 仍用于画面绕光轴旋转；`yaw_deg` 用于父坐标系 `+Z` 外参朝向微调。
+
+
+## 2026-06-16（Foundation gripper standoff 命令）
+
+- Viewer 新参数：`--foundation_grasp_standoff_m <M>`，例如 `--foundation_grasp_standoff_m 0.105`。
+- 采集 wrapper 新环境变量：`FOUNDATION_GRASP_STANDOFF_M=0.105 bash collect_foundation_piper_ik.sh v1 0 0 0 o1.2 standoff105`。
+- 默认 Foundation V1-V4 YAML 已改为 `foundation_grasp_standoff: 0.105`；不显式传参时也使用新距离。

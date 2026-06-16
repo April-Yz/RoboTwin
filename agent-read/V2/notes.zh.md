@@ -33,3 +33,8 @@
 - Viewer 新增 `--show_camera_frustums 1`，显式显示并校验 `left_camera`、`right_camera`、`head_camera`；修复 `--hold 1` 过去未生效的问题。
 - 修复 Piper IK move/settle/gripper 循环只更新 wrist 图像但不调用 `viewer.render()` 的问题；实时 SAPIEN 与双腕预览可独立或同时运行。
 - 新增 `script/diagnose_piper_wrist_camera_axes.py`，用于区分 Pika 物理 `+X` 与旧 debug `+Z` 前向约定；当前 wrist forward 与物理 `+X` 基本对齐，并可把微小开合平面误差作为 viewer yaw 参数输出。
+
+
+## 2026-06-16：Foundation 抓取深度默认值
+
+O.1/O.1.2 Foundation Piper IK 的 `foundation_grasp_standoff` 默认值现在是 `0.105m`。旧值 `0.085m` 容易让瓶子看起来进入夹爪根部；新值让 EE/gripper base 目标后退 2cm，使瓶子更靠近夹爪指尖闭合区域。调试入口：viewer `--foundation_grasp_standoff_m`，采集 wrapper `FOUNDATION_GRASP_STANDOFF_M`。

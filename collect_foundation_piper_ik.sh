@@ -12,6 +12,7 @@ wrist_left_forward=${WRIST_LEFT_FORWARD_OFFSET_M:-}
 wrist_right_forward=${WRIST_RIGHT_FORWARD_OFFSET_M:-}
 wrist_left_roll=${WRIST_LEFT_ROLL_DEG:-}
 wrist_right_roll=${WRIST_RIGHT_ROLL_DEG:-}
+foundation_grasp_standoff=${FOUNDATION_GRASP_STANDOFF_M:-}
 
 if [[ ! "$version" =~ ^v[1-4]$ ]] || [[ ! "$foundation_id" =~ ^[0-9]+$ ]] || \
    [[ ! "$foundation_frame" =~ ^[0-9]+$ ]] || \
@@ -37,6 +38,13 @@ if [[ "$wrist_override_count" -eq 4 ]]; then
       exit 2
     fi
   done
+fi
+if [[ -n "$foundation_grasp_standoff" ]]; then
+  number_re='^([0-9]+([.][0-9]*)?|[.][0-9]+)$'
+  if [[ ! "$foundation_grasp_standoff" =~ $number_re ]]; then
+    echo "Invalid FOUNDATION_GRASP_STANDOFF_M: $foundation_grasp_standoff" >&2
+    exit 2
+  fi
 fi
 
 repo_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -72,11 +80,19 @@ if [[ "$wrist_override_count" -eq 4 ]]; then
     -e "s|^    right:.*|    right: {forward_offset_m: ${wrist_right_forward}, image_roll_deg: ${wrist_right_roll}}|"
   )
 fi
+if [[ -n "$foundation_grasp_standoff" ]]; then
+  sed_args+=(
+    -e "s|^foundation_grasp_standoff:.*|foundation_grasp_standoff: ${foundation_grasp_standoff}|"
+  )
+fi
 sed -E "${sed_args[@]}" "${base_config}" > "${generated_config}"
 
 echo "[foundation-collect] config=${config_name} mode=${foundation_mode} gpu=${gpu_id} episode_num=1"
 if [[ "$wrist_override_count" -eq 4 ]]; then
   echo "[foundation-collect] wrist tuning: left=(${wrist_left_forward}m, ${wrist_left_roll}deg) right=(${wrist_right_forward}m, ${wrist_right_roll}deg)"
+fi
+if [[ -n "$foundation_grasp_standoff" ]]; then
+  echo "[foundation-collect] foundation_grasp_standoff=${foundation_grasp_standoff}m"
 fi
 cd "${repo_dir}"
 bash collect_data.sh pick_diverse_bottles_piper_ik_foundation "${config_name}" "${gpu_id}"

@@ -2138,3 +2138,10 @@
 - Added viewer parameters: `--wrist_left_yaw_deg` and `--wrist_right_yaw_deg`.
 - Current values for zeroing the finger-opening `Y` component are `--wrist_left_yaw_deg 0.182 --wrist_right_yaw_deg 0.840`.
 - `roll_deg` still rotates the image about the optical axis; `yaw_deg` adjusts extrinsic orientation about parent-frame `+Z`.
+
+
+## 2026-06-16 (Foundation Gripper Standoff Commands)
+
+- New viewer option: `--foundation_grasp_standoff_m <M>`, for example `--foundation_grasp_standoff_m 0.105`.
+- New collection-wrapper environment variable: `FOUNDATION_GRASP_STANDOFF_M=0.105 bash collect_foundation_piper_ik.sh v1 0 0 0 o1.2 standoff105`.
+- Default Foundation V1-V4 YAML files now use `foundation_grasp_standoff: 0.105`, so the new distance is active without explicit overrides.

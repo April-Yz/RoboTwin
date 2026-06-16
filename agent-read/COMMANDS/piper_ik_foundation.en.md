@@ -166,3 +166,12 @@ python script/diagnose_piper_wrist_camera_axes.py
 ```
 
 The script reuses the axis conversion from `envs/camera/camera.py` and reports the SAPIEN camera `+X` forward direction in the gripper frame, the error against the plane perpendicular to finger-opening `Y`, angles to both the Pika physical `+X` and legacy debug `+Z` conventions, and ready-to-copy `--wrist_left_yaw_deg` / `--wrist_right_yaw_deg` viewer arguments. Current conclusion: the camera forward axis is already close to Pika physical `+X` and almost in the `X-Z` plane perpendicular to finger opening. The roughly 90-degree error against legacy debug `+Z` is a frame-convention mismatch, not a camera-extrinsic correction to apply directly.
+### Wrist +2cm And Downward-View Check
+
+Current forward offsets are left `0.125m` and right `0.11m`; moving 2cm further along the camera optical axis uses left `0.145m` and right `0.13m`. This changes position only, not downward pitch. Both the raw 0515 calibration and yaw-corrected forward axes are close to Pika physical `+X`, so they are not visibly looking down at the gripper. Seeing the fingers requires a parent-frame pitch about gripper `Y`.
+
+
+
+### Foundation Gripper Standoff Tuning
+
+O.1/O.1.2 grasp depth is controlled by `foundation_grasp_standoff`, not wrist-camera `forward_offset_m`. The default is now `0.105m` instead of `0.085m`, moving the gripper-base target 2cm farther from the bottle center so the object sits closer to the fingertip/scissor region. The viewer can override it with `--foundation_grasp_standoff_m 0.105`; the collection wrapper can override it with `FOUNDATION_GRASP_STANDOFF_M=0.105 bash collect_foundation_piper_ik.sh ...`.
