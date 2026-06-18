@@ -2893,3 +2893,11 @@ Validation: `py_compile` passed; `DRY_RUN=1` generated configs for both pick_div
 - Optional avoidance: `foundation_pregrasp_clearance=0.06m` inserts a lifted waypoint before pregrasp. The default remains `0`, so existing no-avoidance commands are unchanged.
 
 Validation: O.2 V1/ID0 headless with default object-keyframe succeeded. The action target changed from the old EE `Y≈0.266` to gripper `Y≈0.075/0.069`, with object error about `4.2cm/3.3cm`; `foundation_pregrasp_clearance=0.06` succeeded; `0.10` failed because the left cup rotated about `16.3deg`, exceeding the gate.
+
+## 2026-06-18 (Piper Wrist Camera State Backup And Restore)
+
+- First committed the current suspected-bad state as requested: `2feaa0b Backup current Piper wrist camera state`, covering `COMMAND_LIBRARY.zh.md` and `code_painting/plan_anygrasp_keyframes_r1.py`.
+- Then restored the planner/command-documentation state from before that backup with a non-destructive `git revert`: `916d9f6 Revert "Backup current Piper wrist camera state"`.
+- After the restore, confirmed that `plan_anygrasp_keyframes_r1.py` and `run_plan_keyframes_human_replay_piper_d435.sh` still expose `--wrist_*`, `--joint_trajectory_interpolation`, `--dual_stage_freeze_reached_arms_on_replan`, `--fail_on_execution_failure`, and `--piper_calibration_bundle`.
+
+Validation: `git status --short` was clean; `/home/zaijia001/ssd/miniconda3/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py` passed.

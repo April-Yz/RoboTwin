@@ -2891,3 +2891,11 @@
 - 可选避障：`foundation_pregrasp_clearance=0.06m` 在 pregrasp 前插入抬高 waypoint；默认仍为 `0`，不影响无避障命令。
 
 验证：O.2 V1/ID0 headless 默认 object-keyframe 成功，action target 从旧 EE `Y≈0.266` 改为 gripper `Y≈0.075/0.069`，object error 约 `4.2cm/3.3cm`；`foundation_pregrasp_clearance=0.06` 成功；`0.10` 失败，左杯旋转约 `16.3deg` 超过门限。
+
+## 2026-06-18（Piper wrist camera 状态备份与恢复）
+
+- 先按用户要求提交当前疑似损坏状态：`2feaa0b Backup current Piper wrist camera state`，改动涉及 `COMMAND_LIBRARY.zh.md` 和 `code_painting/plan_anygrasp_keyframes_r1.py`。
+- 随后用非破坏性 `git revert` 恢复到备份提交之前的 planner/命令文档状态：`916d9f6 Revert "Backup current Piper wrist camera state"`。
+- 恢复后确认 `plan_anygrasp_keyframes_r1.py` 和 `run_plan_keyframes_human_replay_piper_d435.sh` 仍支持 `--wrist_*`、`--joint_trajectory_interpolation`、`--dual_stage_freeze_reached_arms_on_replan`、`--fail_on_execution_failure` 和 `--piper_calibration_bundle` 参数。
+
+验证：`git status --short` 干净；`/home/zaijia001/ssd/miniconda3/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py` 通过。
