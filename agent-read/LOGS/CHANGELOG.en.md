@@ -1,5 +1,20 @@
 # CHANGELOG.en
 
+## 2026-06-18 (Restore Mode M/L Wrist Extrinsic Default Behavior)
+
+- Reverted the previous incorrect wrist roll documentation:
+  - `507782e` reverted `b297f32`, removing the `+14.635/-44.649` recommended-roll note.
+- Updated `code_painting/run_plan_keyframes_human_replay_piper_d435.sh`:
+  - `PIPER_CALIBRATION_BUNDLE` now defaults to empty instead of loading the 0515 bundle.
+  - Without an explicit `--piper_calibration_bundle`, the wrapper no longer forwards any `--wrist_*` tuning to the Python planner.
+  - If the outer command includes `--wrist_*` without a bundle, the wrapper prints a warning and ignores those parameters.
+- Reason:
+  - With the 0515 bundle and O.1 tuning as Mode M/L defaults, id1 extracted wrist frames looked at the gripper back shell or empty background, so the current L wrist parent-frame/axis convention cannot directly reuse the O.1 parameters.
+- Validation:
+  - `bash -n code_painting/run_plan_keyframes_human_replay_piper_d435.sh` passed.
+  - A dry-run with `--wrist_*` and no bundle printed the warning.
+  - The no-viewer id1 probe under `/tmp/robo_wrist_restored_baseline_probe/pick_diverse_bottles/foundation_input_1` executed successfully, and logs confirmed that no calibration bundle was loaded.
+
 ## 2026-06-02 (Mode O First-Frame FoundationPose Direct Strategy Grasp)
 
 - Follow-up viewer fix:

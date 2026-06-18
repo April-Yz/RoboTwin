@@ -1,5 +1,20 @@
 # CHANGELOG.zh
 
+## 2026-06-18（恢复 Mode M/L wrist 外参默认行为）
+
+- 撤销上一轮错误的 wrist roll 文档建议：
+  - `507782e` revert 了 `b297f32`，删除 `+14.635/-44.649` 作为推荐 roll 的记录。
+- 修改 `code_painting/run_plan_keyframes_human_replay_piper_d435.sh`：
+  - `PIPER_CALIBRATION_BUNDLE` 默认改为空，不再默认加载 0515 bundle。
+  - 没有显式 `--piper_calibration_bundle` 时，不再向 Python planner 传 `--wrist_*` tuning。
+  - 如果外层命令写了 `--wrist_*` 但没有 bundle，打印 warning 并忽略这些参数。
+- 原因：
+  - 使用默认 0515 bundle + O.1 tuning 的 L/Mode M id1 抽帧显示相机看夹爪背壳/空白背景，说明当前 L wrist 父帧/轴约定不能直接复用 O.1 参数。
+- 验证：
+  - `bash -n code_painting/run_plan_keyframes_human_replay_piper_d435.sh` 通过。
+  - dry-run 带 `--wrist_*` 但不带 bundle 时打印 warning。
+  - no-viewer id1 探针 `/tmp/robo_wrist_restored_baseline_probe/pick_diverse_bottles/foundation_input_1` 执行成功，日志确认不加载 calibration bundle。
+
 ## 2026-06-02（Mode O 第一帧 FoundationPose 直接策略抓取）
 
 - 后续 viewer 修复：

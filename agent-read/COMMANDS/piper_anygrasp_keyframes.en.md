@@ -894,3 +894,31 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_
 | 2 | 1.17/2.72 cm | 0.48/0.90 cm | 1.37/3.40 cm | complete success |
 
 There is no strict roll-range constraint about the local +Z approach axis yet. Piper `global_trans_matrix` is a fixed 180-degree rotation about local X, but IK targets and reported EE poses do not yet share one transform convention, so approximately 178-180 degree rotation errors cannot be treated as physical roll errors. `--apply_global_trans_to_ik 1` made IK worse in testing and is not recommended.
+
+## Mode M-0618: L Wrist Extrinsic Restore Strategy
+
+`run_plan_keyframes_human_replay_piper_d435.sh` no longer loads `calibration_bundle_piper_new_table_0515.json` by default. Directly making the O.1 wrist bundle and O.1 tuning the L/Mode M default produced id1 frames that looked at the gripper back shell or empty background, which means the current L wrist parent-frame/axis convention is not ready to reuse the O.1 parameters directly.
+
+Current behavior:
+
+- Without an explicit `--piper_calibration_bundle`, the wrapper does not forward any `--wrist_*` tuning to the Python planner. If the outer command still includes those parameters, it prints a warning and ignores them.
+- To continue diagnosing O.1 wrist migration, pass the bundle explicitly:
+
+```text
+--piper_calibration_bundle /home/zaijia001/ssd/RoboTwin/calibration_bundle_piper_new_table_0515.json
+```
+
+Validation command:
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_piper_d435.sh \
+  --gpu 2 --ids 1 --dry_run --tasks pick_diverse_bottles \
+  --wrist_left_forward_offset_m 0.145 --wrist_right_forward_offset_m 0.13 \
+  --wrist_left_roll_deg -15 --wrist_right_roll_deg -60
+```
+
+Expected output includes:
+
+```text
+[warn] --wrist_* tuning ignored because --piper_calibration_bundle is not set
+```
