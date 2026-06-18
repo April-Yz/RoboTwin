@@ -327,6 +327,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--debug_camera_axis_length", type=float, default=0.16)
     parser.add_argument("--debug_camera_axis_thickness", type=float, default=0.006)
     parser.add_argument("--target_local_forward_retreat_m", type=float, default=0.0, help="Retreat replay target opposite the hand/gripper local forward axis before planning; 0 keeps legacy AnyGrasp planner behavior.")
+    parser.add_argument("--piper_calibration_bundle", type=Path, default=None, help="Optional self-contained Piper calibration bundle; overrides robot_config and wrist camera local poses (same format as render_hand_retarget pipeline).")
+    # Wrist camera tuning (same convention as O.1 envs/camera/camera.py)
+    parser.add_argument("--wrist_left_forward_offset_m", type=float, default=0.0)
+    parser.add_argument("--wrist_right_forward_offset_m", type=float, default=0.0)
+    parser.add_argument("--wrist_left_lateral_offset_m", type=float, default=0.0)
+    parser.add_argument("--wrist_right_lateral_offset_m", type=float, default=0.0)
+    parser.add_argument("--wrist_left_roll_deg", type=float, default=0.0)
+    parser.add_argument("--wrist_right_roll_deg", type=float, default=0.0)
+    parser.add_argument("--wrist_left_yaw_deg", type=float, default=0.0)
+    parser.add_argument("--wrist_right_yaw_deg", type=float, default=0.0)
+    parser.add_argument("--wrist_left_pitch_deg", type=float, default=0.0)
+    parser.add_argument("--wrist_right_pitch_deg", type=float, default=0.0)
     parser.add_argument("--save_rank_preview_images", type=int, default=1)
     parser.add_argument("--rank_preview_top_n", type=int, default=3, help="Save per-keyframe rank preview PNGs for left/right rank 1..N.")
     parser.add_argument("--debug_target_axis_length", type=float, default=0.08)
@@ -337,6 +349,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--vscode_compatible_video", type=int, default=1, help="If 1, transcode head/third mp4 outputs to H.264 yuv420p faststart so VS Code can preview them reliably when ffmpeg is available.")
     parser.add_argument("--enable_viewer", type=int, default=0)
     parser.add_argument("--viewer_show_camera_frustums", type=int, default=0, help="If 1, keep SAPIEN viewer camera frustum lines visible. Original viewer plugin field: show_camera_linesets.")
+    parser.add_argument("--wrist_preview", type=int, default=0, help="If 1, open an OpenCV window showing left+right wrist camera feeds side-by-side during viewer mode.")
     parser.add_argument("--viewer_frame_delay", type=float, default=0.0)
     parser.add_argument("--viewer_wait_at_end", type=int, default=0)
     parser.add_argument(
@@ -733,10 +746,10 @@ def build_renderer(args: argparse.Namespace) -> ReplayRenderer:
         camera_cv_axis_mode=args.camera_cv_axis_mode,
         head_camera_local_pos=args.head_camera_local_pos,
         head_camera_local_quat_wxyz=args.head_camera_local_quat_wxyz,
-        wrist_camera_local_pos=base.DEFAULT_WRIST_CAMERA_LOCAL_POS,
+        wrist_camera_local_pos=getattr(args, "wrist_camera_local_pos", base.DEFAULT_WRIST_CAMERA_LOCAL_POS),
         # For the R1 planner path, match galaxea_sim/robots/r1.py exactly.
         # R1 Pro carries an extra local z=-90 deg wrist rotation, but R1 does not.
-        wrist_camera_local_quat_wxyz=R1_WRIST_CAMERA_LOCAL_QUAT_WXYZ,
+        wrist_camera_local_quat_wxyz=getattr(args, "wrist_camera_local_quat_wxyz", R1_WRIST_CAMERA_LOCAL_QUAT_WXYZ),
         camera_debug_target="head",
         enable_viewer=bool(args.enable_viewer),
         viewer_frame_delay=args.viewer_frame_delay,
@@ -790,6 +803,33 @@ def build_renderer(args: argparse.Namespace) -> ReplayRenderer:
         renderer_kwargs["urdfik_execute_partial_cartesian_plan"] = bool(args.execute_partial_cartesian_plan)
         renderer_kwargs["urdfik_apply_global_trans_to_ik"] = bool(args.piper_urdfik_apply_global_trans_to_ik)
     renderer = renderer_cls(**renderer_kwargs)
+    # Apply wrist camera tuning (same convention as O.1 envs/camera/camera.py)
+    renderer._wrist_camera_tuning = {
+        "left": {
+            "forward_offset_m": float(args.wrist_left_forward_offset_m),
+            "parent_lateral_offset_m": float(args.wrist_left_lateral_offset_m),
+            "image_roll_deg": float(args.wrist_left_roll_deg),
+            "parent_yaw_deg": float(args.wrist_left_yaw_deg),
+            "parent_pitch_deg": float(args.wrist_left_pitch_deg),
+        },
+        "right": {
+            "forward_offset_m": float(args.wrist_right_forward_offset_m),
+            "parent_lateral_offset_m": float(args.wrist_right_lateral_offset_m),
+            "image_roll_deg": float(args.wrist_right_roll_deg),
+            "parent_yaw_deg": float(args.wrist_right_yaw_deg),
+            "parent_pitch_deg": float(args.wrist_right_pitch_deg),
+        },
+    }
+    renderer._show_wrist_preview = bool(args.wrist_preview)
+    # Per-side calibrated wrist camera poses (from calibration bundle + adapter)
+    for side in ("left", "right"):
+        pos_attr = f"_wrist_{side}_local_pos"
+        quat_attr = f"_wrist_{side}_local_quat_wxyz"
+        arg_pos = getattr(args, pos_attr, None)
+        arg_quat = getattr(args, quat_attr, None)
+        if arg_pos is not None and arg_quat is not None:
+            setattr(renderer, pos_attr, np.asarray(arg_pos, dtype=np.float64))
+            setattr(renderer, quat_attr, np.asarray(arg_quat, dtype=np.float64))
     # SAPIEN viewer draws camera frustum lines through ControlWindow.show_camera_linesets.
     # Keep them off by default so viewer recordings match the intended clean video output.
     try:
@@ -2932,6 +2972,34 @@ def record_frame(
         right_wrist_lines = list(overlay_lines) + ["right_wrist"]
         right_wrist_bgr = base.overlay_text(right_wrist_rgb, right_wrist_lines) if use_overlay else cv2.cvtColor(right_wrist_rgb, cv2.COLOR_RGB2BGR)
         debug_execution_state.right_wrist_writer.write(right_wrist_bgr)
+    # Wrist camera preview window (like O.1 --wrist_preview 1)
+    if viewer_active and getattr(renderer, "_show_wrist_preview", False) and getattr(renderer, "_left_wrist_camera_link", None) is not None and getattr(renderer, "_right_wrist_camera_link", None) is not None:
+        _wrist_preview_cache = getattr(renderer, "_wrist_preview_cache", None)
+        if _wrist_preview_cache is None:
+            _wrist_preview_cache = {"window_name": "RoboTwin wrist cameras", "window_created": False}
+            renderer._wrist_preview_cache = _wrist_preview_cache
+        try:
+            l_rgb, _ = renderer.capture_camera(renderer.left_wrist_camera)
+            r_rgb, _ = renderer.capture_camera(renderer.right_wrist_camera)
+            l_rgb = rotate_wrist_rgb_for_export(l_rgb)
+            r_rgb = rotate_wrist_rgb_for_export(r_rgb)
+            # Match heights
+            h = max(l_rgb.shape[0], r_rgb.shape[0])
+            if l_rgb.shape[0] != h:
+                l_rgb = cv2.resize(l_rgb, (int(l_rgb.shape[1] * h / l_rgb.shape[0]), h))
+            if r_rgb.shape[0] != h:
+                r_rgb = cv2.resize(r_rgb, (int(r_rgb.shape[1] * h / r_rgb.shape[0]), h))
+            preview = np.concatenate([l_rgb, r_rgb], axis=1)
+            preview_bgr = cv2.cvtColor(preview, cv2.COLOR_RGB2BGR)
+            # Label left/right
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            cv2.putText(preview_bgr, "left_wrist", (4, 16), font, 0.4, (0, 255, 255), 1, cv2.LINE_AA)
+            cv2.putText(preview_bgr, "right_wrist", (l_rgb.shape[1] + 4, 16), font, 0.4, (0, 255, 255), 1, cv2.LINE_AA)
+            cv2.imshow(_wrist_preview_cache["window_name"], preview_bgr)
+            _wrist_preview_cache["window_created"] = True
+            cv2.waitKey(1)
+        except Exception:
+            pass
     frame_metrics = None
     if debug_execution_state is not None:
         frame_metrics = build_execution_frame_metrics(renderer, debug_execution_state)
@@ -5158,6 +5226,9 @@ def main() -> None:
             f"final_keyframes={args.resolved_keyframes}"
         )
 
+    # Apply Piper calibration bundle before building renderer so wrist cameras
+    # get the correct gripper_T_camera pose instead of staying at link6 origin.
+    base.apply_piper_calibration_bundle(args)
     renderer = build_renderer(args)
     hand_data = load_hand_data(args.hand_npz)
     replay_frame_indices, object_tracks = load_object_tracks(args.replay_dir, args.object_mesh_overrides)

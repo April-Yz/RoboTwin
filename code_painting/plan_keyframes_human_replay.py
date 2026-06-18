@@ -204,6 +204,7 @@ def build_plan_summary(
     mode: str,
     cv_axis_mode: str = "legacy_r1",
     action_orientation_source: str = "keyframe",
+    target_retreat_m: float = 0.0,
 ) -> dict:
     """Build a complete plan_summary.json."""
     obj_map = TASK_OBJECT_MAP.get(task, {"left": "object", "right": "object"})
@@ -227,6 +228,14 @@ def build_plan_summary(
             if pose_wxyz is None:
                 print(f"  [WARNING] arm={arm} frame={kf_frame}: could not compute world pose, skipping")
                 continue
+            # Apply target retreat along gripper local Z (approach axis).
+            # The hand keyframe gives the TCP pose; retreat converts to link6 target.
+            # Set --target_retreat_m to gripper_bias (e.g. 0.12 for Piper) so that
+            # link6 is placed behind the TCP and the actual TCP reaches the hand position.
+            if abs(target_retreat_m) > 1e-12:
+                quat_xyzw = [float(pose_wxyz[4]), float(pose_wxyz[5]), float(pose_wxyz[6]), float(pose_wxyz[3])]
+                local_z = R.from_quat(quat_xyzw).as_matrix()[:, 2]
+                pose_wxyz[:3] = pose_wxyz[:3] - local_z * float(target_retreat_m)
             orientation_source = f"hand_frame_{int(kf_frame)}"
             if idx > 0 and action_orientation_source == "grasp" and grasp_pose_wxyz is not None:
                 pose_wxyz = np.concatenate([pose_wxyz[:3], grasp_pose_wxyz[3:]]).astype(np.float64)
@@ -265,6 +274,7 @@ def build_plan_summary(
         "video_id": int(video_id),
         "target_source": "human_replay",
         "human_replay_action_orientation_source": str(action_orientation_source),
+        "human_replay_target_retreat_m": float(target_retreat_m),
         "mode": mode,
         "selected_arm": primary_arm,
         "selected_candidates": all_candidates,
@@ -351,7 +361,23 @@ def run_planner_with_targets(
         "--fovy_deg", str(args.fovy_deg),
         "--fps", str(int(args.fps)),
         "--robot_config", str(args.robot_config),
+        *(["--piper_calibration_bundle", str(args.piper_calibration_bundle)] if args.piper_calibration_bundle else []),
         "--fail_on_execution_failure", str(args.fail_on_execution_failure),
+        "--wrist_preview", str(args.wrist_preview),
+        "--viewer_show_camera_frustums", str(args.viewer_show_camera_frustums),
+        "--debug_visualize_cameras", str(args.debug_visualize_cameras),
+        "--debug_camera_axis_length", str(args.debug_camera_axis_length),
+        # Wrist camera tuning (same convention as O.1)
+        "--wrist_left_forward_offset_m", str(args.wrist_left_forward_offset_m),
+        "--wrist_right_forward_offset_m", str(args.wrist_right_forward_offset_m),
+        "--wrist_left_lateral_offset_m", str(args.wrist_left_lateral_offset_m),
+        "--wrist_right_lateral_offset_m", str(args.wrist_right_lateral_offset_m),
+        "--wrist_left_roll_deg", str(args.wrist_left_roll_deg),
+        "--wrist_right_roll_deg", str(args.wrist_right_roll_deg),
+        "--wrist_left_yaw_deg", str(args.wrist_left_yaw_deg),
+        "--wrist_right_yaw_deg", str(args.wrist_right_yaw_deg),
+        "--wrist_left_pitch_deg", str(args.wrist_left_pitch_deg),
+        "--wrist_right_pitch_deg", str(args.wrist_right_pitch_deg),
     ]
 
     if view_mode:
@@ -405,6 +431,10 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--enable_viewer", type=int, default=0)
     parser.add_argument("--viewer_wait_at_end", type=int, default=0)
     parser.add_argument("--viewer_frame_delay", type=float, default=0.02)
+    parser.add_argument("--wrist_preview", type=int, default=0, help="If 1, show live left+right wrist camera preview window during viewer mode.")
+    parser.add_argument("--viewer_show_camera_frustums", type=int, default=0, help="If 1, keep SAPIEN viewer camera frustum lines visible.")
+    parser.add_argument("--debug_visualize_cameras", type=int, default=0, help="If 1, draw camera axis actors (RGB=XYZ) for head and wrist cameras.")
+    parser.add_argument("--debug_camera_axis_length", type=float, default=0.10)
     parser.add_argument("--lighting_mode", type=str, default="front_no_shadow")
     parser.add_argument("--camera_cv_axis_mode", type=str, default="legacy_r1")
     parser.add_argument("--head_camera_local_pos", type=float, nargs=3, default=[0.11210396690038413, -0.39189397826604927, 0.4753892624100325])
@@ -428,6 +458,9 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--candidate_orientation_remap_label", type=str, default="identity")
     parser.add_argument("--approach_axis", type=str, default="local_z")
     parser.add_argument("--approach_offset_m", type=float, default=0.12)
+    parser.add_argument("--piper_calibration_bundle", type=Path, default=None, help="Optional self-contained Piper calibration bundle; overrides robot_config and wrist camera local poses.")
+    parser.add_argument("--target_retreat_m", type=float, default=0.0,
+                        help="Offset grasp target backward along approach axis (local Z) to convert hand TCP to link6 target. Set to gripper_bias (e.g. 0.12 for Piper) to compensate for wrist-to-tip distance.")
     parser.add_argument("--action_orientation_source", choices=["keyframe", "grasp"], default="grasp")
     parser.add_argument("--dual_stage_freeze_reached_arms_on_replan", type=int, default=1)
     parser.add_argument("--require_keyframe1_reached_before_close", type=int, default=1)
@@ -451,6 +484,17 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--enable_grasp_action_object_collision", type=int, default=0)
     parser.add_argument("--replay_objects_ignore_collision", type=int, default=1)
     parser.add_argument("--fail_on_execution_failure", type=int, default=1)
+    # Wrist camera tuning (same convention as O.1 envs/camera/camera.py)
+    parser.add_argument("--wrist_left_forward_offset_m", type=float, default=0.0)
+    parser.add_argument("--wrist_right_forward_offset_m", type=float, default=0.0)
+    parser.add_argument("--wrist_left_lateral_offset_m", type=float, default=0.0)
+    parser.add_argument("--wrist_right_lateral_offset_m", type=float, default=0.0)
+    parser.add_argument("--wrist_left_roll_deg", type=float, default=0.0)
+    parser.add_argument("--wrist_right_roll_deg", type=float, default=0.0)
+    parser.add_argument("--wrist_left_yaw_deg", type=float, default=0.0)
+    parser.add_argument("--wrist_right_yaw_deg", type=float, default=0.0)
+    parser.add_argument("--wrist_left_pitch_deg", type=float, default=0.0)
+    parser.add_argument("--wrist_right_pitch_deg", type=float, default=0.0)
     parser.add_argument("--object_mesh_override", action="append", default=[], help="Repeatable mesh override in the form NAME=/abs/path/to/mesh.obj")
     parser.add_argument("--execution_object_visual_scale_override", action="append", default=[], help="Repeatable visual scale override NAME=SCALE")
     parser.add_argument("--execution_object_collision_scale_override", action="append", default=[], help="Repeatable collision scale override NAME=SCALE")
@@ -511,6 +555,7 @@ def main() -> None:
         mode=mode,
         cv_axis_mode=args.camera_cv_axis_mode,
         action_orientation_source=args.action_orientation_source,
+        target_retreat_m=args.target_retreat_m,
     )
 
     plan_summary_path = args.output_dir / "plan_summary_human_replay.json"

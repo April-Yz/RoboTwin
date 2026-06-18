@@ -149,4 +149,15 @@ if [[ "$dry_run" == "1" ]]; then
 fi
 
 cd "${repo_dir}"
-bash collect_data.sh "${task_name}" "${config_name}" "${gpu_id}"
+# SAPIEN rendering can rarely hang; timeout after 180s and retry next run
+timeout 180 bash collect_data.sh "${task_name}" "${config_name}" "${gpu_id}" || {
+  rc=$?
+  if [ $rc -eq 124 ]; then
+    echo "[foundation-verified-collect] TIMEOUT: ${task_name} id=${foundation_id}"
+  else
+    echo "[foundation-verified-collect] FAILED (rc=${rc}): ${task_name} id=${foundation_id}"
+  fi
+  # Clean up incomplete data so resume script retries this ID
+  rm -rf "data/${task_name}/${config_name}"
+  exit 0  # don't abort the batch loop
+}

@@ -30,8 +30,8 @@ class pick_diverse_bottles_piper_ik_foundation(pick_diverse_bottles_piper_ik):
     FOUNDATION_DEFAULT_ANNOTATION_JSON = (
         "code_painting/h2o_manual_review/pick_diverse_bottles/hand_keyframes_all.json"
     )
-    FOUNDATION_DEFAULT_HAND_TARGETS_ROOT = "code_painting/human_replay/pick_diverse_bottles"
-    FOUNDATION_DEFAULT_HAND_TARGETS_PATTERN = "id_{episode}/world_targets_and_status.npz"
+    FOUNDATION_DEFAULT_HAND_TARGETS_ROOT = "code_painting/human_replay/h2_pure_d435/pick_diverse_bottles"
+    FOUNDATION_DEFAULT_HAND_TARGETS_PATTERN = "id{episode}_d435_z005/world_targets_and_status.npz"
     FOUNDATION_DEFAULT_LEFT_DESCRIPTION = "left cola bottle"
     FOUNDATION_DEFAULT_RIGHT_DESCRIPTION = "right bottle"
     FOUNDATION_DEFAULT_OPEN_AFTER_ACTION = False

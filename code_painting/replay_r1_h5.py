@@ -151,10 +151,25 @@ class ReplayRenderer(base.HandRetargetR1Renderer):
     def update_robot_link_cameras(self) -> None:
         if self._fixed_head_camera_pose is not None:
             self.zed_camera.set_entity_pose(self._fixed_head_camera_pose)
-            if self._left_wrist_camera_link is not None:
-                self.left_wrist_camera.set_entity_pose(base.HIDDEN_DEBUG_POSE)
-            if self._right_wrist_camera_link is not None:
-                self.right_wrist_camera.set_entity_pose(base.HIDDEN_DEBUG_POSE)
+            # Only hide wrist cameras when robot is explicitly hidden (hide_robot=True).
+            # For normal replay with a fixed calibrated head pose, wrist cameras
+            # should follow link6 normally via get_wrist_camera_pose.
+            if getattr(self, "hide_robot", False):
+                if self._left_wrist_camera_link is not None:
+                    self.left_wrist_camera.set_entity_pose(base.HIDDEN_DEBUG_POSE)
+                if self._right_wrist_camera_link is not None:
+                    self.right_wrist_camera.set_entity_pose(base.HIDDEN_DEBUG_POSE)
+            else:
+                if self._left_wrist_camera_link is not None:
+                    lp = self.get_wrist_camera_pose("left")
+                    self.left_wrist_camera.set_entity_pose(lp)
+                    if hasattr(self, "_left_wrist_camera_axis_actor") and self._left_wrist_camera_axis_actor is not None:
+                        self._set_axis_actor_pose(self._left_wrist_camera_axis_actor, np.concatenate([np.asarray(lp.p, dtype=np.float64), base.normalize_quat_wxyz(lp.q)]))
+                if self._right_wrist_camera_link is not None:
+                    rp = self.get_wrist_camera_pose("right")
+                    self.right_wrist_camera.set_entity_pose(rp)
+                    if hasattr(self, "_right_wrist_camera_axis_actor") and self._right_wrist_camera_axis_actor is not None:
+                        self._set_axis_actor_pose(self._right_wrist_camera_axis_actor, np.concatenate([np.asarray(rp.p, dtype=np.float64), base.normalize_quat_wxyz(rp.q)]))
             if self.third_person_view:
                 self.third_camera.set_entity_pose(self._build_third_camera_pose(self._fixed_head_camera_pose))
             return
@@ -162,9 +177,21 @@ class ReplayRenderer(base.HandRetargetR1Renderer):
             head_pose = self.get_head_camera_pose()
             self.zed_camera.set_entity_pose(head_pose)
             if self._left_wrist_camera_link is not None:
-                self.left_wrist_camera.set_entity_pose(self.get_wrist_camera_pose("left"))
+                left_wp = self.get_wrist_camera_pose("left")
+                self.left_wrist_camera.set_entity_pose(left_wp)
+                if hasattr(self, "_left_wrist_camera_axis_actor") and self._left_wrist_camera_axis_actor is not None:
+                    self._set_axis_actor_pose(
+                        self._left_wrist_camera_axis_actor,
+                        np.concatenate([np.asarray(left_wp.p, dtype=np.float64), base.normalize_quat_wxyz(left_wp.q)]),
+                    )
             if self._right_wrist_camera_link is not None:
-                self.right_wrist_camera.set_entity_pose(self.get_wrist_camera_pose("right"))
+                right_wp = self.get_wrist_camera_pose("right")
+                self.right_wrist_camera.set_entity_pose(right_wp)
+                if hasattr(self, "_right_wrist_camera_axis_actor") and self._right_wrist_camera_axis_actor is not None:
+                    self._set_axis_actor_pose(
+                        self._right_wrist_camera_axis_actor,
+                        np.concatenate([np.asarray(right_wp.p, dtype=np.float64), base.normalize_quat_wxyz(right_wp.q)]),
+                    )
             if self.third_person_view:
                 self.third_camera.set_entity_pose(self._build_third_camera_pose(head_pose))
             return

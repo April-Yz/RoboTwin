@@ -14,7 +14,6 @@ foundation_input_dir: "/home/zaijia001/ssd/data/piper/hand/pick_diverse_bottles/
 foundation_frame: 0
 foundation_mode: "o1"
 foundation_annotation_json: "/home/zaijia001/ssd/RoboTwin/code_painting/h2o_manual_review/pick_diverse_bottles/hand_keyframes_all.json"
-foundation_hand_targets_root: "/home/zaijia001/ssd/RoboTwin/code_painting/human_replay/pick_diverse_bottles"
 foundation_use_orientation: false
 foundation_table_clearance: 0.002
 foundation_mesh_mass: 0.05

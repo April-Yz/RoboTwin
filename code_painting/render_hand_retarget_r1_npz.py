@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Sequence, Tupl
 import cv2
 import numpy as np
 import sapien.core as sapien
+import transforms3d as t3d
 from scipy.spatial.transform import Rotation as R, Slerp
 
 THIS_DIR = Path(__file__).resolve().parent
@@ -702,6 +703,8 @@ class HandRetargetR1Renderer:
         self._left_target_axis_actor = None
         self._right_target_axis_actor = None
         self._head_camera_axis_actor = None
+        self._left_wrist_camera_axis_actor = None
+        self._right_wrist_camera_axis_actor = None
 
         self._setup_scene()
         self._setup_cameras()
@@ -769,6 +772,10 @@ class HandRetargetR1Renderer:
                 print(f"[viewer-warning] failed to create interactive viewer, falling back to offscreen only: {type(exc).__name__}: {exc}")
 
     def _setup_cameras(self) -> None:
+        if self.debug_visualize_cameras:
+            self._head_camera_axis_actor = self._create_debug_camera_actor("head_camera_debug_axis")
+            self._left_wrist_camera_axis_actor = self._create_debug_camera_actor("left_wrist_camera_debug_axis")
+            self._right_wrist_camera_axis_actor = self._create_debug_camera_actor("right_wrist_camera_debug_axis")
         self.zed_camera = self.scene.add_camera(
             name="zed_camera",
             width=self.image_width,
@@ -890,8 +897,6 @@ class HandRetargetR1Renderer:
         if self.debug_visualize_targets:
             self._left_target_axis_actor = self._create_debug_axis_actor("left_target_axis")
             self._right_target_axis_actor = self._create_debug_axis_actor("right_target_axis")
-        if self.debug_visualize_cameras:
-            self._head_camera_axis_actor = self._create_debug_camera_actor("head_camera_debug_axis")
 
         self._update_table_pose()
         self._update_base_occluder_pose()
@@ -1028,9 +1033,81 @@ class HandRetargetR1Renderer:
         if link is None:
             raise RuntimeError(f"{side} wrist camera link is unavailable.")
         link_pose = link.get_entity_pose()
-        local_pose = sapien.Pose(self.wrist_camera_local_pos, self.wrist_camera_local_quat_wxyz)
+        # Use per-side calibrated local pose when available (from calibration bundle adapter),
+        # falling back to the shared wrist_camera_local_pos/quat.
+        side_local_pos = getattr(self, f"_wrist_{side}_local_pos", None)
+        side_local_quat = getattr(self, f"_wrist_{side}_local_quat_wxyz", None)
+        _wrist_debug_printed = getattr(self, "_wrist_debug_printed", False)
+        if not _wrist_debug_printed:
+            self._wrist_debug_printed = True
+            print(f"[wrist-debug] side={side} link={link.get_name()}")
+            print(f"[wrist-debug] link_pose p={np.round(link_pose.p, 4)} q={np.round(link_pose.q, 4)}")
+            print(f"[wrist-debug] per_side_pos={'YES' if side_local_pos is not None else 'MISSING'}")
+            if side_local_pos is not None:
+                print(f"[wrist-debug] per_side_pos={np.round(side_local_pos, 4).tolist()}")
+                print(f"[wrist-debug] per_side_quat={np.round(side_local_quat, 4).tolist()}")
+            print(f"[wrist-debug] shared_pos={np.round(self.wrist_camera_local_pos, 4).tolist()}")
+            print(f"[wrist-debug] shared_quat={np.round(self.wrist_camera_local_quat_wxyz, 4).tolist()}")
+        if side_local_pos is not None and side_local_quat is not None:
+            local_pose = sapien.Pose(np.asarray(side_local_pos, dtype=np.float64),
+                                     np.asarray(side_local_quat, dtype=np.float64))
+        else:
+            local_pose = sapien.Pose(self.wrist_camera_local_pos, self.wrist_camera_local_quat_wxyz)
+        # Apply wrist camera tuning in LOCAL frame before converting to world
+        # (matching O.1 envs/camera/camera.py: tuning is applied to link6_T_camera,
+        #  NOT to world_T_camera). This is critical because yaw/pitch are about
+        #  link6/parent axes, not world axes.
+        tuning = getattr(self, "_wrist_camera_tuning", {}).get(side, {})
+        if tuning:
+            local_pose = self._apply_wrist_tuning(local_pose, tuning)
         pose = matrix_to_pose(pose_to_matrix(link_pose) @ pose_to_matrix(local_pose))
         return self._apply_camera_debug(pose, f"{side}_wrist")
+
+    @staticmethod
+    def _apply_wrist_tuning(pose: sapien.Pose, tuning: dict) -> sapien.Pose:
+        """Apply wrist camera tuning transform to a camera pose.
+
+        Tuning dict keys (all optional, default 0.0):
+          forward_offset_m       — shift along camera optical axis (render +X)
+          parent_lateral_offset_m — shift along parent/world Y
+          parent_yaw_deg         — rotate about parent/world Z
+          parent_pitch_deg       — rotate about parent/world Y
+          image_roll_deg         — rotate about camera forward (optical) axis
+        """
+        matrix = pose_to_matrix(pose)
+        render_rotation = matrix[:3, :3].copy()
+        forward_offset = float(tuning.get("forward_offset_m", 0.0))
+        lateral_offset = float(tuning.get("parent_lateral_offset_m", 0.0))
+        yaw_deg = float(tuning.get("parent_yaw_deg", 0.0))
+        pitch_deg = float(tuning.get("parent_pitch_deg", 0.0))
+        roll_deg = float(tuning.get("image_roll_deg", 0.0))
+        if not np.isfinite([forward_offset, lateral_offset, yaw_deg, pitch_deg, roll_deg]).all():
+            return pose
+        # yaw about parent Z
+        if abs(yaw_deg) > 1e-12:
+            yaw_rad = np.deg2rad(yaw_deg)
+            c, s = np.cos(yaw_rad), np.sin(yaw_rad)
+            yaw_mat = np.array([[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]], dtype=np.float64)
+            render_rotation = yaw_mat @ render_rotation
+        # pitch about parent Y
+        if abs(pitch_deg) > 1e-12:
+            pitch_rad = np.deg2rad(pitch_deg)
+            c, s = np.cos(pitch_rad), np.sin(pitch_rad)
+            pitch_mat = np.array([[c, 0.0, s], [0.0, 1.0, 0.0], [-s, 0.0, c]], dtype=np.float64)
+            render_rotation = pitch_mat @ render_rotation
+        # forward offset along optical axis (render +X = column 0)
+        matrix[:3, 3] += render_rotation[:, 0] * forward_offset
+        # lateral offset along parent Y
+        matrix[:3, 3] += np.array([0.0, lateral_offset, 0.0], dtype=np.float64)
+        # roll about camera forward (optical) axis
+        if abs(roll_deg) > 1e-12:
+            roll_rad = np.deg2rad(roll_deg)
+            c, s = np.cos(roll_rad), np.sin(roll_rad)
+            roll_mat = np.array([[1.0, 0.0, 0.0], [0.0, c, -s], [0.0, s, c]], dtype=np.float64)
+            render_rotation = render_rotation @ roll_mat
+        matrix[:3, :3] = render_rotation
+        quat = t3d.quaternions.mat2quat(matrix[:3, :3])
+        return sapien.Pose(matrix[:3, 3], quat)
 
     def _camera_cv_rotation(self) -> np.ndarray:
         return CV_TO_WORLD_CAMERA_PRESETS.get(self.camera_cv_axis_mode, CV_TO_WORLD_CAMERA_PRESETS["legacy_r1"])
@@ -1190,9 +1267,19 @@ class HandRetargetR1Renderer:
             np.concatenate([np.asarray(head_pose.p, dtype=np.float64), normalize_quat_wxyz(head_pose.q)]),
         )
         if self._left_wrist_camera_link is not None:
-            self.left_wrist_camera.set_entity_pose(self.get_wrist_camera_pose("left"))
+            left_pose = self.get_wrist_camera_pose("left")
+            self.left_wrist_camera.set_entity_pose(left_pose)
+            self._set_axis_actor_pose(
+                self._left_wrist_camera_axis_actor,
+                np.concatenate([np.asarray(left_pose.p, dtype=np.float64), normalize_quat_wxyz(left_pose.q)]),
+            )
         if self._right_wrist_camera_link is not None:
-            self.right_wrist_camera.set_entity_pose(self.get_wrist_camera_pose("right"))
+            right_pose = self.get_wrist_camera_pose("right")
+            self.right_wrist_camera.set_entity_pose(right_pose)
+            self._set_axis_actor_pose(
+                self._right_wrist_camera_axis_actor,
+                np.concatenate([np.asarray(right_pose.p, dtype=np.float64), normalize_quat_wxyz(right_pose.q)]),
+            )
         if self.third_person_view:
             self.third_camera.set_entity_pose(self._build_third_camera_pose(head_pose))
 
@@ -1874,10 +1961,46 @@ def apply_piper_calibration_bundle(args: argparse.Namespace) -> None:
     # Current renderer exposes one shared wrist-camera local pose. Keep left as
     # the generic default and record both source values in the bundle for future
     # left/right-specific wrist rendering.
-    wrist = bundle.get("wrist_cameras", {}).get("left_gripper_T_camera")
-    if wrist is not None:
-        args.wrist_camera_local_pos = [float(v) for v in wrist["translation"]]
-        args.wrist_camera_local_quat_wxyz = [float(v) for v in wrist["quat_wxyz"]]
+    wrist_cameras = bundle.get("wrist_cameras", {})
+    adapters = wrist_cameras.get("simulation_adapters", {})
+    adapter = adapters.get("piper_pika_agx", {}).get("matrix")
+    if adapter is not None:
+        adapter = np.asarray(adapter, dtype=np.float64).reshape(4, 4)
+    else:
+        adapter = np.eye(4, dtype=np.float64)
+
+    def _apply_adapter(raw_trans, raw_quat_wxyz):
+        """Apply simulation adapter + OpenCV→SAPIEN axis conversion.
+
+        The calibration bundle stores camera poses in OpenCV optical convention
+        (camera looks along +Z). SAPIEN cameras look along +X. We must convert
+        the rotation via cv_to_render.T, matching O.1 envs/camera/camera.py.
+        """
+        raw_mat = np.eye(4, dtype=np.float64)
+        raw_mat[:3, :3] = t3d.quaternions.quat2mat(np.asarray(raw_quat_wxyz, dtype=np.float64))
+        raw_mat[:3, 3] = np.asarray(raw_trans, dtype=np.float64)
+        # Step 1: real TCP frame → simulation link6 frame
+        corrected = adapter @ raw_mat
+        # Step 2: OpenCV optical → SAPIEN render convention
+        cv_to_render = CV_TO_WORLD_CAMERA_PRESETS.get("legacy_r1", np.eye(3, dtype=np.float64))
+        render_rotation = corrected[:3, :3] @ cv_to_render.T
+        render_quat = t3d.quaternions.mat2quat(render_rotation)
+        return corrected[:3, 3].tolist(), render_quat.tolist()
+
+    left_wrist = wrist_cameras.get("left_gripper_T_camera")
+    if left_wrist is not None:
+        pos, quat = _apply_adapter(left_wrist["translation"], left_wrist["quat_wxyz"])
+        args.wrist_camera_local_pos = [float(v) for v in pos]
+        args.wrist_camera_local_quat_wxyz = [float(v) for v in quat]
+        # Store per-side corrected poses for renderers that support them
+        args._wrist_left_local_pos = [float(v) for v in pos]
+        args._wrist_left_local_quat_wxyz = [float(v) for v in quat]
+
+    right_wrist = wrist_cameras.get("right_gripper_T_camera")
+    if right_wrist is not None:
+        pos, quat = _apply_adapter(right_wrist["translation"], right_wrist["quat_wxyz"])
+        args._wrist_right_local_pos = [float(v) for v in pos]
+        args._wrist_right_local_quat_wxyz = [float(v) for v in quat]
 
     print(f"[piper-calibration-bundle] loaded {bundle_path}")
     print(f"[piper-calibration-bundle] generated_robot_config={generated_config}")

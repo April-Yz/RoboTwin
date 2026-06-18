@@ -37,6 +37,19 @@ REACH_ROT_TOL_DEG=180
 REACH_POS_TOL_M=0.04
 FAIL_ON_EXECUTION_FAILURE=1
 APPROACH_OFFSET_M=0.12
+TARGET_RETREAT_M=0.0
+PIPER_CALIBRATION_BUNDLE=/home/zaijia001/ssd/RoboTwin/calibration_bundle_piper_new_table_0515.json
+# Wrist camera tuning (same convention as O.1)
+WRIST_LEFT_FORWARD_OFFSET_M=0.0
+WRIST_RIGHT_FORWARD_OFFSET_M=0.0
+WRIST_LEFT_LATERAL_OFFSET_M=0.0
+WRIST_RIGHT_LATERAL_OFFSET_M=0.0
+WRIST_LEFT_ROLL_DEG=0.0
+WRIST_RIGHT_ROLL_DEG=0.0
+WRIST_LEFT_YAW_DEG=0.0
+WRIST_RIGHT_YAW_DEG=0.0
+WRIST_LEFT_PITCH_DEG=0.0
+WRIST_RIGHT_PITCH_DEG=0.0
 REPLAN_MAX_ATTEMPTS=5
 VISUALIZE_TARGETS=1
 DISABLE_EXECUTION_COLLISIONS=1
@@ -62,6 +75,7 @@ Options:
   --id_start <N>        Start of ID range (inclusive, requires --id_end)
   --id_end <N>          End of ID range (inclusive, requires --id_start)
   --approach_offset_m <M>  Pregrasp approach distance (default: 0.12)
+  --target_retreat_m <M>  Offset grasp target backward along approach axis to convert hand TCP to link6 target (default: 0.0; set to gripper_bias e.g. 0.12 for Piper)
   --trajectory_mode <M>    Trajectory mode (default: joint_interp)
   --cartesian_auto_step_m <M>
   --ik_max_rotation_threshold_rad <RAD>
@@ -91,6 +105,18 @@ while (($# > 0)); do
     --dry_run) DRY_RUN=1; shift ;;
     --output_root) OUTPUT_ROOT="$2"; shift 2 ;;
     --approach_offset_m) APPROACH_OFFSET_M="$2"; shift 2 ;;
+    --target_retreat_m) TARGET_RETREAT_M="$2"; shift 2 ;;
+    --piper_calibration_bundle) PIPER_CALIBRATION_BUNDLE="$2"; shift 2 ;;
+    --wrist_left_forward_offset_m) WRIST_LEFT_FORWARD_OFFSET_M="$2"; shift 2 ;;
+    --wrist_right_forward_offset_m) WRIST_RIGHT_FORWARD_OFFSET_M="$2"; shift 2 ;;
+    --wrist_left_lateral_offset_m) WRIST_LEFT_LATERAL_OFFSET_M="$2"; shift 2 ;;
+    --wrist_right_lateral_offset_m) WRIST_RIGHT_LATERAL_OFFSET_M="$2"; shift 2 ;;
+    --wrist_left_roll_deg) WRIST_LEFT_ROLL_DEG="$2"; shift 2 ;;
+    --wrist_right_roll_deg) WRIST_RIGHT_ROLL_DEG="$2"; shift 2 ;;
+    --wrist_left_yaw_deg) WRIST_LEFT_YAW_DEG="$2"; shift 2 ;;
+    --wrist_right_yaw_deg) WRIST_RIGHT_YAW_DEG="$2"; shift 2 ;;
+    --wrist_left_pitch_deg) WRIST_LEFT_PITCH_DEG="$2"; shift 2 ;;
+    --wrist_right_pitch_deg) WRIST_RIGHT_PITCH_DEG="$2"; shift 2 ;;
     --replan_until_reached_max_attempts) REPLAN_MAX_ATTEMPTS="$2"; shift 2 ;;
     --trajectory_mode) TRAJECTORY_MODE="$2"; shift 2 ;;
     --cartesian_auto_step_m) CARTESIAN_AUTO_STEP_M="$2"; shift 2 ;;
@@ -222,7 +248,22 @@ for ID in "${IDS[@]}"; do
     --reach_rot_tol_deg "$REACH_ROT_TOL_DEG"
     --reach_pos_tol_m "$REACH_POS_TOL_M"
     --fail_on_execution_failure "$FAIL_ON_EXECUTION_FAILURE"
+    --wrist_preview 1
+    --viewer_show_camera_frustums 1
+    --debug_visualize_cameras 1 --debug_camera_axis_length 0.10
     --approach_offset_m "$APPROACH_OFFSET_M"
+    --piper_calibration_bundle "$PIPER_CALIBRATION_BUNDLE"
+    --target_retreat_m "$TARGET_RETREAT_M"
+    --wrist_left_forward_offset_m "$WRIST_LEFT_FORWARD_OFFSET_M"
+    --wrist_right_forward_offset_m "$WRIST_RIGHT_FORWARD_OFFSET_M"
+    --wrist_left_lateral_offset_m "$WRIST_LEFT_LATERAL_OFFSET_M"
+    --wrist_right_lateral_offset_m "$WRIST_RIGHT_LATERAL_OFFSET_M"
+    --wrist_left_roll_deg "$WRIST_LEFT_ROLL_DEG"
+    --wrist_right_roll_deg "$WRIST_RIGHT_ROLL_DEG"
+    --wrist_left_yaw_deg "$WRIST_LEFT_YAW_DEG"
+    --wrist_right_yaw_deg "$WRIST_RIGHT_YAW_DEG"
+    --wrist_left_pitch_deg "$WRIST_LEFT_PITCH_DEG"
+    --wrist_right_pitch_deg "$WRIST_RIGHT_PITCH_DEG"
     --replan_until_reached_max_attempts "$REPLAN_MAX_ATTEMPTS"
   )
 

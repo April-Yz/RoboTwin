@@ -23,7 +23,10 @@ import render_hand_retarget_r1_npz as base
 from replay_piper_dual_h5 import PiperDualReplayRenderer
 from urdfik import URDFInverseKinematics
 
-PIPER_URDF = PROJECT_ROOT / "assets" / "embodiments" / "piper" / "piper.urdf"
+# 使用与 SAPIEN 仿真一致的 URDF（piper_pika_agx），
+# 而非 piper/piper.urdf（关节原点不同！IK 求解的关节角在错误 URDF 上执行会产生巨大误差）。
+# 参见 envs/robot/piper_ik.py 的相同处理。
+PIPER_URDF = PROJECT_ROOT / "assets" / "embodiments" / "piper_pika_agx" / "piper_pika_agx.urdf"
 DEFAULT_INIT_ARM_JOINTS = np.array([0.0, 0.8, 1.2, 0.0, -0.4, 0.0], dtype=np.float64)
 DEFAULT_INIT_GRIPPER_OPEN = 1.0
 
