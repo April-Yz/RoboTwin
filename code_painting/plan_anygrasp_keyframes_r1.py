@@ -190,7 +190,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--arm", choices=["auto", "left", "right"], default="auto")
     parser.add_argument("--execute_both_arms", type=int, default=1, help="If 1 and --arm auto, execute synchronized dual-arm stages and advance only when both arms satisfy reach checks.")
     parser.add_argument("--dual_stage_require_all_plans", type=int, default=1, help="If 1 in dual-arm mode, do not execute either arm in a stage unless both left/right plans are successful. This prevents one arm from moving alone when the other arm's IK fails.")
-    parser.add_argument("--dual_stage_freeze_reached_arms_on_replan", type=int, default=0, help="If 1, once one arm reaches a dual-arm stage target, later replan attempts hold that arm fixed and only move unreached arms.")
     parser.add_argument("--require_keyframe1_reached_before_close", type=int, default=0, help="If 1, skip gripper close and second-keyframe action unless the first-keyframe grasp stage reached the configured pose tolerance.")
     parser.add_argument("--require_keyframe1_reached_before_action", type=int, default=0, help="If 1, skip the second-keyframe action stage unless the first-keyframe grasp stage reached the configured pose tolerance.")
     parser.add_argument("--debug_stop_after_keyframe1", type=int, default=0, help="If 1, stop execution after the first-keyframe pregrasp/grasp stages. The gripper is not closed and the second-keyframe action is marked skipped. Use this to debug init-to-keyframe1 reachability in isolation.")
@@ -236,20 +235,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--urdfik_max_position_threshold_m", type=float, default=None, help="Maximum relaxed URDF IK position threshold in meters. Default preserves the solver's old 2 mm cap.")
     parser.add_argument("--urdfik_max_rotation_threshold_rad", type=float, default=None, help="Maximum relaxed URDF IK rotation threshold in radians. Default preserves the solver's old 0.04 rad cap.")
     parser.add_argument("--urdfik_num_seeds", type=int, default=1, help="Number of CuRobo IK seeds used by URDF IK.")
-    parser.add_argument(
-        "--urdfik_solution_selection",
-        choices=["pose_error", "joint_continuity"],
-        default="pose_error",
-        help="Choose seeded/unseeded IK solutions by endpoint pose error or minimum joint change from the previous waypoint.",
-    )
-    parser.add_argument("--urdfik_seed_perturbations", type=int, default=0, help="Number of deterministic small perturbations around the current joint seed to try explicitly.")
-    parser.add_argument("--urdfik_seed_perturbation_scale", type=float, default=0.05, help="Standard deviation in radians for --urdfik_seed_perturbations.")
-    parser.add_argument(
-        "--urdfik_max_joint_step_rad",
-        type=float,
-        default=0.0,
-        help="Reject an IK waypoint if any arm joint changes by more than this many radians from the previous waypoint. <=0 disables the check.",
-    )
     parser.add_argument("--execute_partial_cartesian_plan", type=int, default=0, help="If 1, cartesian_interp_ik plans that fail at an intermediate waypoint still execute the successfully solved waypoint prefix as a Partial plan. Diagnostic only; reached remains false unless the final target is reached.")
     parser.add_argument("--piper_urdfik_apply_global_trans_to_ik", type=int, default=0, help="Piper diagnostic only. If 1, additionally remove global_trans_matrix from the gripper target before URDFIK. Default 0 matches the direct Piper hand replay convention.")
     parser.add_argument("--left_target_object", type=str, default="cup")
@@ -283,12 +268,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--approach_axis", choices=["local_x", "local_z"], default="local_x", help="Target local axis used for pregrasp retreat. Default local_x preserves the legacy AnyGrasp planner behavior. local_z matches the direct hand replay convention after remapping AnyGrasp +X to replay +Z.")
     parser.add_argument("--settle_steps", type=int, default=4)
     parser.add_argument("--execute_interp_steps", type=int, default=24)
-    parser.add_argument(
-        "--joint_trajectory_interpolation",
-        choices=["linear", "cubic"],
-        default="linear",
-        help="Interpolation used to densify joint waypoints before execution. cubic uses zero-slope smoothstep segments.",
-    )
     parser.add_argument("--joint_command_scene_steps", type=int, default=2, help="Physics scene steps to advance after each commanded arm waypoint.")
     parser.add_argument("--joint_target_wait_steps", type=int, default=60, help="Maximum extra physics scene steps used after a stage trajectory to let the arm converge to the final commanded joint target.")
     parser.add_argument("--joint_target_wait_tol_rad", type=float, default=0.01, help="Per-joint absolute tolerance in radians used by the final post-trajectory convergence wait.")
@@ -327,18 +306,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--debug_camera_axis_length", type=float, default=0.16)
     parser.add_argument("--debug_camera_axis_thickness", type=float, default=0.006)
     parser.add_argument("--target_local_forward_retreat_m", type=float, default=0.0, help="Retreat replay target opposite the hand/gripper local forward axis before planning; 0 keeps legacy AnyGrasp planner behavior.")
-    parser.add_argument("--piper_calibration_bundle", type=Path, default=None, help="Optional self-contained Piper calibration bundle; overrides robot_config and wrist camera local poses (same format as render_hand_retarget pipeline).")
-    # Wrist camera tuning (same convention as O.1 envs/camera/camera.py)
-    parser.add_argument("--wrist_left_forward_offset_m", type=float, default=0.0)
-    parser.add_argument("--wrist_right_forward_offset_m", type=float, default=0.0)
-    parser.add_argument("--wrist_left_lateral_offset_m", type=float, default=0.0)
-    parser.add_argument("--wrist_right_lateral_offset_m", type=float, default=0.0)
-    parser.add_argument("--wrist_left_roll_deg", type=float, default=0.0)
-    parser.add_argument("--wrist_right_roll_deg", type=float, default=0.0)
-    parser.add_argument("--wrist_left_yaw_deg", type=float, default=0.0)
-    parser.add_argument("--wrist_right_yaw_deg", type=float, default=0.0)
-    parser.add_argument("--wrist_left_pitch_deg", type=float, default=0.0)
-    parser.add_argument("--wrist_right_pitch_deg", type=float, default=0.0)
+    parser.add_argument("--piper_calibration_bundle", type=Path, default=None, help="Optional self-contained Piper calibration bundle; overrides robot_config and wrist camera local poses.")
     parser.add_argument("--save_rank_preview_images", type=int, default=1)
     parser.add_argument("--rank_preview_top_n", type=int, default=3, help="Save per-keyframe rank preview PNGs for left/right rank 1..N.")
     parser.add_argument("--debug_target_axis_length", type=float, default=0.08)
@@ -349,15 +317,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--vscode_compatible_video", type=int, default=1, help="If 1, transcode head/third mp4 outputs to H.264 yuv420p faststart so VS Code can preview them reliably when ffmpeg is available.")
     parser.add_argument("--enable_viewer", type=int, default=0)
     parser.add_argument("--viewer_show_camera_frustums", type=int, default=0, help="If 1, keep SAPIEN viewer camera frustum lines visible. Original viewer plugin field: show_camera_linesets.")
-    parser.add_argument("--wrist_preview", type=int, default=0, help="If 1, open an OpenCV window showing left+right wrist camera feeds side-by-side during viewer mode.")
     parser.add_argument("--viewer_frame_delay", type=float, default=0.0)
     parser.add_argument("--viewer_wait_at_end", type=int, default=0)
-    parser.add_argument(
-        "--fail_on_execution_failure",
-        type=int,
-        default=0,
-        help="Exit nonzero after writing outputs when a required pregrasp/grasp/action stage did not reach its target.",
-    )
     parser.add_argument("--disable_table", type=int, default=1)
     parser.add_argument("--base_occluder_enable", type=int, default=0, help="If 1, add a visual-only box attached above the robot base to occlude the chassis in camera views. No collision is created.")
     parser.add_argument("--base_occluder_local_pos", type=float, nargs=3, default=[0.0, 0.0, 0.4], metavar=("X", "Y", "Z"))
@@ -367,10 +328,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--camera_cv_axis_mode", choices=sorted(base.CV_TO_WORLD_CAMERA_PRESETS.keys()), default="legacy_r1")
     parser.add_argument("--head_camera_local_pos", type=float, nargs=3, default=base.DEFAULT_HEAD_CAMERA_LOCAL_POS.tolist())
     parser.add_argument("--head_camera_local_quat_wxyz", type=float, nargs=4, default=base.DEFAULT_HEAD_CAMERA_LOCAL_QUAT_WXYZ.tolist())
-    parser.add_argument("--init_left_arm_joints", type=float, nargs=6, default=None, metavar=("J0","J1","J2","J3","J4","J5"), help="Optional initial left arm joint positions for async staged execution.")
-    parser.add_argument("--init_right_arm_joints", type=float, nargs=6, default=None, metavar=("J0","J1","J2","J3","J4","J5"), help="Optional initial right arm joint positions for async staged execution.")
-    parser.add_argument("--save_final_joints_json", type=Path, default=None, help="Optional path to save final left/right arm joint positions after execution as JSON.")
-    parser.add_argument("--init_gripper_open_val", type=float, default=None, help="Optional initial gripper open value for both arms.")
     return parser.parse_args()
 
 
@@ -450,7 +407,6 @@ def preview_candidate_entry_to_pose(
 def load_reused_plan_summary(
     path: Path,
     requested_arm_mode: str,
-    postprocess_args: Optional[argparse.Namespace] = None,
 ) -> Tuple[ArmSelectionResult, Dict[str, ArmDebugInfo], List[Tuple[str, List[SelectedKeyframe]]], Dict]:
     with path.open("r", encoding="utf-8") as f:
         summary = json.load(f)
@@ -475,11 +431,6 @@ def load_reused_plan_summary(
             raise ValueError(
                 f"reuse_plan_summary_json={path} does not contain selected candidates for requested arm={requested_arm_mode}"
             )
-    if postprocess_args is not None:
-        execution_sequences = [
-            (arm_name, postprocess_selected_keyframe_rolls(seq, postprocess_args))
-            for arm_name, seq in execution_sequences
-        ]
 
     primary_arm_name = str(summary.get("selected_arm", execution_sequences[0][0]))
     primary_sequence = None
@@ -779,9 +730,9 @@ def build_renderer(args: argparse.Namespace) -> ReplayRenderer:
         base_occluder_color=args.base_occluder_color,
         camera_sweep_enable=False,
         camera_sweep_steps_deg=[0.0],
-        init_left_arm_joints=(np.array(args.init_left_arm_joints, dtype=np.float64) if args.init_left_arm_joints is not None else None),
-        init_right_arm_joints=(np.array(args.init_right_arm_joints, dtype=np.float64) if args.init_right_arm_joints is not None else None),
-        init_gripper_open=(float(args.init_gripper_open_val) if args.init_gripper_open_val is not None else None),
+        init_left_arm_joints=None,
+        init_right_arm_joints=None,
+        init_gripper_open=None,
         lighting_mode=args.lighting_mode,
         attach_planner=attach_planner,
         hide_robot=False,
@@ -796,40 +747,9 @@ def build_renderer(args: argparse.Namespace) -> ReplayRenderer:
         renderer_kwargs["urdfik_max_position_threshold_m"] = args.urdfik_max_position_threshold_m
         renderer_kwargs["urdfik_max_rotation_threshold_rad"] = args.urdfik_max_rotation_threshold_rad
         renderer_kwargs["urdfik_num_seeds"] = int(args.urdfik_num_seeds)
-        renderer_kwargs["urdfik_solution_selection"] = str(args.urdfik_solution_selection)
-        renderer_kwargs["urdfik_seed_perturbations"] = int(args.urdfik_seed_perturbations)
-        renderer_kwargs["urdfik_seed_perturbation_scale"] = float(args.urdfik_seed_perturbation_scale)
-        renderer_kwargs["urdfik_max_joint_step_rad"] = float(args.urdfik_max_joint_step_rad)
         renderer_kwargs["urdfik_execute_partial_cartesian_plan"] = bool(args.execute_partial_cartesian_plan)
         renderer_kwargs["urdfik_apply_global_trans_to_ik"] = bool(args.piper_urdfik_apply_global_trans_to_ik)
     renderer = renderer_cls(**renderer_kwargs)
-    # Apply wrist camera tuning (same convention as O.1 envs/camera/camera.py)
-    renderer._wrist_camera_tuning = {
-        "left": {
-            "forward_offset_m": float(args.wrist_left_forward_offset_m),
-            "parent_lateral_offset_m": float(args.wrist_left_lateral_offset_m),
-            "image_roll_deg": float(args.wrist_left_roll_deg),
-            "parent_yaw_deg": float(args.wrist_left_yaw_deg),
-            "parent_pitch_deg": float(args.wrist_left_pitch_deg),
-        },
-        "right": {
-            "forward_offset_m": float(args.wrist_right_forward_offset_m),
-            "parent_lateral_offset_m": float(args.wrist_right_lateral_offset_m),
-            "image_roll_deg": float(args.wrist_right_roll_deg),
-            "parent_yaw_deg": float(args.wrist_right_yaw_deg),
-            "parent_pitch_deg": float(args.wrist_right_pitch_deg),
-        },
-    }
-    renderer._show_wrist_preview = bool(args.wrist_preview)
-    # Per-side calibrated wrist camera poses (from calibration bundle + adapter)
-    for side in ("left", "right"):
-        pos_attr = f"_wrist_{side}_local_pos"
-        quat_attr = f"_wrist_{side}_local_quat_wxyz"
-        arg_pos = getattr(args, pos_attr, None)
-        arg_quat = getattr(args, quat_attr, None)
-        if arg_pos is not None and arg_quat is not None:
-            setattr(renderer, pos_attr, np.asarray(arg_pos, dtype=np.float64))
-            setattr(renderer, quat_attr, np.asarray(arg_quat, dtype=np.float64))
     # SAPIEN viewer draws camera frustum lines through ControlWindow.show_camera_linesets.
     # Keep them off by default so viewer recordings match the intended clean video output.
     try:
@@ -2425,45 +2345,20 @@ def project_world_point_to_image(
     image_width: int,
     image_height: int,
 ) -> Optional[Tuple[int, int]]:
-    pixel = project_world_point_to_pixel(camera, intrinsic, point_world)
-    if pixel is None:
-        return None
-    u, v = pixel
-    if u < -32 or u >= image_width + 32 or v < -32 or v >= image_height + 32:
-        return None
-    return u, v
-
-
-def project_world_point_to_pixel(
-    camera,
-    intrinsic: np.ndarray,
-    point_world: np.ndarray,
-) -> Optional[Tuple[int, int]]:
     try:
-        camera_to_world = np.asarray(camera.get_model_matrix(), dtype=np.float64)
+        extrinsic = np.asarray(camera.get_extrinsic_matrix(), dtype=np.float64)
     except Exception:
-        try:
-            camera_to_world = np.linalg.inv(np.asarray(camera.get_extrinsic_matrix(), dtype=np.float64))
-        except Exception:
-            return None
-    if camera_to_world.shape == (3, 4):
-        camera_to_world_4x4 = np.eye(4, dtype=np.float64)
-        camera_to_world_4x4[:3, :4] = camera_to_world
-        camera_to_world = camera_to_world_4x4
-    if camera_to_world.shape != (4, 4):
         return None
-    try:
-        world_to_camera = np.linalg.inv(camera_to_world)
-    except np.linalg.LinAlgError:
+    if extrinsic.shape == (3, 4):
+        extrinsic_4x4 = np.eye(4, dtype=np.float64)
+        extrinsic_4x4[:3, :4] = extrinsic
+        extrinsic = extrinsic_4x4
+    if extrinsic.shape != (4, 4):
         return None
 
     point_h = np.ones(4, dtype=np.float64)
     point_h[:3] = np.asarray(point_world, dtype=np.float64).reshape(3)
-    point_cam_sapien = world_to_camera @ point_h
-    point_cam = np.array(
-        [point_cam_sapien[0], -point_cam_sapien[1], -point_cam_sapien[2]],
-        dtype=np.float64,
-    )
+    point_cam = extrinsic @ point_h
     z = float(point_cam[2])
     if not np.isfinite(z) or z <= 1e-6:
         return None
@@ -2473,128 +2368,9 @@ def project_world_point_to_pixel(
         return None
     u = int(round(float(pixel[0] / pixel[2])))
     v = int(round(float(pixel[1] / pixel[2])))
+    if u < -32 or u >= image_width + 32 or v < -32 or v >= image_height + 32:
+        return None
     return u, v
-
-
-def pixel_is_inside_image(pixel_xy: Tuple[int, int], image_width: int, image_height: int) -> bool:
-    return 0 <= int(pixel_xy[0]) < int(image_width) and 0 <= int(pixel_xy[1]) < int(image_height)
-
-
-def draw_clipped_line(
-    image_bgr: np.ndarray,
-    start_xy: Tuple[int, int],
-    end_xy: Tuple[int, int],
-    color_bgr: Tuple[int, int, int],
-    thickness: int,
-) -> bool:
-    width = int(image_bgr.shape[1])
-    height = int(image_bgr.shape[0])
-    rect = (0, 0, width, height)
-    ok, clipped_start, clipped_end = cv2.clipLine(rect, (int(start_xy[0]), int(start_xy[1])), (int(end_xy[0]), int(end_xy[1])))
-    if not ok:
-        return False
-    cv2.line(image_bgr, clipped_start, clipped_end, color_bgr, int(thickness), cv2.LINE_AA)
-    return True
-
-
-def clamp_pixel_to_image_edge(pixel_xy: Tuple[int, int], image_width: int, image_height: int, pad: int = 8) -> Tuple[int, int]:
-    return (
-        int(np.clip(int(pixel_xy[0]), int(pad), int(image_width) - int(pad) - 1)),
-        int(np.clip(int(pixel_xy[1]), int(pad), int(image_height) - int(pad) - 1)),
-    )
-
-
-def draw_projected_gripper_wireframe(
-    image_bgr: np.ndarray,
-    camera,
-    intrinsic: np.ndarray,
-    candidate: CandidatePose,
-    color_bgr: Tuple[int, int, int],
-    forward_axis: str,
-    label: str,
-    object_state: Optional[ObjectState] = None,
-) -> bool:
-    pose_world = np.asarray(candidate.pose_world_matrix, dtype=np.float64).reshape(4, 4)
-    rot = pose_world[:3, :3]
-    center = pose_world[:3, 3]
-    x_axis = rot[:, 0]
-    y_axis = rot[:, 1]
-    z_axis = rot[:, 2]
-    forward = z_axis if str(forward_axis) == "local_z" else x_axis
-
-    grip_width = float(np.clip(candidate.width_m, 0.01, 0.12))
-    grip_depth = float(np.clip(candidate.depth_m, 0.01, 0.08))
-    palm_back = float(min(0.018, grip_depth * 0.7))
-    finger_len = float(max(0.018, grip_depth))
-
-    back_center = center - forward * palm_back
-    left_base = center + y_axis * (grip_width * 0.5)
-    right_base = center - y_axis * (grip_width * 0.5)
-    left_back = back_center + y_axis * (grip_width * 0.5)
-    right_back = back_center - y_axis * (grip_width * 0.5)
-    left_tip = left_base + forward * finger_len
-    right_tip = right_base + forward * finger_len
-
-    width = int(image_bgr.shape[1])
-    height = int(image_bgr.shape[0])
-
-    def project(point: np.ndarray) -> Optional[Tuple[int, int]]:
-        return project_world_point_to_pixel(camera, intrinsic, point)
-
-    visible_any = False
-    if object_state is not None:
-        object_center = np.asarray(object_state.pose_world_wxyz[:3], dtype=np.float64).reshape(3)
-        object_px = project(object_center)
-        center_px_for_link = project(center)
-        if object_px is not None and center_px_for_link is not None:
-            visible_any = draw_clipped_line(image_bgr, object_px, center_px_for_link, (80, 80, 80), 1) or visible_any
-            if pixel_is_inside_image(object_px, width, height):
-                cv2.circle(image_bgr, object_px, 3, (80, 80, 80), -1, cv2.LINE_AA)
-
-    for start, end in (
-        (left_back, right_back),
-        (left_back, left_base),
-        (right_back, right_base),
-        (left_base, left_tip),
-        (right_base, right_tip),
-    ):
-        start_px = project(start)
-        end_px = project(end)
-        if start_px is None or end_px is None:
-            continue
-        visible_any = draw_clipped_line(image_bgr, start_px, end_px, color_bgr, 3) or visible_any
-
-    center_px = project(center)
-    if center_px is None:
-        y = height - 34 if str(label).startswith("L") else height - 14
-        draw_small_candidate_label(image_bgr, f"{label} behind camera", (12, y), color_bgr, font_scale=0.45)
-        return visible_any
-    if pixel_is_inside_image(center_px, width, height):
-        cv2.circle(image_bgr, center_px, 5, color_bgr, -1, cv2.LINE_AA)
-        draw_small_candidate_label(image_bgr, label, (center_px[0] + 6, center_px[1] - 6), color_bgr, font_scale=0.42)
-        visible_any = True
-    else:
-        edge_px = clamp_pixel_to_image_edge(center_px, width, height, pad=12)
-        cv2.drawMarker(image_bgr, edge_px, (0, 0, 0), markerType=cv2.MARKER_TRIANGLE_UP, markerSize=22, thickness=4, line_type=cv2.LINE_AA)
-        cv2.drawMarker(image_bgr, edge_px, color_bgr, markerType=cv2.MARKER_TRIANGLE_UP, markerSize=16, thickness=2, line_type=cv2.LINE_AA)
-        draw_small_candidate_label(image_bgr, f"{label} offscreen", (edge_px[0] + 4, edge_px[1] - 4), color_bgr, font_scale=0.38)
-        visible_any = True
-
-    axis_len = 0.065
-    for axis, axis_color, axis_label in (
-        (x_axis, (0, 0, 255), "X"),
-        (y_axis, (0, 190, 0), "Y"),
-        (z_axis, (255, 0, 0), "Z"),
-    ):
-        end_px = project(center + axis * axis_len)
-        if end_px is None:
-            continue
-        draw_start = center_px if pixel_is_inside_image(center_px, width, height) else clamp_pixel_to_image_edge(center_px, width, height, pad=12)
-        if pixel_is_inside_image(draw_start, width, height) and pixel_is_inside_image(end_px, width, height):
-            cv2.arrowedLine(image_bgr, draw_start, end_px, axis_color, 2, cv2.LINE_AA, tipLength=0.25)
-            draw_small_candidate_label(image_bgr, axis_label, (end_px[0] + 2, end_px[1] + 2), axis_color, font_scale=0.34)
-            visible_any = True
-    return visible_any
 
 
 def draw_small_candidate_label(
@@ -2608,43 +2384,6 @@ def draw_small_candidate_label(
     thickness = 1
     x, y = int(pixel_xy[0]), int(pixel_xy[1])
     cv2.putText(image_bgr, text, (x, y), font, float(font_scale), color_bgr, thickness, cv2.LINE_AA)
-
-
-def candidate_target_debug_line(candidate: Optional[CandidatePose], arm_label: str, object_states: Dict[str, ObjectState]) -> str:
-    if candidate is None:
-        return f"{arm_label}: none"
-    target_xyz = np.asarray(candidate.pose_world_wxyz[:3], dtype=np.float64).reshape(3)
-    state = object_states.get(str(candidate.nearest_object))
-    if state is None:
-        return (
-            f"{arm_label}: target=({target_xyz[0]:+.3f},{target_xyz[1]:+.3f},{target_xyz[2]:+.3f}) "
-            f"object={candidate.nearest_object}"
-        )
-    object_xyz = np.asarray(state.pose_world_wxyz[:3], dtype=np.float64).reshape(3)
-    delta = target_xyz - object_xyz
-    return (
-        f"{arm_label}: target=({target_xyz[0]:+.3f},{target_xyz[1]:+.3f},{target_xyz[2]:+.3f}) "
-        f"d_obj=({delta[0]:+.3f},{delta[1]:+.3f},{delta[2]:+.3f}) |d|={np.linalg.norm(delta):.3f}"
-    )
-
-
-def candidate_projection_debug_line(
-    camera,
-    intrinsic: np.ndarray,
-    candidate: Optional[CandidatePose],
-    arm_label: str,
-    image_width: int,
-    image_height: int,
-) -> str:
-    if candidate is None:
-        return f"{arm_label}: proj=none"
-    pixel = project_world_point_to_pixel(camera, intrinsic, np.asarray(candidate.pose_world_wxyz[:3], dtype=np.float64))
-    if pixel is None:
-        return f"{arm_label}: proj=behind_camera"
-    if pixel_is_inside_image(pixel, image_width, image_height):
-        return f"{arm_label}: proj=inside({pixel[0]},{pixel[1]})"
-    edge = clamp_pixel_to_image_edge(pixel, image_width, image_height, pad=12)
-    return f"{arm_label}: proj=offscreen({pixel[0]},{pixel[1]}) edge=({edge[0]},{edge[1]})"
 
 
 def annotate_candidate_labels(
@@ -2972,34 +2711,6 @@ def record_frame(
         right_wrist_lines = list(overlay_lines) + ["right_wrist"]
         right_wrist_bgr = base.overlay_text(right_wrist_rgb, right_wrist_lines) if use_overlay else cv2.cvtColor(right_wrist_rgb, cv2.COLOR_RGB2BGR)
         debug_execution_state.right_wrist_writer.write(right_wrist_bgr)
-    # Wrist camera preview window (like O.1 --wrist_preview 1)
-    if viewer_active and getattr(renderer, "_show_wrist_preview", False) and getattr(renderer, "_left_wrist_camera_link", None) is not None and getattr(renderer, "_right_wrist_camera_link", None) is not None:
-        _wrist_preview_cache = getattr(renderer, "_wrist_preview_cache", None)
-        if _wrist_preview_cache is None:
-            _wrist_preview_cache = {"window_name": "RoboTwin wrist cameras", "window_created": False}
-            renderer._wrist_preview_cache = _wrist_preview_cache
-        try:
-            l_rgb, _ = renderer.capture_camera(renderer.left_wrist_camera)
-            r_rgb, _ = renderer.capture_camera(renderer.right_wrist_camera)
-            l_rgb = rotate_wrist_rgb_for_export(l_rgb)
-            r_rgb = rotate_wrist_rgb_for_export(r_rgb)
-            # Match heights
-            h = max(l_rgb.shape[0], r_rgb.shape[0])
-            if l_rgb.shape[0] != h:
-                l_rgb = cv2.resize(l_rgb, (int(l_rgb.shape[1] * h / l_rgb.shape[0]), h))
-            if r_rgb.shape[0] != h:
-                r_rgb = cv2.resize(r_rgb, (int(r_rgb.shape[1] * h / r_rgb.shape[0]), h))
-            preview = np.concatenate([l_rgb, r_rgb], axis=1)
-            preview_bgr = cv2.cvtColor(preview, cv2.COLOR_RGB2BGR)
-            # Label left/right
-            font = cv2.FONT_HERSHEY_SIMPLEX
-            cv2.putText(preview_bgr, "left_wrist", (4, 16), font, 0.4, (0, 255, 255), 1, cv2.LINE_AA)
-            cv2.putText(preview_bgr, "right_wrist", (l_rgb.shape[1] + 4, 16), font, 0.4, (0, 255, 255), 1, cv2.LINE_AA)
-            cv2.imshow(_wrist_preview_cache["window_name"], preview_bgr)
-            _wrist_preview_cache["window_created"] = True
-            cv2.waitKey(1)
-        except Exception:
-            pass
     frame_metrics = None
     if debug_execution_state is not None:
         frame_metrics = build_execution_frame_metrics(renderer, debug_execution_state)
@@ -3787,12 +3498,7 @@ def poses_are_effectively_same(
     return pos_err <= float(pos_tol_m) and rot_err <= float(rot_tol_deg)
 
 
-def interpolate_joint_trajectory(
-    position: np.ndarray,
-    velocity: np.ndarray,
-    num_steps: int,
-    interpolation: str = "linear",
-) -> Tuple[np.ndarray, np.ndarray]:
+def interpolate_joint_trajectory(position: np.ndarray, velocity: np.ndarray, num_steps: int) -> Tuple[np.ndarray, np.ndarray]:
     position = np.asarray(position, dtype=np.float64)
     velocity = np.asarray(velocity, dtype=np.float64)
     if position.shape[0] < 2 or int(num_steps) <= position.shape[0]:
@@ -3804,11 +3510,7 @@ def interpolate_joint_trajectory(
     for idx in range(position.shape[0] - 1):
         start = position[idx]
         end = position[idx + 1]
-        segment_steps = max(int(num_steps / max(position.shape[0] - 1, 1)), 2)
-        ratios = np.linspace(0.0, 1.0, num=segment_steps, endpoint=False, dtype=np.float64)
-        if interpolation == "cubic":
-            ratios = ratios * ratios * (3.0 - 2.0 * ratios)
-        seg = start[None, :] + ratios[:, None] * (end - start)[None, :]
+        seg = np.linspace(start, end, num=max(int(num_steps / max(position.shape[0] - 1, 1)), 2), endpoint=False)
         out_pos.extend(seg.tolist())
     out_pos.append(position[-1].tolist())
     out_pos_arr = np.asarray(out_pos, dtype=np.float64)
@@ -3968,7 +3670,6 @@ def execute_single_arm_plan(
     attached_actor: Optional[sapien.Entity] = None,
     tcp_to_object: Optional[np.ndarray] = None,
     execute_interp_steps: int = 24,
-    joint_trajectory_interpolation: str = "linear",
     settle_steps: int = 4,
     hold_frames_after_stage: int = 0,
     target_visual_pose: Optional[np.ndarray] = None,
@@ -3993,12 +3694,7 @@ def execute_single_arm_plan(
 
     position = np.asarray(plan["position"], dtype=np.float64)
     velocity = np.asarray(plan["velocity"], dtype=np.float64)
-    position, velocity = interpolate_joint_trajectory(
-        position,
-        velocity,
-        execute_interp_steps,
-        interpolation=joint_trajectory_interpolation,
-    )
+    position, velocity = interpolate_joint_trajectory(position, velocity, execute_interp_steps)
     scene_steps_per_waypoint = max(int(joint_command_scene_steps), 1)
     for idx in range(position.shape[0]):
         renderer.robot.set_arm_joints(position[idx], velocity[idx], arm)
@@ -4131,7 +3827,6 @@ def execute_stage_until_reached(
             attached_actor=attached_actor,
             tcp_to_object=tcp_to_object,
             execute_interp_steps=args.execute_interp_steps,
-            joint_trajectory_interpolation=args.joint_trajectory_interpolation,
             settle_steps=args.settle_steps,
             hold_frames_after_stage=args.hold_frames_after_stage,
             target_visual_pose=target_visual_pose,
@@ -4278,7 +3973,6 @@ def execute_dual_arm_plan(
     third_writer: Optional[cv2.VideoWriter],
     use_overlay: bool,
     execute_interp_steps: int = 24,
-    joint_trajectory_interpolation: str = "linear",
     settle_steps: int = 4,
     hold_frames_after_stage: int = 0,
     debug_visuals: Optional[DebugVisualBundle] = None,
@@ -4328,12 +4022,7 @@ def execute_dual_arm_plan(
         plan = plans_by_arm[arm]
         position = np.asarray(plan["position"], dtype=np.float64)
         velocity = np.asarray(plan["velocity"], dtype=np.float64)
-        position, velocity = interpolate_joint_trajectory(
-            position,
-            velocity,
-            execute_interp_steps,
-            interpolation=joint_trajectory_interpolation,
-        )
+        position, velocity = interpolate_joint_trajectory(position, velocity, execute_interp_steps)
         trajectories[arm] = (position, velocity)
         max_steps = max(max_steps, int(position.shape[0]))
 
@@ -4476,7 +4165,6 @@ def execute_dual_stage_until_reached(
 
     attempt_history: List[Dict[str, object]] = []
     last_arm_metrics: Dict[str, Dict[str, object]] = {}
-    frozen_arms: set[str] = set()
     attempt = 0
     while True:
         attempt += 1
@@ -4500,11 +4188,8 @@ def execute_dual_stage_until_reached(
                 f"lat_cm={float(pre_plan_by_arm[arm]['error']['lateral_to_forward_axis_cm']):.2f} "
                 f"theory={short_direction_label(str(pre_plan_by_arm[arm]['theoretical_forward_axis_motion']))}"
             )
-        if frozen_arms:
-            print("[dual-freeze] stage={} try={} holding_reached_arms={}".format(label, attempt, ",".join(sorted(frozen_arms))))
         plans_by_arm: Dict[str, Optional[Dict]] = {
-            arm: (None if arm in frozen_arms else renderer.plan_path(arm, target_pose_world_wxyz_by_arm[arm]))
-            for arm in arms
+            arm: renderer.plan_path(arm, target_pose_world_wxyz_by_arm[arm]) for arm in arms
         }
         for arm in arms:
             plan = plans_by_arm.get(arm)
@@ -4566,7 +4251,6 @@ def execute_dual_stage_until_reached(
             third_writer=third_writer,
             use_overlay=use_overlay,
             execute_interp_steps=args.execute_interp_steps,
-            joint_trajectory_interpolation=args.joint_trajectory_interpolation,
             settle_steps=args.settle_steps,
             hold_frames_after_stage=args.hold_frames_after_stage,
             debug_visuals=debug_visuals,
@@ -4579,7 +4263,7 @@ def execute_dual_stage_until_reached(
             joint_command_scene_steps=args.joint_command_scene_steps,
             joint_target_wait_steps=args.joint_target_wait_steps,
             joint_target_wait_tol_rad=args.joint_target_wait_tol_rad,
-            require_all_plans=bool(args.dual_stage_require_all_plans) and not bool(frozen_arms),
+            require_all_plans=bool(args.dual_stage_require_all_plans),
             print_pose_every=int(args.print_execution_pose_every),
         )
 
@@ -4590,14 +4274,13 @@ def execute_dual_stage_until_reached(
             error_breakdown = pose_error_breakdown(target_eval_pose, current_eval_pose)
             pos_err = float(error_breakdown["dist_m"])
             rot_err = float(error_breakdown["rot_err_deg"])
-            status = "Frozen" if arm in frozen_arms else statuses.get(arm, "Missing")
             reached = (
-                (status in {"Success", "Frozen"})
+                statuses.get(arm, "Missing") == "Success"
                 and pos_err <= float(args.reach_pos_tol_m)
                 and rot_err <= float(args.reach_rot_tol_deg)
             )
             arm_metrics[arm] = {
-                "status": status,
+                "status": statuses.get(arm, "Missing"),
                 "target_error": error_breakdown,
                 "pos_err_m": float(pos_err),
                 "rot_err_deg": float(rot_err),
@@ -4611,7 +4294,6 @@ def execute_dual_stage_until_reached(
                 "pre_plan_by_arm": pre_plan_by_arm,
                 "plan_solution_by_arm": plan_solution_by_arm,
                 "arms": arm_metrics,
-                "frozen_arms": sorted(frozen_arms),
                 "reached": bool(stage_reached),
             }
         )
@@ -4647,8 +4329,6 @@ def execute_dual_stage_until_reached(
                 "arms": arm_metrics,
                 "attempt_history": attempt_history,
             }
-        if bool(args.dual_stage_freeze_reached_arms_on_replan):
-            frozen_arms = {arm for arm in arms if bool(arm_metrics.get(arm, {}).get("reached", False))}
         if max_attempts is not None and attempt >= max_attempts:
             break
 
@@ -4780,12 +4460,7 @@ def export_rank_preview_images(
             forward_axis=str(args.debug_gripper_actor_forward_axis),
         ),
     }
-    selected_map = {(int(item.source_frame), item.arm): int(item.candidate.candidate_idx) for item in selected_keyframes}
-    arm_debug_frames = {
-        int(frame)
-        for arm_info in arm_debugs.values()
-        for frame in arm_info.ranked_candidates_per_frame.keys()
-    }
+    selected_map = {int(item.source_frame): (item.arm, int(item.candidate.candidate_idx)) for item in selected_keyframes}
     preview_frames = sorted(
         {
             int(frame)
@@ -4795,7 +4470,6 @@ def export_rank_preview_images(
             int(item.source_frame)
             for item in selected_keyframes
         }
-        | arm_debug_frames
     )
     records: List[RankPreviewRecord] = []
 
@@ -4804,18 +4478,7 @@ def export_rank_preview_images(
             frame = int(frame)
             object_states = object_states_per_frame.get(frame)
             if object_states is None:
-                try:
-                    object_states = load_object_states(
-                        args.replay_dir,
-                        frame,
-                        args.object_mesh_overrides,
-                        args.execution_object_visual_scale_overrides,
-                        args.execution_object_collision_scale_overrides,
-                    )
-                    object_states_per_frame[frame] = object_states
-                except Exception as exc:
-                    print(f"[rank-preview-warning] skip frame={frame}: failed to load object states: {type(exc).__name__}: {exc}")
-                    continue
+                continue
             for state in object_states.values():
                 if state.actor is None:
                     continue
@@ -4850,47 +4513,20 @@ def export_rank_preview_images(
                     f"rank={rank_idx + 1}",
                     (
                         f"left_candidate={left_cand.candidate_idx}"
-                        + (" selected" if selected_map.get((frame, "left")) == int(left_cand.candidate_idx) else "")
+                        + (" selected" if selected_map.get(frame) == ("left", int(left_cand.candidate_idx)) else "")
                         if left_cand is not None
                         else "left_candidate=none"
                     ),
                     (
                         f"right_candidate={right_cand.candidate_idx}"
-                        + (" selected" if selected_map.get((frame, "right")) == int(right_cand.candidate_idx) else "")
+                        + (" selected" if selected_map.get(frame) == ("right", int(right_cand.candidate_idx)) else "")
                         if right_cand is not None
                         else "right_candidate=none"
                     ),
-                    "2D C-gripper overlay: left=blue right=orange",
-                    "axes: X=red Y=green Z=blue(+Z approach)",
-                    candidate_target_debug_line(left_cand, "L", object_states),
-                    candidate_target_debug_line(right_cand, "R", object_states),
-                    candidate_projection_debug_line(renderer.zed_camera, head_intrinsic, left_cand, "L", int(args.image_width), int(args.image_height)),
-                    candidate_projection_debug_line(renderer.zed_camera, head_intrinsic, right_cand, "R", int(args.image_width), int(args.image_height)),
+                    "color=blue:left orange:right",
                 ]
                 head_rgb, _ = renderer.capture_camera(renderer.zed_camera)
                 image_bgr = base.overlay_text(head_rgb, overlay_lines)
-                if left_cand is not None:
-                    draw_projected_gripper_wireframe(
-                        image_bgr=image_bgr,
-                        camera=renderer.zed_camera,
-                        intrinsic=head_intrinsic,
-                        candidate=left_cand,
-                        color_bgr=(255, 100, 0),
-                        forward_axis=str(args.debug_gripper_actor_forward_axis),
-                        label=f"L{int(left_cand.candidate_idx)}",
-                        object_state=object_states.get(str(left_cand.nearest_object)),
-                    )
-                if right_cand is not None:
-                    draw_projected_gripper_wireframe(
-                        image_bgr=image_bgr,
-                        camera=renderer.zed_camera,
-                        intrinsic=head_intrinsic,
-                        candidate=right_cand,
-                        color_bgr=(0, 140, 255),
-                        forward_axis=str(args.debug_gripper_actor_forward_axis),
-                        label=f"R{int(right_cand.candidate_idx)}",
-                        object_state=object_states.get(str(right_cand.nearest_object)),
-                    )
                 annotate_candidate_labels(
                     image_bgr,
                     renderer.zed_camera,
@@ -5226,8 +4862,6 @@ def main() -> None:
             f"final_keyframes={args.resolved_keyframes}"
         )
 
-    # Apply Piper calibration bundle before building renderer so wrist cameras
-    # get the correct gripper_T_camera pose instead of staying at link6 origin.
     base.apply_piper_calibration_bundle(args)
     renderer = build_renderer(args)
     hand_data = load_hand_data(args.hand_npz)
@@ -5292,7 +4926,6 @@ def main() -> None:
         selection_result, arm_debugs, execution_sequences, reused_plan_summary = load_reused_plan_summary(
             path=args.reuse_plan_summary_json,
             requested_arm_mode=str(args.arm),
-            postprocess_args=args,
         )
         if not (bool(args.execute_both_arms) and args.arm == "auto"):
             execution_sequences = [(selection_result.arm, selection_result.selected_keyframes)]
@@ -6279,14 +5912,9 @@ def main() -> None:
         "urdfik_max_position_threshold_m": None if args.urdfik_max_position_threshold_m is None else float(args.urdfik_max_position_threshold_m),
         "urdfik_max_rotation_threshold_rad": None if args.urdfik_max_rotation_threshold_rad is None else float(args.urdfik_max_rotation_threshold_rad),
         "urdfik_num_seeds": int(args.urdfik_num_seeds),
-        "urdfik_solution_selection": str(args.urdfik_solution_selection),
-        "urdfik_seed_perturbations": int(args.urdfik_seed_perturbations),
-        "urdfik_seed_perturbation_scale": float(args.urdfik_seed_perturbation_scale),
-        "urdfik_max_joint_step_rad": float(args.urdfik_max_joint_step_rad),
         "execute_partial_cartesian_plan": int(args.execute_partial_cartesian_plan),
         "piper_urdfik_apply_global_trans_to_ik": int(args.piper_urdfik_apply_global_trans_to_ik),
         "execute_interp_steps": int(args.execute_interp_steps),
-        "joint_trajectory_interpolation": str(args.joint_trajectory_interpolation),
         "settle_steps": int(args.settle_steps),
         "joint_command_scene_steps": int(args.joint_command_scene_steps),
         "joint_target_wait_steps": int(args.joint_target_wait_steps),
@@ -6310,10 +5938,8 @@ def main() -> None:
         "init_prefix_frames": int(args.init_prefix_frames),
         "execute_both_arms": int(args.execute_both_arms),
         "dual_stage_require_all_plans": int(args.dual_stage_require_all_plans),
-        "dual_stage_freeze_reached_arms_on_replan": int(args.dual_stage_freeze_reached_arms_on_replan),
         "require_keyframe1_reached_before_close": int(args.require_keyframe1_reached_before_close),
         "require_keyframe1_reached_before_action": int(args.require_keyframe1_reached_before_action),
-        "fail_on_execution_failure": int(args.fail_on_execution_failure),
         "debug_stop_after_keyframe1": int(args.debug_stop_after_keyframe1),
         "execution_mode": "dual_sync" if dual_sync_mode else "single_or_sequential",
         "manual_candidate_overrides": {arm: {str(frame): idx for frame, idx in frame_map.items()} for arm, frame_map in args.manual_candidate_overrides.items() if frame_map},
@@ -6495,18 +6121,6 @@ def main() -> None:
     with (args.output_dir / "plan_summary.json").open("w", encoding="utf-8") as f:
         json.dump(summary, f, indent=2)
 
-    # Save final joint state for async staged chaining
-    if args.save_final_joints_json is not None:
-        try:
-            final_left = [float(v) for v in renderer.robot.get_left_arm_real_jointState()[:6]]
-            final_right = [float(v) for v in renderer.robot.get_right_arm_real_jointState()[:6]]
-            args.save_final_joints_json.parent.mkdir(parents=True, exist_ok=True)
-            with open(str(args.save_final_joints_json), "w") as jf:
-                json.dump({"left": final_left, "right": final_right}, jf, indent=2)
-            print(f"[save-final-joints] wrote {args.save_final_joints_json}")
-        except Exception as e:
-            print(f"[save-final-joints] ERROR: {e}")
-
     status_prefix = "[warn]" if bool(summary["execution_failed"]) else "[done]"
     sel0 = primary_exec_selected_keyframes[0]
     sel1 = primary_exec_selected_keyframes[1]
@@ -6521,8 +6135,6 @@ def main() -> None:
         f"video={head_video_path}"
     )
     renderer.hold_viewer()
-    if bool(args.fail_on_execution_failure) and bool(summary["execution_failed"]):
-        raise SystemExit(1)
 
 
 if __name__ == "__main__":
