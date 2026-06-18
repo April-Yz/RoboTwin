@@ -2187,3 +2187,11 @@ Update: the verified-v2 daily viewer command now includes `--foundation_capture_
 - Added viewer option: `--foundation_pregrasp_clearance_m <M>`; `0` is the default no-avoidance path, and a positive value inserts a lifted waypoint before pregrasp.
 - `pnp_tray_piper_ik_foundation` defaults to `object_keyframe`; pick_diverse still defaults to `hand_ee`.
 - Wrapper environment variable: `FOUNDATION_PREGRASP_CLEARANCE_M=0.06 bash collect_foundation_piper_ik_verified.sh pnp_tray v1 0 0 o2_pregrasp_clearance006`.
+
+
+## 2026-06-18 (L16 Human Replay Wrist Batch Commands)
+
+- Added `COMMAND_LIBRARY.zh.md` L16.1 with `pick_diverse_bottles` viewer-debug and no-viewer batch collection commands.
+- The batch command uses `--ids 0-101 --continue_on_error` for 102 episodes and writes to `.../L16_human_replay_clean/pick_diverse_bottles/foundation_input_<ID>/`.
+- Viewer and no-viewer commands use the same wrist extrinsics: left/right forward `-0.04/-0.01`, roll `14.635/-44.649`, yaw `0.182/0.840`, pitch `-90/-90`, and lateral `-0.0207/0.0274`.
+- The wrapper now forwards wrist preview, camera frustum, and camera RGB-axis visualization arguments only in `--viewer` mode; no-viewer batch output keeps clean videos/obs.

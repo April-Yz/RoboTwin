@@ -2901,3 +2901,12 @@ Validation: O.2 V1/ID0 headless with default object-keyframe succeeded. The acti
 - After the restore, confirmed that `plan_anygrasp_keyframes_r1.py` and `run_plan_keyframes_human_replay_piper_d435.sh` still expose `--wrist_*`, `--joint_trajectory_interpolation`, `--dual_stage_freeze_reached_arms_on_replan`, `--fail_on_execution_failure`, and `--piper_calibration_bundle`.
 
 Validation: `git status --short` was clean; `/home/zaijia001/ssd/miniconda3/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py` passed.
+
+
+## 2026-06-18 (Mode M No-Viewer Camera-Axis Visualization Isolation)
+
+- `run_plan_keyframes_human_replay_piper_d435.sh` now forwards `--wrist_preview 1`, `--viewer_show_camera_frustums 1`, and `--debug_visualize_cameras 1` only in `--viewer` mode.
+- No-viewer batch collection no longer draws wrist/head camera frustums or camera RGB axes. Wrist extrinsic arguments are still forwarded unchanged, so batch wrist views use the same camera extrinsics as the viewer-debug run.
+- Recorded the L16 tested `pick_diverse_bottles` wrist parameters: left/right forward `-0.04/-0.01`, roll `14.635/-44.649`, yaw `0.182/0.840`, pitch `-90/-90`, and lateral `-0.0207/0.0274`.
+
+Validation: `bash -n code_painting/run_plan_keyframes_human_replay_piper_d435.sh` passed; L16 viewer/no-viewer commands passed `--dry_run`.

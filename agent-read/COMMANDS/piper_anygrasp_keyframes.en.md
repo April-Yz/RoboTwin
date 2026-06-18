@@ -894,3 +894,46 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_
 | 2 | 1.17/2.72 cm | 0.48/0.90 cm | 1.37/3.40 cm | complete success |
 
 There is no strict roll-range constraint about the local +Z approach axis yet. Piper `global_trans_matrix` is a fixed 180-degree rotation about local X, but IK targets and reported EE poses do not yet share one transform convention, so approximately 178-180 degree rotation errors cannot be treated as physical roll errors. `--apply_global_trans_to_ik 1` made IK worse in testing and is not recommended.
+
+## L16: Human Replay Piper D435 Tested Wrist Parameters
+
+Purpose: record the tested-good `pick_diverse_bottles` wrist parameters from 2026-06-18, with matching viewer-debug and no-viewer batch commands. Valid `pick_diverse_bottles` IDs are `0-101`, for 102 episodes.
+
+Key constraints:
+
+- Viewer debug and no-viewer batch collection must use the same `--wrist_*` parameters so wrist videos/obs use the same camera extrinsics as the debug view.
+- The wrapper only forwards `--wrist_preview 1`, `--viewer_show_camera_frustums 1`, and `--debug_visualize_cameras 1` in `--viewer` mode; no-viewer batch output does not draw wrist/head camera frustums or camera RGB axes.
+- The current successful view uses `--wrist_left_pitch_deg -90 --wrist_right_pitch_deg -90`; do not replace it with `+90`.
+
+Viewer debug:
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+export DISPLAY=:1.0
+xdpyinfo >/dev/null || { echo "DISPLAY=:1.0 unavailable"; exit 1; }
+
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_piper_d435.sh \
+  --gpu 2 --ids 1 --viewer --tasks pick_diverse_bottles \
+  --target_retreat_m 0.14 \
+  --wrist_left_forward_offset_m -0.04 --wrist_right_forward_offset_m -0.01 \
+  --wrist_left_roll_deg 14.635 --wrist_right_roll_deg -44.649 \
+  --wrist_left_yaw_deg 0.182 --wrist_right_yaw_deg 0.840 \
+  --wrist_left_pitch_deg -90 --wrist_right_pitch_deg -90 \
+  --wrist_left_lateral_offset_m -0.0207 --wrist_right_lateral_offset_m 0.0274
+```
+
+No-viewer batch collection:
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_piper_d435.sh \
+  --gpu 2 --ids 0-101 --continue_on_error --tasks pick_diverse_bottles \
+  --target_retreat_m 0.14 \
+  --wrist_left_forward_offset_m -0.04 --wrist_right_forward_offset_m -0.01 \
+  --wrist_left_roll_deg 14.635 --wrist_right_roll_deg -44.649 \
+  --wrist_left_yaw_deg 0.182 --wrist_right_yaw_deg 0.840 \
+  --wrist_left_pitch_deg -90 --wrist_right_pitch_deg -90 \
+  --wrist_left_lateral_offset_m -0.0207 --wrist_right_lateral_offset_m 0.0274 \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_human_replay_clean
+```

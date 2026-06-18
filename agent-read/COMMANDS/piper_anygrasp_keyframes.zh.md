@@ -894,3 +894,46 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_
 | 2 | 1.17/2.72cm | 0.48/0.90cm | 1.37/3.40cm | 完整成功 |
 
 当前没有严格的 local +Z 前进轴 roll 范围约束。Piper `global_trans_matrix` 是绕 local X 的固定 180 度变换，但 IK target 和 EE 回报尚未统一变换约定，因此约 178-180 度旋转误差暂不能作为真实 roll 误差。`--apply_global_trans_to_ik 1` 实测使 IK 更差，暂不推荐。
+
+## L16：Human Replay Piper D435 wrist 实测参数
+
+用途：记录 2026-06-18 实测较好的 `pick_diverse_bottles` wrist 参数，并给出同参数的 viewer debug 与 no-viewer 批量采集命令。`pick_diverse_bottles` 有效 ID 为 `0-101`，共 102 条。
+
+关键约束：
+
+- viewer debug 与 no-viewer 批量采集必须使用同一组 `--wrist_*` 参数，保证 wrist 视频/obs 的相机外参与调试视角一致。
+- wrapper 仅在 `--viewer` 模式传 `--wrist_preview 1`、`--viewer_show_camera_frustums 1` 和 `--debug_visualize_cameras 1`；no-viewer 批量输出不绘制 wrist/head 相机框线或相机 RGB 轴。
+- 当前成功视角使用 `--wrist_left_pitch_deg -90 --wrist_right_pitch_deg -90`，不要替换成 `+90`。
+
+Viewer debug：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+export DISPLAY=:1.0
+xdpyinfo >/dev/null || { echo "DISPLAY=:1.0 不可用"; exit 1; }
+
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_piper_d435.sh \
+  --gpu 2 --ids 1 --viewer --tasks pick_diverse_bottles \
+  --target_retreat_m 0.14 \
+  --wrist_left_forward_offset_m -0.04 --wrist_right_forward_offset_m -0.01 \
+  --wrist_left_roll_deg 14.635 --wrist_right_roll_deg -44.649 \
+  --wrist_left_yaw_deg 0.182 --wrist_right_yaw_deg 0.840 \
+  --wrist_left_pitch_deg -90 --wrist_right_pitch_deg -90 \
+  --wrist_left_lateral_offset_m -0.0207 --wrist_right_lateral_offset_m 0.0274
+```
+
+No-viewer 批量采集：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_piper_d435.sh \
+  --gpu 2 --ids 0-101 --continue_on_error --tasks pick_diverse_bottles \
+  --target_retreat_m 0.14 \
+  --wrist_left_forward_offset_m -0.04 --wrist_right_forward_offset_m -0.01 \
+  --wrist_left_roll_deg 14.635 --wrist_right_roll_deg -44.649 \
+  --wrist_left_yaw_deg 0.182 --wrist_right_yaw_deg 0.840 \
+  --wrist_left_pitch_deg -90 --wrist_right_pitch_deg -90 \
+  --wrist_left_lateral_offset_m -0.0207 --wrist_right_lateral_offset_m 0.0274 \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_human_replay_clean
+```

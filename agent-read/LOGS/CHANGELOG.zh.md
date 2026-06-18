@@ -2899,3 +2899,12 @@
 - 恢复后确认 `plan_anygrasp_keyframes_r1.py` 和 `run_plan_keyframes_human_replay_piper_d435.sh` 仍支持 `--wrist_*`、`--joint_trajectory_interpolation`、`--dual_stage_freeze_reached_arms_on_replan`、`--fail_on_execution_failure` 和 `--piper_calibration_bundle` 参数。
 
 验证：`git status --short` 干净；`/home/zaijia001/ssd/miniconda3/bin/python -m py_compile /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_r1.py` 通过。
+
+
+## 2026-06-18（Mode M no-viewer 相机轴可视化隔离）
+
+- `run_plan_keyframes_human_replay_piper_d435.sh` 现在只在 `--viewer` 模式转发 `--wrist_preview 1`、`--viewer_show_camera_frustums 1` 和 `--debug_visualize_cameras 1`。
+- no-viewer 批量采集不再绘制 wrist/head 相机框线或相机 RGB 轴；wrist 外参参数仍按命令原样转发，因此批量 wrist 视角与 viewer debug 的相机外参一致。
+- 记录 L16 `pick_diverse_bottles` 实测 wrist 参数：left/right forward `-0.04/-0.01`，roll `14.635/-44.649`，yaw `0.182/0.840`，pitch `-90/-90`，lateral `-0.0207/0.0274`。
+
+验证：`bash -n code_painting/run_plan_keyframes_human_replay_piper_d435.sh` 通过；L16 viewer/no-viewer 命令 `--dry_run` 均通过。

@@ -2185,3 +2185,11 @@
 - 新增 viewer 参数：`--foundation_pregrasp_clearance_m <M>`；`0` 为默认无避障，正值在 pregrasp 前插入抬高 waypoint。
 - `pnp_tray_piper_ik_foundation` 默认使用 `object_keyframe`；pick_diverse 默认仍为 `hand_ee`。
 - wrapper 新增环境变量：`FOUNDATION_PREGRASP_CLEARANCE_M=0.06 bash collect_foundation_piper_ik_verified.sh pnp_tray v1 0 0 o2_pregrasp_clearance006`。
+
+
+## 2026-06-18（L16 Human Replay wrist 批量命令）
+
+- 新增 `COMMAND_LIBRARY.zh.md` L16.1：`pick_diverse_bottles` viewer debug 与 no-viewer 批量采集命令。
+- 批量命令使用 `--ids 0-101 --continue_on_error`，共 102 条，输出到 `.../L16_human_replay_clean/pick_diverse_bottles/foundation_input_<ID>/`。
+- viewer 与 no-viewer 使用同一组 wrist 外参：left/right forward `-0.04/-0.01`，roll `14.635/-44.649`，yaw `0.182/0.840`，pitch `-90/-90`，lateral `-0.0207/0.0274`。
+- wrapper 调整为仅在 `--viewer` 模式转发 wrist preview、相机 frustum 和相机 RGB 轴可视化参数；no-viewer 批量输出保持干净视频/obs。

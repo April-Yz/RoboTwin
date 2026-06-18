@@ -248,9 +248,6 @@ for ID in "${IDS[@]}"; do
     --reach_rot_tol_deg "$REACH_ROT_TOL_DEG"
     --reach_pos_tol_m "$REACH_POS_TOL_M"
     --fail_on_execution_failure "$FAIL_ON_EXECUTION_FAILURE"
-    --wrist_preview 1
-    --viewer_show_camera_frustums 1
-    --debug_visualize_cameras 1 --debug_camera_axis_length 0.10
     --approach_offset_m "$APPROACH_OFFSET_M"
     --piper_calibration_bundle "$PIPER_CALIBRATION_BUNDLE"
     --target_retreat_m "$TARGET_RETREAT_M"
@@ -268,7 +265,12 @@ for ID in "${IDS[@]}"; do
   )
 
   if ((VIEWER)); then
-    M_ARGS+=(--enable_viewer 1 --viewer_wait_at_end "$VIEWER_WAIT_AT_END")
+    M_ARGS+=(
+      --enable_viewer 1 --viewer_wait_at_end "$VIEWER_WAIT_AT_END"
+      --wrist_preview 1
+      --viewer_show_camera_frustums 1
+      --debug_visualize_cameras 1 --debug_camera_axis_length 0.10
+    )
   fi
   if ((VISUALIZE_TARGETS)); then M_ARGS+=(--debug_visualize_targets 1); fi
   if ((DISABLE_EXECUTION_COLLISIONS)); then M_ARGS+=(--enable_grasp_action_object_collision 0); fi

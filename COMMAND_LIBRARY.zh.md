@@ -5250,6 +5250,66 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_
   --wrist_left_pitch_deg -90 --wrist_right_pitch_deg -90 \
   --wrist_left_lateral_offset_m -0.0207 --wrist_right_lateral_offset_m 0.0274
 ```
+
+## L16. Human Replay + Piper D435 wrist 实测参数（2026-06-18）
+
+本节记录当前实测较好的 Mode M / Human Replay wrist 相机参数。批量 no-viewer 命令必须和 viewer debug 使用同一组 wrist 外参参数，以保证保存的视频和机器人 obs 与调试视角一致。
+
+关键 wrist 参数：
+
+| 参数 | left | right | 说明 |
+|---|---:|---:|---|
+| `forward_offset_m` | `-0.04` | `-0.01` | 沿相机前向的最终微调 |
+| `roll_deg` | `14.635` | `-44.649` | 画面横轴扶正到接近夹爪开合轴 |
+| `yaw_deg` | `0.182` | `0.840` | 消除原始标定中前向轴的微小 Y 分量 |
+| `pitch_deg` | `-90` | `-90` | 俯视方向：保持当前成功视角，不要改成 `+90` |
+| `lateral_offset_m` | `-0.0207` | `0.0274` | 将相机平移到 gripper 中线附近 |
+
+### L16.1 pick_diverse_bottles
+
+`pick_diverse_bottles` 当前有效 ID 为 `0-101`，共 102 条。
+
+#### L16.1.1 Viewer debug（ID 1，带 wrist preview 和相机轴）
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+export DISPLAY=:1.0
+xdpyinfo >/dev/null || { echo "DISPLAY=:1.0 不可用"; exit 1; }
+
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_piper_d435.sh \
+  --gpu 2 --ids 1 --viewer --tasks pick_diverse_bottles \
+  --target_retreat_m 0.14 \
+  --wrist_left_forward_offset_m -0.04 --wrist_right_forward_offset_m -0.01 \
+  --wrist_left_roll_deg 14.635 --wrist_right_roll_deg -44.649 \
+  --wrist_left_yaw_deg 0.182 --wrist_right_yaw_deg 0.840 \
+  --wrist_left_pitch_deg -90 --wrist_right_pitch_deg -90 \
+  --wrist_left_lateral_offset_m -0.0207 --wrist_right_lateral_offset_m 0.0274
+```
+
+#### L16.1.2 No-viewer 批量生成数据（ID 0-101）
+
+不启用 viewer，不需要 `DISPLAY`；不会打开 wrist preview，也不会绘制 wrist/head 相机框线或相机 RGB 轴。wrist 外参参数与 L16.1.1 完全一致。
+
+输出目录：
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_human_replay_clean/pick_diverse_bottles/foundation_input_<ID>/
+```
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_piper_d435.sh \
+  --gpu 2 --ids 0-101 --continue_on_error --tasks pick_diverse_bottles \
+  --target_retreat_m 0.14 \
+  --wrist_left_forward_offset_m -0.04 --wrist_right_forward_offset_m -0.01 \
+  --wrist_left_roll_deg 14.635 --wrist_right_roll_deg -44.649 \
+  --wrist_left_yaw_deg 0.182 --wrist_right_yaw_deg 0.840 \
+  --wrist_left_pitch_deg -90 --wrist_right_pitch_deg -90 \
+  --wrist_left_lateral_offset_m -0.0207 --wrist_right_lateral_offset_m 0.0274 \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_human_replay_clean
+```
+
 ---
 
 ## M. 消融实验：Human Replay 人手关键帧目标 [已实现]
