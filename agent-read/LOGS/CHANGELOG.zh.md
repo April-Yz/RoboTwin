@@ -1,5 +1,20 @@
 # CHANGELOG.zh
 
+## 2026-06-18（Mode M wrist 相机 roll 复算）
+
+- 复查 O.1 与 L/Mode M 的 wrist tuning 代码路径：
+  - O.1 `envs/camera/camera.py` 与 L `render_hand_retarget_r1_npz.py` 都在 wrist/link6 local pose 上使用 `pitch @ yaw @ R`，沿 render camera `+X` 前移，再绕 camera `+X` 做 `image_roll_deg`。
+  - 未发现 tuning 乘法顺序导致的 L/O 差异。
+- 离线复算 0515 wrist bundle + `piper_pika_agx` + `legacy_r1`：
+  - 若目标是 camera `+Y` 横轴平行 gripper `+Y` 开合轴，当前 L 参数 `left=-15deg/right=-60deg` 不是几何扶正角。
+  - 建议先试 `--wrist_left_roll_deg 14.635 --wrist_right_roll_deg -44.649`，保留当前 yaw/pitch/lateral/forward。
+- 验证：
+  - 备份提交当前用户调参状态：`435e092 Backup Piper wrist camera tuning state`。
+  - no-viewer 最小运行写入 `/tmp/robo_wrist_roll_test/pick_diverse_bottles/foundation_input_1`，IK/执行成功，左右 wrist 视频均为 `107` 帧、`640x480`。
+  - `pitch=0` 对照写入 `/tmp/robo_wrist_roll_pitch0_test/pick_diverse_bottles/foundation_input_1`，IK/执行也成功，但早期 wrist 帧更空，因此暂不建议直接去掉 `pitch=15`。
+- 文档：
+  - `agent-read/COMMANDS/piper_anygrasp_keyframes.zh.md` / `.en.md` 新增 Mode M-0618 wrist roll 复算和 viewer 命令。
+
 ## 2026-06-02（Mode O 第一帧 FoundationPose 直接策略抓取）
 
 - 后续 viewer 修复：

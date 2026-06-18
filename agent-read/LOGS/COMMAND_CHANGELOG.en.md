@@ -1,3 +1,14 @@
+## 2026-06-18 00:00:00 +08
+
+- Added the Mode M human replay wrist roll recalculation command note:
+  - Entry point: `code_painting/run_plan_keyframes_human_replay_piper_d435.sh`
+  - Example task: `--tasks pick_diverse_bottles --ids 1 --viewer`
+  - Key recommended parameter change: `--wrist_left_roll_deg 14.635 --wrist_right_roll_deg -44.649`
+  - Kept settings: `--wrist_left/right_yaw_deg 0.182/0.840`, `--wrist_left/right_pitch_deg 15`, `--wrist_left/right_lateral_offset_m -0.0207/0.0274`, and `--wrist_left/right_forward_offset_m 0.145/0.13`.
+  - Purpose: replace the old empirical `left=-15/right=-60` roll values when the target is camera `+Y` horizontal axis parallel to gripper `+Y` opening axis.
+- Validation command:
+  - The no-viewer minimal validation wrote `/tmp/robo_wrist_roll_test/pick_diverse_bottles/foundation_input_1`; IK/execution succeeded, and both wrist videos were `107` frames at `640x480`.
+
 ## 2026-06-02 00:00:00 +08
 
 - Fixed Mode O viewer environment forwarding:

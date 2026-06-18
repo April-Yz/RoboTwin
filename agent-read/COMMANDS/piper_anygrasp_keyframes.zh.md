@@ -894,3 +894,43 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_
 | 2 | 1.17/2.72cm | 0.48/0.90cm | 1.37/3.40cm | 完整成功 |
 
 当前没有严格的 local +Z 前进轴 roll 范围约束。Piper `global_trans_matrix` 是绕 local X 的固定 180 度变换，但 IK target 和 EE 回报尚未统一变换约定，因此约 178-180 度旋转误差暂不能作为真实 roll 误差。`--apply_global_trans_to_ik 1` 实测使 IK 更差，暂不推荐。
+
+## Mode M-0618：Human Replay wrist 相机 roll 复算
+
+L/Mode M 的 wrist tuning 与 O.1 的实现顺序一致：先在 wrist/link6 local pose 上做 `pitch @ yaw @ R`，再沿 render camera `+X` 光轴前移，最后绕 camera `+X` 做 `image_roll_deg`。因此本轮未发现 L/O 在 tuning 乘法顺序上的代码差异。
+
+如果目标定义为“相机安装在夹爪开合中线附近，camera 绿色横轴/图像长边平行 gripper 绿色开合轴”，那么当前 L 命令中的旧 roll 值不是几何扶正值。基于 0515 wrist bundle、`piper_pika_agx` adapter、`legacy_r1`、`yaw=(0.182,0.840)`、`pitch=15` 复算：
+
+| side | 旧 roll | 几何对齐 roll | 当前额外残差 | pitch 后 forward 到 gripper +X |
+|---|---:|---:|---:|---:|
+| left | `-15deg` | `+14.635deg` | 还需约 `+29.635deg` | `14.627deg` |
+| right | `-60deg` | `-44.649deg` | 还需约 `+15.351deg` | `13.668deg` |
+
+`pitch=15deg` 是保守下俯量，不是精确看向 nominal tip 的解。按当前相机中心 `[0.066, 0, 0.057]` 附近估算，如果要让 forward 直接指向 nominal tip `[0.12,0,0]`，需要约 `47-49deg` 的 parent pitch，通常太大，不建议直接作为默认。
+
+推荐先用下面的 viewer 命令验证 roll 扶正。它保留当前成功的 IK/retreat/yaw/pitch/lateral，只把 roll 换成按 camera `+Y` 对齐 gripper `+Y` 的角度：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+export DISPLAY=:1.0
+xdpyinfo >/dev/null || { echo "DISPLAY=:1.0 不可用"; exit 1; }
+
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_piper_d435.sh \
+  --gpu 2 --ids 1 --viewer --tasks pick_diverse_bottles \
+  --trajectory_mode joint_interp --joint_trajectory_interpolation cubic \
+  --ik_num_seeds 1 --ik_solution_selection joint_continuity \
+  --ik_seed_perturbations 6 --ik_seed_perturbation_scale 0.05 \
+  --ik_max_joint_step_rad 0 --execute_partial_cartesian_plan 0 \
+  --apply_global_trans_to_ik 0 --action_orientation_source grasp \
+  --dual_stage_freeze_reached_arms_on_replan 1 \
+  --reach_pos_tol_m 0.04 --reach_rot_tol_deg 180 \
+  --replan_until_reached_max_attempts 5 --fail_on_execution_failure 1 \
+  --target_retreat_m 0.14 \
+  --wrist_left_forward_offset_m 0.145 --wrist_right_forward_offset_m 0.13 \
+  --wrist_left_roll_deg 14.635 --wrist_right_roll_deg -44.649 \
+  --wrist_left_yaw_deg 0.182 --wrist_right_yaw_deg 0.840 \
+  --wrist_left_pitch_deg 15 --wrist_right_pitch_deg 15 \
+  --wrist_left_lateral_offset_m -0.0207 --wrist_right_lateral_offset_m 0.0274
+```
+
+验证记录：上述 roll 版本的 no-viewer 最小运行写入 `/tmp/robo_wrist_roll_test/pick_diverse_bottles/foundation_input_1`，IK/执行成功，左右 wrist 视频均为 `107` 帧、`640x480`。抽帧显示左右夹爪横向扶正；但中段画面可能偏空，说明后续若要优化“看到夹爪/物体的多少”，应继续小步扫描 `pitch` 和 `forward_offset_m`，不要再用 roll 兼任视线方向调整。

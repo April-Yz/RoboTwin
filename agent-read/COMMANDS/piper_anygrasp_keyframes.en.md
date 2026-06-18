@@ -894,3 +894,43 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_
 | 2 | 1.17/2.72 cm | 0.48/0.90 cm | 1.37/3.40 cm | complete success |
 
 There is no strict roll-range constraint about the local +Z approach axis yet. Piper `global_trans_matrix` is a fixed 180-degree rotation about local X, but IK targets and reported EE poses do not yet share one transform convention, so approximately 178-180 degree rotation errors cannot be treated as physical roll errors. `--apply_global_trans_to_ik 1` made IK worse in testing and is not recommended.
+
+## Mode M-0618: Human Replay Wrist Camera Roll Recalculation
+
+The L/Mode M wrist tuning implementation matches the O.1 order: apply `pitch @ yaw @ R` to the wrist/link6 local pose, shift along render camera `+X`, then apply `image_roll_deg` about camera `+X`. This pass did not find an O/L multiplication-order mismatch in the tuning code.
+
+If the target is "camera near the gripper opening centerline, with the camera green horizontal/image-long axis parallel to the gripper green opening axis", the old roll values in the L command are not the geometric leveling values. Recomputed from the 0515 wrist bundle, `piper_pika_agx` adapter, `legacy_r1`, `yaw=(0.182,0.840)`, and `pitch=15`:
+
+| side | old roll | geometric alignment roll | remaining residual | forward angle to gripper +X after pitch |
+|---|---:|---:|---:|---:|
+| left | `-15deg` | `+14.635deg` | needs about `+29.635deg` more | `14.627deg` |
+| right | `-60deg` | `-44.649deg` | needs about `+15.351deg` more | `13.668deg` |
+
+`pitch=15deg` is a conservative downward-looking amount, not the exact look-at-tip solution. With the current camera center near `[0.066, 0, 0.057]`, pointing the forward axis directly at the nominal tip `[0.12,0,0]` would require roughly `47-49deg` of parent pitch, which is usually too large for the default.
+
+Use this viewer command first to validate roll leveling. It keeps the currently successful IK/retreat/yaw/pitch/lateral settings and only replaces roll with the camera-`+Y` to gripper-`+Y` alignment angles:
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+export DISPLAY=:1.0
+xdpyinfo >/dev/null || { echo "DISPLAY=:1.0 不可用"; exit 1; }
+
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_piper_d435.sh \
+  --gpu 2 --ids 1 --viewer --tasks pick_diverse_bottles \
+  --trajectory_mode joint_interp --joint_trajectory_interpolation cubic \
+  --ik_num_seeds 1 --ik_solution_selection joint_continuity \
+  --ik_seed_perturbations 6 --ik_seed_perturbation_scale 0.05 \
+  --ik_max_joint_step_rad 0 --execute_partial_cartesian_plan 0 \
+  --apply_global_trans_to_ik 0 --action_orientation_source grasp \
+  --dual_stage_freeze_reached_arms_on_replan 1 \
+  --reach_pos_tol_m 0.04 --reach_rot_tol_deg 180 \
+  --replan_until_reached_max_attempts 5 --fail_on_execution_failure 1 \
+  --target_retreat_m 0.14 \
+  --wrist_left_forward_offset_m 0.145 --wrist_right_forward_offset_m 0.13 \
+  --wrist_left_roll_deg 14.635 --wrist_right_roll_deg -44.649 \
+  --wrist_left_yaw_deg 0.182 --wrist_right_yaw_deg 0.840 \
+  --wrist_left_pitch_deg 15 --wrist_right_pitch_deg 15 \
+  --wrist_left_lateral_offset_m -0.0207 --wrist_right_lateral_offset_m 0.0274
+```
+
+Validation note: the same roll settings passed a no-viewer minimal run under `/tmp/robo_wrist_roll_test/pick_diverse_bottles/foundation_input_1`; IK/execution succeeded, and both wrist videos were `107` frames at `640x480`. Extracted frames showed the left and right grippers leveled horizontally. Some middle frames can still look sparse, so further "see more gripper/object" tuning should scan `pitch` and `forward_offset_m`; do not use roll to compensate for viewing direction.
