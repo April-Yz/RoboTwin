@@ -1,13 +1,3 @@
-## 2026-06-18 14:40:00 +08
-
-- 更新 Mode M human replay wrapper 的 wrist bundle 默认策略：
-  - 入口：`code_painting/run_plan_keyframes_human_replay_piper_d435.sh`
-  - 默认不再加载 `calibration_bundle_piper_new_table_0515.json`。
-  - `--wrist_*` tuning 只有在显式传 `--piper_calibration_bundle` 时才会转发给 Python planner。
-  - 未传 bundle 但传了 `--wrist_*` 时，会打印 warning 并忽略这些参数。
-- 用途：
-  - 恢复 L/Mode M 的默认 wrist 行为，避免 O.1 wrist 外参迁移未完成时默认出现朝后/背壳视角。
-
 ## 2026-06-02 00:00:00 +08
 
 - 修复 Mode O viewer 环境传递：

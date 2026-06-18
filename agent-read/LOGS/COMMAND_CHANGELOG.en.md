@@ -1,13 +1,3 @@
-## 2026-06-18 14:40:00 +08
-
-- Updated the Mode M human replay wrapper wrist-bundle default:
-  - Entry point: `code_painting/run_plan_keyframes_human_replay_piper_d435.sh`
-  - It no longer loads `calibration_bundle_piper_new_table_0515.json` by default.
-  - `--wrist_*` tuning is forwarded to the Python planner only when `--piper_calibration_bundle` is passed explicitly.
-  - If `--wrist_*` is provided without a bundle, the wrapper prints a warning and ignores those parameters.
-- Purpose:
-  - Restore the L/Mode M default wrist behavior and avoid a backward/back-shell view while the O.1 wrist extrinsic migration remains unresolved.
-
 ## 2026-06-02 00:00:00 +08
 
 - Fixed Mode O viewer environment forwarding:

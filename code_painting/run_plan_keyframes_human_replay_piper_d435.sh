@@ -38,9 +38,7 @@ REACH_POS_TOL_M=0.04
 FAIL_ON_EXECUTION_FAILURE=1
 APPROACH_OFFSET_M=0.12
 TARGET_RETREAT_M=0.0
-# Keep Mode M/L on its original wrist-camera parent-frame behavior by default.
-# Pass --piper_calibration_bundle explicitly when testing O.1 wrist extrinsic migration.
-PIPER_CALIBRATION_BUNDLE=""
+PIPER_CALIBRATION_BUNDLE=/home/zaijia001/ssd/RoboTwin/calibration_bundle_piper_new_table_0515.json
 # Wrist camera tuning (same convention as O.1)
 WRIST_LEFT_FORWARD_OFFSET_M=0.0
 WRIST_RIGHT_FORWARD_OFFSET_M=0.0
@@ -209,11 +207,6 @@ else
 fi
 
 echo "===== Mode M: Human Replay Target task=${TASK} ids=${IDS[*]} viewer=${VIEWER} ====="
-if [[ -z "$PIPER_CALIBRATION_BUNDLE" ]]; then
-  if [[ "$WRIST_LEFT_FORWARD_OFFSET_M $WRIST_RIGHT_FORWARD_OFFSET_M $WRIST_LEFT_LATERAL_OFFSET_M $WRIST_RIGHT_LATERAL_OFFSET_M $WRIST_LEFT_ROLL_DEG $WRIST_RIGHT_ROLL_DEG $WRIST_LEFT_YAW_DEG $WRIST_RIGHT_YAW_DEG $WRIST_LEFT_PITCH_DEG $WRIST_RIGHT_PITCH_DEG" != "0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0" ]]; then
-    echo "[warn] --wrist_* tuning ignored because --piper_calibration_bundle is not set; pass the bundle explicitly to test O.1 wrist extrinsic migration."
-  fi
-fi
 
 for ID in "${IDS[@]}"; do
   ANY=${ANY_ROOT}/foundation_input_${ID}
@@ -259,24 +252,20 @@ for ID in "${IDS[@]}"; do
     --viewer_show_camera_frustums 1
     --debug_visualize_cameras 1 --debug_camera_axis_length 0.10
     --approach_offset_m "$APPROACH_OFFSET_M"
+    --piper_calibration_bundle "$PIPER_CALIBRATION_BUNDLE"
     --target_retreat_m "$TARGET_RETREAT_M"
+    --wrist_left_forward_offset_m "$WRIST_LEFT_FORWARD_OFFSET_M"
+    --wrist_right_forward_offset_m "$WRIST_RIGHT_FORWARD_OFFSET_M"
+    --wrist_left_lateral_offset_m "$WRIST_LEFT_LATERAL_OFFSET_M"
+    --wrist_right_lateral_offset_m "$WRIST_RIGHT_LATERAL_OFFSET_M"
+    --wrist_left_roll_deg "$WRIST_LEFT_ROLL_DEG"
+    --wrist_right_roll_deg "$WRIST_RIGHT_ROLL_DEG"
+    --wrist_left_yaw_deg "$WRIST_LEFT_YAW_DEG"
+    --wrist_right_yaw_deg "$WRIST_RIGHT_YAW_DEG"
+    --wrist_left_pitch_deg "$WRIST_LEFT_PITCH_DEG"
+    --wrist_right_pitch_deg "$WRIST_RIGHT_PITCH_DEG"
     --replan_until_reached_max_attempts "$REPLAN_MAX_ATTEMPTS"
   )
-  if [[ -n "$PIPER_CALIBRATION_BUNDLE" ]]; then
-    M_ARGS+=(
-      --piper_calibration_bundle "$PIPER_CALIBRATION_BUNDLE"
-      --wrist_left_forward_offset_m "$WRIST_LEFT_FORWARD_OFFSET_M"
-      --wrist_right_forward_offset_m "$WRIST_RIGHT_FORWARD_OFFSET_M"
-      --wrist_left_lateral_offset_m "$WRIST_LEFT_LATERAL_OFFSET_M"
-      --wrist_right_lateral_offset_m "$WRIST_RIGHT_LATERAL_OFFSET_M"
-      --wrist_left_roll_deg "$WRIST_LEFT_ROLL_DEG"
-      --wrist_right_roll_deg "$WRIST_RIGHT_ROLL_DEG"
-      --wrist_left_yaw_deg "$WRIST_LEFT_YAW_DEG"
-      --wrist_right_yaw_deg "$WRIST_RIGHT_YAW_DEG"
-      --wrist_left_pitch_deg "$WRIST_LEFT_PITCH_DEG"
-      --wrist_right_pitch_deg "$WRIST_RIGHT_PITCH_DEG"
-    )
-  fi
 
   if ((VIEWER)); then
     M_ARGS+=(--enable_viewer 1 --viewer_wait_at_end "$VIEWER_WAIT_AT_END")

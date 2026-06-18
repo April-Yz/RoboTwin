@@ -894,31 +894,3 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_
 | 2 | 1.17/2.72cm | 0.48/0.90cm | 1.37/3.40cm | 完整成功 |
 
 当前没有严格的 local +Z 前进轴 roll 范围约束。Piper `global_trans_matrix` 是绕 local X 的固定 180 度变换，但 IK target 和 EE 回报尚未统一变换约定，因此约 178-180 度旋转误差暂不能作为真实 roll 误差。`--apply_global_trans_to_ik 1` 实测使 IK 更差，暂不推荐。
-
-## Mode M-0618：L wrist 外参恢复策略
-
-`run_plan_keyframes_human_replay_piper_d435.sh` 不再默认加载 `calibration_bundle_piper_new_table_0515.json`。原因是把 O.1 的 wrist bundle 和 O.1 tuning 直接设为 L/Mode M 默认值时，id1 抽帧出现看夹爪背壳/空白背景的问题，说明 L 的当前 wrist 父帧/轴约定还不能直接复用 O.1 的参数。
-
-当前行为：
-
-- 不显式传 `--piper_calibration_bundle` 时，wrapper 不向 Python planner 传任何 `--wrist_*` tuning，即使外层命令写了这些参数也会打印 warning 并忽略。
-- 要继续诊断 O.1 wrist 迁移，必须显式传：
-
-```text
---piper_calibration_bundle /home/zaijia001/ssd/RoboTwin/calibration_bundle_piper_new_table_0515.json
-```
-
-验证命令：
-
-```bash
-bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_piper_d435.sh \
-  --gpu 2 --ids 1 --dry_run --tasks pick_diverse_bottles \
-  --wrist_left_forward_offset_m 0.145 --wrist_right_forward_offset_m 0.13 \
-  --wrist_left_roll_deg -15 --wrist_right_roll_deg -60
-```
-
-预期输出包含：
-
-```text
-[warn] --wrist_* tuning ignored because --piper_calibration_bundle is not set
-```
