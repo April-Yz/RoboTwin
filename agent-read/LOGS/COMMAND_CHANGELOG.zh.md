@@ -1,14 +1,3 @@
-## 2026-06-18 00:00:00 +08
-
-- 新增 Mode M human replay wrist roll 复算命令说明：
-  - 入口：`code_painting/run_plan_keyframes_human_replay_piper_d435.sh`
-  - 任务示例：`--tasks pick_diverse_bottles --ids 1 --viewer`
-  - 关键参数更新建议：`--wrist_left_roll_deg 14.635 --wrist_right_roll_deg -44.649`
-  - 保留参数：`--wrist_left/right_yaw_deg 0.182/0.840`、`--wrist_left/right_pitch_deg 15`、`--wrist_left/right_lateral_offset_m -0.0207/0.0274`、`--wrist_left/right_forward_offset_m 0.145/0.13`。
-  - 用途：按 camera `+Y` 横轴平行 gripper `+Y` 开合轴的目标，替换旧的 `left=-15/right=-60` 经验 roll。
-- 验证命令：
-  - no-viewer 最小验证输出 `/tmp/robo_wrist_roll_test/pick_diverse_bottles/foundation_input_1`，IK/执行成功，左右 wrist 视频 `107` 帧、`640x480`。
-
 ## 2026-06-02 00:00:00 +08
 
 - 修复 Mode O viewer 环境传递：

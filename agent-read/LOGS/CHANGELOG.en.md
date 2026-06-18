@@ -1,20 +1,5 @@
 # CHANGELOG.en
 
-## 2026-06-18 (Mode M Wrist Camera Roll Recalculation)
-
-- Rechecked the O.1 and L/Mode M wrist tuning code paths:
-  - O.1 `envs/camera/camera.py` and L `render_hand_retarget_r1_npz.py` both apply `pitch @ yaw @ R` in the wrist/link6 local pose, shift along render camera `+X`, then apply `image_roll_deg` about camera `+X`.
-  - No O/L tuning multiplication-order mismatch was found.
-- Recomputed the 0515 wrist bundle with `piper_pika_agx` and `legacy_r1`:
-  - If the target is camera `+Y` horizontal axis parallel to gripper `+Y` opening axis, the current L values `left=-15deg/right=-60deg` are not the geometric leveling angles.
-  - Recommended first test: `--wrist_left_roll_deg 14.635 --wrist_right_roll_deg -44.649`, keeping current yaw/pitch/lateral/forward settings.
-- Validation:
-  - Backed up the current user tuning state as commit `435e092 Backup Piper wrist camera tuning state`.
-  - A no-viewer minimal run wrote `/tmp/robo_wrist_roll_test/pick_diverse_bottles/foundation_input_1`; IK/execution succeeded, and both wrist videos were `107` frames at `640x480`.
-  - A `pitch=0` comparison wrote `/tmp/robo_wrist_roll_pitch0_test/pick_diverse_bottles/foundation_input_1`; IK/execution also succeeded, but early wrist frames were sparser, so dropping `pitch=15` is not recommended yet.
-- Documentation:
-  - Added the Mode M-0618 wrist roll recalculation and viewer command to `agent-read/COMMANDS/piper_anygrasp_keyframes.zh.md` / `.en.md`.
-
 ## 2026-06-02 (Mode O First-Frame FoundationPose Direct Strategy Grasp)
 
 - Follow-up viewer fix:
