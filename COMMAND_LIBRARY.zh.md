@@ -5235,6 +5235,21 @@ eog /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_preview_d435_robot_f
 eog /home/zaijia001/ssd/data/piper/hand/pick_diverse_bottles/pick_diverse_bottles_output/foundation_input_1/vis/grasp_result_000046.png
 ```
 
+#### codex
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+export DISPLAY=:1.0
+xdpyinfo >/dev/null || { echo "DISPLAY=:1.0 不可用"; exit 1; }
+
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_piper_d435.sh \
+  --gpu 2 --ids 1 --viewer --tasks pick_diverse_bottles \
+  --target_retreat_m 0.14 \
+  --wrist_left_forward_offset_m -0.04 --wrist_right_forward_offset_m -0.01 \
+  --wrist_left_roll_deg 14.635 --wrist_right_roll_deg -44.649 \
+  --wrist_left_yaw_deg 0.182 --wrist_right_yaw_deg 0.840 \
+  --wrist_left_pitch_deg -90 --wrist_right_pitch_deg -90 \
+  --wrist_left_lateral_offset_m -0.0207 --wrist_right_lateral_offset_m 0.0274
+```
 ---
 
 ## M. 消融实验：Human Replay 人手关键帧目标 [已实现]
