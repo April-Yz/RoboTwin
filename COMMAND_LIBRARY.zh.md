@@ -5035,6 +5035,87 @@ handover 的特殊性在于：
 4. Stage 间的状态传递和 video 拼接
 
 
+### L15.20 六任务 Human Replay viewer debug 命令（Mode M + wrist 校准）
+
+以下命令使用 Human Replay（Mode M）路径，带 L16 实测 wrist 参数。每个任务单独一条 viewer debug 命令，方便逐个调试。
+
+> **注意**：这些命令使用 `run_plan_keyframes_human_replay_piper_d435.sh`（Human Replay），与上方的 `run_plan_anygrasp_keyframes_piper_d435_async_staged.sh`（AnyGrasp async staged）是两套不同的 target 来源。Human Replay 直接使用人手 gripper pose，AnyGrasp async staged 使用 AnyGrasp 候选。
+
+```bash
+# pick_diverse_bottles (模式 A: 2全局关键帧, ID 1)
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_piper_d435.sh \
+  --gpu 2 --ids 1 --viewer --tasks pick_diverse_bottles \
+  --target_retreat_m 0.14 \
+  --wrist_left_forward_offset_m -0.04 --wrist_right_forward_offset_m -0.01 \
+  --wrist_left_roll_deg 14.635 --wrist_right_roll_deg -44.649 \
+  --wrist_left_yaw_deg 0.182 --wrist_right_yaw_deg 0.840 \
+  --wrist_left_pitch_deg -90 --wrist_right_pitch_deg -90 \
+  --wrist_left_lateral_offset_m -0.0207 --wrist_right_lateral_offset_m 0.0274 \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L1520_human_replay_viewer
+
+# place_bread_basket (模式 B: L2+R2, ID 0)
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_piper_d435.sh \
+  --gpu 2 --ids 0 --viewer --tasks place_bread_basket \
+  --target_retreat_m 0.14 \
+  --wrist_left_forward_offset_m -0.04 --wrist_right_forward_offset_m -0.01 \
+  --wrist_left_roll_deg 14.635 --wrist_right_roll_deg -44.649 \
+  --wrist_left_yaw_deg 0.182 --wrist_right_yaw_deg 0.840 \
+  --wrist_left_pitch_deg -90 --wrist_right_pitch_deg -90 \
+  --wrist_left_lateral_offset_m -0.0207 --wrist_right_lateral_offset_m 0.0274 \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L1520_human_replay_viewer
+
+# stack_cups (模式 B: L2+R2, ID 0)
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_piper_d435.sh \
+  --gpu 2 --ids 0 --viewer --tasks stack_cups \
+  --target_retreat_m 0.14 \
+  --wrist_left_forward_offset_m -0.04 --wrist_right_forward_offset_m -0.01 \
+  --wrist_left_roll_deg 14.635 --wrist_right_roll_deg -44.649 \
+  --wrist_left_yaw_deg 0.182 --wrist_right_yaw_deg 0.840 \
+  --wrist_left_pitch_deg -90 --wrist_right_pitch_deg -90 \
+  --wrist_left_lateral_offset_m -0.0207 --wrist_right_lateral_offset_m 0.0274 \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L1520_human_replay_viewer
+
+# handover_bottle (模式 C: L1+R1+G1, ID 1, 无 id=0)
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_piper_d435.sh \
+  --gpu 2 --ids 1 --viewer --tasks handover_bottle \
+  --target_retreat_m 0.14 \
+  --wrist_left_forward_offset_m -0.04 --wrist_right_forward_offset_m -0.01 \
+  --wrist_left_roll_deg 14.635 --wrist_right_roll_deg -44.649 \
+  --wrist_left_yaw_deg 0.182 --wrist_right_yaw_deg 0.840 \
+  --wrist_left_pitch_deg -90 --wrist_right_pitch_deg -90 \
+  --wrist_left_lateral_offset_m -0.0207 --wrist_right_lateral_offset_m 0.0274 \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L1520_human_replay_viewer
+
+# pnp_bread (模式 B/D 混合, ID 10)
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_piper_d435.sh \
+  --gpu 2 --ids 10 --viewer --tasks pnp_bread \
+  --target_retreat_m 0.14 \
+  --wrist_left_forward_offset_m -0.04 --wrist_right_forward_offset_m -0.01 \
+  --wrist_left_roll_deg 14.635 --wrist_right_roll_deg -44.649 \
+  --wrist_left_yaw_deg 0.182 --wrist_right_yaw_deg 0.840 \
+  --wrist_left_pitch_deg -90 --wrist_right_pitch_deg -90 \
+  --wrist_left_lateral_offset_m -0.0207 --wrist_right_lateral_offset_m 0.0274 \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L1520_human_replay_viewer
+
+# pnp_tray (模式 A: 2全局关键帧, ID 0)
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_piper_d435.sh \
+  --gpu 2 --ids 0 --viewer --tasks pnp_tray \
+  --target_retreat_m 0.14 \
+  --wrist_left_forward_offset_m -0.04 --wrist_right_forward_offset_m -0.01 \
+  --wrist_left_roll_deg 14.635 --wrist_right_roll_deg -44.649 \
+  --wrist_left_yaw_deg 0.182 --wrist_right_yaw_deg 0.840 \
+  --wrist_left_pitch_deg -90 --wrist_right_pitch_deg -90 \
+  --wrist_left_lateral_offset_m -0.0207 --wrist_right_lateral_offset_m 0.0274 \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L1520_human_replay_viewer
+```
+
+> 使用时需要先设置环境变量：
+> ```bash
+> source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+> export DISPLAY=:1.0
+> xdpyinfo >/dev/null || { echo "DISPLAY=:1.0 不可用"; exit 1; }
+> ```
+
 ---
 
 ## L15.21 AnyGrasp 候选筛选逻辑详解
@@ -5301,6 +5382,387 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate R
 
 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_piper_d435.sh \
   --gpu 2 --ids 0-101 --continue_on_error --tasks pick_diverse_bottles \
+  --target_retreat_m 0.14 \
+  --wrist_left_forward_offset_m -0.04 --wrist_right_forward_offset_m -0.01 \
+  --wrist_left_roll_deg 14.635 --wrist_right_roll_deg -44.649 \
+  --wrist_left_yaw_deg 0.182 --wrist_right_yaw_deg 0.840 \
+  --wrist_left_pitch_deg -90 --wrist_right_pitch_deg -90 \
+  --wrist_left_lateral_offset_m -0.0207 --wrist_right_lateral_offset_m 0.0274 \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_human_replay_clean
+```
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+export DISPLAY=:1.0
+xdpyinfo >/dev/null || { echo "DISPLAY=:1.0 不可用"; exit 1; }
+
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_piper_d435.sh \
+  --gpu 2 --ids 1 --viewer --tasks pick_diverse_bottles \
+  --target_retreat_m 0.14 \
+  --wrist_left_forward_offset_m -0.01 --wrist_right_forward_offset_m -0.01 \
+  --wrist_left_roll_deg 14.635 --wrist_right_roll_deg -44.649 \
+  --wrist_left_yaw_deg 0.182 --wrist_right_yaw_deg 0.840 \
+  --wrist_left_pitch_deg -90 --wrist_right_pitch_deg -90 \
+  --wrist_left_lateral_offset_m -0.0207 --wrist_right_lateral_offset_m 0.0274
+```
+
+### L16.2 place_bread_basket
+
+`place_bread_basket` 当前有效 ID 为 `0-73`，hand_keyframes_all.json 中 53 条有效（status 非 reject/discard/bad）。
+
+**模式 B (L2+R2 独立)**：左手先操作（L1→L2），右手后操作（R1→R2），时间上不重叠。
+
+关键帧动作：
+
+```
+Stage 1: L1 — pregrasp → grasp → close left gripper  （左手抓起 bread）
+Stage 2: L2 — pregrasp → grasp → open left gripper    （左手将 bread 放入 basket）
+Stage 3: R1 — pregrasp → grasp → close right gripper  （右手抓起 basket）
+Stage 4: R2 — pregrasp → grasp → open right gripper   （右手提起 basket）
+```
+
+执行顺序 L1→L2→R1→R2，非活跃 arm 保持当前 joint 位姿。
+
+#### L16.2.1 Viewer debug（ID 0，带 wrist preview 和相机轴）
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+export DISPLAY=:1.0
+xdpyinfo >/dev/null || { echo "DISPLAY=:1.0 不可用"; exit 1; }
+
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_piper_d435.sh \
+  --gpu 2 --ids 0 --viewer --tasks place_bread_basket \
+  --target_retreat_m 0.14 \
+  --wrist_left_forward_offset_m -0.04 --wrist_right_forward_offset_m -0.01 \
+  --wrist_left_roll_deg 14.635 --wrist_right_roll_deg -44.649 \
+  --wrist_left_yaw_deg 0.182 --wrist_right_yaw_deg 0.840 \
+  --wrist_left_pitch_deg -90 --wrist_right_pitch_deg -90 \
+  --wrist_left_lateral_offset_m -0.0207 --wrist_right_lateral_offset_m 0.0274
+```
+
+#### L16.2.2 No-viewer 批量生成数据（ID 0-73）
+
+不启用 viewer，不需要 `DISPLAY`；不会打开 wrist preview，也不会绘制 wrist/head 相机框线或相机 RGB 轴。wrist 外参参数与 L16.2.1 完全一致。
+
+输出目录：
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_human_replay_clean/place_bread_basket/foundation_input_<ID>/
+```
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_piper_d435.sh \
+  --gpu 2 --ids 0-73 --continue_on_error --tasks place_bread_basket \
+  --target_retreat_m 0.14 \
+  --wrist_left_forward_offset_m -0.04 --wrist_right_forward_offset_m -0.01 \
+  --wrist_left_roll_deg 14.635 --wrist_right_roll_deg -44.649 \
+  --wrist_left_yaw_deg 0.182 --wrist_right_yaw_deg 0.840 \
+  --wrist_left_pitch_deg -90 --wrist_right_pitch_deg -90 \
+  --wrist_left_lateral_offset_m -0.0207 --wrist_right_lateral_offset_m 0.0274 \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_human_replay_clean
+```
+
+---
+
+### L16.3 stack_cups
+
+`stack_cups` 当前有效 ID 为 `0-46`，hand_keyframes_all.json 中 41 条有效（status 非 reject/discard/bad）。
+
+**模式 B (L2+R2 独立)**：右手先操作（R1→R2），左手后操作（L1→L2），与 place_bread_basket 顺序相反。
+
+关键帧动作：
+
+```
+Stage 1: R1 — pregrasp → grasp → close right gripper  （右手抓起一个杯子）
+Stage 2: R2 — pregrasp → grasp → open right gripper   （右手将杯子叠放到目标上）
+Stage 3: L1 — pregrasp → grasp → close left gripper   （左手抓起另一个杯子）
+Stage 4: L2 — pregrasp → grasp → open left gripper    （左手将杯子叠放到目标上）
+```
+
+执行顺序 R1→R2→L1→L2，非活跃 arm 保持当前 joint 位姿。注意原始时间顺序是 R1→R2→L1→L2，与执行顺序一致。
+
+#### L16.3.1 Viewer debug（ID 0，带 wrist preview 和相机轴）
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+export DISPLAY=:1.0
+xdpyinfo >/dev/null || { echo "DISPLAY=:1.0 不可用"; exit 1; }
+
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_piper_d435.sh \
+  --gpu 2 --ids 1 --viewer --tasks stack_cups \
+  --target_retreat_m 0.14 \
+  --wrist_left_forward_offset_m -0.04 --wrist_right_forward_offset_m -0.01 \
+  --wrist_left_roll_deg 14.635 --wrist_right_roll_deg -44.649 \
+  --wrist_left_yaw_deg 0.182 --wrist_right_yaw_deg 0.840 \
+  --wrist_left_pitch_deg -90 --wrist_right_pitch_deg -90 \
+  --wrist_left_lateral_offset_m -0.0207 --wrist_right_lateral_offset_m 0.0274
+```
+
+#### L16.3.2 No-viewer 批量生成数据（ID 0-46）
+
+不启用 viewer，不需要 `DISPLAY`；不会打开 wrist preview，也不会绘制 wrist/head 相机框线或相机 RGB 轴。wrist 外参参数与 L16.3.1 完全一致。
+
+输出目录：
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_human_replay_clean/stack_cups/foundation_input_<ID>/
+```
+
+```bash
+# debug先
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_piper_d435.sh \
+  --gpu 2 --ids 0-10 --continue_on_error --tasks stack_cups \
+  --target_retreat_m 0.14 \
+  --wrist_left_forward_offset_m -0.04 --wrist_right_forward_offset_m -0.01 \
+  --wrist_left_roll_deg 14.635 --wrist_right_roll_deg -44.649 \
+  --wrist_left_yaw_deg 0.182 --wrist_right_yaw_deg 0.840 \
+  --wrist_left_pitch_deg -90 --wrist_right_pitch_deg -90 \
+  --wrist_left_lateral_offset_m -0.0207 --wrist_right_lateral_offset_m 0.0274 \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_de_human_replay_clean
+```
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_piper_d435.sh \
+  --gpu 2 --ids 0-46 --continue_on_error --tasks stack_cups \
+  --target_retreat_m 0.14 \
+  --wrist_left_forward_offset_m -0.04 --wrist_right_forward_offset_m -0.01 \
+  --wrist_left_roll_deg 14.635 --wrist_right_roll_deg -44.649 \
+  --wrist_left_yaw_deg 0.182 --wrist_right_yaw_deg 0.840 \
+  --wrist_left_pitch_deg -90 --wrist_right_pitch_deg -90 \
+  --wrist_left_lateral_offset_m -0.0207 --wrist_right_lateral_offset_m 0.0274 \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_human_replay_clean
+```
+
+---
+
+### L16.4 handover_bottle
+
+`handover_bottle` 当前有效 ID 为 `1-50`（**无 id=0**），hand_keyframes_all.json 中 50 条有效（status 非 reject/discard/bad）。
+
+**模式 C (L1+R1+G1 交接)**：右手拾取 → 共享帧交接 → 左手接收。
+
+关键帧动作：
+
+```
+Stage 1: R1 — pregrasp → grasp → close right gripper  （右手抓起 bottle）
+Stage 2: G  — both arms approach handover pose         （双手靠近交接帧 G）
+             → open right gripper + close left gripper （右手松开、左手接住 bottle）
+Stage 3: L1 — pregrasp → grasp                         （左手持有 bottle 到达接收位姿）
+```
+
+handover 的特殊性在于共享帧 G 是交接点：`effective_keyframes_by_arm` 中 L=[L1, G], R=[R1, G]。G 帧不是 grasp 而是 transfer pose，需要一个明确的 gripper open/close 序列。
+
+#### L16.4.1 Viewer debug（ID 1，带 wrist preview 和相机轴）
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+export DISPLAY=:1.0
+xdpyinfo >/dev/null || { echo "DISPLAY=:1.0 不可用"; exit 1; }
+
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_piper_d435.sh \
+  --gpu 2 --ids 1 --viewer --tasks handover_bottle \
+  --target_retreat_m 0.14 \
+  --wrist_left_forward_offset_m -0.04 --wrist_right_forward_offset_m -0.01 \
+  --wrist_left_roll_deg 14.635 --wrist_right_roll_deg -44.649 \
+  --wrist_left_yaw_deg 0.182 --wrist_right_yaw_deg 0.840 \
+  --wrist_left_pitch_deg -90 --wrist_right_pitch_deg -90 \
+  --wrist_left_lateral_offset_m -0.0207 --wrist_right_lateral_offset_m 0.0274
+```
+
+#### L16.4.2 No-viewer 批量生成数据（ID 1-50）
+
+不启用 viewer，不需要 `DISPLAY`；不会打开 wrist preview，也不会绘制 wrist/head 相机框线或相机 RGB 轴。wrist 外参参数与 L16.4.1 完全一致。
+
+输出目录：
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_human_replay_clean/handover_bottle/foundation_input_<ID>/
+```
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_piper_d435.sh \
+  --gpu 2 --ids 1-50 --continue_on_error --tasks handover_bottle \
+  --target_retreat_m 0.14 \
+  --wrist_left_forward_offset_m -0.04 --wrist_right_forward_offset_m -0.01 \
+  --wrist_left_roll_deg 14.635 --wrist_right_roll_deg -44.649 \
+  --wrist_left_yaw_deg 0.182 --wrist_right_yaw_deg 0.840 \
+  --wrist_left_pitch_deg -90 --wrist_right_pitch_deg -90 \
+  --wrist_left_lateral_offset_m -0.0207 --wrist_right_lateral_offset_m 0.0274 \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_human_replay_clean
+```
+
+```bash
+# debug
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_piper_d435.sh \
+  --gpu 2 --ids 1-10 --continue_on_error --tasks handover_bottle \
+  --target_retreat_m 0.14 \
+  --wrist_left_forward_offset_m -0.04 --wrist_right_forward_offset_m -0.01 \
+  --wrist_left_roll_deg 14.635 --wrist_right_roll_deg -44.649 \
+  --wrist_left_yaw_deg 0.182 --wrist_right_yaw_deg 0.840 \
+  --wrist_left_pitch_deg -90 --wrist_right_pitch_deg -90 \
+  --wrist_left_lateral_offset_m -0.0207 --wrist_right_lateral_offset_m 0.0274 \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_de_human_replay_clean
+```
+
+---
+
+### L16.5 pnp_bread
+
+`pnp_bread` 当前有效 ID 为 `0-80`，hand_keyframes_all.json 中 74 条有效（status 非 reject/discard/bad）。
+
+**模式 B/D 混合**：部分 ID 是 L2+R2 独立（模式 B），部分 ID 是 G+L1+R1 混合（模式 D）。
+
+- **模式 B (L2+R2)**：L1→L2→R1→R2，左右手各自独立 pick & place
+- **模式 D (G+L1+R1)**：共享帧 G → 左手关键帧 L1 → 右手关键帧 R1
+
+关键帧动作（模式 B）：
+
+```
+Stage 1: L1 — pregrasp → grasp → close left gripper   （左手抓起面包）
+Stage 2: L2 — pregrasp → grasp → open left gripper    （左手将面包放到盘子）
+Stage 3: R1 — pregrasp → grasp → close right gripper  （右手抓起另一个面包）
+Stage 4: R2 — pregrasp → grasp → open right gripper   （右手将面包放到盘子）
+```
+
+关键帧动作（模式 D）：
+
+```
+Stage 1: G  — pregrasp → grasp（双手共享接近物体的帧）
+Stage 2: L1 — pregrasp → grasp → close left gripper   （左手抓起面包）
+Stage 3: R1 — pregrasp → grasp → close right gripper  （右手抓起面包）
+```
+
+模式自动检测由 planner 根据 `hand_keyframes_all.json` 中的 keyframes 结构决定。
+
+#### L16.5.1 Viewer debug（ID 10，带 wrist preview 和相机轴）
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+export DISPLAY=:1.0
+xdpyinfo >/dev/null || { echo "DISPLAY=:1.0 不可用"; exit 1; }
+
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_piper_d435.sh \
+  --gpu 2 --ids 10 --viewer --tasks pnp_bread \
+  --target_retreat_m 0.14 \
+  --wrist_left_forward_offset_m -0.04 --wrist_right_forward_offset_m -0.01 \
+  --wrist_left_roll_deg 14.635 --wrist_right_roll_deg -44.649 \
+  --wrist_left_yaw_deg 0.182 --wrist_right_yaw_deg 0.840 \
+  --wrist_left_pitch_deg -90 --wrist_right_pitch_deg -90 \
+  --wrist_left_lateral_offset_m -0.0207 --wrist_right_lateral_offset_m 0.0274
+```
+
+#### L16.5.2 No-viewer 批量生成数据（ID 0-80）
+
+不启用 viewer，不需要 `DISPLAY`；不会打开 wrist preview，也不会绘制 wrist/head 相机框线或相机 RGB 轴。wrist 外参参数与 L16.5.1 完全一致。
+
+输出目录：
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_human_replay_clean/pnp_bread/foundation_input_<ID>/
+```
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_piper_d435.sh \
+  --gpu 2 --ids 0-80 --continue_on_error --tasks pnp_bread \
+  --target_retreat_m 0.14 \
+  --wrist_left_forward_offset_m -0.04 --wrist_right_forward_offset_m -0.01 \
+  --wrist_left_roll_deg 14.635 --wrist_right_roll_deg -44.649 \
+  --wrist_left_yaw_deg 0.182 --wrist_right_yaw_deg 0.840 \
+  --wrist_left_pitch_deg -90 --wrist_right_pitch_deg -90 \
+  --wrist_left_lateral_offset_m -0.0207 --wrist_right_lateral_offset_m 0.0274 \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_human_replay_clean
+```
+
+```bash
+# debug
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_piper_d435.sh \
+  --gpu 1 --ids 0-10 --continue_on_error --tasks pnp_bread \
+  --target_retreat_m 0.14 \
+  --wrist_left_forward_offset_m -0.04 --wrist_right_forward_offset_m -0.01 \
+  --wrist_left_roll_deg 14.635 --wrist_right_roll_deg -44.649 \
+  --wrist_left_yaw_deg 0.182 --wrist_right_yaw_deg 0.840 \
+  --wrist_left_pitch_deg -90 --wrist_right_pitch_deg -90 \
+  --wrist_left_lateral_offset_m -0.0207 --wrist_right_lateral_offset_m 0.0274 \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_de_human_replay_clean
+```
+
+---
+
+### L16.6 pnp_tray
+
+`pnp_tray` 当前有效 ID 为 `0-50`，hand_keyframes_all.json 中 51 条有效（status 非 reject/discard/bad）。
+
+**模式 A (2 全局关键帧)**：G1→G2，与 pick_diverse_bottles 相同的模式。两个全局关键帧对双手同时有效。
+
+关键帧动作：
+
+```
+全局关键帧 G1 — pregrasp → grasp → close gripper  （双手分别抓起 cup 和 bottle）
+全局关键帧 G2 — pregrasp → grasp → open gripper   （双手将物体放到 tray 上）
+```
+
+> 说明：`hand_keyframes_all.json` 中 G1/G2 为全局 keyframes（非 per-arm），左右手共享同一帧号。Planner 读取后按标准 pregrasp/grasp/action 管线执行。
+
+#### L16.6.1 Viewer debug（ID 0，带 wrist preview 和相机轴）
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+export DISPLAY=:1.0
+xdpyinfo >/dev/null || { echo "DISPLAY=:1.0 不可用"; exit 1; }
+
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_piper_d435.sh \
+  --gpu 2 --ids 2 --viewer --tasks pnp_tray \
+  --target_retreat_m 0.14 \
+  --wrist_left_forward_offset_m -0.04 --wrist_right_forward_offset_m -0.01 \
+  --wrist_left_roll_deg 14.635 --wrist_right_roll_deg -44.649 \
+  --wrist_left_yaw_deg 0.182 --wrist_right_yaw_deg 0.840 \
+  --wrist_left_pitch_deg -90 --wrist_right_pitch_deg -90 \
+  --wrist_left_lateral_offset_m -0.0207 --wrist_right_lateral_offset_m 0.0274
+```
+
+#### L16.6.2 No-viewer 批量生成数据（ID 0-50）
+
+不启用 viewer，不需要 `DISPLAY`；不会打开 wrist preview，也不会绘制 wrist/head 相机框线或相机 RGB 轴。wrist 外参参数与 L16.6.1 完全一致。
+
+输出目录：
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_human_replay_clean/pnp_tray/foundation_input_<ID>/
+```
+
+```bash
+# debug
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_piper_d435.sh \
+  --gpu 0 --ids 0-10 --continue_on_error --tasks pnp_tray \
+  --target_retreat_m 0.14 \
+  --wrist_left_forward_offset_m -0.04 --wrist_right_forward_offset_m -0.01 \
+  --wrist_left_roll_deg 14.635 --wrist_right_roll_deg -44.649 \
+  --wrist_left_yaw_deg 0.182 --wrist_right_yaw_deg 0.840 \
+  --wrist_left_pitch_deg -90 --wrist_right_pitch_deg -90 \
+  --wrist_left_lateral_offset_m -0.0207 --wrist_right_lateral_offset_m 0.0274 \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_de_human_replay_clean
+```
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_piper_d435.sh \
+  --gpu 2 --ids 0-50 --continue_on_error --tasks pnp_tray \
   --target_retreat_m 0.14 \
   --wrist_left_forward_offset_m -0.04 --wrist_right_forward_offset_m -0.01 \
   --wrist_left_roll_deg 14.635 --wrist_right_roll_deg -44.649 \

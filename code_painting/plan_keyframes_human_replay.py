@@ -260,6 +260,44 @@ def build_plan_summary(
                 f"pos=({pose_wxyz[0]:.3f},{pose_wxyz[1]:.3f},{pose_wxyz[2]:.3f})"
             )
 
+    # ── pnp_tray / pnp_bread: G2 place strategy ──
+    # For pick-and-place tasks, the second keyframe (G2) should place objects.
+    # Three-stage approach:
+    #   1. action_approach: G2 target + 5 cm above (world Z).
+    #   2. action:           go to the original G2 hand keyframe position.
+    #   3. action_lower:     lower to G1 grasp TCP Z + offset.
+    #   4. open_gripper to release.
+    #
+    # pnp_tray:  offset=2cm  (cup/bottle are fragile, place gently on tray)
+    # pnp_bread: offset=5cm  (bread can drop onto plate safely, keep gripper away from table)
+    place_raise_m = 0.0
+    g1_tcp_z_by_arm: Dict[str, float] = {}
+    place_lower_offset_m = 0.02
+    if task == "pnp_tray":
+        place_raise_m = 0.05
+        place_lower_offset_m = 0.02
+    elif task == "pnp_bread":
+        place_raise_m = 0.05
+        place_lower_offset_m = 0.05
+    if task in ("pnp_tray", "pnp_bread"):
+        for arm in ("left", "right"):
+            entries = candidates_by_arm.get(arm, [])
+            if len(entries) < 2:
+                continue
+            g1_entry = entries[0]
+            g1_pose = np.array(g1_entry["pose_world_wxyz"], dtype=np.float64)
+
+            # Recover G1 TCP Z (reverse the target_retreat to get actual hand TCP position)
+            g1_quat_xyzw = [float(g1_pose[4]), float(g1_pose[5]), float(g1_pose[6]), float(g1_pose[3])]
+            g1_local_z = R.from_quat(g1_quat_xyzw).as_matrix()[:, 2]
+            g1_tcp_z = float(g1_pose[2] + g1_local_z[2] * float(target_retreat_m))
+            g1_tcp_z_by_arm[arm] = g1_tcp_z
+
+            print(
+                f"  [{task}] {arm} G1 TCP Z={g1_tcp_z:.3f} "
+                f"(G2 kept as original hand pose, lower-to={g1_tcp_z + place_lower_offset_m:.3f})"
+            )
+
     # Determine primary arm
     primary_arm = "left"
     if not candidates_by_arm["left"] and candidates_by_arm["right"]:
@@ -276,6 +314,10 @@ def build_plan_summary(
         "human_replay_action_orientation_source": str(action_orientation_source),
         "human_replay_target_retreat_m": float(target_retreat_m),
         "mode": mode,
+        "place_strategy": "raise_above_then_lower" if place_raise_m > 0 else "none",
+        "place_raise_m": float(place_raise_m),
+        "place_lower_offset_m": float(place_lower_offset_m),
+        "g1_tcp_z_by_arm": {arm: float(z) for arm, z in g1_tcp_z_by_arm.items()},
         "selected_arm": primary_arm,
         "selected_candidates": all_candidates,
         "selected_candidates_by_executed_arm": {arm: entries for arm, entries in candidates_by_arm.items() if entries},

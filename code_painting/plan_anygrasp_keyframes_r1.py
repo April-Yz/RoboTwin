@@ -5836,6 +5836,53 @@ def main() -> None:
                         tcp_pose = renderer.get_current_tcp_pose(arm_name)
                         tcp_to_object_by_arm[arm_name] = np.linalg.inv(pose_wxyz_to_matrix(tcp_pose)) @ object_states[obj_name].pose_world_matrix
 
+                # ── pnp_tray place strategy: approach from above ──
+                # When place_strategy == "raise_above_then_lower", first move to a
+                # position raise_m above the action target (world Z) before lowering.
+                _place_strategy = str((reused_plan_summary or {}).get("place_strategy", "none"))
+                _place_raise_m = float((reused_plan_summary or {}).get("place_raise_m", 0.0))
+                if _place_strategy == "raise_above_then_lower" and _place_raise_m > 0:
+                    _action_approach_targets = {}
+                    for _arm_name in dual_arms:
+                        _target = np.asarray(action_targets[_arm_name], dtype=np.float64).reshape(7)
+                        _target[2] += _place_raise_m
+                        _action_approach_targets[_arm_name] = _target
+                    print(
+                        f"[place-strategy] action_approach: raising {_place_raise_m*100:.0f}cm above target "
+                        + " ".join(f"{a}:z={float(_action_approach_targets[a][2]):.3f}" for a in dual_arms)
+                    )
+                    debug_execution_state.active_frame = int(exec_selected_by_arm["left"][1].source_frame)
+                    debug_execution_state.active_frame_by_arm = {
+                        arm_name: int(seq[1].source_frame) for arm_name, seq in exec_selected_by_arm.items()
+                    }
+                    debug_execution_state.current_stage = "action_approach"
+                    debug_execution_state.target_pose_by_arm = {k: np.asarray(v, dtype=np.float64) for k, v in _action_approach_targets.items()}
+                    debug_execution_state.goal_label_by_arm = {
+                        arm_name: f"keyframe_{int(seq[1].source_frame)}_action_approach" for arm_name, seq in exec_selected_by_arm.items()
+                    }
+                    set_dual_arm_target_visuals(
+                        renderer,
+                        _action_approach_targets.get("left"),
+                        _action_approach_targets.get("right"),
+                    )
+                    _action_approach_dual = execute_dual_stage_until_reached(
+                        renderer=renderer,
+                        target_pose_world_wxyz_by_arm=_action_approach_targets,
+                        label="action_approach",
+                        head_writer=head_writer,
+                        third_writer=third_writer,
+                        use_overlay=use_overlay,
+                        args=args,
+                        debug_visuals=debug_visuals,
+                        debug_execution_state=debug_execution_state,
+                        attached_actor_by_arm=attached_actor_by_arm,
+                        tcp_to_object_by_arm=tcp_to_object_by_arm,
+                        pure_scene_main=pure_scene_main,
+                        use_overlay_debug=use_overlay_debug,
+                    )
+                    if not all(bool(_action_approach_dual["arms"].get(a, {}).get("reached", False)) for a in dual_arms):
+                        print("[place-strategy] action_approach not fully reached, continuing to place anyway")
+
                 debug_execution_state.active_frame = int(exec_selected_by_arm["left"][1].source_frame)
                 debug_execution_state.active_frame_by_arm = {
                     arm_name: int(seq[1].source_frame) for arm_name, seq in exec_selected_by_arm.items()
@@ -5904,6 +5951,79 @@ def main() -> None:
                             "attempt_history": action_dual["attempt_history"],
                         },
                     }
+                # ── pnp_tray place strategy: lower then open grippers ──
+                if _place_strategy == "raise_above_then_lower":
+                    # Stage 3: action_lower — lower from G2 position to G1 TCP Z + offset
+                    _g1_tcp_z_by_arm = (reused_plan_summary or {}).get("g1_tcp_z_by_arm", {})
+                    _place_lower_offset = float((reused_plan_summary or {}).get("place_lower_offset_m", 0.02))
+                    _target_retreat = float((reused_plan_summary or {}).get("human_replay_target_retreat_m", 0.0))
+                    _action_lower_targets = {}
+                    for _arm_name in dual_arms:
+                        _g2_pose = np.asarray(action_targets[_arm_name], dtype=np.float64).reshape(7)
+                        _g2_quat_xyzw = [float(_g2_pose[4]), float(_g2_pose[5]), float(_g2_pose[6]), float(_g2_pose[3])]
+                        _g2_local_z = R.from_quat(_g2_quat_xyzw).as_matrix()[:, 2]
+                        # Target TCP Z = G1 TCP Z + offset; convert to link6 target
+                        _tcp_z = float(_g1_tcp_z_by_arm.get(_arm_name, float(_g2_pose[2])))
+                        _new_link6_z = _tcp_z + _place_lower_offset - _g2_local_z[2] * _target_retreat
+                        _lower_target = _g2_pose.copy()
+                        _lower_target[2] = _new_link6_z
+                        _action_lower_targets[_arm_name] = _lower_target
+                    print(
+                        f"[place-strategy] action_lower: "
+                        + " ".join(f"{a}:z={float(_action_lower_targets[a][2]):.3f}"
+                                   f"(tcp={float(_g1_tcp_z_by_arm.get(a,0)) + _place_lower_offset:.3f})"
+                                   for a in dual_arms)
+                    )
+                    debug_execution_state.active_frame = int(exec_selected_by_arm["left"][1].source_frame)
+                    debug_execution_state.active_frame_by_arm = {
+                        arm_name: int(seq[1].source_frame) for arm_name, seq in exec_selected_by_arm.items()
+                    }
+                    debug_execution_state.current_stage = "action_lower"
+                    debug_execution_state.target_pose_by_arm = {k: np.asarray(v, dtype=np.float64) for k, v in _action_lower_targets.items()}
+                    debug_execution_state.goal_label_by_arm = {
+                        arm_name: f"keyframe_{int(seq[1].source_frame)}_action_lower" for arm_name, seq in exec_selected_by_arm.items()
+                    }
+                    set_dual_arm_target_visuals(
+                        renderer,
+                        _action_lower_targets.get("left"),
+                        _action_lower_targets.get("right"),
+                    )
+                    _action_lower_dual = execute_dual_stage_until_reached(
+                        renderer=renderer,
+                        target_pose_world_wxyz_by_arm=_action_lower_targets,
+                        label="action_lower",
+                        head_writer=head_writer,
+                        third_writer=third_writer,
+                        use_overlay=use_overlay,
+                        args=args,
+                        debug_visuals=debug_visuals,
+                        debug_execution_state=debug_execution_state,
+                        attached_actor_by_arm=attached_actor_by_arm,
+                        tcp_to_object_by_arm=tcp_to_object_by_arm,
+                        pure_scene_main=pure_scene_main,
+                        use_overlay_debug=use_overlay_debug,
+                    )
+                    if not all(bool(_action_lower_dual["arms"].get(a, {}).get("reached", False)) for a in dual_arms):
+                        print("[place-strategy] action_lower not fully reached, opening grippers anyway")
+
+                    # Stage 4: open grippers to release
+                    renderer.set_grippers(args.open_gripper, args.open_gripper)
+                    debug_execution_state.current_stage = "open_gripper"
+                    _open_lines = ["stage=open_gripper", "arm=both", "reason=pnp_tray_place"]
+                    # Record several hold frames so the open gripper is clearly visible
+                    # in the saved video (single frame = 0.2s at 5fps, too fast to see).
+                    _open_hold_frames = max(int(args.debug_keyframe_hold_frames), 6)
+                    for _h in range(_open_hold_frames):
+                        record_frame(
+                            renderer, head_writer, third_writer,
+                            _open_lines + [f"open_hold={_h+1}/{_open_hold_frames}"],
+                            use_overlay, debug_visuals, debug_execution_state,
+                            pure_scene_main=pure_scene_main, use_overlay_debug=use_overlay_debug,
+                        )
+                    # Detach objects so they stay visually at the place position
+                    for _arm_name in dual_arms:
+                        attached_actor_by_arm[_arm_name] = None
+                    print(f"[place-strategy] grippers opened, objects released at place position (held {_open_hold_frames} frames)")
         else:
             for exec_arm, exec_selected_keyframes in execution_sequences:
                 exec_object_name = exec_selected_keyframes[0].candidate.nearest_object
