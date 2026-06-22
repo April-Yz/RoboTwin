@@ -5674,7 +5674,7 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
 
 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_piper_d435.sh \
-  --gpu 2 --ids 0-80 --continue_on_error --tasks pnp_bread \
+  --gpu 0 --ids 0-80 --continue_on_error --tasks pnp_bread \
   --target_retreat_m 0.14 \
   --wrist_left_forward_offset_m -0.04 --wrist_right_forward_offset_m -0.01 \
   --wrist_left_roll_deg 14.635 --wrist_right_roll_deg -44.649 \

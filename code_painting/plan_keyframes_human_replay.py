@@ -260,16 +260,17 @@ def build_plan_summary(
                 f"pos=({pose_wxyz[0]:.3f},{pose_wxyz[1]:.3f},{pose_wxyz[2]:.3f})"
             )
 
-    # ── pnp_tray / pnp_bread: G2 place strategy ──
-    # For pick-and-place tasks, the second keyframe (G2) should place objects.
+    # ── pnp_tray / pnp_bread / stack_cups: G2 place strategy ──
+    # For pick-and-place / stacking tasks, the second keyframe (G2) should place objects.
     # Three-stage approach:
     #   1. action_approach: G2 target + 5 cm above (world Z).
     #   2. action:           go to the original G2 hand keyframe position.
     #   3. action_lower:     lower to G1 grasp TCP Z + offset.
     #   4. open_gripper to release.
     #
-    # pnp_tray:  offset=2cm  (cup/bottle are fragile, place gently on tray)
-    # pnp_bread: offset=5cm  (bread can drop onto plate safely, keep gripper away from table)
+    # pnp_tray:   offset=2cm  (cup/bottle are fragile, place gently on tray)
+    # pnp_bread:  offset=5cm  (bread can drop onto plate safely, keep gripper away from table)
+    # stack_cups: offset=1cm  (stack tightly on the cup below)
     place_raise_m = 0.0
     g1_tcp_z_by_arm: Dict[str, float] = {}
     place_lower_offset_m = 0.02
@@ -279,7 +280,10 @@ def build_plan_summary(
     elif task == "pnp_bread":
         place_raise_m = 0.05
         place_lower_offset_m = 0.05
-    if task in ("pnp_tray", "pnp_bread"):
+    elif task == "stack_cups":
+        place_raise_m = 0.05
+        place_lower_offset_m = 0.01
+    if task in ("pnp_tray", "pnp_bread", "stack_cups"):
         for arm in ("left", "right"):
             entries = candidates_by_arm.get(arm, [])
             if len(entries) < 2:
@@ -303,6 +307,18 @@ def build_plan_summary(
     if not candidates_by_arm["left"] and candidates_by_arm["right"]:
         primary_arm = "right"
 
+    # Determine execution arm order based on keyframe timing.
+    # For stack_cups, right hand grabs first (R1 < L1), so right arm must
+    # execute completely (including open_gripper) before left arm starts,
+    # otherwise the two arms collide in the shared workspace.
+    execution_arm_order = ["left", "right"]
+    if task == "stack_cups":
+        left_kf = effective_by_arm.get("left", [])
+        right_kf = effective_by_arm.get("right", [])
+        if left_kf and right_kf and int(right_kf[0]) < int(left_kf[0]):
+            execution_arm_order = ["right", "left"]
+            print(f"  [stack_cups] execution order: right first (R1={right_kf[0]} < L1={left_kf[0]})")
+
     all_candidates = candidates_by_arm["left"] + candidates_by_arm["right"]
     if not all_candidates:
         raise ValueError("No valid targets computed for any arm")
@@ -318,9 +334,10 @@ def build_plan_summary(
         "place_raise_m": float(place_raise_m),
         "place_lower_offset_m": float(place_lower_offset_m),
         "g1_tcp_z_by_arm": {arm: float(z) for arm, z in g1_tcp_z_by_arm.items()},
+        "execution_arm_order": [str(a) for a in execution_arm_order],
         "selected_arm": primary_arm,
         "selected_candidates": all_candidates,
-        "selected_candidates_by_executed_arm": {arm: entries for arm, entries in candidates_by_arm.items() if entries},
+        "selected_candidates_by_executed_arm": {arm: entries for arm in execution_arm_order for entries in [candidates_by_arm.get(arm, [])] if entries},
         "executed_arms": [arm for arm, entries in candidates_by_arm.items() if entries],
     }
 

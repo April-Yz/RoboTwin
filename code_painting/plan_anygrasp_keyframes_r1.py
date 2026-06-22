@@ -5499,7 +5499,21 @@ def main() -> None:
     use_overlay = bool(args.overlay_text) and not bool(args.pure_scene_output)
     use_overlay_debug = bool(args.overlay_text)
     pure_scene_main = bool(args.pure_scene_output)
-    dual_sync_mode = bool(args.execute_both_arms) and args.arm == "auto" and len(execution_sequences) >= 2
+    # When place_strategy is active with multiple arms, force sequential execution
+    # so each arm completes all stages (including open_gripper + retreat) before
+    # the next arm starts. This prevents collisions in shared workspace (e.g. stack_cups).
+    _summary_place_strategy = str((reused_plan_summary or {}).get("place_strategy", "none"))
+    _summary_arm_order = (reused_plan_summary or {}).get("execution_arm_order", [])
+    _force_sequential = (
+        _summary_place_strategy == "raise_above_then_lower"
+        and len(_summary_arm_order) >= 2
+    )
+    dual_sync_mode = (
+        bool(args.execute_both_arms)
+        and args.arm == "auto"
+        and len(execution_sequences) >= 2
+        and not _force_sequential
+    )
     stages_by_executed_arm: Dict[str, Dict[str, object]] = {}
     supervision_targets_by_executed_arm: Dict[str, Dict[str, np.ndarray]] = {}
     supervision_only_arms_by_executed_arm: Dict[str, List[str]] = {}
@@ -6007,11 +6021,16 @@ def main() -> None:
                         print("[place-strategy] action_lower not fully reached, opening grippers anyway")
 
                     # Stage 4: open grippers to release
+                    # Gripper is drive-actuated (max velocity ~0.05/step).
+                    # Need many scene steps for the drive to physically reach the open
+                    # position; 2 steps (from set_grippers) is not enough.
                     renderer.set_grippers(args.open_gripper, args.open_gripper)
+                    _gripper_open_steps = 30
+                    renderer.step_scene(steps=_gripper_open_steps)
                     debug_execution_state.current_stage = "open_gripper"
                     _open_lines = ["stage=open_gripper", "arm=both", "reason=pnp_tray_place"]
                     # Record several hold frames so the open gripper is clearly visible
-                    # in the saved video (single frame = 0.2s at 5fps, too fast to see).
+                    # in the saved video.
                     _open_hold_frames = max(int(args.debug_keyframe_hold_frames), 6)
                     for _h in range(_open_hold_frames):
                         record_frame(
@@ -6023,7 +6042,48 @@ def main() -> None:
                     # Detach objects so they stay visually at the place position
                     for _arm_name in dual_arms:
                         attached_actor_by_arm[_arm_name] = None
-                    print(f"[place-strategy] grippers opened, objects released at place position (held {_open_hold_frames} frames)")
+                    print(f"[place-strategy] grippers opened, objects released at place position (stepped {_gripper_open_steps}x, held {_open_hold_frames} frames)")
+
+                    # Stage 5: retreat — back away from placed objects to avoid collision
+                    _retreat_targets = {}
+                    for _arm_name in dual_arms:
+                        _tcp_z = float(_g1_tcp_z_by_arm.get(_arm_name, 0.0))
+                        _g2_pose_rt = np.asarray(action_targets[_arm_name], dtype=np.float64).reshape(7)
+                        _g2_quat_rt = [float(_g2_pose_rt[4]), float(_g2_pose_rt[5]), float(_g2_pose_rt[6]), float(_g2_pose_rt[3])]
+                        _g2_lz_rt = R.from_quat(_g2_quat_rt).as_matrix()[:, 2]
+                        _retreat_z = _tcp_z + _place_raise_m - _g2_lz_rt[2] * _target_retreat
+                        _retreat_pose = _g2_pose_rt.copy()
+                        _retreat_pose[2] = _retreat_z
+                        _retreat_targets[_arm_name] = _retreat_pose
+                    print(
+                        f"[place-strategy] retreat: "
+                        + " ".join(f"{a}:z={float(_retreat_targets[a][2]):.3f}" for a in dual_arms)
+                    )
+                    debug_execution_state.current_stage = "retreat"
+                    debug_execution_state.target_pose_by_arm = {k: np.asarray(v, dtype=np.float64) for k, v in _retreat_targets.items()}
+                    debug_execution_state.goal_label_by_arm = {
+                        arm_name: f"keyframe_{int(seq[1].source_frame)}_retreat" for arm_name, seq in exec_selected_by_arm.items()
+                    }
+                    set_dual_arm_target_visuals(
+                        renderer,
+                        _retreat_targets.get("left"),
+                        _retreat_targets.get("right"),
+                    )
+                    _retreat_dual = execute_dual_stage_until_reached(
+                        renderer=renderer,
+                        target_pose_world_wxyz_by_arm=_retreat_targets,
+                        label="retreat",
+                        head_writer=head_writer,
+                        third_writer=third_writer,
+                        use_overlay=use_overlay,
+                        args=args,
+                        debug_visuals=debug_visuals,
+                        debug_execution_state=debug_execution_state,
+                        pure_scene_main=pure_scene_main,
+                        use_overlay_debug=use_overlay_debug,
+                    )
+                    if not all(bool(_retreat_dual["arms"].get(a, {}).get("reached", False)) for a in dual_arms):
+                        print("[place-strategy] retreat not fully reached, continuing anyway")
         else:
             for exec_arm, exec_selected_keyframes in execution_sequences:
                 exec_object_name = exec_selected_keyframes[0].candidate.nearest_object
@@ -6281,6 +6341,46 @@ def main() -> None:
                     tcp_pose = renderer.get_current_tcp_pose(exec_arm)
                     tcp_to_object = np.linalg.inv(pose_wxyz_to_matrix(tcp_pose)) @ object_states[exec_object_name].pose_world_matrix
 
+                # ── place strategy for single-arm path (stack_cups etc.) ──
+                _sp_place_strategy = str((reused_plan_summary or {}).get("place_strategy", "none"))
+                _sp_place_raise_m = float((reused_plan_summary or {}).get("place_raise_m", 0.0))
+                _sp_place_lower_offset = float((reused_plan_summary or {}).get("place_lower_offset_m", 0.02))
+                _sp_target_retreat = float((reused_plan_summary or {}).get("human_replay_target_retreat_m", 0.0))
+                _sp_g1_tcp_z_by_arm = (reused_plan_summary or {}).get("g1_tcp_z_by_arm", {})
+
+                if _sp_place_strategy == "raise_above_then_lower" and _sp_place_raise_m > 0:
+                    # action_approach: 5cm above G2 target
+                    _sp_approach_pose = np.asarray(action_pose, dtype=np.float64).reshape(7).copy()
+                    _sp_approach_pose[2] += _sp_place_raise_m
+                    print(
+                        f"[place-strategy] {exec_arm} action_approach: "
+                        f"raising {_sp_place_raise_m*100:.0f}cm above target z={float(_sp_approach_pose[2]):.3f}"
+                    )
+                    debug_execution_state.active_frame = int(exec_selected_keyframes[1].source_frame)
+                    debug_execution_state.active_frame_by_arm = {exec_arm: int(exec_selected_keyframes[1].source_frame)}
+                    debug_execution_state.current_stage = "action_approach"
+                    debug_execution_state.target_pose_by_arm = {exec_arm: np.asarray(_sp_approach_pose, dtype=np.float64)}
+                    debug_execution_state.goal_label_by_arm = {exec_arm: f"keyframe_{int(exec_selected_keyframes[1].source_frame)}_action_approach"}
+                    set_single_arm_target_visual(renderer, exec_arm, _sp_approach_pose)
+                    _sp_approach_result = execute_stage_until_reached(
+                        renderer=renderer,
+                        arm=exec_arm,
+                        target_pose_world_wxyz=_sp_approach_pose,
+                        label="action_approach",
+                        head_writer=head_writer,
+                        third_writer=third_writer,
+                        use_overlay=use_overlay,
+                        args=args,
+                        attached_actor=attached_actor,
+                        tcp_to_object=tcp_to_object,
+                        target_visual_pose=action_pose,
+                        target_visual_label=f"keyframe_{exec_selected_keyframes[1].source_frame}",
+                        debug_visuals=debug_visuals,
+                        debug_execution_state=debug_execution_state,
+                        pure_scene_main=pure_scene_main,
+                        use_overlay_debug=use_overlay_debug,
+                    )
+
                 debug_execution_state.active_frame = int(exec_selected_keyframes[1].source_frame)
                 debug_execution_state.active_frame_by_arm = {exec_arm: int(exec_selected_keyframes[1].source_frame)}
                 debug_execution_state.current_stage = "action"
@@ -6326,6 +6426,94 @@ def main() -> None:
                         pure_scene_main=pure_scene_main,
                         use_overlay_debug=use_overlay_debug,
                     )
+
+                # ── place strategy: action_lower + open gripper (single-arm) ──
+                if _sp_place_strategy == "raise_above_then_lower" and _sp_place_raise_m > 0:
+                    _sp_g2_pose = np.asarray(action_pose, dtype=np.float64).reshape(7)
+                    _sp_g2_quat_xyzw = [float(_sp_g2_pose[4]), float(_sp_g2_pose[5]), float(_sp_g2_pose[6]), float(_sp_g2_pose[3])]
+                    _sp_g2_local_z = R.from_quat(_sp_g2_quat_xyzw).as_matrix()[:, 2]
+                    _sp_tcp_z = float(_sp_g1_tcp_z_by_arm.get(exec_arm, float(_sp_g2_pose[2])))
+                    _sp_lower_z = _sp_tcp_z + _sp_place_lower_offset - _sp_g2_local_z[2] * _sp_target_retreat
+                    _sp_lower_pose = _sp_g2_pose.copy()
+                    _sp_lower_pose[2] = _sp_lower_z
+                    print(
+                        f"[place-strategy] {exec_arm} action_lower: "
+                        f"z={_sp_lower_z:.3f} (tcp={_sp_tcp_z + _sp_place_lower_offset:.3f})"
+                    )
+                    debug_execution_state.active_frame = int(exec_selected_keyframes[1].source_frame)
+                    debug_execution_state.active_frame_by_arm = {exec_arm: int(exec_selected_keyframes[1].source_frame)}
+                    debug_execution_state.current_stage = "action_lower"
+                    debug_execution_state.target_pose_by_arm = {exec_arm: np.asarray(_sp_lower_pose, dtype=np.float64)}
+                    debug_execution_state.goal_label_by_arm = {exec_arm: f"keyframe_{int(exec_selected_keyframes[1].source_frame)}_action_lower"}
+                    set_single_arm_target_visual(renderer, exec_arm, _sp_lower_pose)
+                    _sp_lower_result = execute_stage_until_reached(
+                        renderer=renderer,
+                        arm=exec_arm,
+                        target_pose_world_wxyz=_sp_lower_pose,
+                        label="action_lower",
+                        head_writer=head_writer,
+                        third_writer=third_writer,
+                        use_overlay=use_overlay,
+                        args=args,
+                        attached_actor=attached_actor,
+                        tcp_to_object=tcp_to_object,
+                        target_visual_pose=action_pose,
+                        target_visual_label=f"keyframe_{exec_selected_keyframes[1].source_frame}",
+                        debug_visuals=debug_visuals,
+                        debug_execution_state=debug_execution_state,
+                        pure_scene_main=pure_scene_main,
+                        use_overlay_debug=use_overlay_debug,
+                    )
+
+                    # Open gripper with enough scene steps for drive actuator to reach target
+                    renderer.set_grippers(
+                        args.open_gripper if exec_arm == "left" else None,
+                        args.open_gripper if exec_arm == "right" else None,
+                    )
+                    _sp_gripper_steps = 30
+                    renderer.step_scene(steps=_sp_gripper_steps)
+                    debug_execution_state.current_stage = "open_gripper"
+                    _sp_open_lines = ["stage=open_gripper", f"arm={exec_arm}", "reason=place_strategy"]
+                    _sp_open_hold = max(int(args.debug_keyframe_hold_frames), 6)
+                    for _sp_h in range(_sp_open_hold):
+                        record_frame(
+                            renderer, head_writer, third_writer,
+                            _sp_open_lines + [f"open_hold={_sp_h+1}/{_sp_open_hold}"],
+                            use_overlay, debug_visuals, debug_execution_state,
+                            pure_scene_main=pure_scene_main, use_overlay_debug=use_overlay_debug,
+                        )
+                    attached_actor = None
+                    print(f"[place-strategy] {exec_arm} gripper opened (stepped {_sp_gripper_steps}x, held {_sp_open_hold} frames)")
+
+                    # Stage 5: retreat — back away from placed object
+                    _sp_retreat_z = _sp_tcp_z + _sp_place_raise_m - _sp_g2_local_z[2] * _sp_target_retreat
+                    _sp_retreat_pose = _sp_g2_pose.copy()
+                    _sp_retreat_pose[2] = _sp_retreat_z
+                    print(
+                        f"[place-strategy] {exec_arm} retreat: "
+                        f"z={_sp_retreat_z:.3f} (tcp={_sp_tcp_z + _sp_place_raise_m:.3f})"
+                    )
+                    debug_execution_state.current_stage = "retreat"
+                    debug_execution_state.target_pose_by_arm = {exec_arm: np.asarray(_sp_retreat_pose, dtype=np.float64)}
+                    debug_execution_state.goal_label_by_arm = {exec_arm: f"keyframe_{int(exec_selected_keyframes[1].source_frame)}_retreat"}
+                    set_single_arm_target_visual(renderer, exec_arm, _sp_retreat_pose)
+                    _sp_retreat_result = execute_stage_until_reached(
+                        renderer=renderer,
+                        arm=exec_arm,
+                        target_pose_world_wxyz=_sp_retreat_pose,
+                        label="retreat",
+                        head_writer=head_writer,
+                        third_writer=third_writer,
+                        use_overlay=use_overlay,
+                        args=args,
+                        target_visual_pose=action_pose,
+                        target_visual_label=f"keyframe_{exec_selected_keyframes[1].source_frame}",
+                        debug_visuals=debug_visuals,
+                        debug_execution_state=debug_execution_state,
+                        pure_scene_main=pure_scene_main,
+                        use_overlay_debug=use_overlay_debug,
+                    )
+
                 stages_by_executed_arm[exec_arm] = {
                     "pregrasp": pregrasp_result,
                     "grasp": grasp_result,
