@@ -283,6 +283,9 @@ def build_plan_summary(
     elif task == "stack_cups":
         place_raise_m = 0.05
         place_lower_offset_m = 0.01
+    # handover_bottle uses a different strategy (handover transfer),
+    # not the generic place strategy. Marked via handover_strategy flag.
+    handover_strategy = (task == "handover_bottle")
     if task in ("pnp_tray", "pnp_bread", "stack_cups"):
         for arm in ("left", "right"):
             entries = candidates_by_arm.get(arm, [])
@@ -334,6 +337,7 @@ def build_plan_summary(
         "place_raise_m": float(place_raise_m),
         "place_lower_offset_m": float(place_lower_offset_m),
         "g1_tcp_z_by_arm": {arm: float(z) for arm, z in g1_tcp_z_by_arm.items()},
+        "handover_strategy": bool(handover_strategy),
         "execution_arm_order": [str(a) for a in execution_arm_order],
         "selected_arm": primary_arm,
         "selected_candidates": all_candidates,

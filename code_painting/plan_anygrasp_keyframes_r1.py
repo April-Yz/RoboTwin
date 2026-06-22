@@ -490,7 +490,12 @@ def load_reused_plan_summary(
     if primary_sequence is None:
         primary_arm_name, primary_sequence = execution_sequences[0]
 
-    keyframes = [int(item.source_frame) for item in primary_sequence]
+    # Collect all unique keyframes from all arms, not just the primary arm
+    keyframes = sorted(set(
+        int(item.source_frame)
+        for _arm_name, _seq in execution_sequences
+        for item in _seq
+    ))
     primary_expected_object = summary.get("expected_object_for_selected_arm")
     if primary_expected_object is None and primary_sequence:
         primary_expected_object = primary_sequence[0].candidate.nearest_object
@@ -2743,10 +2748,16 @@ def create_debug_visual_bundle(
     arm_display_candidates: Dict[str, Dict[int, List[CandidatePose]]],
     selected_keyframes: List[SelectedKeyframe],
 ) -> DebugVisualBundle:
-    axis_colors = {
-        int(keyframes[0]): ([1.0, 0.35, 0.10], [1.0, 0.65, 0.15], [1.0, 0.90, 0.20]),
-        int(keyframes[1]): ([0.15, 0.85, 1.0], [0.15, 0.45, 1.0], [0.55, 0.25, 1.0]),
-    }
+    # Generate distinct colors for each unique keyframe (supports >2 keyframes
+    # for multi-arm tasks where each arm may have different frame numbers).
+    _unique_kf = sorted(set(int(f) for f in keyframes))
+    _palette = [
+        ([1.0, 0.35, 0.10], [1.0, 0.65, 0.15], [1.0, 0.90, 0.20]),   # orange
+        ([0.15, 0.85, 1.0], [0.15, 0.45, 1.0], [0.55, 0.25, 1.0]),   # blue
+        ([0.15, 1.0, 0.35], [0.15, 0.75, 0.25], [0.25, 1.0, 0.55]),   # green
+        ([1.0, 0.15, 0.85], [0.75, 0.15, 0.55], [1.0, 0.35, 0.65]),   # magenta
+    ]
+    axis_colors = {_unique_kf[i]: _palette[i % len(_palette)] for i in range(len(_unique_kf))}
     keyframe_axis_actors = {
         (int(frame), arm_name): create_colored_axis_actor(
             renderer.scene,
@@ -5297,7 +5308,14 @@ def main() -> None:
         if not (bool(args.execute_both_arms) and args.arm == "auto"):
             execution_sequences = [(selection_result.arm, selection_result.selected_keyframes)]
         selected_keyframes = selection_result.selected_keyframes
-        keyframes = [int(item.source_frame) for item in selected_keyframes]
+        # Collect all unique keyframes from ALL execution arms, not just the
+        # primary arm. Otherwise per-arm object states for non-primary arms
+        # are never loaded, and the initial scene uses wrong object positions.
+        keyframes = sorted(set(
+            int(item.source_frame)
+            for _arm_name, _seq in execution_sequences
+            for item in _seq
+        ))
         args.requested_keyframes = list(keyframes)
         args.resolved_keyframes = list(keyframes)
         args.resolved_keyframe_pairs = [(int(frame), int(frame)) for frame in keyframes]
@@ -5514,6 +5532,7 @@ def main() -> None:
         and len(execution_sequences) >= 2
         and not _force_sequential
     )
+    _summary_handover = bool((reused_plan_summary or {}).get("handover_strategy", False))
     stages_by_executed_arm: Dict[str, Dict[str, object]] = {}
     supervision_targets_by_executed_arm: Dict[str, Dict[str, np.ndarray]] = {}
     supervision_only_arms_by_executed_arm: Dict[str, List[str]] = {}
@@ -5523,7 +5542,209 @@ def main() -> None:
     init_prefix_frames_written_by_executed_arm: Dict[str, int] = {}
 
     try:
-        if dual_sync_mode:
+        if _summary_handover and len(execution_sequences) >= 2:
+            # ── handover_bottle: custom handover execution ──
+            # Mode C (R1 → G handover → L1):
+            #   1. Right arm: pregrasp → grasp R1 → close gripper (pick bottle)
+            #   2. Right arm: move to G (handover position) with bottle attached
+            #   3. Left arm:  pregrasp → grasp G (approach handover, gripper OPEN)
+            #   4. Handover:  left close gripper, right open gripper (bottle switches to left)
+            #   5. Right arm: retreat to safe position
+            #
+            # Keyframes: right=[R1, G], left=[G, L1] (left reordered by frame number)
+            _ho_right_seq = None
+            _ho_left_seq = None
+            for _arm_name, _seq in execution_sequences:
+                if _arm_name == "right":
+                    _ho_right_seq = _seq
+                elif _arm_name == "left":
+                    _ho_left_seq = _seq
+            if _ho_right_seq is None or _ho_left_seq is None:
+                raise RuntimeError("handover requires both left and right arm keyframes")
+
+            _ho_right_kf = list(_ho_right_seq)  # [R1, G]
+            _ho_left_kf = sorted(list(_ho_left_seq), key=lambda item: int(item.source_frame))  # [G, L1]
+            _ho_right_obj = _ho_right_kf[0].candidate.nearest_object
+            _ho_left_obj = _ho_left_kf[1].candidate.nearest_object
+
+            print(f"[handover] right_kf={[int(k.source_frame) for k in _ho_right_kf]} left_kf={[int(k.source_frame) for k in _ho_left_kf]}")
+            print(f"[handover] right_obj={_ho_right_obj} left_obj={_ho_left_obj}")
+
+            # Init both arms
+            init_info = apply_robot_init_pose(renderer, open_gripper=args.open_gripper, settle_steps=args.settle_steps)
+            init_pose_info_by_executed_arm["right"] = init_info
+            init_pose_info_by_executed_arm["left"] = init_info
+            renderer.set_grippers(args.open_gripper, args.open_gripper)
+            emit_init_prefix_frames(
+                renderer=renderer, head_writer=head_writer, third_writer=third_writer,
+                use_overlay=use_overlay, init_info=init_info, fixed_frames=args.init_prefix_frames,
+                arm_label="both", debug_visuals=debug_visuals, debug_execution_state=debug_execution_state,
+                pure_scene_main=pure_scene_main, use_overlay_debug=use_overlay_debug,
+            )
+
+            # --- Stage 1: Right pregrasp → grasp R1 → close gripper ---
+            _ho_r1_pose = _ho_right_kf[0].candidate.pose_world_wxyz
+            _ho_r1_pregrasp = pose_with_offset_along_local_axis(_ho_r1_pose, args.approach_offset_m, args.approach_axis)
+
+            debug_execution_state.current_stage = "pregrasp"
+            debug_execution_state.target_pose_by_arm = {"right": np.asarray(_ho_r1_pregrasp, dtype=np.float64)}
+            set_single_arm_target_visual(renderer, "right", _ho_r1_pose)
+            _ho_r1_pregrasp_result = execute_stage_until_reached(
+                renderer=renderer, arm="right", target_pose_world_wxyz=_ho_r1_pregrasp,
+                label="pregrasp", head_writer=head_writer, third_writer=third_writer,
+                use_overlay=use_overlay, args=args, target_visual_pose=_ho_r1_pose,
+                target_visual_label=f"keyframe_{_ho_right_kf[0].source_frame}",
+                debug_visuals=debug_visuals, debug_execution_state=debug_execution_state,
+                pure_scene_main=pure_scene_main, use_overlay_debug=use_overlay_debug,
+            )
+
+            debug_execution_state.current_stage = "grasp"
+            debug_execution_state.target_pose_by_arm = {"right": np.asarray(_ho_r1_pose, dtype=np.float64)}
+            set_single_arm_target_visual(renderer, "right", _ho_r1_pose)
+            _ho_r1_grasp_result = execute_stage_until_reached(
+                renderer=renderer, arm="right", target_pose_world_wxyz=_ho_r1_pose,
+                label="grasp", head_writer=head_writer, third_writer=third_writer,
+                use_overlay=use_overlay, args=args, target_visual_pose=_ho_r1_pose,
+                target_visual_label=f"keyframe_{_ho_right_kf[0].source_frame}",
+                debug_visuals=debug_visuals, debug_execution_state=debug_execution_state,
+                pure_scene_main=pure_scene_main, use_overlay_debug=use_overlay_debug,
+            )
+
+            # Attach bottle to right TCP
+            _ho_attached_actor = object_states[_ho_right_obj].actor
+            _ho_tcp_pose = renderer.get_current_tcp_pose("right")
+            _ho_tcp_to_obj = np.linalg.inv(pose_wxyz_to_matrix(_ho_tcp_pose)) @ object_states[_ho_right_obj].pose_world_matrix
+
+            # Close right gripper
+            renderer.set_grippers(None, args.close_gripper)
+            debug_execution_state.current_stage = "close_gripper"
+            record_frame(renderer, head_writer, third_writer, ["stage=close_gripper", "arm=right"], use_overlay, debug_visuals, debug_execution_state, pure_scene_main=pure_scene_main, use_overlay_debug=use_overlay_debug)
+            print(f"[handover] Stage 1 done: right grasped R1 frame={_ho_right_kf[0].source_frame}")
+
+            # --- Stage 2: Right arm moves to G (handover position) with bottle ---
+            _ho_g_pose = _ho_right_kf[1].candidate.pose_world_wxyz  # G frame target for right
+            debug_execution_state.current_stage = "action"
+            debug_execution_state.target_pose_by_arm = {"right": np.asarray(_ho_g_pose, dtype=np.float64)}
+            set_single_arm_target_visual(renderer, "right", _ho_g_pose)
+            _ho_r1_action_result = execute_stage_until_reached(
+                renderer=renderer, arm="right", target_pose_world_wxyz=_ho_g_pose,
+                label="action", head_writer=head_writer, third_writer=third_writer,
+                use_overlay=use_overlay, args=args,
+                attached_actor=_ho_attached_actor, tcp_to_object=_ho_tcp_to_obj,
+                target_visual_pose=_ho_g_pose,
+                target_visual_label=f"keyframe_{_ho_right_kf[1].source_frame}",
+                debug_visuals=debug_visuals, debug_execution_state=debug_execution_state,
+                pure_scene_main=pure_scene_main, use_overlay_debug=use_overlay_debug,
+            )
+            # _ho_tcp_to_obj is in right TCP local frame — it stays valid as the
+            # TCP moves, so do NOT recompute it from object_states (which holds
+            # the initial bottle position, not the current one).
+            print(f"[handover] Stage 2 done: right at handover G frame={_ho_right_kf[1].source_frame}")
+
+            # --- Stage 3: Left arm pregrasp → grasp G (bottle stays on right TCP) ---
+            # Use dual-arm executor so the bottle follows the RIGHT TCP while only
+            # the left arm moves. Right arm target = current G position (no-op plan).
+            _ho_left_g_pose = _ho_left_kf[0].candidate.pose_world_wxyz
+            _ho_left_pregrasp = pose_with_offset_along_local_axis(_ho_left_g_pose, args.approach_offset_m, args.approach_axis)
+            _ho_right_g_pose = _ho_right_kf[1].candidate.pose_world_wxyz
+
+            debug_execution_state.current_stage = "pregrasp"
+            debug_execution_state.target_pose_by_arm = {"left": np.asarray(_ho_left_pregrasp, dtype=np.float64), "right": np.asarray(_ho_right_g_pose, dtype=np.float64)}
+            set_dual_arm_target_visuals(renderer, _ho_left_pregrasp, _ho_right_g_pose)
+            _ho_left_pregrasp_result = execute_dual_stage_until_reached(
+                renderer=renderer,
+                target_pose_world_wxyz_by_arm={"left": np.asarray(_ho_left_pregrasp, dtype=np.float64), "right": np.asarray(_ho_right_g_pose, dtype=np.float64)},
+                label="pregrasp", head_writer=head_writer, third_writer=third_writer,
+                use_overlay=use_overlay, args=args,
+                attached_actor_by_arm={"right": _ho_attached_actor},
+                tcp_to_object_by_arm={"right": _ho_tcp_to_obj},
+                debug_visuals=debug_visuals, debug_execution_state=debug_execution_state,
+                pure_scene_main=pure_scene_main, use_overlay_debug=use_overlay_debug,
+            )
+
+            debug_execution_state.current_stage = "grasp"
+            debug_execution_state.target_pose_by_arm = {"left": np.asarray(_ho_left_g_pose, dtype=np.float64), "right": np.asarray(_ho_right_g_pose, dtype=np.float64)}
+            set_dual_arm_target_visuals(renderer, _ho_left_g_pose, _ho_right_g_pose)
+            _ho_left_grasp_result = execute_dual_stage_until_reached(
+                renderer=renderer,
+                target_pose_world_wxyz_by_arm={"left": np.asarray(_ho_left_g_pose, dtype=np.float64), "right": np.asarray(_ho_right_g_pose, dtype=np.float64)},
+                label="grasp", head_writer=head_writer, third_writer=third_writer,
+                use_overlay=use_overlay, args=args,
+                attached_actor_by_arm={"right": _ho_attached_actor},
+                tcp_to_object_by_arm={"right": _ho_tcp_to_obj},
+                debug_visuals=debug_visuals, debug_execution_state=debug_execution_state,
+                pure_scene_main=pure_scene_main, use_overlay_debug=use_overlay_debug,
+            )
+
+            print(f"[handover] Stage 3 done: left at handover G frame={_ho_left_kf[0].source_frame}")
+
+            # --- Stage 4: Handover transfer ---
+            # Left close gripper (grab bottle)
+            renderer.set_grippers(args.close_gripper, None)
+            debug_execution_state.current_stage = "close_gripper"
+            record_frame(renderer, head_writer, third_writer, ["stage=close_gripper", "arm=left", "reason=handover_receive"], use_overlay, debug_visuals, debug_execution_state, pure_scene_main=pure_scene_main, use_overlay_debug=use_overlay_debug)
+
+            # Right open gripper (release bottle)
+            renderer.set_grippers(None, args.open_gripper)
+            _ho_open_steps = 30
+            renderer.step_scene(steps=_ho_open_steps)
+            debug_execution_state.current_stage = "open_gripper"
+            _ho_open_hold = max(int(args.debug_keyframe_hold_frames), 6)
+            for _h in range(_ho_open_hold):
+                record_frame(renderer, head_writer, third_writer, ["stage=open_gripper", "arm=right", "reason=handover_release"], use_overlay, debug_visuals, debug_execution_state, pure_scene_main=pure_scene_main, use_overlay_debug=use_overlay_debug)
+
+            # Object now follows left TCP — use bottle actor's CURRENT world pose,
+            # NOT object_states (which still holds the initial table position).
+            _ho_left_tcp = renderer.get_current_tcp_pose("left")
+            _ho_actor_pose = _ho_attached_actor.get_pose()
+            _ho_bottle_world = np.concatenate([
+                np.asarray(_ho_actor_pose.p, dtype=np.float64).reshape(3),
+                base.normalize_quat_wxyz(np.asarray(_ho_actor_pose.q, dtype=np.float64).reshape(4)),
+            ]).astype(np.float64)
+            _ho_left_tcp_to_obj = np.linalg.inv(pose_wxyz_to_matrix(_ho_left_tcp)) @ pose_wxyz_to_matrix(_ho_bottle_world)
+            _ho_attached_actor = object_states[_ho_right_obj].actor
+            print("[handover] Stage 4 done: transfer complete (left closed, right opened)")
+
+            # --- Stage 5: Right arm retreat (bottle stays on left TCP) ---
+            _ho_r1_pose_arr = np.asarray(_ho_r1_pose, dtype=np.float64).reshape(7)
+            _ho_r1_quat = [float(_ho_r1_pose_arr[4]), float(_ho_r1_pose_arr[5]), float(_ho_r1_pose_arr[6]), float(_ho_r1_pose_arr[3])]
+            _ho_r1_local_z = R.from_quat(_ho_r1_quat).as_matrix()[:, 2]
+            _ho_target_retreat = float((reused_plan_summary or {}).get("human_replay_target_retreat_m", 0.0))
+            _ho_r1_tcp_z = float(_ho_r1_pose_arr[2] + _ho_r1_local_z[2] * _ho_target_retreat)
+            _ho_retreat_z = _ho_r1_tcp_z + 0.05 - _ho_r1_local_z[2] * _ho_target_retreat
+            _ho_retreat_pose = _ho_r1_pose_arr.copy()
+            _ho_retreat_pose[2] = _ho_retreat_z
+            print(f"[handover] Stage 5: right retreat z={_ho_retreat_z:.3f} (R1 tcp={_ho_r1_tcp_z:.3f} + 5cm)")
+            # Dual-arm: right retreats, left stays at G, bottle on left TCP
+            debug_execution_state.current_stage = "retreat"
+            debug_execution_state.target_pose_by_arm = {"right": np.asarray(_ho_retreat_pose, dtype=np.float64), "left": np.asarray(_ho_left_g_pose, dtype=np.float64)}
+            set_dual_arm_target_visuals(renderer, _ho_left_g_pose, _ho_retreat_pose)
+            _ho_retreat_result = execute_dual_stage_until_reached(
+                renderer=renderer,
+                target_pose_world_wxyz_by_arm={"right": np.asarray(_ho_retreat_pose, dtype=np.float64), "left": np.asarray(_ho_left_g_pose, dtype=np.float64)},
+                label="retreat", head_writer=head_writer, third_writer=third_writer,
+                use_overlay=use_overlay, args=args,
+                attached_actor_by_arm={"left": _ho_attached_actor},
+                tcp_to_object_by_arm={"left": _ho_left_tcp_to_obj},
+                debug_visuals=debug_visuals, debug_execution_state=debug_execution_state,
+                pure_scene_main=pure_scene_main, use_overlay_debug=use_overlay_debug,
+            )
+
+            # Populate all required summary fields
+            stages_by_executed_arm["right"] = {"pregrasp": _ho_r1_pregrasp_result, "grasp": _ho_r1_grasp_result, "action": _ho_r1_action_result}
+            stages_by_executed_arm["left"] = {"pregrasp": _ho_left_pregrasp_result, "grasp": _ho_left_grasp_result, "action": {"status": "handover_complete"}}
+            selected_objects_by_executed_arm["right"] = _ho_right_obj
+            selected_objects_by_executed_arm["left"] = _ho_left_obj
+            selected_candidates_by_executed_arm["right"] = _ho_right_kf
+            selected_candidates_by_executed_arm["left"] = _ho_left_kf
+            _ho_r1_frame = int(_ho_right_kf[0].source_frame)
+            _ho_g_frame = int(_ho_right_kf[1].source_frame)
+            supervision_targets_by_executed_arm["right"] = {"left": np.asarray(_ho_left_g_pose, dtype=np.float64), "right": np.asarray(_ho_g_pose, dtype=np.float64)}
+            supervision_targets_by_executed_arm["left"] = {"left": np.asarray(_ho_left_g_pose, dtype=np.float64), "right": np.asarray(_ho_g_pose, dtype=np.float64)}
+            supervision_only_arms_by_executed_arm["right"] = []
+            supervision_only_arms_by_executed_arm["left"] = []
+            print("[handover] SUCCESS")
+        elif dual_sync_mode:
             exec_selected_by_arm = {arm_name: seq for arm_name, seq in execution_sequences[:2]}
             dual_arms = [arm_name for arm_name in ("left", "right") if arm_name in exec_selected_by_arm]
             for arm_name in dual_arms:

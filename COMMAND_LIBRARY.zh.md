@@ -5463,6 +5463,22 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_
   --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_human_replay_clean
 ```
 
+
+```bash
+#debug
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin
+
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_piper_d435.sh \
+  --gpu 2 --ids 0-10 --continue_on_error --tasks place_bread_basket \
+  --target_retreat_m 0.14 \
+  --wrist_left_forward_offset_m -0.04 --wrist_right_forward_offset_m -0.01 \
+  --wrist_left_roll_deg 14.635 --wrist_right_roll_deg -44.649 \
+  --wrist_left_yaw_deg 0.182 --wrist_right_yaw_deg 0.840 \
+  --wrist_left_pitch_deg -90 --wrist_right_pitch_deg -90 \
+  --wrist_left_lateral_offset_m -0.0207 --wrist_right_lateral_offset_m 0.0274 \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_de_human_replay_clean
+```
+
 ---
 
 ### L16.3 stack_cups
@@ -5546,16 +5562,31 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_
 
 **模式 C (L1+R1+G1 交接)**：右手拾取 → 共享帧交接 → 左手接收。
 
-关键帧动作：
+关键帧动作（专用 handover 执行路径，不走 generic Mode B 逻辑）：
 
 ```
-Stage 1: R1 — pregrasp → grasp → close right gripper  （右手抓起 bottle）
-Stage 2: G  — both arms approach handover pose         （双手靠近交接帧 G）
-             → open right gripper + close left gripper （右手松开、左手接住 bottle）
-Stage 3: L1 — pregrasp → grasp                         （左手持有 bottle 到达接收位姿）
+Stage 1: 右手 pregrasp → grasp R1 → close right gripper
+         （右手单独到达抓取帧，抓起 bottle，物体附着右手 TCP）
+
+Stage 2: 右手移动到 G（交接位置）
+         （右手带着 bottle 到达 handover 帧，此时左手仍在初始位姿）
+
+Stage 3: 左手 pregrasp → grasp G（bottle 始终挂在右手 TCP 上）
+         （左手从 pregrasp 到达交接位置，夹爪保持 OPEN。
+          右手 target 设为实际 TCP 位置，确保不漂移）
+
+Stage 4: Handover 交接
+         → 左手 close gripper（接住 bottle）
+         → 右手 open gripper（松手，step_scene(30) + hold frames）
+         → 物体切换到左手 TCP（从 actor 当前世界位姿计算偏移，非 object_states 初始位置）
+
+Stage 5: 右手 retreat 到 R1 TCP Z + 5cm 安全高度
+         （左手 target 设为实际 TCP 位置，确保不漂移）
 ```
 
-handover 的特殊性在于共享帧 G 是交接点：`effective_keyframes_by_arm` 中 L=[L1, G], R=[R1, G]。G 帧不是 grasp 而是 transfer pose，需要一个明确的 gripper open/close 序列。
+关键帧结构：`right=[R1, G]`, `left=[G, L1]`（left 按帧号排序后 G 在前）。
+G 帧是双手共享的交接点。Stage 3/5 使用 `execute_dual_stage_until_reached`，
+非活跃手 target 设为其**实际当前 TCP**（非 ideal pose），避免 plan 产生微小位移导致漂移。
 
 #### L16.4.1 Viewer debug（ID 1，带 wrist preview 和相机轴）
 
