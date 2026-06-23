@@ -3978,6 +3978,7 @@ def execute_single_arm_plan(
     use_overlay: bool,
     attached_actor: Optional[sapien.Entity] = None,
     tcp_to_object: Optional[np.ndarray] = None,
+    extra_attached_actors: Optional[List[Tuple[sapien.Entity, np.ndarray]]] = None,
     execute_interp_steps: int = 24,
     joint_trajectory_interpolation: str = "linear",
     settle_steps: int = 4,
@@ -4020,6 +4021,12 @@ def execute_single_arm_plan(
             object_world = pose_wxyz_to_matrix(tcp_pose) @ tcp_to_object
             quat = base.quat_xyzw_to_wxyz(R.from_matrix(object_world[:3, :3]).as_quat())
             set_actor_pose(attached_actor, np.concatenate([object_world[:3, 3], quat]))
+            # Update extra attached actors (e.g. bread follows basket)
+            if extra_attached_actors:
+                for _extra_actor, _extra_tcp_to_obj in extra_attached_actors:
+                    _extra_world = pose_wxyz_to_matrix(tcp_pose) @ _extra_tcp_to_obj
+                    _extra_quat = base.quat_xyzw_to_wxyz(R.from_matrix(_extra_world[:3, :3]).as_quat())
+                    set_actor_pose(_extra_actor, np.concatenate([_extra_world[:3, 3], _extra_quat]))
         renderer.step_scene(steps=scene_steps_per_waypoint)
         record_frame(
             renderer,
@@ -4082,6 +4089,7 @@ def execute_stage_until_reached(
     args: argparse.Namespace,
     attached_actor: Optional[sapien.Entity] = None,
     tcp_to_object: Optional[np.ndarray] = None,
+    extra_attached_actors: Optional[List[Tuple[sapien.Entity, np.ndarray]]] = None,
     target_visual_pose: Optional[np.ndarray] = None,
     target_visual_label: Optional[str] = None,
     debug_visuals: Optional[DebugVisualBundle] = None,
@@ -4141,6 +4149,7 @@ def execute_stage_until_reached(
             use_overlay=use_overlay,
             attached_actor=attached_actor,
             tcp_to_object=tcp_to_object,
+            extra_attached_actors=extra_attached_actors,
             execute_interp_steps=args.execute_interp_steps,
             joint_trajectory_interpolation=args.joint_trajectory_interpolation,
             settle_steps=args.settle_steps,
@@ -6568,8 +6577,13 @@ def main() -> None:
                 _sp_place_lower_offset = float((reused_plan_summary or {}).get("place_lower_offset_m", 0.02))
                 _sp_target_retreat = float((reused_plan_summary or {}).get("human_replay_target_retreat_m", 0.0))
                 _sp_g1_tcp_z_by_arm = (reused_plan_summary or {}).get("g1_tcp_z_by_arm", {})
+                _sp_place_per_arm = (reused_plan_summary or {}).get("place_strategy_per_arm", {})
+                _sp_retreat_raise = float((reused_plan_summary or {}).get("retreat_raise_m_by_arm", {}).get(exec_arm, _sp_place_raise_m))
+                _sp_lower_by_arm = (reused_plan_summary or {}).get("place_lower_offset_by_arm", {})
+                _sp_place_lower_offset = float(_sp_lower_by_arm.get(exec_arm, _sp_place_lower_offset))
+                _sp_use_place = bool(_sp_place_per_arm.get(exec_arm, True))  # default: use place
 
-                if _sp_place_strategy == "raise_above_then_lower" and _sp_place_raise_m > 0:
+                if _sp_place_strategy == "raise_above_then_lower" and _sp_place_raise_m > 0 and _sp_use_place:
                     # action_approach: 5cm above G2 target
                     _sp_approach_pose = np.asarray(action_pose, dtype=np.float64).reshape(7).copy()
                     _sp_approach_pose[2] += _sp_place_raise_m
@@ -6628,6 +6642,23 @@ def main() -> None:
                         use_overlay_debug=use_overlay_debug,
                     )
                 else:
+                    # For place_bread_basket right arm: bread sits in the basket,
+                    # so when the right arm lifts the basket, bread must follow.
+                    _extra_actors = None
+                    _task_name = str((reused_plan_summary or {}).get("task", ""))
+                    if _task_name == "place_bread_basket" and exec_arm == "right":
+                        _bread_obj = "bread"
+                        if _bread_obj in object_states:
+                            _bread_actor = object_states[_bread_obj].actor
+                            _bread_tcp = renderer.get_current_tcp_pose(exec_arm)
+                            _bread_current = np.concatenate([
+                                np.asarray(_bread_actor.get_pose().p, dtype=np.float64).reshape(3),
+                                base.normalize_quat_wxyz(np.asarray(_bread_actor.get_pose().q, dtype=np.float64).reshape(4)),
+                            ]).astype(np.float64)
+                            _bread_tcp_to_obj = np.linalg.inv(pose_wxyz_to_matrix(_bread_tcp)) @ pose_wxyz_to_matrix(_bread_current)
+                            _extra_actors = [(_bread_actor, _bread_tcp_to_obj)]
+                            print(f"[place-strategy] right arm: bread follows basket (extra_actors=1)")
+
                     action_result = execute_stage_until_reached(
                         renderer=renderer,
                         arm=exec_arm,
@@ -6639,6 +6670,7 @@ def main() -> None:
                         args=args,
                         attached_actor=attached_actor,
                         tcp_to_object=tcp_to_object,
+                        extra_attached_actors=_extra_actors,
                         target_visual_pose=action_pose,
                         target_visual_label=f"keyframe_{exec_selected_keyframes[1].source_frame}",
                         debug_visuals=debug_visuals,
@@ -6654,37 +6686,42 @@ def main() -> None:
                     _sp_g2_quat_xyzw = [float(_sp_g2_pose[4]), float(_sp_g2_pose[5]), float(_sp_g2_pose[6]), float(_sp_g2_pose[3])]
                     _sp_g2_local_z = R.from_quat(_sp_g2_quat_xyzw).as_matrix()[:, 2]
                     _sp_tcp_z = float(_sp_g1_tcp_z_by_arm.get(exec_arm, float(_sp_g2_pose[2])))
-                    _sp_lower_z = _sp_tcp_z + _sp_place_lower_offset - _sp_g2_local_z[2] * _sp_target_retreat
-                    _sp_lower_pose = _sp_g2_pose.copy()
-                    _sp_lower_pose[2] = _sp_lower_z
-                    print(
-                        f"[place-strategy] {exec_arm} action_lower: "
-                        f"z={_sp_lower_z:.3f} (tcp={_sp_tcp_z + _sp_place_lower_offset:.3f})"
-                    )
-                    debug_execution_state.active_frame = int(exec_selected_keyframes[1].source_frame)
-                    debug_execution_state.active_frame_by_arm = {exec_arm: int(exec_selected_keyframes[1].source_frame)}
-                    debug_execution_state.current_stage = "action_lower"
-                    debug_execution_state.target_pose_by_arm = {exec_arm: np.asarray(_sp_lower_pose, dtype=np.float64)}
-                    debug_execution_state.goal_label_by_arm = {exec_arm: f"keyframe_{int(exec_selected_keyframes[1].source_frame)}_action_lower"}
-                    set_single_arm_target_visual(renderer, exec_arm, _sp_lower_pose)
-                    _sp_lower_result = execute_stage_until_reached(
-                        renderer=renderer,
-                        arm=exec_arm,
-                        target_pose_world_wxyz=_sp_lower_pose,
-                        label="action_lower",
-                        head_writer=head_writer,
-                        third_writer=third_writer,
-                        use_overlay=use_overlay,
-                        args=args,
-                        attached_actor=attached_actor,
-                        tcp_to_object=tcp_to_object,
-                        target_visual_pose=action_pose,
-                        target_visual_label=f"keyframe_{exec_selected_keyframes[1].source_frame}",
-                        debug_visuals=debug_visuals,
-                        debug_execution_state=debug_execution_state,
-                        pure_scene_main=pure_scene_main,
-                        use_overlay_debug=use_overlay_debug,
-                    )
+
+                    # action_lower: skip if lower offset is 0 (e.g. right arm lifting basket)
+                    if abs(_sp_place_lower_offset) > 1e-12:
+                        _sp_lower_z = _sp_tcp_z + _sp_place_lower_offset - _sp_g2_local_z[2] * _sp_target_retreat
+                        _sp_lower_pose = _sp_g2_pose.copy()
+                        _sp_lower_pose[2] = _sp_lower_z
+                        print(
+                            f"[place-strategy] {exec_arm} action_lower: "
+                            f"z={_sp_lower_z:.3f} (tcp={_sp_tcp_z + _sp_place_lower_offset:.3f})"
+                        )
+                        debug_execution_state.active_frame = int(exec_selected_keyframes[1].source_frame)
+                        debug_execution_state.active_frame_by_arm = {exec_arm: int(exec_selected_keyframes[1].source_frame)}
+                        debug_execution_state.current_stage = "action_lower"
+                        debug_execution_state.target_pose_by_arm = {exec_arm: np.asarray(_sp_lower_pose, dtype=np.float64)}
+                        debug_execution_state.goal_label_by_arm = {exec_arm: f"keyframe_{int(exec_selected_keyframes[1].source_frame)}_action_lower"}
+                        set_single_arm_target_visual(renderer, exec_arm, _sp_lower_pose)
+                        _sp_lower_result = execute_stage_until_reached(
+                            renderer=renderer,
+                            arm=exec_arm,
+                            target_pose_world_wxyz=_sp_lower_pose,
+                            label="action_lower",
+                            head_writer=head_writer,
+                            third_writer=third_writer,
+                            use_overlay=use_overlay,
+                            args=args,
+                            attached_actor=attached_actor,
+                            tcp_to_object=tcp_to_object,
+                            target_visual_pose=action_pose,
+                            target_visual_label=f"keyframe_{exec_selected_keyframes[1].source_frame}",
+                            debug_visuals=debug_visuals,
+                            debug_execution_state=debug_execution_state,
+                            pure_scene_main=pure_scene_main,
+                            use_overlay_debug=use_overlay_debug,
+                        )
+                    else:
+                        print(f"[place-strategy] {exec_arm} action_lower skipped (offset=0)")
 
                     # Open gripper with enough scene steps for drive actuator to reach target
                     renderer.set_grippers(
@@ -6706,34 +6743,37 @@ def main() -> None:
                     attached_actor = None
                     print(f"[place-strategy] {exec_arm} gripper opened (stepped {_sp_gripper_steps}x, held {_sp_open_hold} frames)")
 
-                    # Stage 5: retreat — back away from placed object
-                    _sp_retreat_z = _sp_tcp_z + _sp_place_raise_m - _sp_g2_local_z[2] * _sp_target_retreat
-                    _sp_retreat_pose = _sp_g2_pose.copy()
-                    _sp_retreat_pose[2] = _sp_retreat_z
-                    print(
-                        f"[place-strategy] {exec_arm} retreat: "
-                        f"z={_sp_retreat_z:.3f} (tcp={_sp_tcp_z + _sp_place_raise_m:.3f})"
-                    )
-                    debug_execution_state.current_stage = "retreat"
-                    debug_execution_state.target_pose_by_arm = {exec_arm: np.asarray(_sp_retreat_pose, dtype=np.float64)}
-                    debug_execution_state.goal_label_by_arm = {exec_arm: f"keyframe_{int(exec_selected_keyframes[1].source_frame)}_retreat"}
-                    set_single_arm_target_visual(renderer, exec_arm, _sp_retreat_pose)
-                    _sp_retreat_result = execute_stage_until_reached(
-                        renderer=renderer,
-                        arm=exec_arm,
-                        target_pose_world_wxyz=_sp_retreat_pose,
-                        label="retreat",
-                        head_writer=head_writer,
-                        third_writer=third_writer,
-                        use_overlay=use_overlay,
-                        args=args,
-                        target_visual_pose=action_pose,
-                        target_visual_label=f"keyframe_{exec_selected_keyframes[1].source_frame}",
-                        debug_visuals=debug_visuals,
-                        debug_execution_state=debug_execution_state,
-                        pure_scene_main=pure_scene_main,
-                        use_overlay_debug=use_overlay_debug,
-                    )
+                    # Stage 5: retreat — back away from placed object (skip if raise=0)
+                    if abs(_sp_retreat_raise) > 1e-12:
+                        _sp_retreat_z = _sp_tcp_z + _sp_retreat_raise - _sp_g2_local_z[2] * _sp_target_retreat
+                        _sp_retreat_pose = _sp_g2_pose.copy()
+                        _sp_retreat_pose[2] = _sp_retreat_z
+                        print(
+                            f"[place-strategy] {exec_arm} retreat: "
+                            f"z={_sp_retreat_z:.3f} (tcp={_sp_tcp_z + _sp_retreat_raise:.3f})"
+                        )
+                        debug_execution_state.current_stage = "retreat"
+                        debug_execution_state.target_pose_by_arm = {exec_arm: np.asarray(_sp_retreat_pose, dtype=np.float64)}
+                        debug_execution_state.goal_label_by_arm = {exec_arm: f"keyframe_{int(exec_selected_keyframes[1].source_frame)}_retreat"}
+                        set_single_arm_target_visual(renderer, exec_arm, _sp_retreat_pose)
+                        _sp_retreat_result = execute_stage_until_reached(
+                            renderer=renderer,
+                            arm=exec_arm,
+                            target_pose_world_wxyz=_sp_retreat_pose,
+                            label="retreat",
+                            head_writer=head_writer,
+                            third_writer=third_writer,
+                            use_overlay=use_overlay,
+                            args=args,
+                            target_visual_pose=action_pose,
+                            target_visual_label=f"keyframe_{exec_selected_keyframes[1].source_frame}",
+                            debug_visuals=debug_visuals,
+                            debug_execution_state=debug_execution_state,
+                            pure_scene_main=pure_scene_main,
+                            use_overlay_debug=use_overlay_debug,
+                        )
+                    else:
+                        print(f"[place-strategy] {exec_arm} retreat skipped (raise=0)")
 
                 stages_by_executed_arm[exec_arm] = {
                     "pregrasp": pregrasp_result,

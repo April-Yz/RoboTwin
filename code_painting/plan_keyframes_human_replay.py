@@ -41,7 +41,7 @@ IDENTITY_WXYZ = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)
 # Per-arm task object mapping
 TASK_OBJECT_MAP = {
     "pick_diverse_bottles": {"left": "left_bottle", "right": "right_bottle"},
-    "place_bread_basket": {"left": "basket", "right": "bread"},
+    "place_bread_basket": {"left": "bread", "right": "basket"},
     "stack_cups": {"left": "left_light_pink_cup", "right": "right_dark_red_cup"},
     "handover_bottle": {"left": "right_bottle", "right": "right_bottle"},
     "pnp_bread": {"left": "left_bread", "right": "right_bread"},
@@ -260,20 +260,18 @@ def build_plan_summary(
                 f"pos=({pose_wxyz[0]:.3f},{pose_wxyz[1]:.3f},{pose_wxyz[2]:.3f})"
             )
 
-    # ── pnp_tray / pnp_bread / stack_cups: G2 place strategy ──
-    # For pick-and-place / stacking tasks, the second keyframe (G2) should place objects.
-    # Three-stage approach:
-    #   1. action_approach: G2 target + 5 cm above (world Z).
-    #   2. action:           go to the original G2 hand keyframe position.
-    #   3. action_lower:     lower to G1 grasp TCP Z + offset.
-    #   4. open_gripper to release.
-    #
+    # ── Place strategy tasks ──
     # pnp_tray:   offset=2cm  (cup/bottle are fragile, place gently on tray)
-    # pnp_bread:  offset=5cm  (bread can drop onto plate safely, keep gripper away from table)
+    # pnp_bread:  offset=5cm  (bread can drop onto plate safely)
     # stack_cups: offset=1cm  (stack tightly on the cup below)
+    # place_bread_basket: left arm places bread (offset=2cm, retreat=10cm),
+    #                      right arm just lifts basket (no place strategy)
     place_raise_m = 0.0
     g1_tcp_z_by_arm: Dict[str, float] = {}
     place_lower_offset_m = 0.02
+    place_strategy_per_arm: Dict[str, bool] = {}
+    retreat_raise_m_by_arm: Dict[str, float] = {}
+    place_lower_offset_by_arm: Dict[str, float] = {}
     if task == "pnp_tray":
         place_raise_m = 0.05
         place_lower_offset_m = 0.02
@@ -283,26 +281,51 @@ def build_plan_summary(
     elif task == "stack_cups":
         place_raise_m = 0.05
         place_lower_offset_m = 0.01
+    elif task == "place_bread_basket":
+        place_raise_m = 0.05
+        place_lower_offset_m = 0.02
+        # Left: full place (approach+5cm, lower 2cm for bread, retreat 10cm).
+        #   G2 Z +5cm because the gripper can't reach inside the basket like a human hand.
+        # Right: no place strategy, just R1 pick→close→R2 lift 5cm above R1 TCP.
+        place_strategy_per_arm = {"left": True, "right": False}
+        retreat_raise_m_by_arm = {"left": 0.10, "right": 0.0}
+        place_lower_offset_by_arm = {"left": 0.02, "right": 0.0}
     # handover_bottle uses a different strategy (handover transfer),
     # not the generic place strategy. Marked via handover_strategy flag.
     handover_strategy = (task == "handover_bottle")
-    if task in ("pnp_tray", "pnp_bread", "stack_cups"):
+    _place_tasks = ("pnp_tray", "pnp_bread", "stack_cups", "place_bread_basket")
+    if task in _place_tasks:
         for arm in ("left", "right"):
             entries = candidates_by_arm.get(arm, [])
             if len(entries) < 2:
                 continue
             g1_entry = entries[0]
+            g2_entry = entries[1]
             g1_pose = np.array(g1_entry["pose_world_wxyz"], dtype=np.float64)
+            g2_pose = np.array(g2_entry["pose_world_wxyz"], dtype=np.float64)
 
-            # Recover G1 TCP Z (reverse the target_retreat to get actual hand TCP position)
+            # Recover G1 TCP Z
             g1_quat_xyzw = [float(g1_pose[4]), float(g1_pose[5]), float(g1_pose[6]), float(g1_pose[3])]
             g1_local_z = R.from_quat(g1_quat_xyzw).as_matrix()[:, 2]
             g1_tcp_z = float(g1_pose[2] + g1_local_z[2] * float(target_retreat_m))
             g1_tcp_z_by_arm[arm] = g1_tcp_z
 
+            _use_place = place_strategy_per_arm.get(arm, True)
+            # place_bread_basket adjustments:
+            #   Left G2: +5cm Z (gripper can't reach inside basket like human hand).
+            #   Right G2: lift to R1 TCP Z + 5cm (just lift the basket, keep gripper closed).
+            if task == "place_bread_basket":
+                if arm == "left":
+                    g2_pose[2] += 0.05
+                    g2_entry["pose_world_wxyz"] = g2_pose.tolist()
+                elif arm == "right":
+                    _r1_tcp_z = g1_tcp_z
+                    _new_z = _r1_tcp_z + 0.05 - g1_local_z[2] * float(target_retreat_m)
+                    g2_pose[2] = _new_z
+                    g2_entry["pose_world_wxyz"] = g2_pose.tolist()
             print(
                 f"  [{task}] {arm} G1 TCP Z={g1_tcp_z:.3f} "
-                f"(G2 kept as original hand pose, lower-to={g1_tcp_z + place_lower_offset_m:.3f})"
+                f"(place_strategy={_use_place}, lower-to={g1_tcp_z + place_lower_offset_m:.3f})"
             )
 
     # Determine primary arm
@@ -337,6 +360,9 @@ def build_plan_summary(
         "place_raise_m": float(place_raise_m),
         "place_lower_offset_m": float(place_lower_offset_m),
         "g1_tcp_z_by_arm": {arm: float(z) for arm, z in g1_tcp_z_by_arm.items()},
+        "place_strategy_per_arm": {str(a): bool(v) for a, v in place_strategy_per_arm.items()},
+        "retreat_raise_m_by_arm": {str(a): float(v) for a, v in retreat_raise_m_by_arm.items()},
+        "place_lower_offset_by_arm": {str(a): float(v) for a, v in place_lower_offset_by_arm.items()},
         "handover_strategy": bool(handover_strategy),
         "execution_arm_order": [str(a) for a in execution_arm_order],
         "selected_arm": primary_arm,

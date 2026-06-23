@@ -5411,16 +5411,21 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_
 
 **模式 B (L2+R2 独立)**：左手先操作（L1→L2），右手后操作（R1→R2），时间上不重叠。
 
-关键帧动作：
+关键帧动作（per-arm 策略：左手用 place strategy，右手不用）：
 
 ```
-Stage 1: L1 — pregrasp → grasp → close left gripper  （左手抓起 bread）
-Stage 2: L2 — pregrasp → grasp → open left gripper    （左手将 bread 放入 basket）
-Stage 3: R1 — pregrasp → grasp → close right gripper  （右手抓起 basket）
-Stage 4: R2 — pregrasp → grasp → open right gripper   （右手提起 basket）
+=== 左手 (place_strategy=true, G2 Z+5cm, lower=2cm, retreat=10cm) ===
+Stage L1 — pregrasp → grasp → close left gripper                    （左手抓起 bread）
+Stage L2 — action_approach(+5cm) → action(G2+5cm Z)                 （夹爪不能像人手伸进篮子，G2 Z 提高 5cm）
+           → action_lower(+2cm) → open_gripper(step30+hold)         （松手放面包）
+           → retreat(G1_TCP+10cm)                                    （回退防止挡右手）
+
+=== 右手 (place_strategy=false, R2=R1 TCP Z+5cm) ===
+Stage R1 — pregrasp → grasp → close right gripper                   （右手抓起 basket）
+Stage R2 — action(R2=R1_TCP_Z+5cm, 夹爪保持 close)                  （提起篮子 5cm，不松手）
 ```
 
-执行顺序 L1→L2→R1→R2，非活跃 arm 保持当前 joint 位姿。
+左手 G2 Z 在代码中自动 +5cm。右手 R2 的目标 Z = R1 TCP Z + 5cm，夹爪保持闭合——纯粹把篮子提起来。
 
 #### L16.2.1 Viewer debug（ID 0，带 wrist preview 和相机轴）
 
