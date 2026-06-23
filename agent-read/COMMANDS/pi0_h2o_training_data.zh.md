@@ -259,3 +259,10 @@ ROOT=/home/zaijia001/.cache/huggingface/lerobot/local/h2o_pick_diverse_bottles_h
 ```bash
 ROOT=/home/zaijia001/.cache/huggingface/lerobot/local/h2o_pick_diverse_bottles_human_head_pure_action; sed -n '1,5p' "$ROOT/meta/tasks.jsonl"; sed -n '1,5p' "$ROOT/meta/episodes.jsonl"
 ```
+
+
+## L16 六任务机器人+物体 repaint 指令
+
+`COMMAND_LIBRARY.zh.md` 的 I3.6/I3.7 记录了 L16 Human Replay 输出的 repaint 流程。该流程不复用旧 I1 的“只抠除人手”背景，而是新建 `results_repaint_piper_h2_l16/stage1_human_object`，用任务物体 prompt 同时抠除人手和真实物体，再把 `L16_human_replay_clean/<TASK>/foundation_input_<ID>/head_cam_plan.mp4` 中的机器人+物体通过 visible-reinit 贴回。
+
+推荐顺序：先运行 I3.6 六任务各 5 个 ID debug，检查 `w_box_head_cam_plan.mp4`、`w_mask_head_cam_plan.mp4` 和 `final_repainted.mp4`；确认无背景误贴和物体重影后再运行 I3.7 全量批处理。

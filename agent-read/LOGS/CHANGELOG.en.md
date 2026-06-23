@@ -2910,3 +2910,12 @@ Validation: `git status --short` was clean; `/home/zaijia001/ssd/miniconda3/bin/
 - Recorded the L16 tested `pick_diverse_bottles` wrist parameters: left/right forward `-0.04/-0.01`, roll `14.635/-44.649`, yaw `0.182/0.840`, pitch `-90/-90`, and lateral `-0.0207/0.0274`.
 
 Validation: `bash -n code_painting/run_plan_keyframes_human_replay_piper_d435.sh` passed; L16 viewer/no-viewer commands passed `--dry_run`.
+
+
+## 2026-06-24 (L16 Six-Task Human+Object Inpaint/Repaint Commands)
+
+- Added `COMMAND_LIBRARY.zh.md` sections I3.6/I3.7 for L16 six-task human+object Stage-1 inpaint debug commands and full batch commands.
+- Stage-1 now calls `remove_anything_video_sam2.py` directly, avoiding the two-stage wrapper's requirement for a Stage-2 composite when only a background is needed.
+- New outputs use `results_repaint_piper_h2_l16/stage1_human_object` and `results_repaint_piper_h2_l16_visible_reinit/e0_robot_object`, leaving old I1/I3.5 outputs untouched.
+
+Validation: static bash syntax checks were run for the newly added command blocks; results are in this turn's command output.

@@ -2195,3 +2195,11 @@ Update: the verified-v2 daily viewer command now includes `--foundation_capture_
 - The batch command uses `--ids 0-101 --continue_on_error` for 102 episodes and writes to `.../L16_human_replay_clean/pick_diverse_bottles/foundation_input_<ID>/`.
 - Viewer and no-viewer commands use the same wrist extrinsics: left/right forward `-0.04/-0.01`, roll `14.635/-44.649`, yaw `0.182/0.840`, pitch `-90/-90`, and lateral `-0.0207/0.0274`.
 - The wrapper now forwards wrist preview, camera frustum, and camera RGB-axis visualization arguments only in `--viewer` mode; no-viewer batch output keeps clean videos/obs.
+
+
+## 2026-06-24 (Added L16 Six-Task Repaint Commands)
+
+- New command locations: `COMMAND_LIBRARY.zh.md` I3.6/I3.7.
+- I3.6: debug command for five available IDs per six-task run; it first creates human+object Stage-1 inpaint backgrounds, then visible-reinit repaints robot+object pixels from L16 `head_cam_plan.mp4`.
+- I3.7: full batch command that enumerates `L16_human_replay_clean/<TASK>/foundation_input_<ID>/head_cam_plan.mp4` and skips existing Stage-1 BGs and `final_repainted.mp4` outputs.
+- Key outputs: `results_repaint_piper_h2_l16/stage1_human_object/<TASK>/id_<ID>/...` and `results_repaint_piper_h2_l16_visible_reinit/e0_robot_object/<TASK>/id_<ID>_l16/final_repainted.mp4`.

@@ -2908,3 +2908,12 @@
 - 记录 L16 `pick_diverse_bottles` 实测 wrist 参数：left/right forward `-0.04/-0.01`，roll `14.635/-44.649`，yaw `0.182/0.840`，pitch `-90/-90`，lateral `-0.0207/0.0274`。
 
 验证：`bash -n code_painting/run_plan_keyframes_human_replay_piper_d435.sh` 通过；L16 viewer/no-viewer 命令 `--dry_run` 均通过。
+
+
+## 2026-06-24（L16 六任务人手+物体 inpaint/repaint 指令）
+
+- 在 `COMMAND_LIBRARY.zh.md` 新增 I3.6/I3.7：L16 六任务的人手+物体 Stage-1 inpaint debug 指令和全量批处理指令。
+- Stage-1 改为直接调用 `remove_anything_video_sam2.py`，避免 `run_human_robot_inpaint_repaint.py` 在只想生成背景时仍要求 Stage-2 composite。
+- 新输出目录为 `results_repaint_piper_h2_l16/stage1_human_object` 与 `results_repaint_piper_h2_l16_visible_reinit/e0_robot_object`，不覆盖旧 I1/I3.5。
+
+验证：对新增 bash 代码块做静态语法检查，结果记录在本轮命令输出中。

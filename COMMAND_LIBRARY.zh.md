@@ -1194,6 +1194,258 @@ for TASK in handover_bottle pnp_bread pnp_tray; do echo "===== ${TASK} ====="; f
 - lost 后根据 `--empty_mask_when_lost 1` 输出空 mask，避免把 robot replay 背景拷贝到 Stage-1 BG；后续 frame 再次检测到 robot 时重新初始化。
 - 批处理脚本复用同一个 `VisibleReinitRobotSegmenter` 实例，因此不会每个视频都重新加载 DINO/SAM checkpoint。
 
+### I3.6 L16 六任务：人手+物体 Stage-1 inpaint debug（每任务 5 个 id）
+
+用途：给 L16 Human Replay 的机器人+物体 repaint 准备真实背景。和 I1/I1.1 不同，本节 Stage-1 会把**人手/手臂 + 当前任务物体**一起抠除，避免后续把 L16 里的仿真物体贴回时和真实原始物体重影。输出目录不覆盖旧 I1/I3.5：
+
+```text
+Stage-1 BG:
+/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stage1_human_object/<TASK>/id_<ID>/stage1_human_inpaint/removed_w_mask_rgb_<ID>.mp4
+
+Stage-2 final:
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_visible_reinit/e0_robot_object/<TASK>/id_<ID>_l16/final_repainted.mp4
+```
+
+对应 L16 小节和任务物体：
+
+| 任务 | 对应 L16 | debug id | Stage-1 物体 prompt |
+| --- | --- | --- | --- |
+| `pick_diverse_bottles` | L16.1 | `0 1 2 3 4` | `left bottle, right bottle, bottles` |
+| `place_bread_basket` | L16.2 | `0 1 2 3 4` | `bread, basket` |
+| `stack_cups` | L16.3 | `0 1 2 3 4` | `left red cup, right red cup, cups` |
+| `handover_bottle` | L16.4 | `1 2 3 4 5` | `right bottle, bottle` |
+| `pnp_bread` | L16.5 | `7 8 9 10 11` | `bread` |
+| `pnp_tray` | L16.6 | `0 1 2 3 4` | `left red cup, right bottle, cup, bottle` |
+
+`pnp_bread` 先使用泛化 `bread`，因为真实画面中 `left/right bread` 未必比 `bread` 更稳；如果 debug 发现漏检，再把 prompt 改为 `left bread, right bread, bread.` 重跑对应 id。
+
+直接运行：
+
+```bash
+bash <<'BASH'
+set -euo pipefail
+
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
+
+L16=/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_human_replay_clean
+STAGE1=/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stage1_human_object
+OUTROOT=/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_visible_reinit/e0_robot_object
+SAM2=/home/zaijia001/ssd/inpainting_sam2_robot
+SAM3=/home/zaijia001/ssd/inpainting_sam3_robot
+GPU_STAGE1=3
+GPU_STAGE2=3
+FPS=5
+
+ids() {
+  case "$1" in
+    pick_diverse_bottles|place_bread_basket|stack_cups|pnp_tray) echo 0 1 2 3 4 ;;
+    handover_bottle) echo 1 2 3 4 5 ;;
+    pnp_bread) echo 7 8 9 10 11 ;;
+  esac
+}
+
+human_prompt() {
+  case "$1" in
+    pick_diverse_bottles) echo "arms, hands, wrists, watch, left bottle, right bottle, bottles." ;;
+    place_bread_basket) echo "arms, hands, wrists, watch, bread, basket." ;;
+    stack_cups) echo "arms, hands, wrists, watch, left red cup, right red cup, cups." ;;
+    handover_bottle) echo "arms, hands, wrists, watch, right bottle, bottle." ;;
+    pnp_bread) echo "arms, hands, wrists, watch, bread." ;;
+    pnp_tray) echo "arms, hands, wrists, watch, left red cup, right bottle, cup, bottle." ;;
+  esac
+}
+
+repaint_prompt() {
+  case "$1" in
+    pick_diverse_bottles) echo "robot arm, robotic gripper, robot wrist, robot forearm, left bottle, right bottle, bottles." ;;
+    place_bread_basket) echo "robot arm, robotic gripper, robot wrist, robot forearm, bread, basket." ;;
+    stack_cups) echo "robot arm, robotic gripper, robot wrist, robot forearm, left red cup, right red cup, cups." ;;
+    handover_bottle) echo "robot arm, robotic gripper, robot wrist, robot forearm, right bottle, bottle." ;;
+    pnp_bread) echo "robot arm, robotic gripper, robot wrist, robot forearm, bread." ;;
+    pnp_tray) echo "robot arm, robotic gripper, robot wrist, robot forearm, left red cup, right bottle, cup, bottle." ;;
+  esac
+}
+
+conda activate inpainting-sam2-r1
+cd "$SAM2"
+for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do
+  for ID in $(ids "$TASK"); do
+    HUMAN=/home/zaijia001/ssd/data/piper/hand/${TASK}/harmer_input/rgb_${ID}.mp4
+    S1OUT=$STAGE1/${TASK}/id_${ID}/stage1_human_inpaint
+    BG=$S1OUT/removed_w_mask_rgb_${ID}.mp4
+    [[ -f "$BG" ]] && { echo "[stage1 skip] task=${TASK} id=${ID} bg=${BG}"; continue; }
+    [[ -f "$HUMAN" ]] || { echo "[stage1 skip] task=${TASK} id=${ID} missing HUMAN=${HUMAN}"; continue; }
+    echo "[stage1 run] task=${TASK} id=${ID}"
+    CUDA_VISIBLE_DEVICES=$GPU_STAGE1 python remove_anything_video_sam2.py \
+      --input_video "$HUMAN" \
+      --coords_type key_in --point_coords 10 80 --point_labels 1 \
+      --dilate_kernel_size 100 \
+      --text_prompt "$(human_prompt "$TASK")" \
+      --box_threshold 0.35 --text_threshold 0.25 \
+      --output_dir "$S1OUT" \
+      --sam_ckpt "$SAM2/pretrained_models/sam_vit_h_4b8939.pth" \
+      --lama_config "$SAM2/lama/configs/prediction/default.yaml" \
+      --lama_ckpt "$SAM2/pretrained_models/big-lama" \
+      --tracker_ckpt vitb_384_mae_ce_32x4_ep300 \
+      --vi_ckpt "$SAM2/pretrained_models/sttn.pth" \
+      --mask_idx 2 --fps $FPS --device cuda \
+      --save_mask_frames 1 --save_mask_video 1 --save_vis_mask_video 1 --save_vis_box_video 1
+  done
+done
+
+conda activate inpainting-sam3-dino3
+cd "$SAM3"
+for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do
+  for ID in $(ids "$TASK"); do
+    BG=$STAGE1/${TASK}/id_${ID}/stage1_human_inpaint/removed_w_mask_rgb_${ID}.mp4
+    ROBOT=$L16/${TASK}/foundation_input_${ID}/head_cam_plan.mp4
+    OUT=$OUTROOT/${TASK}/id_${ID}_l16
+    [[ -f "$BG" ]] || { echo "[repaint skip] task=${TASK} id=${ID} missing BG=${BG}"; continue; }
+    [[ -f "$ROBOT" ]] || { echo "[repaint skip] task=${TASK} id=${ID} missing ROBOT=${ROBOT}"; continue; }
+    echo "[repaint run] task=${TASK} id=${ID}"
+    CUDA_VISIBLE_DEVICES=$GPU_STAGE2 python remove_anything_video_sam3_robot_visible_reinit.py \
+      --input_video "$ROBOT" --target_video "$BG" --output_dir "$OUT" \
+      --coords_type key_in --point_coords 10 80 --point_labels 1 \
+      --init_policy first_visible --reinit_policy on_lost \
+      --detector_stride 1 --min_visible_consecutive 1 --lost_patience 2 --empty_mask_when_lost 1 \
+      --text_prompt "$(repaint_prompt "$TASK")" \
+      --box_threshold 0.35 --text_threshold 0.30 \
+      --max_mask_area_ratio 0.35 --min_mask_area_ratio 0.002 --max_white_pixel_ratio_in_mask 0.60 \
+      --exclude_bottom_ratio 0.14 --erode_kernel_size 3 --composite_erode_kernel_size 1 --blend_alpha_sigma 1.0 \
+      --fps $FPS --device cuda \
+      --save_removed_video 0 --save_mask_frames 1 --save_mask_video 1 \
+      --save_vis_mask_video 1 --save_vis_box_video 1 --save_target_composite_video 1
+  done
+done
+BASH
+```
+
+检查 debug 输出：
+
+```bash
+for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do echo "===== ${TASK} ====="; find /home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_visible_reinit/e0_robot_object/${TASK} -maxdepth 2 -type f -name final_repainted.mp4 2>/dev/null | sort; done
+```
+
+重点查看每个 id 的：
+
+```text
+w_box_head_cam_plan.mp4
+w_mask_head_cam_plan.mp4
+final_repainted.mp4
+```
+
+### I3.7 L16 六任务：人手+物体 Stage-1 + L16 robot/object repaint 批处理
+
+用途：在 I3.6 debug 检查通过后，自动枚举 L16 中已经存在 `head_cam_plan.mp4` 的全部 id。`--overwrite` 逻辑由脚本中的 skip 实现：已有 Stage-1 BG 会跳过，已有 `final_repainted.mp4` 也会跳过；因此可以反复运行用于补齐缺失项。
+
+直接运行：
+
+```bash
+bash <<'BASH'
+set -euo pipefail
+
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
+
+L16=/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_human_replay_clean
+STAGE1=/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stage1_human_object
+OUTROOT=/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_visible_reinit/e0_robot_object
+SAM2=/home/zaijia001/ssd/inpainting_sam2_robot
+SAM3=/home/zaijia001/ssd/inpainting_sam3_robot
+GPU_STAGE1=3
+GPU_STAGE2=3
+FPS=5
+
+ids() {
+  find "$L16/$1" -path '*/head_cam_plan.mp4' 2>/dev/null \
+    | sed 's#.*/foundation_input_\([0-9]*\)/head_cam_plan.mp4#\1#' \
+    | sort -n
+}
+
+human_prompt() {
+  case "$1" in
+    pick_diverse_bottles) echo "arms, hands, wrists, watch, left bottle, right bottle, bottles." ;;
+    place_bread_basket) echo "arms, hands, wrists, watch, bread, basket." ;;
+    stack_cups) echo "arms, hands, wrists, watch, left red cup, right red cup, cups." ;;
+    handover_bottle) echo "arms, hands, wrists, watch, right bottle, bottle." ;;
+    pnp_bread) echo "arms, hands, wrists, watch, bread." ;;
+    pnp_tray) echo "arms, hands, wrists, watch, left red cup, right bottle, cup, bottle." ;;
+  esac
+}
+
+repaint_prompt() {
+  case "$1" in
+    pick_diverse_bottles) echo "robot arm, robotic gripper, robot wrist, robot forearm, left bottle, right bottle, bottles." ;;
+    place_bread_basket) echo "robot arm, robotic gripper, robot wrist, robot forearm, bread, basket." ;;
+    stack_cups) echo "robot arm, robotic gripper, robot wrist, robot forearm, left red cup, right red cup, cups." ;;
+    handover_bottle) echo "robot arm, robotic gripper, robot wrist, robot forearm, right bottle, bottle." ;;
+    pnp_bread) echo "robot arm, robotic gripper, robot wrist, robot forearm, bread." ;;
+    pnp_tray) echo "robot arm, robotic gripper, robot wrist, robot forearm, left red cup, right bottle, cup, bottle." ;;
+  esac
+}
+
+conda activate inpainting-sam2-r1
+cd "$SAM2"
+for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do
+  for ID in $(ids "$TASK"); do
+    HUMAN=/home/zaijia001/ssd/data/piper/hand/${TASK}/harmer_input/rgb_${ID}.mp4
+    S1OUT=$STAGE1/${TASK}/id_${ID}/stage1_human_inpaint
+    BG=$S1OUT/removed_w_mask_rgb_${ID}.mp4
+    [[ -f "$BG" ]] && { echo "[stage1 skip] task=${TASK} id=${ID} bg=${BG}"; continue; }
+    [[ -f "$HUMAN" ]] || { echo "[stage1 skip] task=${TASK} id=${ID} missing HUMAN=${HUMAN}"; continue; }
+    echo "[stage1 run] task=${TASK} id=${ID}"
+    CUDA_VISIBLE_DEVICES=$GPU_STAGE1 python remove_anything_video_sam2.py \
+      --input_video "$HUMAN" \
+      --coords_type key_in --point_coords 10 80 --point_labels 1 \
+      --dilate_kernel_size 100 \
+      --text_prompt "$(human_prompt "$TASK")" \
+      --box_threshold 0.35 --text_threshold 0.25 \
+      --output_dir "$S1OUT" \
+      --sam_ckpt "$SAM2/pretrained_models/sam_vit_h_4b8939.pth" \
+      --lama_config "$SAM2/lama/configs/prediction/default.yaml" \
+      --lama_ckpt "$SAM2/pretrained_models/big-lama" \
+      --tracker_ckpt vitb_384_mae_ce_32x4_ep300 \
+      --vi_ckpt "$SAM2/pretrained_models/sttn.pth" \
+      --mask_idx 2 --fps $FPS --device cuda \
+      --save_mask_frames 0 --save_mask_video 1 --save_vis_mask_video 1 --save_vis_box_video 1
+  done
+done
+
+conda activate inpainting-sam3-dino3
+cd "$SAM3"
+for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do
+  for ID in $(ids "$TASK"); do
+    BG=$STAGE1/${TASK}/id_${ID}/stage1_human_inpaint/removed_w_mask_rgb_${ID}.mp4
+    ROBOT=$L16/${TASK}/foundation_input_${ID}/head_cam_plan.mp4
+    OUT=$OUTROOT/${TASK}/id_${ID}_l16
+    FINAL=$OUT/final_repainted.mp4
+    [[ -f "$FINAL" ]] && { echo "[repaint skip] task=${TASK} id=${ID} final=${FINAL}"; continue; }
+    [[ -f "$BG" ]] || { echo "[repaint skip] task=${TASK} id=${ID} missing BG=${BG}"; continue; }
+    [[ -f "$ROBOT" ]] || { echo "[repaint skip] task=${TASK} id=${ID} missing ROBOT=${ROBOT}"; continue; }
+    echo "[repaint run] task=${TASK} id=${ID}"
+    CUDA_VISIBLE_DEVICES=$GPU_STAGE2 python remove_anything_video_sam3_robot_visible_reinit.py \
+      --input_video "$ROBOT" --target_video "$BG" --output_dir "$OUT" \
+      --coords_type key_in --point_coords 10 80 --point_labels 1 \
+      --init_policy first_visible --reinit_policy on_lost \
+      --detector_stride 1 --min_visible_consecutive 1 --lost_patience 2 --empty_mask_when_lost 1 \
+      --text_prompt "$(repaint_prompt "$TASK")" \
+      --box_threshold 0.35 --text_threshold 0.30 \
+      --max_mask_area_ratio 0.35 --min_mask_area_ratio 0.002 --max_white_pixel_ratio_in_mask 0.60 \
+      --exclude_bottom_ratio 0.14 --erode_kernel_size 3 --composite_erode_kernel_size 1 --blend_alpha_sigma 1.0 \
+      --fps $FPS --device cuda \
+      --save_removed_video 0 --save_mask_frames 0 --save_mask_video 1 \
+      --save_vis_mask_video 1 --save_vis_box_video 1 --save_target_composite_video 1
+  done
+done
+BASH
+```
+
+批处理数量检查：
+
+```bash
+echo "stage1 human-object counts"; for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do printf '%s ' "$TASK"; find /home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stage1_human_object/$TASK -path '*/stage1_human_inpaint/removed_w_mask_*.mp4' 2>/dev/null | wc -l; done
+echo "final repaint counts"; for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do printf '%s ' "$TASK"; find /home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_visible_reinit/e0_robot_object/$TASK -maxdepth 2 -type f -name final_repainted.mp4 2>/dev/null | wc -l; done
+```
+
 ## J. AnyGrasp 候选筛选：找离人手朝向/目标物最近的候选
 
 说明：三个任务的 AnyGrasp 结果位于 `/home/zaijia001/ssd/data/piper/hand/<TASK>/<TASK>_output/foundation_input_<ID>`。J0 先检查 id0-id10 需要的 AnyGrasp、Foundation replay、HaMeR NPZ 是否齐全；J1 生成 ranked preview 和 `summary.json`，其中 `orientation_rank` 更偏向“和人手局部轴接近”，`fused_rank` 同时考虑 AnyGrasp score 和人手朝向。

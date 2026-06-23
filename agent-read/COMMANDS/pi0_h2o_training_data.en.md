@@ -259,3 +259,10 @@ ROOT=/home/zaijia001/.cache/huggingface/lerobot/local/h2o_pick_diverse_bottles_h
 ```bash
 ROOT=/home/zaijia001/.cache/huggingface/lerobot/local/h2o_pick_diverse_bottles_human_head_pure_action; sed -n '1,5p' "$ROOT/meta/tasks.jsonl"; sed -n '1,5p' "$ROOT/meta/episodes.jsonl"
 ```
+
+
+## L16 Six-Task Robot+Object Repaint Commands
+
+`COMMAND_LIBRARY.zh.md` sections I3.6/I3.7 document the repaint flow for L16 Human Replay outputs. This flow does not reuse the old I1 "human hand only" backgrounds. Instead, it writes `results_repaint_piper_h2_l16/stage1_human_object`, removes both human hands and task objects with task-specific prompts, then visible-reinit repaints robot+object pixels from `L16_human_replay_clean/<TASK>/foundation_input_<ID>/head_cam_plan.mp4`.
+
+Recommended order: run I3.6 first for five debug IDs per task and inspect `w_box_head_cam_plan.mp4`, `w_mask_head_cam_plan.mp4`, and `final_repainted.mp4`; after confirming no background leakage or object ghosting, run the I3.7 full batch command.

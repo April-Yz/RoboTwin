@@ -2193,3 +2193,11 @@
 - 批量命令使用 `--ids 0-101 --continue_on_error`，共 102 条，输出到 `.../L16_human_replay_clean/pick_diverse_bottles/foundation_input_<ID>/`。
 - viewer 与 no-viewer 使用同一组 wrist 外参：left/right forward `-0.04/-0.01`，roll `14.635/-44.649`，yaw `0.182/0.840`，pitch `-90/-90`，lateral `-0.0207/0.0274`。
 - wrapper 调整为仅在 `--viewer` 模式转发 wrist preview、相机 frustum 和相机 RGB 轴可视化参数；no-viewer 批量输出保持干净视频/obs。
+
+
+## 2026-06-24（新增 L16 六任务 repaint 指令）
+
+- 新增命令位置：`COMMAND_LIBRARY.zh.md` I3.6/I3.7。
+- I3.6：六任务各 5 个可用 ID 的 debug 指令，先做人手+物体 Stage-1 inpaint，再把 L16 `head_cam_plan.mp4` 中的机器人+物体 visible-reinit repaint 到背景上。
+- I3.7：全量批处理指令，自动枚举 `L16_human_replay_clean/<TASK>/foundation_input_<ID>/head_cam_plan.mp4`，并跳过已存在的 Stage-1 BG 和 `final_repainted.mp4`。
+- 关键输出：`results_repaint_piper_h2_l16/stage1_human_object/<TASK>/id_<ID>/...` 和 `results_repaint_piper_h2_l16_visible_reinit/e0_robot_object/<TASK>/id_<ID>_l16/final_repainted.mp4`。
