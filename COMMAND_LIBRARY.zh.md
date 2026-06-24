@@ -1836,7 +1836,8 @@ tmux new-session -d -s l16_s1_pick_gpu0 'TASK=pick_diverse_bottles GPU=0 OVERWRI
 tmux new-session -d -s l16_s1_place_gpu1 'TASK=place_bread_basket GPU=1 OVERWRITE=0 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_stage1_human_object_task.sh'
 tmux new-session -d -s l16_s1_handover_gpu2 'TASK=handover_bottle GPU=2 OVERWRITE=0 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_stage1_human_object_task.sh'
 tmux new-session -d -s l16_s1_pnpbread_gpu3 'TASK=pnp_bread GPU=3 OVERWRITE=0 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_stage1_human_object_task.sh'
-tmux new-session -d -s l16_s1_pnptray_gpu4 'TASK=pnp_tray GPU=4 OVERWRITE=0 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_stage1_human_object_task.sh'
+# 第二波：等任意一张 GPU 空出来后再跑 pnp_tray；这里示例用 GPU=0。
+tmux new-session -d -s l16_s1_pnptray_gpu0 'TASK=pnp_tray GPU=0 OVERWRITE=0 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_stage1_human_object_task.sh'
 ```
 
 Stage-1 检查：
@@ -1852,7 +1853,8 @@ tmux new-session -d -s l16_rp_pick_gpu0 'TASK=pick_diverse_bottles GPU=0 OVERWRI
 tmux new-session -d -s l16_rp_place_gpu1 'TASK=place_bread_basket GPU=1 OVERWRITE=1 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_whitebg_repaint_task.sh'
 tmux new-session -d -s l16_rp_handover_gpu2 'TASK=handover_bottle GPU=2 OVERWRITE=1 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_whitebg_repaint_task.sh'
 tmux new-session -d -s l16_rp_pnpbread_gpu3 'TASK=pnp_bread GPU=3 OVERWRITE=1 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_whitebg_repaint_task.sh'
-tmux new-session -d -s l16_rp_pnptray_gpu4 'TASK=pnp_tray GPU=4 OVERWRITE=1 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_whitebg_repaint_task.sh'
+# 第二波：等任意一张 GPU 空出来后再跑 pnp_tray；这里示例用 GPU=0。
+tmux new-session -d -s l16_rp_pnptray_gpu0 'TASK=pnp_tray GPU=0 OVERWRITE=1 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_whitebg_repaint_task.sh'
 ```
 
 Stage-2 检查：

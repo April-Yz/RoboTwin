@@ -2244,3 +2244,7 @@
 ## 2026-06-24（COMMAND_LIBRARY I3.6.1 任务级并行指令）
 
 - 新增 I3.6.1：使用 `run_l16_stage1_human_object_task.sh` 和 `run_l16_whitebg_repaint_task.sh` 分别按任务并行运行 Stage-1 inpaint 与 Stage-2 repaint。
+
+## 2026-06-24（I3.6.1 GPU 编号修正）
+
+- 将 I3.6.1 中 `pnp_tray` 的示例 GPU 从不存在的 GPU4 改成第二波复用 GPU0；当前机器可用 GPU 编号为 0-3，五个任务不能全部独占不同 GPU 同时跑。

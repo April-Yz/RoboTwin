@@ -2975,3 +2975,7 @@ Validation: `python3 -m py_compile /home/zaijia001/ssd/inpainting_sam3_robot/rem
 - `COMMAND_LIBRARY.zh.md` 新增 I3.6.1，记录五个非 `stack_cups` 任务的并行 tmux 指令。
 
 Validation: `bash -n code_painting/run_l16_stage1_human_object_task.sh code_painting/run_l16_whitebg_repaint_task.sh`。
+
+## 2026-06-24（I3.6.1 GPU 编号修正）
+
+- 将 I3.6.1 中 `pnp_tray` 的示例 GPU 从不存在的 GPU4 改成第二波复用 GPU0；当前机器可用 GPU 编号为 0-3，五个任务不能全部独占不同 GPU 同时跑。

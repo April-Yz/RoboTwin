@@ -2246,3 +2246,7 @@ Update: the verified-v2 daily viewer command now includes `--foundation_capture_
 ## 2026-06-24 (COMMAND_LIBRARY I3.6.1 Per-Task Parallel Commands)
 
 - Added I3.6.1: use `run_l16_stage1_human_object_task.sh` and `run_l16_whitebg_repaint_task.sh` to run Stage-1 inpaint and Stage-2 repaint per task in parallel.
+
+## 2026-06-24 (I3.6.1 GPU Index Fix)
+
+- Changed the I3.6.1 `pnp_tray` example from non-existent GPU4 to a second-wave GPU0 command. This machine exposes GPUs 0-3, so five tasks cannot all run simultaneously on unique GPUs.
