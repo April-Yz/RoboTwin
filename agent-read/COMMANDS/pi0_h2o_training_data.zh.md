@@ -267,7 +267,7 @@ ROOT=/home/zaijia001/.cache/huggingface/lerobot/local/h2o_pick_diverse_bottles_h
 
 推荐顺序：先运行 I3.5.2 六任务各 5 个 ID debug，检查 `w_box_head_cam_plan.mp4`、`w_mask_head_cam_plan.mp4` 和 `final_repainted.mp4`；确认无背景误贴和物体重影后再运行 I3.5.3 全量批处理。
 
-`COMMAND_LIBRARY.zh.md` 的 I3.6 记录了新增的白色背景 SAM + 反选 mask 对照路线。它默认复用 I3.5.2/I3.5.3 的 human+object Stage-1 背景，先 prompt L16 源视频中的白色背景，再使用保存出的反选 mask 帧外部合成 `final_repainted.mp4`，避免直接在第一帧 prompt 机械臂/物体。`stack_cups` 的 Stage-1 prompt 去掉泛化 `cups`，只保留 `left red cup, right red cup`，以免误抠除绿色杯子。输出根目录是 `results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object`；SAM/反选检查重点看 `w_box_head_cam_plan.mp4`、`w_mask_head_cam_plan.mp4`、`mask_head_cam_plan.mp4` 和 `mask_head_cam_plan/000000.jpg`。
+`COMMAND_LIBRARY.zh.md` 的 I3.6 记录了新增的白色背景 SAM + 反选 mask 对照路线。它默认复用 I3.5.2/I3.5.3 的 human+object Stage-1 背景，先 prompt L16 源视频中的白色背景，再使用保存出的反选 mask 帧外部合成 `final_repainted.mp4`，避免直接在第一帧 prompt 机械臂/物体。`stack_cups` 的 Stage-1 prompt 去掉泛化 `cups`，只保留 `left light pink cup, right dark red cup`，以免误抠除绿色杯子。输出根目录是 `results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object`；SAM/反选检查重点看 `w_box_head_cam_plan.mp4`、`w_mask_head_cam_plan.mp4`、`mask_head_cam_plan.mp4` 和 `mask_head_cam_plan/000000.jpg`。
 
 ## L16 可视化拼接：HaMeR / Foundation / L16 / Repaint
 

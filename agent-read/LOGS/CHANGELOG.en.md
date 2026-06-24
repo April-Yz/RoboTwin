@@ -2956,3 +2956,9 @@ Validation: re-extracted the I3.6 debug/batch bash blocks and checked them with 
 - Synchronized `agent-read/COMMANDS/pi0_h2o_training_data.*.md`.
 
 Validation: re-extracted the I3.6 debug/batch bash blocks and checked them with `bash -n`; extracted the inline compose Python and checked it with `python3 -m py_compile`.
+
+## 2026-06-24 (Refine stack_cups Prompt to Pink/Dark-Red Cups)
+
+- Refined the `stack_cups` Stage-1/robot-object prompt from `left red cup, right red cup` to `left light pink cup, right dark red cup`, matching the AnyGrasp/Foundation object naming and reducing the risk that `red cup` generalizes to the green cup.
+
+Validation: re-extracted the I3.6 debug/batch bash blocks and checked them with `bash -n`; extracted the inline compose Python and checked it with `python3 -m py_compile`.

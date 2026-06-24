@@ -2231,3 +2231,7 @@
 - I3.6 白背景反选 repaint 命令默认第一行改为 `RUN_MODE=debug BG_MODE=human_object OVERWRITE=1 bash <<'BASH'`。
 - I3.6 批处理默认第一行改为 `RUN_MODE=batch BG_MODE=human_object OVERWRITE=0 bash <<'BASH'`。
 - `stack_cups` 的 object prompt 去掉 `cups`，避免误选绿色杯子。
+
+## 2026-06-24（COMMAND_LIBRARY stack_cups prompt 细化）
+
+- `stack_cups` inpaint/repaint prompt 改为 `left light pink cup, right dark red cup`，不再使用 `red cup` / `cups` 泛化描述。

@@ -1212,14 +1212,14 @@ Stage-2 final:
 | --- | --- | --- | --- |
 | `pick_diverse_bottles` | L16.1 | `0 1 2 3 4` | `left bottle, right bottle, bottles` |
 | `place_bread_basket` | L16.2 | `0 1 2 3 4` | `bread, basket` |
-| `stack_cups` | L16.3 | `0 1 2 3 4` | `left red cup, right red cup` |
+| `stack_cups` | L16.3 | `0 1 2 3 4` | `left light pink cup, right dark red cup` |
 | `handover_bottle` | L16.4 | `1 2 3 4 5` | `right bottle, bottle` |
 | `pnp_bread` | L16.5 | `7 8 9 10 11` | `bread` |
 | `pnp_tray` | L16.6 | `0 1 2 3 4` | `left red cup, right bottle, cup, bottle` |
 
 `pnp_bread` 先使用泛化 `bread`，因为真实画面中 `left/right bread` 未必比 `bread` 更稳；如果 debug 发现漏检，再把 prompt 改为 `left bread, right bread, bread.` 重跑对应 id。
 
-`stack_cups` 不再追加泛化 `cups`，只使用 `left red cup, right red cup`，避免把绿色杯子也一起 inpaint。
+`stack_cups` 不再追加泛化 `cups`，只使用 `left light pink cup, right dark red cup`，避免把绿色杯子也一起 inpaint。
 
 直接运行：
 
@@ -1250,7 +1250,7 @@ human_prompt() {
   case "$1" in
     pick_diverse_bottles) echo "arms, hands, wrists, watch, left bottle, right bottle, bottles." ;;
     place_bread_basket) echo "arms, hands, wrists, watch, bread, basket." ;;
-    stack_cups) echo "arms, hands, wrists, watch, left red cup, right red cup." ;;
+    stack_cups) echo "arms, hands, wrists, watch, left light pink cup, right dark red cup." ;;
     handover_bottle) echo "arms, hands, wrists, watch, right bottle, bottle." ;;
     pnp_bread) echo "arms, hands, wrists, watch, bread." ;;
     pnp_tray) echo "arms, hands, wrists, watch, left red cup, right bottle, cup, bottle." ;;
@@ -1261,7 +1261,7 @@ repaint_prompt() {
   case "$1" in
     pick_diverse_bottles) echo "robot arm, robotic gripper, robot wrist, robot forearm, left bottle, right bottle, bottles." ;;
     place_bread_basket) echo "robot arm, robotic gripper, robot wrist, robot forearm, bread, basket." ;;
-    stack_cups) echo "robot arm, robotic gripper, robot wrist, robot forearm, left red cup, right red cup." ;;
+    stack_cups) echo "robot arm, robotic gripper, robot wrist, robot forearm, left light pink cup, right dark red cup." ;;
     handover_bottle) echo "robot arm, robotic gripper, robot wrist, robot forearm, right bottle, bottle." ;;
     pnp_bread) echo "robot arm, robotic gripper, robot wrist, robot forearm, bread." ;;
     pnp_tray) echo "robot arm, robotic gripper, robot wrist, robot forearm, left red cup, right bottle, cup, bottle." ;;
@@ -1368,7 +1368,7 @@ human_prompt() {
   case "$1" in
     pick_diverse_bottles) echo "arms, hands, wrists, watch, left bottle, right bottle, bottles." ;;
     place_bread_basket) echo "arms, hands, wrists, watch, bread, basket." ;;
-    stack_cups) echo "arms, hands, wrists, watch, left red cup, right red cup." ;;
+    stack_cups) echo "arms, hands, wrists, watch, left light pink cup, right dark red cup." ;;
     handover_bottle) echo "arms, hands, wrists, watch, right bottle, bottle." ;;
     pnp_bread) echo "arms, hands, wrists, watch, bread." ;;
     pnp_tray) echo "arms, hands, wrists, watch, left red cup, right bottle, cup, bottle." ;;
@@ -1379,7 +1379,7 @@ repaint_prompt() {
   case "$1" in
     pick_diverse_bottles) echo "robot arm, robotic gripper, robot wrist, robot forearm, left bottle, right bottle, bottles." ;;
     place_bread_basket) echo "robot arm, robotic gripper, robot wrist, robot forearm, bread, basket." ;;
-    stack_cups) echo "robot arm, robotic gripper, robot wrist, robot forearm, left red cup, right red cup." ;;
+    stack_cups) echo "robot arm, robotic gripper, robot wrist, robot forearm, left light pink cup, right dark red cup." ;;
     handover_bottle) echo "robot arm, robotic gripper, robot wrist, robot forearm, right bottle, bottle." ;;
     pnp_bread) echo "robot arm, robotic gripper, robot wrist, robot forearm, bread." ;;
     pnp_tray) echo "robot arm, robotic gripper, robot wrist, robot forearm, left red cup, right bottle, cup, bottle." ;;

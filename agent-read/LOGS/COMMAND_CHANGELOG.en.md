@@ -2233,3 +2233,7 @@ Update: the verified-v2 daily viewer command now includes `--foundation_capture_
 - Changed the I3.6 white-background inverted-mask repaint debug first line to `RUN_MODE=debug BG_MODE=human_object OVERWRITE=1 bash <<'BASH'`.
 - Changed the I3.6 batch first line to `RUN_MODE=batch BG_MODE=human_object OVERWRITE=0 bash <<'BASH'`.
 - Removed `cups` from the `stack_cups` object prompt to avoid selecting the green cup.
+
+## 2026-06-24 (COMMAND_LIBRARY stack_cups Prompt Refinement)
+
+- Changed the `stack_cups` inpaint/repaint prompt to `left light pink cup, right dark red cup`; it no longer uses the generic `red cup` / `cups` descriptions.
