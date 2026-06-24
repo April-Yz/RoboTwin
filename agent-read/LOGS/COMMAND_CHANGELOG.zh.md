@@ -2207,3 +2207,9 @@
 
 - I3.6/I3.7 不再使用 `set -u`，以兼容 `inpainting-sam3-dino3` conda activate 脚本。
 - I3.6/I3.7 Stage-1 在写 `removed_w_mask_rgb_<ID>.mp4` 前显式创建 `stage1_human_inpaint` 目录。
+
+## 2026-06-24 13:20 +08 - L16 可视化拼接命令
+
+- 在 `COMMAND_LIBRARY.zh.md` 末尾新增 `P. 可视化：L16 HaMeR / Foundation / repaint 拼接对比`。
+- 新增单 id tmux 测试命令：`python3 code_painting/make_l16_repaint_montage.py --task pick_diverse_bottles --id 0 --overwrite`。
+- 新增批处理说明：`pick_diverse_bottles/place_bread_basket/stack_cups/pnp_tray` 用 `--ids 0-4`；`handover_bottle` 用 `--ids 1-5`；`pnp_bread` 用 `--ids 7-11`。

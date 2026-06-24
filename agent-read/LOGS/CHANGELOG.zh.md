@@ -2925,3 +2925,9 @@
 - 在 Stage-1 调用 `remove_anything_video_sam2.py` 前增加 `mkdir -p "$S1OUT"`，避免批处理 `save_mask_frames=0` 时输出目录不存在导致 `FileNotFoundError`。
 
 验证：重新提取 I3.6/I3.7 bash 块并通过 `bash -n`。
+
+## 2026-06-24 13:20 +08 - L16 可视化拼接脚本
+
+- 新增 `code_painting/make_l16_repaint_montage.py`，用于把 HaMeR gripper、Foundation object replay、L16 robot plan 横向拼接；如果 Stage1 inpaint 和 final repaint 已存在，会自动加入面板。
+- 在新 tmux `l16_vis_id0` 中测试 `pick_diverse_bottles id0` 成功，输出 `code_painting/l16_repaint_montage/pick_diverse_bottles/id_0/compare_hamer_foundation_l16_repaint_pick_diverse_bottles_id0.mp4`。
+- 验证：`python3 -m py_compile code_painting/make_l16_repaint_montage.py` 通过；`ffprobe` 显示输出视频为 `2130x320`、`5 fps`、`21.4s`、`107` 帧。

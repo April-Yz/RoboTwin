@@ -8944,3 +8944,87 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_
 ```
 
 > 批量无 viewer 命令（含 wrist 校准）见 [L15.20 → L5 批量采集](#l5-批量无-viewer-采集head--wrist-视频--target_retreat_m-014--o1-wrist-校准)。
+
+## P. 可视化：L16 HaMeR / Foundation / repaint 拼接对比
+
+### P1. L16 五联横向拼接脚本
+
+脚本位置：
+
+```bash
+/home/zaijia001/ssd/RoboTwin/code_painting/make_l16_repaint_montage.py
+```
+
+默认面板顺序：
+
+1. `HaMeR gripper`：`/home/zaijia001/ssd/data/piper/hand/<TASK>/harmer_output/hand_vis_gripper_<ID>.mp4`
+2. `Foundation object`：优先读取 `/home/zaijia001/ssd/data/piper/hand/<TASK>/foundation_replay_d435/foundation_input_<ID>/head_cam_replay.mp4`，不存在时回退到 `foundation_replay`
+3. `L16 robot plan`：`/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_human_replay_clean/<TASK>/foundation_input_<ID>/head_cam_plan.mp4`
+4. `Stage1 inpaint`（可选，存在才加入）：`/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stage1_human_object/<TASK>/id_<ID>/stage1_human_inpaint/removed_w_mask_rgb_<ID>.mp4`
+5. `Final repaint`（可选，存在才加入）：`/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_visible_reinit/e0_robot_object/<TASK>/id_<ID>_l16/final_repainted.mp4`
+
+输出位置：
+
+```bash
+/home/zaijia001/ssd/RoboTwin/code_painting/l16_repaint_montage/<TASK>/id_<ID>/compare_hamer_foundation_l16_repaint_<TASK>_id<ID>.mp4
+```
+
+### P2. 已测试 id0 命令（新 tmux）
+
+`handover_bottle` 没有 L16 id0，`pnp_bread` 的 L16 从 id7 开始；因此 id0 debug 推荐先用 `pick_diverse_bottles`。
+
+```bash
+tmux new-session -d -s l16_vis_id0 'cd /home/zaijia001/ssd/RoboTwin && python3 /home/zaijia001/ssd/RoboTwin/code_painting/make_l16_repaint_montage.py --task pick_diverse_bottles --id 0 --overwrite'
+```
+
+检查输出：
+
+```bash
+ls -lh /home/zaijia001/ssd/RoboTwin/code_painting/l16_repaint_montage/pick_diverse_bottles/id_0
+ffprobe -v error -select_streams v:0 -show_entries stream=width,height,nb_frames,r_frame_rate,duration -of default=noprint_wrappers=1 /home/zaijia001/ssd/RoboTwin/code_painting/l16_repaint_montage/pick_diverse_bottles/id_0/compare_hamer_foundation_l16_repaint_pick_diverse_bottles_id0.mp4
+```
+
+本次已验证输出：
+
+```text
+width=2130
+height=320
+r_frame_rate=5/1
+duration=21.400000
+nb_frames=107
+```
+
+### P3. 批处理命令
+
+跑 id0-id4 中 L16 从 0 开始的任务：
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin && python3 /home/zaijia001/ssd/RoboTwin/code_painting/make_l16_repaint_montage.py \
+  --tasks pick_diverse_bottles place_bread_basket stack_cups pnp_tray \
+  --ids 0-4 \
+  --overwrite
+```
+
+补 `handover_bottle` 的前 5 个有效 L16 id：
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin && python3 /home/zaijia001/ssd/RoboTwin/code_painting/make_l16_repaint_montage.py \
+  --task handover_bottle \
+  --ids 1-5 \
+  --overwrite
+```
+
+补 `pnp_bread` 的前 5 个有效 L16 id：
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin && python3 /home/zaijia001/ssd/RoboTwin/code_painting/make_l16_repaint_montage.py \
+  --task pnp_bread \
+  --ids 7-11 \
+  --overwrite
+```
+
+如果只想看前三联（不加入当前 inpainting/repainting 结果），加：
+
+```bash
+--include_optional 0
+```

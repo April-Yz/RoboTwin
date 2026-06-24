@@ -2927,3 +2927,9 @@ Validation: static bash syntax checks were run for the newly added command block
 - Added `mkdir -p "$S1OUT"` before calling `remove_anything_video_sam2.py`, preventing `FileNotFoundError` when batch Stage-1 uses `save_mask_frames=0`.
 
 Validation: re-extracted I3.6/I3.7 bash blocks and checked them with `bash -n`.
+
+## 2026-06-24 13:20 +08 - L16 Visualization Montage Script
+
+- Added `code_painting/make_l16_repaint_montage.py` to horizontally stitch HaMeR gripper, Foundation object replay, and L16 robot plan videos; existing Stage-1 inpaint and final repaint outputs are appended automatically when present.
+- Tested `pick_diverse_bottles id0` in the new tmux session `l16_vis_id0`; it produced `code_painting/l16_repaint_montage/pick_diverse_bottles/id_0/compare_hamer_foundation_l16_repaint_pick_diverse_bottles_id0.mp4`.
+- Validation: `python3 -m py_compile code_painting/make_l16_repaint_montage.py` passed; `ffprobe` reported `2130x320`, `5 fps`, `21.4s`, and `107` frames.

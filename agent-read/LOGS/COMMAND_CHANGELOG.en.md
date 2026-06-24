@@ -2209,3 +2209,9 @@ Update: the verified-v2 daily viewer command now includes `--foundation_capture_
 
 - I3.6/I3.7 no longer use `set -u`, so they are compatible with the `inpainting-sam3-dino3` conda activation scripts.
 - I3.6/I3.7 Stage-1 now explicitly creates the `stage1_human_inpaint` directory before writing `removed_w_mask_rgb_<ID>.mp4`.
+
+## 2026-06-24 13:20 +08 - L16 Visualization Montage Commands
+
+- Added `P. Visualization: L16 HaMeR / Foundation / repaint montage comparison` to the end of `COMMAND_LIBRARY.zh.md`.
+- Added single-id tmux test command: `python3 code_painting/make_l16_repaint_montage.py --task pick_diverse_bottles --id 0 --overwrite`.
+- Added batch guidance: use `--ids 0-4` for `pick_diverse_bottles/place_bread_basket/stack_cups/pnp_tray`, `--ids 1-5` for `handover_bottle`, and `--ids 7-11` for `pnp_bread`.

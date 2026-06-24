@@ -266,3 +266,25 @@ ROOT=/home/zaijia001/.cache/huggingface/lerobot/local/h2o_pick_diverse_bottles_h
 `COMMAND_LIBRARY.zh.md` 的 I3.6/I3.7 记录了 L16 Human Replay 输出的 repaint 流程。该流程不复用旧 I1 的“只抠除人手”背景，而是新建 `results_repaint_piper_h2_l16/stage1_human_object`，用任务物体 prompt 同时抠除人手和真实物体，再把 `L16_human_replay_clean/<TASK>/foundation_input_<ID>/head_cam_plan.mp4` 中的机器人+物体通过 visible-reinit 贴回。
 
 推荐顺序：先运行 I3.6 六任务各 5 个 ID debug，检查 `w_box_head_cam_plan.mp4`、`w_mask_head_cam_plan.mp4` 和 `final_repainted.mp4`；确认无背景误贴和物体重影后再运行 I3.7 全量批处理。
+
+## L16 可视化拼接：HaMeR / Foundation / L16 / Repaint
+
+新增脚本：`code_painting/make_l16_repaint_montage.py`。该脚本把每个任务/ID 的 HaMeR 人手可视化、Foundation object replay、L16 `head_cam_plan.mp4` 横向拼接；如果当前 Stage1 inpaint 和 final repaint 结果存在，也会自动追加为第 4、第 5 个面板。
+
+核心输入：
+
+- HaMeR：`/home/zaijia001/ssd/data/piper/hand/<TASK>/harmer_output/hand_vis_gripper_<ID>.mp4`
+- Foundation replay：优先 `foundation_replay_d435/foundation_input_<ID>/head_cam_replay.mp4`，缺失时回退到 `foundation_replay`
+- L16 plan：`code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_human_replay_clean/<TASK>/foundation_input_<ID>/head_cam_plan.mp4`
+- 可选 Stage1：`/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stage1_human_object/<TASK>/id_<ID>/stage1_human_inpaint/removed_w_mask_rgb_<ID>.mp4`
+- 可选 final repaint：`/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_visible_reinit/e0_robot_object/<TASK>/id_<ID>_l16/final_repainted.mp4`
+
+输出：`code_painting/l16_repaint_montage/<TASK>/id_<ID>/compare_hamer_foundation_l16_repaint_<TASK>_id<ID>.mp4`，旁边会写入同名 JSON manifest 记录实际采用的输入视频。
+
+已测试命令：
+
+```bash
+tmux new-session -d -s l16_vis_id0 'cd /home/zaijia001/ssd/RoboTwin && python3 /home/zaijia001/ssd/RoboTwin/code_painting/make_l16_repaint_montage.py --task pick_diverse_bottles --id 0 --overwrite'
+```
+
+批处理：`pick_diverse_bottles/place_bread_basket/stack_cups/pnp_tray` 可用 `--ids 0-4`；`handover_bottle` 建议从 `--ids 1-5` 开始；`pnp_bread` 建议从 `--ids 7-11` 开始，因为 L16 没有其 id0-id6。

@@ -266,3 +266,25 @@ ROOT=/home/zaijia001/.cache/huggingface/lerobot/local/h2o_pick_diverse_bottles_h
 `COMMAND_LIBRARY.zh.md` sections I3.6/I3.7 document the repaint flow for L16 Human Replay outputs. This flow does not reuse the old I1 "human hand only" backgrounds. Instead, it writes `results_repaint_piper_h2_l16/stage1_human_object`, removes both human hands and task objects with task-specific prompts, then visible-reinit repaints robot+object pixels from `L16_human_replay_clean/<TASK>/foundation_input_<ID>/head_cam_plan.mp4`.
 
 Recommended order: run I3.6 first for five debug IDs per task and inspect `w_box_head_cam_plan.mp4`, `w_mask_head_cam_plan.mp4`, and `final_repainted.mp4`; after confirming no background leakage or object ghosting, run the I3.7 full batch command.
+
+## L16 Visualization Montage: HaMeR / Foundation / L16 / Repaint
+
+Added script: `code_painting/make_l16_repaint_montage.py`. It horizontally stitches each task/id's HaMeR hand visualization, Foundation object replay, and L16 `head_cam_plan.mp4`. When Stage-1 inpaint and final repaint outputs already exist, they are automatically appended as the fourth and fifth panels.
+
+Core inputs:
+
+- HaMeR: `/home/zaijia001/ssd/data/piper/hand/<TASK>/harmer_output/hand_vis_gripper_<ID>.mp4`
+- Foundation replay: prefers `foundation_replay_d435/foundation_input_<ID>/head_cam_replay.mp4`, falling back to `foundation_replay`
+- L16 plan: `code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_human_replay_clean/<TASK>/foundation_input_<ID>/head_cam_plan.mp4`
+- Optional Stage 1: `/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stage1_human_object/<TASK>/id_<ID>/stage1_human_inpaint/removed_w_mask_rgb_<ID>.mp4`
+- Optional final repaint: `/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_visible_reinit/e0_robot_object/<TASK>/id_<ID>_l16/final_repainted.mp4`
+
+Output: `code_painting/l16_repaint_montage/<TASK>/id_<ID>/compare_hamer_foundation_l16_repaint_<TASK>_id<ID>.mp4`, with a sibling JSON manifest recording the videos actually used.
+
+Validated command:
+
+```bash
+tmux new-session -d -s l16_vis_id0 'cd /home/zaijia001/ssd/RoboTwin && python3 /home/zaijia001/ssd/RoboTwin/code_painting/make_l16_repaint_montage.py --task pick_diverse_bottles --id 0 --overwrite'
+```
+
+Batch notes: `pick_diverse_bottles/place_bread_basket/stack_cups/pnp_tray` can use `--ids 0-4`; `handover_bottle` should start with `--ids 1-5`; `pnp_bread` should start with `--ids 7-11` because its L16 outputs do not include id0-id6.
