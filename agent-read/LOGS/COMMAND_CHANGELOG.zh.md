@@ -2213,3 +2213,10 @@
 - 在 `COMMAND_LIBRARY.zh.md` 末尾新增 `P. 可视化：L16 HaMeR / Foundation / repaint 拼接对比`。
 - 新增单 id tmux 测试命令：`python3 code_painting/make_l16_repaint_montage.py --task pick_diverse_bottles --id 0 --overwrite`。
 - 新增批处理说明：`pick_diverse_bottles/place_bread_basket/stack_cups/pnp_tray` 用 `--ids 0-4`；`handover_bottle` 用 `--ids 1-5`；`pnp_bread` 用 `--ids 7-11`。
+
+## 2026-06-24（COMMAND_LIBRARY I3.6 白背景反选 repaint）
+
+- 新增命令位置：`COMMAND_LIBRARY.zh.md` I3.6。
+- 作用：L16 六任务 debug/批处理时不直接 prompt 机械臂+物体，而是 prompt 白色背景并反选 mask，再把 L16 源视频的非白背景区域合成到 Stage-1 背景。
+- 重要参数：`RUN_MODE=debug|batch`、`BG_MODE=hand_only|human_object`、`MASK_IDX`、`WHITE_PROMPT`、`COMPOSITE_ERODE`、`BLEND_ALPHA_SIGMA`。
+- 输出：`results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object/<TASK>/id_<ID>_l16_whitebg_<BG_MODE>/final_repainted.mp4`。

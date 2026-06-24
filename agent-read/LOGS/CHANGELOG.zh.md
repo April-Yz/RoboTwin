@@ -2931,3 +2931,11 @@
 - 新增 `code_painting/make_l16_repaint_montage.py`，用于把 HaMeR gripper、Foundation object replay、L16 robot plan 横向拼接；如果 Stage1 inpaint 和 final repaint 已存在，会自动加入面板。
 - 在新 tmux `l16_vis_id0` 中测试 `pick_diverse_bottles id0` 成功，输出 `code_painting/l16_repaint_montage/pick_diverse_bottles/id_0/compare_hamer_foundation_l16_repaint_pick_diverse_bottles_id0.mp4`。
 - 验证：`python3 -m py_compile code_painting/make_l16_repaint_montage.py` 通过；`ffprobe` 显示输出视频为 `2130x320`、`5 fps`、`21.4s`、`107` 帧。
+
+## 2026-06-24（L16 白背景反选 repaint 指令）
+
+- 将 `COMMAND_LIBRARY.zh.md` 的 I3.5/I3.6/I3.7 repaint 说明整理为 I3.5.1/I3.5.2/I3.5.3，保留原 D435 visible-reinit 和 L16 robot/object prompt 路线。
+- 新增 I3.6：L16 白色背景 SAM + `--invert_mask` 反选路线。该路线不修改现有 Python 代码，使用 `remove_anything_video_sam3_robot.py` 保存反选 mask，再在命令内用 inline 合成步骤生成 `target_with_original_head_cam_plan.mp4` 和 `final_repainted.mp4`。
+- 新输出根目录：`/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object`。
+
+Validation: 已抽取 I3.6 debug bash block 并通过 `bash -n /tmp/i36_whitebg_debug_block.sh`；已抽取 inline compose Python 并通过 `python3 -m py_compile /tmp/i36_whitebg_inline_compose.py`。本轮未运行实际 SAM 推理。

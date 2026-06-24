@@ -2933,3 +2933,11 @@ Validation: re-extracted I3.6/I3.7 bash blocks and checked them with `bash -n`.
 - Added `code_painting/make_l16_repaint_montage.py` to horizontally stitch HaMeR gripper, Foundation object replay, and L16 robot plan videos; existing Stage-1 inpaint and final repaint outputs are appended automatically when present.
 - Tested `pick_diverse_bottles id0` in the new tmux session `l16_vis_id0`; it produced `code_painting/l16_repaint_montage/pick_diverse_bottles/id_0/compare_hamer_foundation_l16_repaint_pick_diverse_bottles_id0.mp4`.
 - Validation: `python3 -m py_compile code_painting/make_l16_repaint_montage.py` passed; `ffprobe` reported `2130x320`, `5 fps`, `21.4s`, and `107` frames.
+
+## 2026-06-24 (L16 White-Background Inverted-Mask Repaint Commands)
+
+- Reorganized the `COMMAND_LIBRARY.zh.md` repaint sections into I3.5.1/I3.5.2/I3.5.3 while preserving the original D435 visible-reinit and L16 robot/object prompt routes.
+- Added I3.6 for the L16 white-background SAM + `--invert_mask` comparison route. It does not modify existing Python code; it uses `remove_anything_video_sam3_robot.py` to save inverted masks, then an inline compose step in the command writes `target_with_original_head_cam_plan.mp4` and `final_repainted.mp4`.
+- New output root: `/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object`.
+
+Validation: extracted the I3.6 debug bash block and passed `bash -n /tmp/i36_whitebg_debug_block.sh`; extracted the inline compose Python and passed `python3 -m py_compile /tmp/i36_whitebg_inline_compose.py`. Actual SAM inference was not run in this documentation update.

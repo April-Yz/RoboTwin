@@ -263,9 +263,11 @@ ROOT=/home/zaijia001/.cache/huggingface/lerobot/local/h2o_pick_diverse_bottles_h
 
 ## L16 六任务机器人+物体 repaint 指令
 
-`COMMAND_LIBRARY.zh.md` 的 I3.6/I3.7 记录了 L16 Human Replay 输出的 repaint 流程。该流程不复用旧 I1 的“只抠除人手”背景，而是新建 `results_repaint_piper_h2_l16/stage1_human_object`，用任务物体 prompt 同时抠除人手和真实物体，再把 `L16_human_replay_clean/<TASK>/foundation_input_<ID>/head_cam_plan.mp4` 中的机器人+物体通过 visible-reinit 贴回。
+`COMMAND_LIBRARY.zh.md` 的 I3.5.2/I3.5.3 记录了 L16 Human Replay 输出的 robot/object prompt 路线。该流程不复用旧 I1 的“只抠除人手”背景，而是新建 `results_repaint_piper_h2_l16/stage1_human_object`，用任务物体 prompt 同时抠除人手和真实物体，再把 `L16_human_replay_clean/<TASK>/foundation_input_<ID>/head_cam_plan.mp4` 中的机器人+物体通过 visible-reinit 贴回。
 
-推荐顺序：先运行 I3.6 六任务各 5 个 ID debug，检查 `w_box_head_cam_plan.mp4`、`w_mask_head_cam_plan.mp4` 和 `final_repainted.mp4`；确认无背景误贴和物体重影后再运行 I3.7 全量批处理。
+推荐顺序：先运行 I3.5.2 六任务各 5 个 ID debug，检查 `w_box_head_cam_plan.mp4`、`w_mask_head_cam_plan.mp4` 和 `final_repainted.mp4`；确认无背景误贴和物体重影后再运行 I3.5.3 全量批处理。
+
+`COMMAND_LIBRARY.zh.md` 的 I3.6 记录了新增的白色背景 SAM + 反选 mask 对照路线。它默认复用 I1/I1.1 的 hand-only Stage-1 背景，先 prompt L16 源视频中的白色背景，再使用保存出的反选 mask 帧外部合成 `final_repainted.mp4`，避免直接在第一帧 prompt 机械臂/物体。输出根目录是 `results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object`；SAM/反选检查重点看 `w_box_head_cam_plan.mp4`、`w_mask_head_cam_plan.mp4`、`mask_head_cam_plan.mp4` 和 `mask/000000.jpg`。
 
 ## L16 可视化拼接：HaMeR / Foundation / L16 / Repaint
 

@@ -2215,3 +2215,10 @@ Update: the verified-v2 daily viewer command now includes `--foundation_capture_
 - Added `P. Visualization: L16 HaMeR / Foundation / repaint montage comparison` to the end of `COMMAND_LIBRARY.zh.md`.
 - Added single-id tmux test command: `python3 code_painting/make_l16_repaint_montage.py --task pick_diverse_bottles --id 0 --overwrite`.
 - Added batch guidance: use `--ids 0-4` for `pick_diverse_bottles/place_bread_basket/stack_cups/pnp_tray`, `--ids 1-5` for `handover_bottle`, and `--ids 7-11` for `pnp_bread`.
+
+## 2026-06-24 (COMMAND_LIBRARY I3.6 White-Background Inverted-Mask Repaint)
+
+- New command location: `COMMAND_LIBRARY.zh.md` I3.6.
+- Purpose: for L16 six-task debug/batch runs, prompt the white background instead of robot+object, invert the mask, then compose the L16 source video's non-white-background pixels onto the Stage-1 background.
+- Important parameters: `RUN_MODE=debug|batch`, `BG_MODE=hand_only|human_object`, `MASK_IDX`, `WHITE_PROMPT`, `COMPOSITE_ERODE`, `BLEND_ALPHA_SIGMA`.
+- Output: `results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object/<TASK>/id_<ID>_l16_whitebg_<BG_MODE>/final_repainted.mp4`.
