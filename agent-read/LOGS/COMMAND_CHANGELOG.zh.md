@@ -2235,3 +2235,8 @@
 ## 2026-06-24（COMMAND_LIBRARY stack_cups prompt 细化）
 
 - `stack_cups` inpaint/repaint prompt 改为 `left light pink cup, right dark red cup`，不再使用 `red cup` / `cups` 泛化描述。
+
+## 2026-06-24（COMMAND_LIBRARY I3.6 比例拉伸 BG）
+
+- I3.6 repaint 合成命令改为按 robot/mask 帧数输出，Stage-1 BG 较短时按比例采样 BG 帧补齐时间。
+- Stage-2 使用 `--save_removed_video 0` 时已配合脚本跳过无用 STTN inpainting。

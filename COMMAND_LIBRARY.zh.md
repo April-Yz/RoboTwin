@@ -1455,7 +1455,7 @@ echo "final repaint counts"; for TASK in pick_diverse_bottles place_bread_basket
 
 用途：这是 I3.5.2/I3.5.3 的对照路线。旧路线在 Stage-2 直接 prompt `robot arm + object`，如果第一帧没有机械臂/物体，mask 可能从一开始就漂到背景。本节改为 prompt L16 源视频里的白色背景，然后使用 `--invert_mask` 得到“非白背景区域”（通常就是机械臂 + 物体）作为贴回区域。
 
-注意：`remove_anything_video_sam3_robot.py --invert_mask` 会反转保存出来的 `mask_head_cam_plan/`、`mask_head_cam_plan.mp4`、`w_mask_head_cam_plan.mp4`；脚本自带的 `target_with_original_head_cam_plan.mp4` 仍然用原始白背景 mask 合成，所以本节命令会关闭脚本自带合成，并在命令末尾用反选后的 `mask_head_cam_plan/*.jpg` 重新合成 `target_with_original_head_cam_plan.mp4` 和 `final_repainted.mp4`。这不修改仓库代码。
+注意：`remove_anything_video_sam3_robot.py --invert_mask` 会反转保存出来的 `mask_head_cam_plan/`、`mask_head_cam_plan.mp4`、`w_mask_head_cam_plan.mp4`；脚本自带的 `target_with_original_head_cam_plan.mp4` 仍然用原始白背景 mask 合成，所以本节命令会关闭脚本自带合成，并在命令末尾用反选后的 `mask_head_cam_plan/*.jpg` 重新合成 `target_with_original_head_cam_plan.mp4` 和 `final_repainted.mp4`。合成时输出帧数跟随 robot/mask 帧数；如果 Stage-1 背景更短，会按比例采样背景帧来拉伸到同样长度。
 
 默认背景使用 I3.5.2/I3.5.3 的“人手+对应物体” Stage-1：
 
@@ -1579,14 +1579,20 @@ fps = int(float(fps_s))
 erode = int(erode_s)
 sigma = float(sigma_s)
 source = iio.get_reader(source_p)
-bg_reader = iio.get_reader(bg_p)
+bg_frames = iio.mimread(bg_p, memtest=False)
+if not bg_frames:
+    raise SystemExit(f"[compose error] no background frames in {bg_p}")
+out_len = len(mask_frames)
+bg_len = len(bg_frames)
+print(f"[compose info] output_frames={out_len} bg_frames={bg_len}; background is sampled proportionally")
 frames = []
 for idx, mask_p in enumerate(mask_frames):
-    try:
-        src = source.get_data(idx)
-        bg = bg_reader.get_data(idx)
-    except Exception:
-        break
+    src = source.get_data(idx)
+    if bg_len == 1 or out_len == 1:
+        bg_idx = 0
+    else:
+        bg_idx = int(round(idx * (bg_len - 1) / (out_len - 1)))
+    bg = bg_frames[bg_idx]
     if src.ndim == 2:
         src = np.repeat(src[:, :, None], 3, axis=2)
     if bg.ndim == 2:
@@ -1611,9 +1617,8 @@ for idx, mask_p in enumerate(mask_frames):
     alpha = alpha[:, :, None]
     frames.append((src.astype(np.float32) * alpha + bg.astype(np.float32) * (1.0 - alpha)).astype(np.uint8))
 source.close()
-bg_reader.close()
-if not frames:
-    raise SystemExit("[compose error] no frames composed")
+if len(frames) != out_len:
+    raise SystemExit(f"[compose error] composed {len(frames)} frames, expected {out_len}")
 out_video = out / "target_with_original_head_cam_plan.mp4"
 iio.mimwrite(out_video, frames, fps=fps, macro_block_size=1)
 shutil.copyfile(out_video, out / "final_repainted.mp4")
@@ -1735,14 +1740,20 @@ fps = int(float(fps_s))
 erode = int(erode_s)
 sigma = float(sigma_s)
 source = iio.get_reader(source_p)
-bg_reader = iio.get_reader(bg_p)
+bg_frames = iio.mimread(bg_p, memtest=False)
+if not bg_frames:
+    raise SystemExit(f"[compose error] no background frames in {bg_p}")
+out_len = len(mask_frames)
+bg_len = len(bg_frames)
+print(f"[compose info] output_frames={out_len} bg_frames={bg_len}; background is sampled proportionally")
 frames = []
 for idx, mask_p in enumerate(mask_frames):
-    try:
-        src = source.get_data(idx)
-        bg = bg_reader.get_data(idx)
-    except Exception:
-        break
+    src = source.get_data(idx)
+    if bg_len == 1 or out_len == 1:
+        bg_idx = 0
+    else:
+        bg_idx = int(round(idx * (bg_len - 1) / (out_len - 1)))
+    bg = bg_frames[bg_idx]
     if src.ndim == 2:
         src = np.repeat(src[:, :, None], 3, axis=2)
     if bg.ndim == 2:
@@ -1767,9 +1778,8 @@ for idx, mask_p in enumerate(mask_frames):
     alpha = alpha[:, :, None]
     frames.append((src.astype(np.float32) * alpha + bg.astype(np.float32) * (1.0 - alpha)).astype(np.uint8))
 source.close()
-bg_reader.close()
-if not frames:
-    raise SystemExit("[compose error] no frames composed")
+if len(frames) != out_len:
+    raise SystemExit(f"[compose error] composed {len(frames)} frames, expected {out_len}")
 out_video = out / "target_with_original_head_cam_plan.mp4"
 iio.mimwrite(out_video, frames, fps=fps, macro_block_size=1)
 shutil.copyfile(out_video, out / "final_repainted.mp4")

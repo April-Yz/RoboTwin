@@ -2237,3 +2237,8 @@ Update: the verified-v2 daily viewer command now includes `--foundation_capture_
 ## 2026-06-24 (COMMAND_LIBRARY stack_cups Prompt Refinement)
 
 - Changed the `stack_cups` inpaint/repaint prompt to `left light pink cup, right dark red cup`; it no longer uses the generic `red cup` / `cups` descriptions.
+
+## 2026-06-24 (COMMAND_LIBRARY I3.6 Proportional BG Stretch)
+
+- I3.6 repaint compose now outputs robot/mask frame count and proportionally samples shorter Stage-1 BG videos to match duration.
+- Stage-2 with `--save_removed_video 0` now pairs with the script change that skips unnecessary STTN inpainting.

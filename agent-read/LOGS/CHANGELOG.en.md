@@ -2962,3 +2962,10 @@ Validation: re-extracted the I3.6 debug/batch bash blocks and checked them with 
 - Refined the `stack_cups` Stage-1/robot-object prompt from `left red cup, right red cup` to `left light pink cup, right dark red cup`, matching the AnyGrasp/Foundation object naming and reducing the risk that `red cup` generalizes to the green cup.
 
 Validation: re-extracted the I3.6 debug/batch bash blocks and checked them with `bash -n`; extracted the inline compose Python and checked it with `python3 -m py_compile`.
+
+## 2026-06-24 (I3.6 Proportional Background Stretch Compose)
+
+- Updated the `COMMAND_LIBRARY.zh.md` I3.6 inline compose logic: final output length follows `mask_head_cam_plan/*.jpg` / robot replay frames, and shorter Stage-1 BG videos are sampled by `round(i * (bg_len - 1) / (out_len - 1))`.
+- Updated `/home/zaijia001/ssd/inpainting_sam3_robot/remove_anything_video_sam3_robot.py`: when `--save_removed_video 0`, the script no longer builds or runs the STTN inpainter and only writes masks/boxes, avoiding unnecessary OOM during white-background inverted-mask Stage-2.
+
+Validation: `python3 -m py_compile /home/zaijia001/ssd/inpainting_sam3_robot/remove_anything_video_sam3_robot.py`; extracted I3.6 debug/batch bash blocks and checked `bash -n`; extracted inline compose Python and checked `python3 -m py_compile`; verified compose on `pick_diverse_bottles id0`, with robot=107 frames, BG=106 frames, final=107 frames.
