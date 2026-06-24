@@ -290,3 +290,13 @@ tmux new-session -d -s l16_vis_id0 'cd /home/zaijia001/ssd/RoboTwin && python3 /
 ```
 
 批处理：`pick_diverse_bottles/place_bread_basket/stack_cups/pnp_tray` 可用 `--ids 0-4`；`handover_bottle` 建议从 `--ids 1-5` 开始；`pnp_bread` 建议从 `--ids 7-11` 开始，因为 L16 没有其 id0-id6。
+
+
+## L16 白背景反选按任务并行入口
+
+`COMMAND_LIBRARY.zh.md` 的 I3.6.1 新增了两个任务级脚本：
+
+- `code_painting/run_l16_stage1_human_object_task.sh`：按单个 `TASK` 补/重跑 Stage-1 人手+物体 inpaint。
+- `code_painting/run_l16_whitebg_repaint_task.sh`：按单个 `TASK` 执行白背景 SAM + 反选 repaint；合成时输出帧数跟随 robot/mask，短 BG 会按比例采样拉伸。
+
+这两个脚本用于把五个非 `stack_cups` 任务分配到不同 GPU 并行运行。`stack_cups` 仍建议先单独调 Stage-1 prompt/dilation，确认绿色杯子没有被误删后再跑 repaint。

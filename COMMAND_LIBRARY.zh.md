@@ -1815,6 +1815,62 @@ SAM 掉背景/反选效果看这里：
 
 调参建议：如果 `w_mask_head_cam_plan.mp4` 反选后包含太多白底，先尝试 `MASK_IDX=1` 或 `MASK_IDX=2` 重跑；如果边缘漏掉机械臂/物体，先保持 `COMPOSITE_ERODE=0`，只调 `BLEND_ALPHA_SIGMA`；如果想确认物体残影来自背景来源，可用 `BG_MODE=hand_only` 对照跑同一批 id；正式结果应优先使用 `BG_MODE=human_object`。
 
+#### I3.6.1 L16 白背景反选：按任务并行重跑入口
+
+用途：把 I3.6 拆成两个可复用脚本，便于按任务分配不同 GPU 并行运行：
+
+```text
+Stage-1 人手+物体 inpaint:
+/home/zaijia001/ssd/RoboTwin/code_painting/run_l16_stage1_human_object_task.sh
+
+Stage-2 白背景 SAM + 反选 repaint:
+/home/zaijia001/ssd/RoboTwin/code_painting/run_l16_whitebg_repaint_task.sh
+```
+
+Stage-2 脚本会按 robot/mask 帧数输出最终视频；如果 Stage-1 BG 更短，会按比例采样 BG 帧拉伸到同样帧数。`remove_anything_video_sam3_robot.py` 在 `--save_removed_video 0` 时已跳过无用 STTN inpainting，只保存 mask/box 并交给脚本内的 compose 步骤合成，避免 Stage-2 OOM。
+
+先补/重跑五个非 `stack_cups` 任务的 Stage-1。`OVERWRITE=0` 只补缺失；如果要强制重做某个任务，把对应命令改成 `OVERWRITE=1`：
+
+```bash
+tmux new-session -d -s l16_s1_pick_gpu0 'TASK=pick_diverse_bottles GPU=0 OVERWRITE=0 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_stage1_human_object_task.sh'
+tmux new-session -d -s l16_s1_place_gpu1 'TASK=place_bread_basket GPU=1 OVERWRITE=0 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_stage1_human_object_task.sh'
+tmux new-session -d -s l16_s1_handover_gpu2 'TASK=handover_bottle GPU=2 OVERWRITE=0 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_stage1_human_object_task.sh'
+tmux new-session -d -s l16_s1_pnpbread_gpu3 'TASK=pnp_bread GPU=3 OVERWRITE=0 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_stage1_human_object_task.sh'
+tmux new-session -d -s l16_s1_pnptray_gpu4 'TASK=pnp_tray GPU=4 OVERWRITE=0 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_stage1_human_object_task.sh'
+```
+
+Stage-1 检查：
+
+```bash
+for TASK in pick_diverse_bottles place_bread_basket handover_bottle pnp_bread pnp_tray; do printf '%s ' "$TASK"; find /home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stage1_human_object/$TASK -path '*/stage1_human_inpaint/removed_w_mask_*.mp4' 2>/dev/null | wc -l; done
+```
+
+再跑五个非 `stack_cups` 任务的 Stage-2 repaint。这里建议 `OVERWRITE=1`，因为旧输出可能是 hand-only 背景或未做比例拉伸：
+
+```bash
+tmux new-session -d -s l16_rp_pick_gpu0 'TASK=pick_diverse_bottles GPU=0 OVERWRITE=1 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_whitebg_repaint_task.sh'
+tmux new-session -d -s l16_rp_place_gpu1 'TASK=place_bread_basket GPU=1 OVERWRITE=1 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_whitebg_repaint_task.sh'
+tmux new-session -d -s l16_rp_handover_gpu2 'TASK=handover_bottle GPU=2 OVERWRITE=1 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_whitebg_repaint_task.sh'
+tmux new-session -d -s l16_rp_pnpbread_gpu3 'TASK=pnp_bread GPU=3 OVERWRITE=1 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_whitebg_repaint_task.sh'
+tmux new-session -d -s l16_rp_pnptray_gpu4 'TASK=pnp_tray GPU=4 OVERWRITE=1 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_whitebg_repaint_task.sh'
+```
+
+Stage-2 检查：
+
+```bash
+for TASK in pick_diverse_bottles place_bread_basket handover_bottle pnp_bread pnp_tray; do printf '%s ' "$TASK"; find /home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object/$TASK -maxdepth 2 -type f -name final_repainted.mp4 -path '*whitebg_human_object*' 2>/dev/null | wc -l; done
+```
+
+单条输出检查：
+
+```text
+Stage-1 BG:
+/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stage1_human_object/<TASK>/id_<ID>/stage1_human_inpaint/removed_w_mask_rgb_<ID>.mp4
+
+Stage-2 final:
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object/<TASK>/id_<ID>_l16_whitebg_human_object/final_repainted.mp4
+```
+
 ## J. AnyGrasp 候选筛选：找离人手朝向/目标物最近的候选
 
 说明：三个任务的 AnyGrasp 结果位于 `/home/zaijia001/ssd/data/piper/hand/<TASK>/<TASK>_output/foundation_input_<ID>`。J0 先检查 id0-id10 需要的 AnyGrasp、Foundation replay、HaMeR NPZ 是否齐全；J1 生成 ranked preview 和 `summary.json`，其中 `orientation_rank` 更偏向“和人手局部轴接近”，`fused_rank` 同时考虑 AnyGrasp score 和人手朝向。

@@ -2240,3 +2240,7 @@
 
 - I3.6 repaint 合成命令改为按 robot/mask 帧数输出，Stage-1 BG 较短时按比例采样 BG 帧补齐时间。
 - Stage-2 使用 `--save_removed_video 0` 时已配合脚本跳过无用 STTN inpainting。
+
+## 2026-06-24（COMMAND_LIBRARY I3.6.1 任务级并行指令）
+
+- 新增 I3.6.1：使用 `run_l16_stage1_human_object_task.sh` 和 `run_l16_whitebg_repaint_task.sh` 分别按任务并行运行 Stage-1 inpaint 与 Stage-2 repaint。

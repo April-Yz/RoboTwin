@@ -2969,3 +2969,11 @@ Validation: re-extracted the I3.6 debug/batch bash blocks and checked them with 
 - Updated `/home/zaijia001/ssd/inpainting_sam3_robot/remove_anything_video_sam3_robot.py`: when `--save_removed_video 0`, the script no longer builds or runs the STTN inpainter and only writes masks/boxes, avoiding unnecessary OOM during white-background inverted-mask Stage-2.
 
 Validation: `python3 -m py_compile /home/zaijia001/ssd/inpainting_sam3_robot/remove_anything_video_sam3_robot.py`; extracted I3.6 debug/batch bash blocks and checked `bash -n`; extracted inline compose Python and checked `python3 -m py_compile`; verified compose on `pick_diverse_bottles id0`, with robot=107 frames, BG=106 frames, final=107 frames.
+
+## 2026-06-24 (L16 White-Background Per-Task Scripts)
+
+- Added `code_painting/run_l16_stage1_human_object_task.sh` to fill or rerun Stage-1 human+object inpaint per task.
+- Added `code_painting/run_l16_whitebg_repaint_task.sh` to run white-background SAM plus inverted-mask repaint per task, with proportional short-BG stretching in compose.
+- Added `COMMAND_LIBRARY.zh.md` I3.6.1 with parallel tmux commands for the five non-`stack_cups` tasks.
+
+Validation: `bash -n code_painting/run_l16_stage1_human_object_task.sh code_painting/run_l16_whitebg_repaint_task.sh`.

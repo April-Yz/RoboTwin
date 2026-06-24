@@ -290,3 +290,13 @@ tmux new-session -d -s l16_vis_id0 'cd /home/zaijia001/ssd/RoboTwin && python3 /
 ```
 
 Batch notes: `pick_diverse_bottles/place_bread_basket/stack_cups/pnp_tray` can use `--ids 0-4`; `handover_bottle` should start with `--ids 1-5`; `pnp_bread` should start with `--ids 7-11` because its L16 outputs do not include id0-id6.
+
+
+## L16 White-Background Inverted-Mask Per-Task Entry Points
+
+`COMMAND_LIBRARY.zh.md` section I3.6.1 adds two task-level scripts:
+
+- `code_painting/run_l16_stage1_human_object_task.sh`: fill or rerun Stage-1 human+object inpaint for one `TASK`.
+- `code_painting/run_l16_whitebg_repaint_task.sh`: run white-background SAM plus inverted-mask repaint for one `TASK`; compose output length follows robot/mask frames, and shorter BG videos are sampled proportionally.
+
+Use these scripts to run the five non-`stack_cups` tasks on separate GPUs. Keep `stack_cups` separate until its Stage-1 prompt/dilation is verified not to remove the green cup.

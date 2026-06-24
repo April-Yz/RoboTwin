@@ -2242,3 +2242,7 @@ Update: the verified-v2 daily viewer command now includes `--foundation_capture_
 
 - I3.6 repaint compose now outputs robot/mask frame count and proportionally samples shorter Stage-1 BG videos to match duration.
 - Stage-2 with `--save_removed_video 0` now pairs with the script change that skips unnecessary STTN inpainting.
+
+## 2026-06-24 (COMMAND_LIBRARY I3.6.1 Per-Task Parallel Commands)
+
+- Added I3.6.1: use `run_l16_stage1_human_object_task.sh` and `run_l16_whitebg_repaint_task.sh` to run Stage-1 inpaint and Stage-2 repaint per task in parallel.
