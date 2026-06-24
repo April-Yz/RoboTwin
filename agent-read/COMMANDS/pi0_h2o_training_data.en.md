@@ -267,7 +267,7 @@ ROOT=/home/zaijia001/.cache/huggingface/lerobot/local/h2o_pick_diverse_bottles_h
 
 Recommended order: run I3.5.2 first for five debug IDs per task and inspect `w_box_head_cam_plan.mp4`, `w_mask_head_cam_plan.mp4`, and `final_repainted.mp4`; after confirming no background leakage or object ghosting, run the I3.5.3 full batch command.
 
-`COMMAND_LIBRARY.zh.md` section I3.6 now documents the added white-background SAM plus inverted-mask comparison route. It defaults to the I1/I1.1 hand-only Stage-1 background, prompts for the white background in each L16 source video, then uses the saved inverted mask frames to externally compose `final_repainted.mp4` without changing repository code. Its output root is `results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object`; inspect `w_box_head_cam_plan.mp4`, `w_mask_head_cam_plan.mp4`, `mask_head_cam_plan.mp4`, and `mask_head_cam_plan/000000.jpg` for SAM/inversion quality.
+`COMMAND_LIBRARY.zh.md` section I3.6 now documents the added white-background SAM plus inverted-mask comparison route. It defaults to the I3.5.2/I3.5.3 human+object Stage-1 background, prompts for the white background in each L16 source video, then uses the saved inverted mask frames to externally compose `final_repainted.mp4` without changing repository code. For `stack_cups`, the Stage-1 prompt removes the generic `cups` term and keeps only `left red cup, right red cup` to avoid removing the green cup. Its output root is `results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object`; inspect `w_box_head_cam_plan.mp4`, `w_mask_head_cam_plan.mp4`, `mask_head_cam_plan.mp4`, and `mask_head_cam_plan/000000.jpg` for SAM/inversion quality.
 
 ## L16 Visualization Montage: HaMeR / Foundation / L16 / Repaint
 

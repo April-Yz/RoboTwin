@@ -2946,3 +2946,11 @@ Validation: 已抽取 I3.6 debug bash block 并通过 `bash -n /tmp/i36_whitebg_
 - 同步更新 I3.6 的输出检查说明和 `agent-read/COMMANDS/pi0_h2o_training_data.*.md`。
 
 Validation: 已重新抽取 I3.6 debug/batch bash block 并做 `bash -n`；已抽取 inline compose Python 并做 `python3 -m py_compile`。
+
+## 2026-06-24（I3.6 默认改用 human-object 背景）
+
+- 将 `COMMAND_LIBRARY.zh.md` I3.6 默认运行方式从 `BG_MODE=hand_only` 改为 `BG_MODE=human_object`，避免白背景反选 repaint 时使用只抠除人手的背景导致真实物体残留。
+- 修正 `stack_cups` 的 Stage-1/robot-object prompt：去掉泛化 `cups`，只保留 `left red cup, right red cup`，减少绿色杯子被误 inpaint 的风险。
+- 同步更新 `agent-read/COMMANDS/pi0_h2o_training_data.*.md`。
+
+Validation: 已重新抽取 I3.6 debug/batch bash block 并做 `bash -n`；已抽取 inline compose Python 并做 `python3 -m py_compile`。

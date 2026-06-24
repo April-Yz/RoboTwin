@@ -2948,3 +2948,11 @@ Validation: extracted the I3.6 debug bash block and passed `bash -n /tmp/i36_whi
 - Updated the I3.6 output inspection notes and `agent-read/COMMANDS/pi0_h2o_training_data.*.md`.
 
 Validation: re-extracted the I3.6 debug/batch bash blocks and checked them with `bash -n`; extracted the inline compose Python and checked it with `python3 -m py_compile`.
+
+## 2026-06-24 (I3.6 Defaults to Human-Object Background)
+
+- Changed the `COMMAND_LIBRARY.zh.md` I3.6 default from `BG_MODE=hand_only` to `BG_MODE=human_object`, preventing white-background inverted-mask repaint outputs from retaining real source objects in the background.
+- Updated the `stack_cups` Stage-1/robot-object prompt by removing the generic `cups` term and keeping only `left red cup, right red cup`, reducing the risk of accidentally inpainting the green cup.
+- Synchronized `agent-read/COMMANDS/pi0_h2o_training_data.*.md`.
+
+Validation: re-extracted the I3.6 debug/batch bash blocks and checked them with `bash -n`; extracted the inline compose Python and checked it with `python3 -m py_compile`.

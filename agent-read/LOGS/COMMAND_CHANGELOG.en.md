@@ -2227,3 +2227,9 @@ Update: the verified-v2 daily viewer command now includes `--foundation_capture_
 
 - Fixed the compose input directory in the I3.6 white-background inverted-mask repaint command: `mask/` -> `mask_head_cam_plan/`.
 - Impact: the previous debug command completed only the first SAM visualization output and then exited during compose; the fixed command can create `final_repainted.mp4` and continue to later task/id jobs.
+
+## 2026-06-24 (COMMAND_LIBRARY I3.6 Defaults to Human-Object Background)
+
+- Changed the I3.6 white-background inverted-mask repaint debug first line to `RUN_MODE=debug BG_MODE=human_object OVERWRITE=1 bash <<'BASH'`.
+- Changed the I3.6 batch first line to `RUN_MODE=batch BG_MODE=human_object OVERWRITE=0 bash <<'BASH'`.
+- Removed `cups` from the `stack_cups` object prompt to avoid selecting the green cup.

@@ -2225,3 +2225,9 @@
 
 - 修正 I3.6 白背景反选 repaint 命令中的合成输入目录：`mask/` -> `mask_head_cam_plan/`。
 - 影响：之前 debug 只会完成第一条 SAM 可视化输出，然后在 compose 步骤退出；修正后可以继续生成 `final_repainted.mp4` 并进入后续 task/id。
+
+## 2026-06-24（COMMAND_LIBRARY I3.6 默认 human-object 背景）
+
+- I3.6 白背景反选 repaint 命令默认第一行改为 `RUN_MODE=debug BG_MODE=human_object OVERWRITE=1 bash <<'BASH'`。
+- I3.6 批处理默认第一行改为 `RUN_MODE=batch BG_MODE=human_object OVERWRITE=0 bash <<'BASH'`。
+- `stack_cups` 的 object prompt 去掉 `cups`，避免误选绿色杯子。

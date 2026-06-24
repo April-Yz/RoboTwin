@@ -803,7 +803,7 @@ find /home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2/stage1 -
 用途：给 `handover_bottle / pnp_bread / pnp_tray` 生成 Stage-1 人手抠除背景，供后续 I3.5 D435 robot visible-reinit repaint 使用。主输出位于：
 
 ```text
-/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2/stage1/<TASK>/id_<ID>/stage1_human_inpaint/removed_w_mask_rgb_<ID>.mp4
+/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stage1_human_object/<TASK>/id_<ID>/stage1_human_inpaint/removed_w_mask_rgb_<ID>.mp4
 ```
 
 运行命令：
@@ -1212,12 +1212,14 @@ Stage-2 final:
 | --- | --- | --- | --- |
 | `pick_diverse_bottles` | L16.1 | `0 1 2 3 4` | `left bottle, right bottle, bottles` |
 | `place_bread_basket` | L16.2 | `0 1 2 3 4` | `bread, basket` |
-| `stack_cups` | L16.3 | `0 1 2 3 4` | `left red cup, right red cup, cups` |
+| `stack_cups` | L16.3 | `0 1 2 3 4` | `left red cup, right red cup` |
 | `handover_bottle` | L16.4 | `1 2 3 4 5` | `right bottle, bottle` |
 | `pnp_bread` | L16.5 | `7 8 9 10 11` | `bread` |
 | `pnp_tray` | L16.6 | `0 1 2 3 4` | `left red cup, right bottle, cup, bottle` |
 
 `pnp_bread` 先使用泛化 `bread`，因为真实画面中 `left/right bread` 未必比 `bread` 更稳；如果 debug 发现漏检，再把 prompt 改为 `left bread, right bread, bread.` 重跑对应 id。
+
+`stack_cups` 不再追加泛化 `cups`，只使用 `left red cup, right red cup`，避免把绿色杯子也一起 inpaint。
 
 直接运行：
 
@@ -1248,7 +1250,7 @@ human_prompt() {
   case "$1" in
     pick_diverse_bottles) echo "arms, hands, wrists, watch, left bottle, right bottle, bottles." ;;
     place_bread_basket) echo "arms, hands, wrists, watch, bread, basket." ;;
-    stack_cups) echo "arms, hands, wrists, watch, left red cup, right red cup, cups." ;;
+    stack_cups) echo "arms, hands, wrists, watch, left red cup, right red cup." ;;
     handover_bottle) echo "arms, hands, wrists, watch, right bottle, bottle." ;;
     pnp_bread) echo "arms, hands, wrists, watch, bread." ;;
     pnp_tray) echo "arms, hands, wrists, watch, left red cup, right bottle, cup, bottle." ;;
@@ -1259,7 +1261,7 @@ repaint_prompt() {
   case "$1" in
     pick_diverse_bottles) echo "robot arm, robotic gripper, robot wrist, robot forearm, left bottle, right bottle, bottles." ;;
     place_bread_basket) echo "robot arm, robotic gripper, robot wrist, robot forearm, bread, basket." ;;
-    stack_cups) echo "robot arm, robotic gripper, robot wrist, robot forearm, left red cup, right red cup, cups." ;;
+    stack_cups) echo "robot arm, robotic gripper, robot wrist, robot forearm, left red cup, right red cup." ;;
     handover_bottle) echo "robot arm, robotic gripper, robot wrist, robot forearm, right bottle, bottle." ;;
     pnp_bread) echo "robot arm, robotic gripper, robot wrist, robot forearm, bread." ;;
     pnp_tray) echo "robot arm, robotic gripper, robot wrist, robot forearm, left red cup, right bottle, cup, bottle." ;;
@@ -1366,7 +1368,7 @@ human_prompt() {
   case "$1" in
     pick_diverse_bottles) echo "arms, hands, wrists, watch, left bottle, right bottle, bottles." ;;
     place_bread_basket) echo "arms, hands, wrists, watch, bread, basket." ;;
-    stack_cups) echo "arms, hands, wrists, watch, left red cup, right red cup, cups." ;;
+    stack_cups) echo "arms, hands, wrists, watch, left red cup, right red cup." ;;
     handover_bottle) echo "arms, hands, wrists, watch, right bottle, bottle." ;;
     pnp_bread) echo "arms, hands, wrists, watch, bread." ;;
     pnp_tray) echo "arms, hands, wrists, watch, left red cup, right bottle, cup, bottle." ;;
@@ -1377,7 +1379,7 @@ repaint_prompt() {
   case "$1" in
     pick_diverse_bottles) echo "robot arm, robotic gripper, robot wrist, robot forearm, left bottle, right bottle, bottles." ;;
     place_bread_basket) echo "robot arm, robotic gripper, robot wrist, robot forearm, bread, basket." ;;
-    stack_cups) echo "robot arm, robotic gripper, robot wrist, robot forearm, left red cup, right red cup, cups." ;;
+    stack_cups) echo "robot arm, robotic gripper, robot wrist, robot forearm, left red cup, right red cup." ;;
     handover_bottle) echo "robot arm, robotic gripper, robot wrist, robot forearm, right bottle, bottle." ;;
     pnp_bread) echo "robot arm, robotic gripper, robot wrist, robot forearm, bread." ;;
     pnp_tray) echo "robot arm, robotic gripper, robot wrist, robot forearm, left red cup, right bottle, cup, bottle." ;;
@@ -1455,22 +1457,22 @@ echo "final repaint counts"; for TASK in pick_diverse_bottles place_bread_basket
 
 注意：`remove_anything_video_sam3_robot.py --invert_mask` 会反转保存出来的 `mask_head_cam_plan/`、`mask_head_cam_plan.mp4`、`w_mask_head_cam_plan.mp4`；脚本自带的 `target_with_original_head_cam_plan.mp4` 仍然用原始白背景 mask 合成，所以本节命令会关闭脚本自带合成，并在命令末尾用反选后的 `mask_head_cam_plan/*.jpg` 重新合成 `target_with_original_head_cam_plan.mp4` 和 `final_repainted.mp4`。这不修改仓库代码。
 
-默认背景使用 I1/I1.1 的“只抠除人手” Stage-1：
-
-```text
-/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2/stage1/<TASK>/id_<ID>/stage1_human_inpaint/removed_w_mask_rgb_<ID>.mp4
-```
-
-如果 debug 发现真实物体残影明显，可以把命令开头改成 `BG_MODE=human_object`，复用 I3.5.2 的人手+物体 Stage-1：
+默认背景使用 I3.5.2/I3.5.3 的“人手+对应物体” Stage-1：
 
 ```text
 /home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stage1_human_object/<TASK>/id_<ID>/stage1_human_inpaint/removed_w_mask_rgb_<ID>.mp4
 ```
 
+如果只是想和“只抠除人手”的旧背景做对照，可以把命令开头改成 `BG_MODE=hand_only`；正式检查 L16 robot/object 合成时不要用 hand-only 背景，否则真实原始物体会留在背景里：
+
+```text
+/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2/stage1/<TASK>/id_<ID>/stage1_human_inpaint/removed_w_mask_rgb_<ID>.mp4
+```
+
 debug 运行六任务各 5 个 id：
 
 ```bash
-RUN_MODE=debug BG_MODE=hand_only OVERWRITE=1 bash <<'BASH'
+RUN_MODE=debug BG_MODE=human_object OVERWRITE=1 bash <<'BASH'
 set -eo pipefail
 
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
@@ -1485,7 +1487,7 @@ LEGACY=/home/zaijia001/ssd/inpainting_sam2_robot
 GPU=${GPU:-3}
 FPS=${FPS:-5}
 RUN_MODE=${RUN_MODE:-debug}
-BG_MODE=${BG_MODE:-hand_only}
+BG_MODE=${BG_MODE:-human_object}
 OVERWRITE=${OVERWRITE:-1}
 MASK_IDX=${MASK_IDX:-0}
 WHITE_PROMPT=${WHITE_PROMPT:-white background, white floor, white table, blank white area.}
@@ -1626,7 +1628,7 @@ BASH
 全量批处理：复制上面 debug 的整段脚本运行，只把第一行改成下面这一行；`OVERWRITE=0` 会跳过已经存在的 `final_repainted.mp4`。
 
 ```bash
-RUN_MODE=batch BG_MODE=hand_only OVERWRITE=0 bash <<'BASH'
+RUN_MODE=batch BG_MODE=human_object OVERWRITE=0 bash <<'BASH'
 set -eo pipefail
 
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
@@ -1641,7 +1643,7 @@ LEGACY=/home/zaijia001/ssd/inpainting_sam2_robot
 GPU=${GPU:-3}
 FPS=${FPS:-5}
 RUN_MODE=${RUN_MODE:-debug}
-BG_MODE=${BG_MODE:-hand_only}
+BG_MODE=${BG_MODE:-human_object}
 OVERWRITE=${OVERWRITE:-1}
 MASK_IDX=${MASK_IDX:-0}
 WHITE_PROMPT=${WHITE_PROMPT:-white background, white floor, white table, blank white area.}
@@ -1788,20 +1790,20 @@ echo "white-bg invert final counts"; for TASK in pick_diverse_bottles place_brea
 合成后视频看这里：
 
 ```text
-/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object/<TASK>/id_<ID>_l16_whitebg_hand_only/final_repainted.mp4
-/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object/<TASK>/id_<ID>_l16_whitebg_hand_only/target_with_original_head_cam_plan.mp4
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object/<TASK>/id_<ID>_l16_whitebg_human_object/final_repainted.mp4
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object/<TASK>/id_<ID>_l16_whitebg_human_object/target_with_original_head_cam_plan.mp4
 ```
 
 SAM 掉背景/反选效果看这里：
 
 ```text
-/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object/<TASK>/id_<ID>_l16_whitebg_hand_only/w_box_head_cam_plan.mp4       # 原始白背景检测框
-/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object/<TASK>/id_<ID>_l16_whitebg_hand_only/w_mask_head_cam_plan.mp4      # 反选后贴图区域，可理解为机器人+物体候选
-/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object/<TASK>/id_<ID>_l16_whitebg_hand_only/mask_head_cam_plan.mp4        # 反选后的二值 mask 视频
-/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object/<TASK>/id_<ID>_l16_whitebg_hand_only/mask_head_cam_plan/000000.jpg     # 逐帧反选 mask
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object/<TASK>/id_<ID>_l16_whitebg_human_object/w_box_head_cam_plan.mp4       # 原始白背景检测框
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object/<TASK>/id_<ID>_l16_whitebg_human_object/w_mask_head_cam_plan.mp4      # 反选后贴图区域，可理解为机器人+物体候选
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object/<TASK>/id_<ID>_l16_whitebg_human_object/mask_head_cam_plan.mp4        # 反选后的二值 mask 视频
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object/<TASK>/id_<ID>_l16_whitebg_human_object/mask_head_cam_plan/000000.jpg     # 逐帧反选 mask
 ```
 
-调参建议：如果 `w_mask_head_cam_plan.mp4` 反选后包含太多白底，先尝试 `MASK_IDX=1` 或 `MASK_IDX=2` 重跑；如果边缘漏掉机械臂/物体，先保持 `COMPOSITE_ERODE=0`，只调 `BLEND_ALPHA_SIGMA`；如果真实物体残影明显，用 `BG_MODE=human_object` 对照跑同一批 id。
+调参建议：如果 `w_mask_head_cam_plan.mp4` 反选后包含太多白底，先尝试 `MASK_IDX=1` 或 `MASK_IDX=2` 重跑；如果边缘漏掉机械臂/物体，先保持 `COMPOSITE_ERODE=0`，只调 `BLEND_ALPHA_SIGMA`；如果想确认物体残影来自背景来源，可用 `BG_MODE=hand_only` 对照跑同一批 id；正式结果应优先使用 `BG_MODE=human_object`。
 
 ## J. AnyGrasp 候选筛选：找离人手朝向/目标物最近的候选
 
