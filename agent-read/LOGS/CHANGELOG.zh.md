@@ -2917,3 +2917,11 @@
 - 新输出目录为 `results_repaint_piper_h2_l16/stage1_human_object` 与 `results_repaint_piper_h2_l16_visible_reinit/e0_robot_object`，不覆盖旧 I1/I3.5。
 
 验证：对新增 bash 代码块做静态语法检查，结果记录在本轮命令输出中。
+
+
+## 2026-06-24（修正 L16 repaint 指令可运行性）
+
+- 修正 I3.6/I3.7 命令：将 `set -euo pipefail` 改为 `set -eo pipefail`，避免 conda activate 脚本因 `ADDR2LINE` 未绑定变量失败。
+- 在 Stage-1 调用 `remove_anything_video_sam2.py` 前增加 `mkdir -p "$S1OUT"`，避免批处理 `save_mask_frames=0` 时输出目录不存在导致 `FileNotFoundError`。
+
+验证：重新提取 I3.6/I3.7 bash 块并通过 `bash -n`。

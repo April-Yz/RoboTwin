@@ -1223,7 +1223,7 @@ Stage-2 final:
 
 ```bash
 bash <<'BASH'
-set -euo pipefail
+set -eo pipefail
 
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
 
@@ -1275,6 +1275,7 @@ for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle p
     BG=$S1OUT/removed_w_mask_rgb_${ID}.mp4
     [[ -f "$BG" ]] && { echo "[stage1 skip] task=${TASK} id=${ID} bg=${BG}"; continue; }
     [[ -f "$HUMAN" ]] || { echo "[stage1 skip] task=${TASK} id=${ID} missing HUMAN=${HUMAN}"; continue; }
+    mkdir -p "$S1OUT"
     echo "[stage1 run] task=${TASK} id=${ID}"
     CUDA_VISIBLE_DEVICES=$GPU_STAGE1 python remove_anything_video_sam2.py \
       --input_video "$HUMAN" \
@@ -1342,7 +1343,7 @@ final_repainted.mp4
 
 ```bash
 bash <<'BASH'
-set -euo pipefail
+set -eo pipefail
 
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
 
@@ -1392,6 +1393,7 @@ for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle p
     BG=$S1OUT/removed_w_mask_rgb_${ID}.mp4
     [[ -f "$BG" ]] && { echo "[stage1 skip] task=${TASK} id=${ID} bg=${BG}"; continue; }
     [[ -f "$HUMAN" ]] || { echo "[stage1 skip] task=${TASK} id=${ID} missing HUMAN=${HUMAN}"; continue; }
+    mkdir -p "$S1OUT"
     echo "[stage1 run] task=${TASK} id=${ID}"
     CUDA_VISIBLE_DEVICES=$GPU_STAGE1 python remove_anything_video_sam2.py \
       --input_video "$HUMAN" \
@@ -1747,7 +1749,7 @@ PY
 # 安全续跑版：只规划已经存在 K0.2 preview summary 的 id；用 heredoc 生成 bash 脚本，避免 zsh 不支持 mapfile 或误用中文引号。
 cat > /tmp/run_h2o_k1_preview_resume.sh <<'BASH'
 #!/usr/bin/env bash
-set -euo pipefail
+set -eo pipefail
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
 
 for TASK in pick_diverse_bottles place_bread_basket stack_cups; do
@@ -1920,7 +1922,7 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && cd /home/zaijia0
 # id 0 验证通过后，批量跑 id 0-10：
 cat > /tmp/run_h2o_k1_debug_bottles_0_10.sh <<'BASH'
 #!/usr/bin/env bash
-set -euo pipefail
+set -eo pipefail
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
 
 TASK=pick_diverse_bottles

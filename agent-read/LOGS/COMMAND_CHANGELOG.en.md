@@ -2203,3 +2203,9 @@ Update: the verified-v2 daily viewer command now includes `--foundation_capture_
 - I3.6: debug command for five available IDs per six-task run; it first creates human+object Stage-1 inpaint backgrounds, then visible-reinit repaints robot+object pixels from L16 `head_cam_plan.mp4`.
 - I3.7: full batch command that enumerates `L16_human_replay_clean/<TASK>/foundation_input_<ID>/head_cam_plan.mp4` and skips existing Stage-1 BGs and `final_repainted.mp4` outputs.
 - Key outputs: `results_repaint_piper_h2_l16/stage1_human_object/<TASK>/id_<ID>/...` and `results_repaint_piper_h2_l16_visible_reinit/e0_robot_object/<TASK>/id_<ID>_l16/final_repainted.mp4`.
+
+
+## 2026-06-24 (Fix L16 Repaint Command Details)
+
+- I3.6/I3.7 no longer use `set -u`, so they are compatible with the `inpainting-sam3-dino3` conda activation scripts.
+- I3.6/I3.7 Stage-1 now explicitly creates the `stage1_human_inpaint` directory before writing `removed_w_mask_rgb_<ID>.mp4`.

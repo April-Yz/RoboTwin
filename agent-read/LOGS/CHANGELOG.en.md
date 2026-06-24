@@ -2919,3 +2919,11 @@ Validation: `bash -n code_painting/run_plan_keyframes_human_replay_piper_d435.sh
 - New outputs use `results_repaint_piper_h2_l16/stage1_human_object` and `results_repaint_piper_h2_l16_visible_reinit/e0_robot_object`, leaving old I1/I3.5 outputs untouched.
 
 Validation: static bash syntax checks were run for the newly added command blocks; results are in this turn's command output.
+
+
+## 2026-06-24 (Fix L16 Repaint Command Runnability)
+
+- Fixed I3.6/I3.7 commands by changing `set -euo pipefail` to `set -eo pipefail`, avoiding conda activation failures from an unbound `ADDR2LINE` variable.
+- Added `mkdir -p "$S1OUT"` before calling `remove_anything_video_sam2.py`, preventing `FileNotFoundError` when batch Stage-1 uses `save_mask_frames=0`.
+
+Validation: re-extracted I3.6/I3.7 bash blocks and checked them with `bash -n`.

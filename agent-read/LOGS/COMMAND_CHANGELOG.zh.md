@@ -2201,3 +2201,9 @@
 - I3.6：六任务各 5 个可用 ID 的 debug 指令，先做人手+物体 Stage-1 inpaint，再把 L16 `head_cam_plan.mp4` 中的机器人+物体 visible-reinit repaint 到背景上。
 - I3.7：全量批处理指令，自动枚举 `L16_human_replay_clean/<TASK>/foundation_input_<ID>/head_cam_plan.mp4`，并跳过已存在的 Stage-1 BG 和 `final_repainted.mp4`。
 - 关键输出：`results_repaint_piper_h2_l16/stage1_human_object/<TASK>/id_<ID>/...` 和 `results_repaint_piper_h2_l16_visible_reinit/e0_robot_object/<TASK>/id_<ID>_l16/final_repainted.mp4`。
+
+
+## 2026-06-24（修正 L16 repaint 命令细节）
+
+- I3.6/I3.7 不再使用 `set -u`，以兼容 `inpainting-sam3-dino3` conda activate 脚本。
+- I3.6/I3.7 Stage-1 在写 `removed_w_mask_rgb_<ID>.mp4` 前显式创建 `stage1_human_inpaint` 目录。
