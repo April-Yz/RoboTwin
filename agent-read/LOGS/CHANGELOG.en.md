@@ -2941,3 +2941,10 @@ Validation: re-extracted I3.6/I3.7 bash blocks and checked them with `bash -n`.
 - New output root: `/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object`.
 
 Validation: extracted the I3.6 debug bash block and passed `bash -n /tmp/i36_whitebg_debug_block.sh`; extracted the inline compose Python and passed `python3 -m py_compile /tmp/i36_whitebg_inline_compose.py`. Actual SAM inference was not run in this documentation update.
+
+## 2026-06-24 (Fix I3.6 White-Background Inverted-Mask Frame Directory)
+
+- Fixed the `COMMAND_LIBRARY.zh.md` I3.6 inline compose snippet: `remove_anything_video_sam3_robot.py` actually writes per-frame masks to `mask_head_cam_plan/`, not `mask/`. The old command failed during the first `pick_diverse_bottles id0` compose step with `no inverted mask frames under .../mask`, so the loop exited early.
+- Updated the I3.6 output inspection notes and `agent-read/COMMANDS/pi0_h2o_training_data.*.md`.
+
+Validation: re-extracted the I3.6 debug/batch bash blocks and checked them with `bash -n`; extracted the inline compose Python and checked it with `python3 -m py_compile`.

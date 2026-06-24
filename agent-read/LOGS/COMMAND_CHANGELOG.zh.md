@@ -2220,3 +2220,8 @@
 - 作用：L16 六任务 debug/批处理时不直接 prompt 机械臂+物体，而是 prompt 白色背景并反选 mask，再把 L16 源视频的非白背景区域合成到 Stage-1 背景。
 - 重要参数：`RUN_MODE=debug|batch`、`BG_MODE=hand_only|human_object`、`MASK_IDX`、`WHITE_PROMPT`、`COMPOSITE_ERODE`、`BLEND_ALPHA_SIGMA`。
 - 输出：`results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object/<TASK>/id_<ID>_l16_whitebg_<BG_MODE>/final_repainted.mp4`。
+
+## 2026-06-24（修正 COMMAND_LIBRARY I3.6 mask 帧目录）
+
+- 修正 I3.6 白背景反选 repaint 命令中的合成输入目录：`mask/` -> `mask_head_cam_plan/`。
+- 影响：之前 debug 只会完成第一条 SAM 可视化输出，然后在 compose 步骤退出；修正后可以继续生成 `final_repainted.mp4` 并进入后续 task/id。

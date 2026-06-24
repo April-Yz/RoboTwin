@@ -2939,3 +2939,10 @@
 - 新输出根目录：`/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object`。
 
 Validation: 已抽取 I3.6 debug bash block 并通过 `bash -n /tmp/i36_whitebg_debug_block.sh`；已抽取 inline compose Python 并通过 `python3 -m py_compile /tmp/i36_whitebg_inline_compose.py`。本轮未运行实际 SAM 推理。
+
+## 2026-06-24（修正 I3.6 白背景反选 mask 帧目录）
+
+- 修正 `COMMAND_LIBRARY.zh.md` I3.6 inline compose 片段：`remove_anything_video_sam3_robot.py` 实际把逐帧 mask 保存到 `mask_head_cam_plan/`，不是 `mask/`。旧命令会在第一条 `pick_diverse_bottles id0` 合成时报 `no inverted mask frames under .../mask`，因此循环提前退出。
+- 同步更新 I3.6 的输出检查说明和 `agent-read/COMMANDS/pi0_h2o_training_data.*.md`。
+
+Validation: 已重新抽取 I3.6 debug/batch bash block 并做 `bash -n`；已抽取 inline compose Python 并做 `python3 -m py_compile`。

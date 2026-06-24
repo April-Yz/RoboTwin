@@ -2222,3 +2222,8 @@ Update: the verified-v2 daily viewer command now includes `--foundation_capture_
 - Purpose: for L16 six-task debug/batch runs, prompt the white background instead of robot+object, invert the mask, then compose the L16 source video's non-white-background pixels onto the Stage-1 background.
 - Important parameters: `RUN_MODE=debug|batch`, `BG_MODE=hand_only|human_object`, `MASK_IDX`, `WHITE_PROMPT`, `COMPOSITE_ERODE`, `BLEND_ALPHA_SIGMA`.
 - Output: `results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object/<TASK>/id_<ID>_l16_whitebg_<BG_MODE>/final_repainted.mp4`.
+
+## 2026-06-24 (Fix COMMAND_LIBRARY I3.6 Mask Frame Directory)
+
+- Fixed the compose input directory in the I3.6 white-background inverted-mask repaint command: `mask/` -> `mask_head_cam_plan/`.
+- Impact: the previous debug command completed only the first SAM visualization output and then exited during compose; the fixed command can create `final_repainted.mp4` and continue to later task/id jobs.

@@ -1453,7 +1453,7 @@ echo "final repaint counts"; for TASK in pick_diverse_bottles place_bread_basket
 
 用途：这是 I3.5.2/I3.5.3 的对照路线。旧路线在 Stage-2 直接 prompt `robot arm + object`，如果第一帧没有机械臂/物体，mask 可能从一开始就漂到背景。本节改为 prompt L16 源视频里的白色背景，然后使用 `--invert_mask` 得到“非白背景区域”（通常就是机械臂 + 物体）作为贴回区域。
 
-注意：`remove_anything_video_sam3_robot.py --invert_mask` 只会反转保存出来的 `mask/`、`mask_head_cam_plan.mp4`、`w_mask_head_cam_plan.mp4`；脚本自带的 `target_with_original_head_cam_plan.mp4` 仍然用原始白背景 mask 合成，所以本节命令会关闭脚本自带合成，并在命令末尾用反选后的 `mask/*.jpg` 重新合成 `target_with_original_head_cam_plan.mp4` 和 `final_repainted.mp4`。这不修改仓库代码。
+注意：`remove_anything_video_sam3_robot.py --invert_mask` 会反转保存出来的 `mask_head_cam_plan/`、`mask_head_cam_plan.mp4`、`w_mask_head_cam_plan.mp4`；脚本自带的 `target_with_original_head_cam_plan.mp4` 仍然用原始白背景 mask 合成，所以本节命令会关闭脚本自带合成，并在命令末尾用反选后的 `mask_head_cam_plan/*.jpg` 重新合成 `target_with_original_head_cam_plan.mp4` 和 `final_repainted.mp4`。这不修改仓库代码。
 
 默认背景使用 I1/I1.1 的“只抠除人手” Stage-1：
 
@@ -1569,9 +1569,10 @@ import numpy as np
 
 source_p, bg_p, out_p, fps_s, erode_s, sigma_s = sys.argv[1:7]
 out = Path(out_p)
-mask_frames = sorted((out / "mask").glob("*.jpg"))
+mask_dir = out / "mask_head_cam_plan"
+mask_frames = sorted(mask_dir.glob("*.jpg"))
 if not mask_frames:
-    raise SystemExit(f"[compose error] no inverted mask frames under {out / 'mask'}")
+    raise SystemExit(f"[compose error] no inverted mask frames under {mask_dir}")
 fps = int(float(fps_s))
 erode = int(erode_s)
 sigma = float(sigma_s)
@@ -1626,6 +1627,156 @@ BASH
 
 ```bash
 RUN_MODE=batch BG_MODE=hand_only OVERWRITE=0 bash <<'BASH'
+set -eo pipefail
+
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
+conda activate inpainting-sam3-dino3
+cd /home/zaijia001/ssd/inpainting_sam3_robot
+
+L16=/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_human_replay_clean
+BGROOT_HAND=/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2/stage1
+BGROOT_OBJECT=/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stage1_human_object
+OUTROOT=/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object
+LEGACY=/home/zaijia001/ssd/inpainting_sam2_robot
+GPU=${GPU:-3}
+FPS=${FPS:-5}
+RUN_MODE=${RUN_MODE:-debug}
+BG_MODE=${BG_MODE:-hand_only}
+OVERWRITE=${OVERWRITE:-1}
+MASK_IDX=${MASK_IDX:-0}
+WHITE_PROMPT=${WHITE_PROMPT:-white background, white floor, white table, blank white area.}
+COMPOSITE_ERODE=${COMPOSITE_ERODE:-0}
+BLEND_ALPHA_SIGMA=${BLEND_ALPHA_SIGMA:-1.0}
+
+ids_debug() {
+  case "$1" in
+    pick_diverse_bottles|place_bread_basket|stack_cups|pnp_tray) echo 0 1 2 3 4 ;;
+    handover_bottle) echo 1 2 3 4 5 ;;
+    pnp_bread) echo 7 8 9 10 11 ;;
+  esac
+}
+
+ids_all() {
+  [[ -d "$L16/$1" ]] || return 0
+  find "$L16/$1" -path '*/head_cam_plan.mp4' 2>/dev/null \
+    | sed 's#.*/foundation_input_\([0-9]*\)/head_cam_plan.mp4#\1#' \
+    | sort -n
+}
+
+ids() {
+  case "$RUN_MODE" in
+    debug) ids_debug "$1" ;;
+    batch) ids_all "$1" ;;
+    *) echo "[error] RUN_MODE must be debug or batch, got $RUN_MODE" >&2; return 1 ;;
+  esac
+}
+
+bg_path() {
+  TASK=$1
+  ID=$2
+  if [[ "$BG_MODE" == "human_object" ]]; then
+    echo "$BGROOT_OBJECT/${TASK}/id_${ID}/stage1_human_inpaint/removed_w_mask_rgb_${ID}.mp4"
+  else
+    BG_ROOT="$BGROOT_HAND/${TASK}/id_${ID}"
+    BG="$BG_ROOT/human_hand_bg.mp4"
+    if [[ ! -f "$BG" && -d "$BG_ROOT/stage1_human_inpaint" ]]; then
+      BG=$(find "$BG_ROOT/stage1_human_inpaint" -maxdepth 1 -type f -name 'removed_w_mask_*.mp4' 2>/dev/null | sort | head -n 1 || true)
+    fi
+    echo "$BG"
+  fi
+}
+
+for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do
+  for ID in $(ids "$TASK"); do
+    ROBOT=$L16/${TASK}/foundation_input_${ID}/head_cam_plan.mp4
+    BG=$(bg_path "$TASK" "$ID")
+    OUT=$OUTROOT/${TASK}/id_${ID}_l16_whitebg_${BG_MODE}
+    FINAL=$OUT/final_repainted.mp4
+    [[ "$OVERWRITE" == "1" || ! -f "$FINAL" ]] || { echo "[skip] task=${TASK} id=${ID} final=${FINAL}"; continue; }
+    [[ -f "$ROBOT" ]] || { echo "[skip] task=${TASK} id=${ID} missing ROBOT=${ROBOT}"; continue; }
+    [[ -f "$BG" ]] || { echo "[skip] task=${TASK} id=${ID} missing BG=${BG}"; continue; }
+    mkdir -p "$OUT"
+    echo "[whitebg-sam] task=${TASK} id=${ID} bg_mode=${BG_MODE} mask_idx=${MASK_IDX}"
+    CUDA_VISIBLE_DEVICES=$GPU python remove_anything_video_sam3_robot.py \
+      --input_video "$ROBOT" --target_video "$BG" --output_dir "$OUT" \
+      --coords_type key_in --point_coords 10 80 --point_labels 1 \
+      --dilate_kernel_size 0 \
+      --text_prompt "$WHITE_PROMPT" \
+      --box_threshold 0.20 --text_threshold 0.20 \
+      --max_mask_area_ratio 1.0 --exclude_bottom_ratio 0.0 \
+      --erode_kernel_size 0 --composite_erode_kernel_size 0 --blend_alpha_sigma 0.0 \
+      --invert_mask --mask_idx $MASK_IDX --fps $FPS --device cuda \
+      --sam_ckpt "$LEGACY/pretrained_models/sam_vit_h_4b8939.pth" \
+      --lama_config "$LEGACY/lama/configs/prediction/default.yaml" \
+      --lama_ckpt "$LEGACY/pretrained_models/big-lama" \
+      --tracker_ckpt vitb_384_mae_ce_32x4_ep300 \
+      --vi_ckpt "$LEGACY/pretrained_models/sttn.pth" \
+      --save_removed_video 0 --save_mask_frames 1 --save_mask_video 1 \
+      --save_vis_mask_video 1 --save_vis_box_video 1 --save_target_composite_video 0
+
+    python - "$ROBOT" "$BG" "$OUT" "$FPS" "$COMPOSITE_ERODE" "$BLEND_ALPHA_SIGMA" <<'PYCODE'
+import shutil
+import sys
+from pathlib import Path
+
+import cv2
+import imageio.v2 as iio
+import numpy as np
+
+source_p, bg_p, out_p, fps_s, erode_s, sigma_s = sys.argv[1:7]
+out = Path(out_p)
+mask_dir = out / "mask_head_cam_plan"
+mask_frames = sorted(mask_dir.glob("*.jpg"))
+if not mask_frames:
+    raise SystemExit(f"[compose error] no inverted mask frames under {mask_dir}")
+fps = int(float(fps_s))
+erode = int(erode_s)
+sigma = float(sigma_s)
+source = iio.get_reader(source_p)
+bg_reader = iio.get_reader(bg_p)
+frames = []
+for idx, mask_p in enumerate(mask_frames):
+    try:
+        src = source.get_data(idx)
+        bg = bg_reader.get_data(idx)
+    except Exception:
+        break
+    if src.ndim == 2:
+        src = np.repeat(src[:, :, None], 3, axis=2)
+    if bg.ndim == 2:
+        bg = np.repeat(bg[:, :, None], 3, axis=2)
+    src = src[:, :, :3]
+    bg = bg[:, :, :3]
+    h, w = bg.shape[:2]
+    src = cv2.resize(src, (w, h), interpolation=cv2.INTER_LINEAR)
+    mask = cv2.imread(str(mask_p), cv2.IMREAD_GRAYSCALE)
+    if mask is None:
+        raise SystemExit(f"[compose error] failed to read mask {mask_p}")
+    mask = cv2.resize(mask, (w, h), interpolation=cv2.INTER_NEAREST)
+    mask = (mask > 127).astype(np.uint8)
+    if erode > 0:
+        kernel = np.ones((erode, erode), np.uint8)
+        mask = cv2.erode(mask, kernel, iterations=1)
+    alpha = mask.astype(np.float32)
+    if sigma > 0:
+        alpha = cv2.GaussianBlur(alpha, (0, 0), sigma)
+        alpha *= mask.astype(np.float32)
+        alpha = np.clip(alpha, 0.0, 1.0)
+    alpha = alpha[:, :, None]
+    frames.append((src.astype(np.float32) * alpha + bg.astype(np.float32) * (1.0 - alpha)).astype(np.uint8))
+source.close()
+bg_reader.close()
+if not frames:
+    raise SystemExit("[compose error] no frames composed")
+out_video = out / "target_with_original_head_cam_plan.mp4"
+iio.mimwrite(out_video, frames, fps=fps, macro_block_size=1)
+shutil.copyfile(out_video, out / "final_repainted.mp4")
+print(f"[compose ok] {out_video}")
+print(f"[final ok] {out / 'final_repainted.mp4'}")
+PYCODE
+  done
+done
+BASH
 ```
 
 检查输出数量：
@@ -1647,7 +1798,7 @@ SAM 掉背景/反选效果看这里：
 /home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object/<TASK>/id_<ID>_l16_whitebg_hand_only/w_box_head_cam_plan.mp4       # 原始白背景检测框
 /home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object/<TASK>/id_<ID>_l16_whitebg_hand_only/w_mask_head_cam_plan.mp4      # 反选后贴图区域，可理解为机器人+物体候选
 /home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object/<TASK>/id_<ID>_l16_whitebg_hand_only/mask_head_cam_plan.mp4        # 反选后的二值 mask 视频
-/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object/<TASK>/id_<ID>_l16_whitebg_hand_only/mask/000000.jpg               # 逐帧反选 mask
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object/<TASK>/id_<ID>_l16_whitebg_hand_only/mask_head_cam_plan/000000.jpg     # 逐帧反选 mask
 ```
 
 调参建议：如果 `w_mask_head_cam_plan.mp4` 反选后包含太多白底，先尝试 `MASK_IDX=1` 或 `MASK_IDX=2` 重跑；如果边缘漏掉机械臂/物体，先保持 `COMPOSITE_ERODE=0`，只调 `BLEND_ALPHA_SIGMA`；如果真实物体残影明显，用 `BG_MODE=human_object` 对照跑同一批 id。
