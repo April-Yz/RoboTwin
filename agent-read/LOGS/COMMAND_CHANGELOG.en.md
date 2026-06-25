@@ -2269,3 +2269,10 @@ tmux new-session -d -s l16_stack_debug_variants_gpu1 'GPU=1 IDS="0 1 2 3 4" MAX_
 - `run_l16_stack_cups_debug_variants.sh` now accepts `VARIANTS`; use `VARIANTS="B_points_negative"` to run only the B variant.
 - B Stage-2 reads `STAGE1=/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stack_cups_debug_variants/B_points_negative`.
 - B finals are written to `/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object_b_points_negative/stack_cups/id_<ID>_l16_whitebg_human_object/final_repainted.mp4`.
+
+## 2026-06-25 (COMMAND_LIBRARY L16 I/L Training-Format Commands)
+
+- Moved the former Q section to `COMMAND_LIBRARY.zh.md` section `I3.6.2`, documenting the `stack_cups` green-cup protection debug result, full B Stage-1 command, and B Stage-2 command.
+- Added `L9.2`: `process_repainted_planner_outputs.py` reads the L16 repaint final, `pose_debug.jsonl`, `left_wrist_cam_plan.mp4`, and `right_wrist_cam_plan.mp4`, then writes `processed_data/h2o_<TASK>_l16_whitebg_repaint-120`.
+- Added `L10.7`: `convert_aloha_data_to_lerobot_R1.py --use-wrist --mode video` converts the data to `local/h2o_<TASK>_l16_whitebg_repaint`.
+- Added `L11.2.5`: creates `_25ep` subsets using `source_episode_id` alignment and records `robot_l16_whitebg_repaint_6task_25ep.zip` plus the separate `stack_cups` B-variant zip/rclone dry-run command.

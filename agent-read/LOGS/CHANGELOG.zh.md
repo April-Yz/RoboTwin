@@ -2995,3 +2995,13 @@ Validation: `python -m py_compile code_painting/l16_stack_cups_debug_variants.py
 - `COMMAND_LIBRARY.zh.md` 新增 Q 节，记录 B/C 结论、A/D 错误原因，以及 B 全量 Stage-1 和独立 Stage-2 输出路径。
 
 Validation: `python -m py_compile code_painting/l16_stack_cups_debug_variants.py` 与 `bash -n code_painting/run_l16_stack_cups_debug_variants.sh` 通过。
+
+## 2026-06-25（L16 指令归回 I 段并补训练格式转换链路）
+
+- 将 `COMMAND_LIBRARY.zh.md` 末尾的 `Q. L16 stack_cups 绿色杯保护...` 移回 `I3.6.2`，不再保留 Q 段。
+- 新增 L9.2：L16 whitebg repaint head + `L16_human_replay_clean` planner state/wrist 转 processed HDF5。
+- 新增 L10.7：L16 processed HDF5 转 LeRobot cache。
+- 新增 L11.2.5：L16 LeRobot cache 抽取 `_25ep`、zip、rclone dry-run 上传检查。
+- 同步更新 `agent-read/COMMANDS/pi0_h2o_training_data.zh.md` 和英文版本，明确 L16 没有 `world_targets_and_status.npz`，应使用 `process_repainted_planner_outputs.py` 而不是 D435 pure replay 的 `process_repainted_headcam_with_wrist.py`。
+
+Validation: `git diff --check`。

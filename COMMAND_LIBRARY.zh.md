@@ -1873,6 +1873,70 @@ Stage-2 final:
 /home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object/<TASK>/id_<ID>_l16_whitebg_human_object/final_repainted.mp4
 ```
 
+#### I3.6.2 L16 stack_cups 绿色杯保护 Stage-1 debug 与 B 方案全量
+
+背景：`stack_cups` 用 DINO 文本框检测 `left light pink cup, right dark red cup` 时，容易产生接近全屏的大框；绿色杯在两个红杯中间，因此会被一起送入 SAM2/video propagation，导致 Stage-1 inpaint 把绿色杯也去掉。
+
+已测四个方案：
+
+- A `A_protect_dino`：DINO remove mask 减 DINO `green cup` protect mask。当前效果不稳定，是错误方法；原因是 remove/protect 都依赖 DINO，大框错误会继续传导。
+- B `B_points_negative`：SAM2 正点标注左右红杯和双手，绿色杯中心作为负点。当前 `id_0..4` debug 可用，优先采用。
+- C `C_hsv_green_protect`：DINO remove mask 减 HSV green protect mask。当前 `id_0..4` debug 也可用，作为 B 的备选。
+- D `D_tight_dino`：只提高 DINO prompt/threshold。当前效果不行，是错误方法；原因是 DINO 仍可能给出覆盖绿色杯的大框。
+
+##### I3.6.2.1 四方案 debug 输出位置
+
+```text
+/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stack_cups_debug_variants/A_protect_dino/stack_cups/id_<ID>/stage1_human_inpaint/
+/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stack_cups_debug_variants/B_points_negative/stack_cups/id_<ID>/stage1_human_inpaint/
+/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stack_cups_debug_variants/C_hsv_green_protect/stack_cups/id_<ID>/stage1_human_inpaint/
+/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stack_cups_debug_variants/D_tight_dino/stack_cups/id_<ID>/stage1_human_inpaint/
+```
+
+重点看：
+
+```text
+w_mask_rgb_<ID>.mp4
+w_box_rgb_<ID>.mp4
+removed_w_mask_rgb_<ID>.mp4
+w_protect_mask_rgb_<ID>.mp4   # A/C 才有
+debug_summary.json
+```
+
+##### I3.6.2.2 只跑 B 方案全量 Stage-1
+
+```bash
+IDS=$(find /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_human_replay_clean/stack_cups -path '*/head_cam_plan.mp4' 2>/dev/null | sed 's#.*/foundation_input_\([0-9]*\)/head_cam_plan.mp4#\1#' | sort -n | tr '\n' ' ')
+tmux new-session -d -s l16_stack_B_stage1_gpu1 "IDS=\"$IDS\" GPU=1 VARIANTS=\"B_points_negative\" MAX_FRAMES=300 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_stack_cups_debug_variants.sh"
+```
+
+看进度：
+
+```bash
+tmux capture-pane -pt l16_stack_B_stage1_gpu1 -S -80
+for V in B_points_negative C_hsv_green_protect; do printf '%s ' "$V"; find /home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stack_cups_debug_variants/$V/stack_cups -maxdepth 3 -type f -name 'removed_w_mask_rgb_*.mp4' 2>/dev/null | wc -l; done
+```
+
+##### I3.6.2.3 B 方案 Stage-2 repaint
+
+Stage-2 读取 B 方案 Stage-1 背景，不覆盖默认 `e0_robot_object` 输出，单独写到 `e0_robot_object_b_points_negative`。
+
+```bash
+tmux new-session -d -s l16_stack_B_stage2_after_s1_gpu1 'while tmux has-session -t l16_stack_B_stage1_gpu1 2>/dev/null; do sleep 60; done; TASK=stack_cups GPU=1 OVERWRITE=1 STAGE1=/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stack_cups_debug_variants/B_points_negative OUTROOT=/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object_b_points_negative bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_whitebg_repaint_task.sh'
+```
+
+最终结果位置：
+
+```text
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object_b_points_negative/stack_cups/id_<ID>_l16_whitebg_human_object/final_repainted.mp4
+```
+
+计数检查：
+
+```bash
+find /home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object_b_points_negative/stack_cups -maxdepth 2 -type f -name final_repainted.mp4 2>/dev/null | wc -l
+```
+
 ## J. AnyGrasp 候选筛选：找离人手朝向/目标物最近的候选
 
 说明：三个任务的 AnyGrasp 结果位于 `/home/zaijia001/ssd/data/piper/hand/<TASK>/<TASK>_output/foundation_input_<ID>`。J0 先检查 id0-id10 需要的 AnyGrasp、Foundation replay、HaMeR NPZ 是否齐全；J1 生成 ranked preview 和 `summary.json`，其中 `orientation_rank` 更偏向“和人手局部轴接近”，`fused_rank` 同时考虑 AnyGrasp score 和人手朝向。
@@ -2946,6 +3010,41 @@ h2o_<TASK>_pure_d435_visible_reinit-120
 h2o_<TASK>_anygrasp_repaint-60
 ```
 
+### L9.2 L16 whitebg repaint head + L16 planner action/wrist 转 processed HDF5
+
+用途：把 I3.6/I3.6.1 生成的 L16 whitebg repaint head 视频，和 L16 planner 目录里的机器人状态、左右 wrist 视频整合成 pi0 intermediate HDF5。
+
+注意：L16 目录是 planner-style 输出，不是 L8.2 的 D435 pure replay 输出。当前 L16 每个 episode 目录里没有 `world_targets_and_status.npz`，因此不要使用 `process_repainted_headcam_with_wrist.py`。这里必须使用 `process_repainted_planner_outputs.py`，输入是：
+
+```text
+head repaint:
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object/<TASK>/id_<ID>_l16_whitebg_human_object/final_repainted.mp4
+
+L16 planner:
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_human_replay_clean/<TASK>/foundation_input_<ID>/pose_debug.jsonl
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_human_replay_clean/<TASK>/foundation_input_<ID>/left_wrist_cam_plan.mp4
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_human_replay_clean/<TASK>/foundation_input_<ID>/right_wrist_cam_plan.mp4
+```
+
+六任务默认 L16 whitebg repaint 转 processed HDF5：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin/policy/pi0 && N=120; for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do case "$TASK" in pick_diverse_bottles) INSTRUCTION="pick up one bottle with one arm, and pick up another bottle with the other arm." ;; place_bread_basket) INSTRUCTION="Use one arm to pick up the bread, put it into the basket, and use another arm to lift the basket." ;; stack_cups) INSTRUCTION="Stack the dark red and light red cups onto the green cup." ;; handover_bottle) INSTRUCTION="Use the right arm to grasp the bottle on the table, handover it to the left arm." ;; pnp_bread) INSTRUCTION="Pick up two breads, then place them onto the blue plate." ;; pnp_tray) INSTRUCTION="Use the left arm to grasp the red cup, and use the right arm to grasp the bottle, then place them onto the blue tray." ;; esac; echo "===== process l16_whitebg_repaint TASK=${TASK} ====="; python scripts/process_repainted_planner_outputs.py "h2o_${TASK}_l16_whitebg_repaint" "$INSTRUCTION" ${N} --head-root /home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object/${TASK} --head-dir-template 'id_{id}_l16_whitebg_human_object' --head-video-name final_repainted.mp4 --planner-root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_human_replay_clean/${TASK} --planner-dir-template 'foundation_input_{id}' --left-wrist-video-name left_wrist_cam_plan.mp4 --right-wrist-video-name right_wrist_cam_plan.mp4 --pose-debug-name pose_debug.jsonl --review-json /home/zaijia001/ssd/RoboTwin/code_painting/h2o_manual_review/${TASK}/hand_keyframes_all.json --output-dir /home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_${TASK}_l16_whitebg_repaint-${N}; done
+```
+
+如果 `stack_cups` 使用 I3.6.2 的 B 方案结果，单独跑这一条覆盖成独立数据集名：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin/policy/pi0 && TASK=stack_cups; INSTRUCTION="Stack the dark red and light red cups onto the green cup."; N=120; python scripts/process_repainted_planner_outputs.py "h2o_${TASK}_l16_whitebg_b_points_negative" "$INSTRUCTION" ${N} --head-root /home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object_b_points_negative/${TASK} --head-dir-template 'id_{id}_l16_whitebg_human_object' --head-video-name final_repainted.mp4 --planner-root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_human_replay_clean/${TASK} --planner-dir-template 'foundation_input_{id}' --left-wrist-video-name left_wrist_cam_plan.mp4 --right-wrist-video-name right_wrist_cam_plan.mp4 --pose-debug-name pose_debug.jsonl --review-json /home/zaijia001/ssd/RoboTwin/code_painting/h2o_manual_review/${TASK}/hand_keyframes_all.json --output-dir /home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_${TASK}_l16_whitebg_b_points_negative-${N}
+```
+
+检查 processed HDF5：
+
+```bash
+for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do ROOT=/home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_${TASK}_l16_whitebg_repaint-120; echo "===== ${TASK} ====="; find "$ROOT" -mindepth 2 -maxdepth 2 -type f -name 'episode_*.hdf5' 2>/dev/null | sort | wc -l; done
+find /home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_stack_cups_l16_whitebg_b_points_negative-120 -mindepth 2 -maxdepth 2 -type f -name 'episode_*.hdf5' 2>/dev/null | wc -l
+```
+
 ### L10. LeRobot 转换：3 种已可用数据模式 x 3 个任务
 
 为什么前面有 4 种模式：
@@ -3062,6 +3161,46 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate R
 
 ```bash
 for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do ROOT=/home/zaijia001/.cache/huggingface/lerobot/local/h2o_${TASK}_pure_d435_visible_reinit; echo "===== h2o_${TASK}_pure_d435_visible_reinit ====="; if [[ -f "$ROOT/meta/info.json" ]]; then python3 - "$ROOT" <<'PY'
+import json, sys
+from pathlib import Path
+root = Path(sys.argv[1])
+info = json.load(open(root / "meta/info.json"))
+print("total_episodes:", info.get("total_episodes"))
+print("total_frames:", info.get("total_frames"))
+PY
+else echo "missing"; fi; done
+```
+
+#### L10.7 六个任务 L9.2：L16 whitebg repaint 转 LeRobot cache
+
+用途：把 L9.2 生成的 L16 planner-style processed HDF5 转成 LeRobot cache。默认六任务输出名：
+
+```text
+local/h2o_<TASK>_l16_whitebg_repaint
+```
+
+如果 `stack_cups` 采用 I3.6.2 的 B 方案，额外输出：
+
+```text
+local/h2o_stack_cups_l16_whitebg_b_points_negative
+```
+
+六任务默认 L16 whitebg repaint：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_openvla && cd /home/zaijia001/ssd/RoboTwin/policy/pi0 && for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do DATASET=/home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_${TASK}_l16_whitebg_repaint-120; case "$TASK" in pick_diverse_bottles) INSTRUCTION="pick up one bottle with one arm, and pick up another bottle with the other arm." ;; place_bread_basket) INSTRUCTION="Use one arm to pick up the bread, put it into the basket, and use another arm to lift the basket." ;; stack_cups) INSTRUCTION="Stack the dark red and light red cups onto the green cup." ;; handover_bottle) INSTRUCTION="Use the right arm to grasp the bottle on the table, handover it to the left arm." ;; pnp_bread) INSTRUCTION="Pick up two breads, then place them onto the blue plate." ;; pnp_tray) INSTRUCTION="Use the left arm to grasp the red cup, and use the right arm to grasp the bottle, then place them onto the blue tray." ;; esac; COUNT=$(find "$DATASET" -mindepth 2 -maxdepth 2 -type f -name 'episode_*.hdf5' 2>/dev/null | wc -l); [[ "$COUNT" -gt 0 ]] || { echo "[skip] ${TASK}: no HDF5 under $DATASET; run L9.2 first"; continue; }; uv run examples/aloha_real/convert_aloha_data_to_lerobot_R1.py --raw-dir "$DATASET" --repo-id "local/h2o_${TASK}_l16_whitebg_repaint" --task "$INSTRUCTION" --use-wrist --mode video; done
+```
+
+`stack_cups` B 方案单独转换：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_openvla && cd /home/zaijia001/ssd/RoboTwin/policy/pi0 && TASK=stack_cups; DATASET=/home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_${TASK}_l16_whitebg_b_points_negative-120; INSTRUCTION="Stack the dark red and light red cups onto the green cup."; COUNT=$(find "$DATASET" -mindepth 2 -maxdepth 2 -type f -name 'episode_*.hdf5' 2>/dev/null | wc -l); [[ "$COUNT" -gt 0 ]] || { echo "[skip] no HDF5 under $DATASET; run L9.2 B first"; exit 0; }; uv run examples/aloha_real/convert_aloha_data_to_lerobot_R1.py --raw-dir "$DATASET" --repo-id "local/h2o_${TASK}_l16_whitebg_b_points_negative" --task "$INSTRUCTION" --use-wrist --mode video
+```
+
+检查：
+
+```bash
+for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do ROOT=/home/zaijia001/.cache/huggingface/lerobot/local/h2o_${TASK}_l16_whitebg_repaint; echo "===== h2o_${TASK}_l16_whitebg_repaint ====="; if [[ -f "$ROOT/meta/info.json" ]]; then python3 - "$ROOT" <<'PY'
 import json, sys
 from pathlib import Path
 root = Path(sys.argv[1])
@@ -3446,6 +3585,96 @@ rclone copy /home/zaijia001/.cache/huggingface/lerobot/local/robot_d435_visible_
 
 ```bash
 for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do ROOT=/home/zaijia001/.cache/huggingface/lerobot/local/h2o_${TASK}_pure_d435_visible_reinit_25ep; echo "===== h2o_${TASK}_pure_d435_visible_reinit_25ep ====="; python3 - "$ROOT" <<'PY'
+import json, sys
+from pathlib import Path
+root = Path(sys.argv[1])
+if not root.exists():
+    print("missing")
+    raise SystemExit
+info = json.load(open(root / "meta/info.json"))
+print("total_episodes:", info.get("total_episodes"))
+print("total_frames:", info.get("total_frames"))
+print("first episodes:", (root / "meta/episodes.jsonl").read_text().splitlines()[:3])
+PY
+done
+```
+
+#### L11.2.5 六任务 L16 whitebg repaint：各抽 25 episode
+
+用途：从 L10.7 生成的 `local/h2o_<TASK>_l16_whitebg_repaint` 中抽取 `_25ep`。这条链路对应 L16 planner-style repaint，不要和 L11.2.4 的 D435 pure replay 混用。
+
+前提：
+
+```text
+I3.6/I3.6.1 L16 whitebg repaint 已完成
+L9.2 processed HDF5 已完成
+L10.7 LeRobot cache 已完成
+```
+
+抽取命令和 L11.2.4 一样按 processed HDF5 的 `instructions.json/source_episode_id` 对齐原始 id，并排除已知 bad id：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_openvla && cd /home/zaijia001/ssd/RoboTwin/policy/pi0 && for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do case "$TASK" in handover_bottle) BAD_IDS="0,7,12,29" ;; pnp_bread) BAD_IDS="0,1,2,3,4,5,6,22,70" ;; *) BAD_IDS="" ;; esac; DATASET=/home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_${TASK}_l16_whitebg_repaint-120; SOURCE=local/h2o_${TASK}_l16_whitebg_repaint; [[ -d "$DATASET" ]] || { echo "[skip] missing processed DATASET=$DATASET; run L9.2 first"; continue; }; [[ -d "/home/zaijia001/.cache/huggingface/lerobot/${SOURCE}" ]] || { echo "[skip] missing LeRobot SOURCE=${SOURCE}; run L10.7 first"; continue; }; EPISODES=$(python3 - "$DATASET" "$BAD_IDS" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+bad = {int(x) for x in sys.argv[2].split(",") if x.strip()}
+keep = []
+
+for p in sorted(root.glob("episode_*/instructions.json"), key=lambda p: int(p.parent.name.split("_")[-1])):
+    ep = int(p.parent.name.split("_")[-1])
+    row = json.loads(p.read_text())
+    src = int(row.get("source_episode_id", ep))
+    if src in bad:
+        continue
+    keep.append(ep)
+    if len(keep) >= 25:
+        break
+
+if len(keep) < 25:
+    raise SystemExit(f"only {len(keep)} usable episodes after excluding {sorted(bad)}")
+print(",".join(map(str, keep)))
+PY
+); echo "===== subset L16 ${TASK}: episodes=${EPISODES} ====="; uv run python scripts/subset_lerobot_episodes.py --source "$SOURCE" --output-repo-id local/h2o_${TASK}_l16_whitebg_repaint_25ep --episodes "$EPISODES" --overwrite; done
+```
+
+如果 `stack_cups` 最终采用 B 方案，额外抽取 B 数据集：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_openvla && cd /home/zaijia001/ssd/RoboTwin/policy/pi0 && TASK=stack_cups; DATASET=/home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_${TASK}_l16_whitebg_b_points_negative-120; SOURCE=local/h2o_${TASK}_l16_whitebg_b_points_negative; [[ -d "$DATASET" ]] || { echo "[skip] missing processed DATASET=$DATASET; run L9.2 B first"; exit 0; }; [[ -d "/home/zaijia001/.cache/huggingface/lerobot/${SOURCE}" ]] || { echo "[skip] missing LeRobot SOURCE=${SOURCE}; run L10.7 B first"; exit 0; }; EPISODES=$(python3 - "$DATASET" <<'PY'
+import json
+import sys
+from pathlib import Path
+root = Path(sys.argv[1])
+keep = []
+for p in sorted(root.glob("episode_*/instructions.json"), key=lambda p: int(p.parent.name.split("_")[-1])):
+    ep = int(p.parent.name.split("_")[-1])
+    keep.append(ep)
+    if len(keep) >= 25:
+        break
+if len(keep) < 25:
+    raise SystemExit(f"only {len(keep)} usable episodes")
+print(",".join(map(str, keep)))
+PY
+); echo "===== subset L16 B stack_cups: episodes=${EPISODES} ====="; uv run python scripts/subset_lerobot_episodes.py --source "$SOURCE" --output-repo-id local/h2o_${TASK}_l16_whitebg_b_points_negative_25ep --episodes "$EPISODES" --overwrite
+```
+
+打包和上传检查：
+
+```bash
+cd /home/zaijia001/.cache/huggingface/lerobot/local && zip -r robot_l16_whitebg_repaint_6task_25ep.zip h2o_pick_diverse_bottles_l16_whitebg_repaint_25ep h2o_place_bread_basket_l16_whitebg_repaint_25ep h2o_stack_cups_l16_whitebg_repaint_25ep h2o_handover_bottle_l16_whitebg_repaint_25ep h2o_pnp_bread_l16_whitebg_repaint_25ep h2o_pnp_tray_l16_whitebg_repaint_25ep
+rclone copy /home/zaijia001/.cache/huggingface/lerobot/local/robot_l16_whitebg_repaint_6task_25ep.zip gdrive:piper/multi/6task/robot_l16_whitebg_repaint -P --drive-chunk-size 64M --transfers 4 --dry-run
+
+cd /home/zaijia001/.cache/huggingface/lerobot/local && zip -r robot_l16_whitebg_b_points_negative_stack_cups_25ep.zip h2o_stack_cups_l16_whitebg_b_points_negative_25ep
+rclone copy /home/zaijia001/.cache/huggingface/lerobot/local/robot_l16_whitebg_b_points_negative_stack_cups_25ep.zip gdrive:piper/multi/6task/robot_l16_whitebg_b_points_negative_stack_cups -P --drive-chunk-size 64M --transfers 4 --dry-run
+```
+
+检查：
+
+```bash
+for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do ROOT=/home/zaijia001/.cache/huggingface/lerobot/local/h2o_${TASK}_l16_whitebg_repaint_25ep; echo "===== h2o_${TASK}_l16_whitebg_repaint_25ep ====="; python3 - "$ROOT" <<'PY'
 import json, sys
 from pathlib import Path
 root = Path(sys.argv[1])
@@ -9452,68 +9681,4 @@ cd /home/zaijia001/ssd/RoboTwin && python3 /home/zaijia001/ssd/RoboTwin/code_pai
 
 ```bash
 --include_optional 0
-```
-
-## Q. L16 stack_cups 绿色杯保护 Stage-1 debug 与 B 方案全量
-
-背景：`stack_cups` 用 DINO 文本框检测 `left light pink cup, right dark red cup` 时，容易产生接近全屏的大框；绿色杯在两个红杯中间，因此会被一起送入 SAM2/video propagation，导致 Stage-1 inpaint 把绿色杯也去掉。
-
-已测四个方案：
-
-- A `A_protect_dino`：DINO remove mask 减 DINO `green cup` protect mask。当前效果不稳定，是错误方法；原因是 remove/protect 都依赖 DINO，大框错误会继续传导。
-- B `B_points_negative`：SAM2 正点标注左右红杯和双手，绿色杯中心作为负点。当前 `id_0..4` debug 可用，优先采用。
-- C `C_hsv_green_protect`：DINO remove mask 减 HSV green protect mask。当前 `id_0..4` debug 也可用，作为 B 的备选。
-- D `D_tight_dino`：只提高 DINO prompt/threshold。当前效果不行，是错误方法；原因是 DINO 仍可能给出覆盖绿色杯的大框。
-
-### Q1. 四方案 debug 输出位置
-
-```text
-/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stack_cups_debug_variants/A_protect_dino/stack_cups/id_<ID>/stage1_human_inpaint/
-/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stack_cups_debug_variants/B_points_negative/stack_cups/id_<ID>/stage1_human_inpaint/
-/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stack_cups_debug_variants/C_hsv_green_protect/stack_cups/id_<ID>/stage1_human_inpaint/
-/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stack_cups_debug_variants/D_tight_dino/stack_cups/id_<ID>/stage1_human_inpaint/
-```
-
-重点看：
-
-```text
-w_mask_rgb_<ID>.mp4
-w_box_rgb_<ID>.mp4
-removed_w_mask_rgb_<ID>.mp4
-w_protect_mask_rgb_<ID>.mp4   # A/C 才有
-debug_summary.json
-```
-
-### Q2. 只跑 B 方案全量 Stage-1
-
-```bash
-IDS=$(find /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_human_replay_clean/stack_cups -path '*/head_cam_plan.mp4' 2>/dev/null | sed 's#.*/foundation_input_\([0-9]*\)/head_cam_plan.mp4#\1#' | sort -n | tr '\n' ' ')
-tmux new-session -d -s l16_stack_B_stage1_gpu1 "IDS=\"$IDS\" GPU=1 VARIANTS=\"B_points_negative\" MAX_FRAMES=300 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_stack_cups_debug_variants.sh"
-```
-
-看进度：
-
-```bash
-tmux capture-pane -pt l16_stack_B_stage1_gpu1 -S -80
-for V in B_points_negative C_hsv_green_protect; do printf '%s ' "$V"; find /home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stack_cups_debug_variants/$V/stack_cups -maxdepth 3 -type f -name 'removed_w_mask_rgb_*.mp4' 2>/dev/null | wc -l; done
-```
-
-### Q3. B 方案 Stage-2 repaint
-
-Stage-2 读取 B 方案 Stage-1 背景，不覆盖默认 `e0_robot_object` 输出，单独写到 `e0_robot_object_b_points_negative`。
-
-```bash
-tmux new-session -d -s l16_stack_B_stage2_after_s1_gpu1 'while tmux has-session -t l16_stack_B_stage1_gpu1 2>/dev/null; do sleep 60; done; TASK=stack_cups GPU=1 OVERWRITE=1 STAGE1=/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stack_cups_debug_variants/B_points_negative OUTROOT=/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object_b_points_negative bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_whitebg_repaint_task.sh'
-```
-
-最终结果位置：
-
-```text
-/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object_b_points_negative/stack_cups/id_<ID>_l16_whitebg_human_object/final_repainted.mp4
-```
-
-计数检查：
-
-```bash
-find /home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object_b_points_negative/stack_cups -maxdepth 2 -type f -name final_repainted.mp4 2>/dev/null | wc -l
 ```

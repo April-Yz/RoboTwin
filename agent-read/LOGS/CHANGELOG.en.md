@@ -2997,3 +2997,13 @@ Validation: `python -m py_compile code_painting/l16_stack_cups_debug_variants.py
 - Added section Q to `COMMAND_LIBRARY.zh.md` with the B/C conclusion, A/D failure notes, and the full B Stage-1 plus separate Stage-2 output path.
 
 Validation: `python -m py_compile code_painting/l16_stack_cups_debug_variants.py` and `bash -n code_painting/run_l16_stack_cups_debug_variants.sh` passed.
+
+## 2026-06-25 (Move L16 Commands Back Under I and Add Training-Format Conversion Flow)
+
+- Moved the trailing `Q. L16 stack_cups green-cup protection...` content in `COMMAND_LIBRARY.zh.md` back under `I3.6.2`; no Q section remains.
+- Added L9.2 for converting L16 whitebg repaint heads plus `L16_human_replay_clean` planner state/wrist outputs into processed HDF5.
+- Added L10.7 for converting L16 processed HDF5 into LeRobot caches.
+- Added L11.2.5 for creating L16 `_25ep` subsets, zip files, and rclone dry-run upload checks.
+- Synchronized `agent-read/COMMANDS/pi0_h2o_training_data.zh.md` and the English version, documenting that L16 has no `world_targets_and_status.npz` and should use `process_repainted_planner_outputs.py`, not the D435 pure replay `process_repainted_headcam_with_wrist.py`.
+
+Validation: `git diff --check`.

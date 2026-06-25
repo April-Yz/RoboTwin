@@ -2267,3 +2267,10 @@ tmux new-session -d -s l16_stack_debug_variants_gpu1 'GPU=1 IDS="0 1 2 3 4" MAX_
 - `run_l16_stack_cups_debug_variants.sh` 新增 `VARIANTS`，可用 `VARIANTS="B_points_negative"` 只跑 B 方案。
 - B Stage-2 读取 `STAGE1=/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stack_cups_debug_variants/B_points_negative`。
 - B final 输出到：`/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object_b_points_negative/stack_cups/id_<ID>_l16_whitebg_human_object/final_repainted.mp4`。
+
+## 2026-06-25（COMMAND_LIBRARY L16 I/L 训练格式命令）
+
+- 将原 Q 段改为 `COMMAND_LIBRARY.zh.md` 的 `I3.6.2`，记录 `stack_cups` 绿色杯保护 debug 结论、B 方案全量 Stage-1、B 方案 Stage-2。
+- 新增 `L9.2`：`process_repainted_planner_outputs.py` 读取 L16 repaint final、`pose_debug.jsonl`、`left_wrist_cam_plan.mp4`、`right_wrist_cam_plan.mp4`，写出 `processed_data/h2o_<TASK>_l16_whitebg_repaint-120`。
+- 新增 `L10.7`：`convert_aloha_data_to_lerobot_R1.py --use-wrist --mode video` 转出 `local/h2o_<TASK>_l16_whitebg_repaint`。
+- 新增 `L11.2.5`：按 `source_episode_id` 抽取 `_25ep`，并记录 `robot_l16_whitebg_repaint_6task_25ep.zip` 与 `stack_cups` B 方案 zip/rclone dry-run 命令。

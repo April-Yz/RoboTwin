@@ -22,6 +22,9 @@
 - D435 pure replay retarget：`/home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure_d435/<TASK>/id<ID>_d435_z005/`
 - AnyGrasp planner：`/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_plan/<TASK>/foundation_input_<ID>/`
 - AnyGrasp repaint head：`/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2/anygrasp/<TASK>/id_<ID>/final_repainted.mp4`
+- L16 planner：`/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_human_replay_clean/<TASK>/foundation_input_<ID>/`
+- L16 whitebg repaint head：`/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object/<TASK>/id_<ID>_l16_whitebg_human_object/final_repainted.mp4`
+- L16 stack_cups B 方案 repaint head：`/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object_b_points_negative/stack_cups/id_<ID>_l16_whitebg_human_object/final_repainted.mp4`
 
 ## pure replay 转换
 
@@ -56,6 +59,42 @@ D435 版本的 AnyGrasp 候选预览不走默认 `foundation_replay`，而是使
 
 `COMMAND_LIBRARY.zh.md` 的 J0.1/J1.1 记录了 6 task D435 AnyGrasp 可用性检查和基于人工关键帧的候选 preview/summary 生成命令。
 
+## L16 whitebg repaint 转换
+
+L16 `L16_human_replay_clean/<TASK>/foundation_input_<ID>/` 是 planner-style 输出，目录里使用：
+
+- `pose_debug.jsonl`
+- `left_wrist_cam_plan.mp4`
+- `right_wrist_cam_plan.mp4`
+- `head_cam_plan.mp4`
+
+当前 L16 目录不包含 `world_targets_and_status.npz`，所以不能走 D435 pure replay 的 `process_repainted_headcam_with_wrist.py`。L16 repaint 视频进入训练格式时应走：
+
+```text
+I3.6/I3.6.1 repaint final
+-> L9.2 process_repainted_planner_outputs.py
+-> L10.7 convert_aloha_data_to_lerobot_R1.py
+-> L11.2.5 subset_lerobot_episodes.py + zip/rclone
+```
+
+默认六任务数据集名：
+
+```text
+processed_data/h2o_<TASK>_l16_whitebg_repaint-120
+local/h2o_<TASK>_l16_whitebg_repaint
+local/h2o_<TASK>_l16_whitebg_repaint_25ep
+```
+
+如果 `stack_cups` 使用绿色杯保护 B 方案，独立数据集名是：
+
+```text
+processed_data/h2o_stack_cups_l16_whitebg_b_points_negative-120
+local/h2o_stack_cups_l16_whitebg_b_points_negative
+local/h2o_stack_cups_l16_whitebg_b_points_negative_25ep
+```
+
+这些命令已经记录在 `COMMAND_LIBRARY.zh.md` 的 L9.2、L10.7、L11.2.5。I3.6.2 记录 `stack_cups` B/C debug 结论和 B 方案 Stage-1/Stage-2 输出位置。
+
 ## 检查命令
 
 ```bash
@@ -82,6 +121,7 @@ find /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_plan -maxdepth 3 -t
 - Human 数据：L5/L5.1 或新三任务 L5.2，之后转 LeRobot 用 L10.4 或 L10.5。
 - Robot replay 数据：默认广角用 L6/L6.1；D435 visible-reinit 六任务统一用 I1/I1.1 -> I3.4/I3.5 -> L8.2 -> L10.6 -> L11.2.4。
 - AnyGrasp replay 数据：L9/L9.1，前提是 planner episode 已有 `pose_debug.jsonl` 和左右 wrist plan 视频。
+- L16 whitebg repaint 数据：I3.6/I3.6.1 -> L9.2 -> L10.7 -> L11.2.5。`stack_cups` 如采用 B 方案，使用 I3.6.2 的独立 `e0_robot_object_b_points_negative` 输出。
 
 关键顺序：
 

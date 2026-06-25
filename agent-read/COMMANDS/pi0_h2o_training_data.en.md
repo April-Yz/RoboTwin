@@ -22,6 +22,9 @@ Record the input paths and conversion entrypoints for turning H2O human, pure re
 - D435 pure replay retarget: `/home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure_d435/<TASK>/id<ID>_d435_z005/`
 - AnyGrasp planner: `/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_h2o_plan/<TASK>/foundation_input_<ID>/`
 - AnyGrasp repaint head: `/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2/anygrasp/<TASK>/id_<ID>/final_repainted.mp4`
+- L16 planner: `/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_human_replay_clean/<TASK>/foundation_input_<ID>/`
+- L16 whitebg repaint head: `/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object/<TASK>/id_<ID>_l16_whitebg_human_object/final_repainted.mp4`
+- L16 stack_cups B-variant repaint head: `/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object_b_points_negative/stack_cups/id_<ID>_l16_whitebg_human_object/final_repainted.mp4`
 
 ## Pure Replay Conversion
 
@@ -56,6 +59,42 @@ The D435 AnyGrasp candidate-preview path does not use the default `foundation_re
 
 `COMMAND_LIBRARY.zh.md` sections J0.1/J1.1 document the six-task D435 AnyGrasp availability check and human-keyframe-based candidate preview/summary generation commands.
 
+## L16 Whitebg Repaint Conversion
+
+L16 `L16_human_replay_clean/<TASK>/foundation_input_<ID>/` is planner-style output. Each episode uses:
+
+- `pose_debug.jsonl`
+- `left_wrist_cam_plan.mp4`
+- `right_wrist_cam_plan.mp4`
+- `head_cam_plan.mp4`
+
+The current L16 directories do not contain `world_targets_and_status.npz`, so they should not use the D435 pure replay script `process_repainted_headcam_with_wrist.py`. L16 repaint videos should enter the training format through:
+
+```text
+I3.6/I3.6.1 repaint final
+-> L9.2 process_repainted_planner_outputs.py
+-> L10.7 convert_aloha_data_to_lerobot_R1.py
+-> L11.2.5 subset_lerobot_episodes.py + zip/rclone
+```
+
+Default six-task dataset names:
+
+```text
+processed_data/h2o_<TASK>_l16_whitebg_repaint-120
+local/h2o_<TASK>_l16_whitebg_repaint
+local/h2o_<TASK>_l16_whitebg_repaint_25ep
+```
+
+If `stack_cups` uses the green-cup-protect B variant, the separate dataset names are:
+
+```text
+processed_data/h2o_stack_cups_l16_whitebg_b_points_negative-120
+local/h2o_stack_cups_l16_whitebg_b_points_negative
+local/h2o_stack_cups_l16_whitebg_b_points_negative_25ep
+```
+
+The runnable commands are documented in `COMMAND_LIBRARY.zh.md` sections L9.2, L10.7, and L11.2.5. Section I3.6.2 records the `stack_cups` B/C debug conclusions and the B-variant Stage-1/Stage-2 output paths.
+
 ## Check Commands
 
 ```bash
@@ -82,6 +121,7 @@ Note: `L9` still requires each planner episode to have `left_wrist_cam_plan.mp4`
 - Human data: L5/L5.1, or L5.2 for the new three tasks; then convert to LeRobot with L10.4 or L10.5.
 - Robot replay data: default wide replay uses L6/L6.1; six-task D435 visible-reinit uses I1/I1.1 -> I3.4/I3.5 -> L8.2 -> L10.6 -> L11.2.4.
 - AnyGrasp replay data: L9/L9.1, requiring planner episodes with `pose_debug.jsonl` and both wrist plan videos.
+- L16 whitebg repaint data: I3.6/I3.6.1 -> L9.2 -> L10.7 -> L11.2.5. If `stack_cups` uses the B variant, use the separate I3.6.2 `e0_robot_object_b_points_negative` output.
 
 Core order:
 
