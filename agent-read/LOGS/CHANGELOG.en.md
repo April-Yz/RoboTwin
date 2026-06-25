@@ -2981,3 +2981,11 @@ Validation: `bash -n code_painting/run_l16_stage1_human_object_task.sh code_pain
 ## 2026-06-24 (I3.6.1 GPU Index Fix)
 
 - Changed the I3.6.1 `pnp_tray` example from non-existent GPU4 to a second-wave GPU0 command. This machine exposes GPUs 0-3, so five tasks cannot all run simultaneously on unique GPUs.
+
+## 2026-06-25 (stack_cups Green-Cup Protection Debug Runner)
+
+- Added `code_painting/l16_stack_cups_debug_variants.py` and `code_painting/run_l16_stack_cups_debug_variants.sh` to run four Stage-1 debug variants for `stack_cups id_0..4`.
+- The variants are DINO green-cup protect-mask subtraction, SAM2 positive/negative points, HSV green-region subtraction, and a stricter DINO prompt/threshold baseline.
+- Output root: `/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stack_cups_debug_variants/<VARIANT>/stack_cups/id_<ID>/stage1_human_inpaint/`.
+
+Validation: `python -m py_compile code_painting/l16_stack_cups_debug_variants.py` passed; tmux `l16_stack_debug_variants_gpu1` was started for `id_0..4`.

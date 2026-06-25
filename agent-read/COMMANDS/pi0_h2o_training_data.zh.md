@@ -300,3 +300,42 @@ tmux new-session -d -s l16_vis_id0 'cd /home/zaijia001/ssd/RoboTwin && python3 /
 - `code_painting/run_l16_whitebg_repaint_task.sh`：按单个 `TASK` 执行白背景 SAM + 反选 repaint；合成时输出帧数跟随 robot/mask，短 BG 会按比例采样拉伸。
 
 这两个脚本用于把五个非 `stack_cups` 任务分配到不同 GPU 并行运行。`stack_cups` 仍建议先单独调 Stage-1 prompt/dilation，确认绿色杯子没有被误删后再跑 repaint。
+
+### stack_cups 绿色杯保护 debug 入口
+
+新增脚本：
+
+- `code_painting/l16_stack_cups_debug_variants.py`
+- `code_painting/run_l16_stack_cups_debug_variants.sh`
+
+用途：只对 `stack_cups id_0..4` 跑 Stage-1 mask/inpaint debug，不覆盖正式 `stage1_human_object`。四个方案分别输出到：
+
+```text
+/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stack_cups_debug_variants/A_protect_dino/stack_cups/id_<ID>/stage1_human_inpaint/
+/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stack_cups_debug_variants/B_points_negative/stack_cups/id_<ID>/stage1_human_inpaint/
+/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stack_cups_debug_variants/C_hsv_green_protect/stack_cups/id_<ID>/stage1_human_inpaint/
+/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stack_cups_debug_variants/D_tight_dino/stack_cups/id_<ID>/stage1_human_inpaint/
+```
+
+四个方案含义：
+
+- `A_protect_dino`：DINO/SAM2 生成 remove mask，再用 `green cup` 生成 protect mask，最终 `remove - protect`。
+- `B_points_negative`：不用 DINO，使用固定正点标注两个红杯和双手，并把绿色杯中心作为负点。
+- `C_hsv_green_protect`：DINO/SAM2 remove mask 减去 HSV 绿色区域保护 mask。
+- `D_tight_dino`：更严格 prompt/threshold 的 DINO 基线，不做绿色保护。
+
+每个目录重点查看：
+
+```text
+w_box_rgb_<ID>.mp4
+w_mask_rgb_<ID>.mp4
+removed_w_mask_rgb_<ID>.mp4
+w_protect_mask_rgb_<ID>.mp4   # A/C 才有
+debug_summary.json
+```
+
+运行命令：
+
+```bash
+tmux new-session -d -s l16_stack_debug_variants_gpu1 'GPU=1 IDS="0 1 2 3 4" MAX_FRAMES=300 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_stack_cups_debug_variants.sh'
+```

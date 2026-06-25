@@ -300,3 +300,42 @@ Batch notes: `pick_diverse_bottles/place_bread_basket/stack_cups/pnp_tray` can u
 - `code_painting/run_l16_whitebg_repaint_task.sh`: run white-background SAM plus inverted-mask repaint for one `TASK`; compose output length follows robot/mask frames, and shorter BG videos are sampled proportionally.
 
 Use these scripts to run the five non-`stack_cups` tasks on separate GPUs. Keep `stack_cups` separate until its Stage-1 prompt/dilation is verified not to remove the green cup.
+
+### stack_cups Green-Cup Protection Debug Entry Point
+
+Added scripts:
+
+- `code_painting/l16_stack_cups_debug_variants.py`
+- `code_painting/run_l16_stack_cups_debug_variants.sh`
+
+Purpose: run Stage-1 mask/inpaint debug only for `stack_cups id_0..4` without overwriting formal `stage1_human_object` outputs. The four variants write to:
+
+```text
+/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stack_cups_debug_variants/A_protect_dino/stack_cups/id_<ID>/stage1_human_inpaint/
+/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stack_cups_debug_variants/B_points_negative/stack_cups/id_<ID>/stage1_human_inpaint/
+/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stack_cups_debug_variants/C_hsv_green_protect/stack_cups/id_<ID>/stage1_human_inpaint/
+/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stack_cups_debug_variants/D_tight_dino/stack_cups/id_<ID>/stage1_human_inpaint/
+```
+
+Variant meanings:
+
+- `A_protect_dino`: create a DINO/SAM2 remove mask, create a `green cup` protect mask, then use `remove - protect`.
+- `B_points_negative`: bypass DINO and use fixed positive points for the two red cups and hands, with the green cup center as a negative point.
+- `C_hsv_green_protect`: subtract an HSV green-region protect mask from the DINO/SAM2 remove mask.
+- `D_tight_dino`: stricter DINO prompt/threshold baseline with no green protection.
+
+Inspect these files in each output directory:
+
+```text
+w_box_rgb_<ID>.mp4
+w_mask_rgb_<ID>.mp4
+removed_w_mask_rgb_<ID>.mp4
+w_protect_mask_rgb_<ID>.mp4   # A/C only
+debug_summary.json
+```
+
+Run command:
+
+```bash
+tmux new-session -d -s l16_stack_debug_variants_gpu1 'GPU=1 IDS="0 1 2 3 4" MAX_FRAMES=300 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_stack_cups_debug_variants.sh'
+```

@@ -2248,3 +2248,16 @@
 ## 2026-06-24（I3.6.1 GPU 编号修正）
 
 - 将 I3.6.1 中 `pnp_tray` 的示例 GPU 从不存在的 GPU4 改成第二波复用 GPU0；当前机器可用 GPU 编号为 0-3，五个任务不能全部独占不同 GPU 同时跑。
+
+## 2026-06-25（stack_cups 四方案 debug 命令）
+
+- 新增命令脚本：`code_painting/run_l16_stack_cups_debug_variants.sh`。
+- 入口 Python：`code_painting/l16_stack_cups_debug_variants.py`。
+- 运行方式：
+
+```bash
+tmux new-session -d -s l16_stack_debug_variants_gpu1 'GPU=1 IDS="0 1 2 3 4" MAX_FRAMES=300 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_stack_cups_debug_variants.sh'
+```
+
+- 输出：`results_repaint_piper_h2_l16/stack_cups_debug_variants/{A_protect_dino,B_points_negative,C_hsv_green_protect,D_tight_dino}/stack_cups/id_<ID>/stage1_human_inpaint/`。
+- 重点查看 `w_mask_rgb_<ID>.mp4`、`w_box_rgb_<ID>.mp4`、`removed_w_mask_rgb_<ID>.mp4`，A/C 还可查看 `w_protect_mask_rgb_<ID>.mp4`。

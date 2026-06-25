@@ -2979,3 +2979,11 @@ Validation: `bash -n code_painting/run_l16_stage1_human_object_task.sh code_pain
 ## 2026-06-24（I3.6.1 GPU 编号修正）
 
 - 将 I3.6.1 中 `pnp_tray` 的示例 GPU 从不存在的 GPU4 改成第二波复用 GPU0；当前机器可用 GPU 编号为 0-3，五个任务不能全部独占不同 GPU 同时跑。
+
+## 2026-06-25（stack_cups 绿色杯保护 debug runner）
+
+- 新增 `code_painting/l16_stack_cups_debug_variants.py` 和 `code_painting/run_l16_stack_cups_debug_variants.sh`，用于对 `stack_cups id_0..4` 跑四种 Stage-1 debug 方案。
+- 四种方案分别是 DINO green-cup protect mask 扣除、SAM2 正/负点、HSV 绿色保护扣除、严格 DINO prompt/threshold 基线。
+- 输出目录：`/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stack_cups_debug_variants/<VARIANT>/stack_cups/id_<ID>/stage1_human_inpaint/`。
+
+Validation: `python -m py_compile code_painting/l16_stack_cups_debug_variants.py` 通过；已启动 tmux `l16_stack_debug_variants_gpu1` 跑 `id_0..4`。

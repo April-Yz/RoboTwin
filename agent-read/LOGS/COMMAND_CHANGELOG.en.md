@@ -2250,3 +2250,16 @@ Update: the verified-v2 daily viewer command now includes `--foundation_capture_
 ## 2026-06-24 (I3.6.1 GPU Index Fix)
 
 - Changed the I3.6.1 `pnp_tray` example from non-existent GPU4 to a second-wave GPU0 command. This machine exposes GPUs 0-3, so five tasks cannot all run simultaneously on unique GPUs.
+
+## 2026-06-25 (stack_cups Four-Variant Debug Command)
+
+- Added command wrapper: `code_painting/run_l16_stack_cups_debug_variants.sh`.
+- Python entry point: `code_painting/l16_stack_cups_debug_variants.py`.
+- Run command:
+
+```bash
+tmux new-session -d -s l16_stack_debug_variants_gpu1 'GPU=1 IDS="0 1 2 3 4" MAX_FRAMES=300 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_stack_cups_debug_variants.sh'
+```
+
+- Outputs: `results_repaint_piper_h2_l16/stack_cups_debug_variants/{A_protect_dino,B_points_negative,C_hsv_green_protect,D_tight_dino}/stack_cups/id_<ID>/stage1_human_inpaint/`.
+- Inspect `w_mask_rgb_<ID>.mp4`, `w_box_rgb_<ID>.mp4`, and `removed_w_mask_rgb_<ID>.mp4`; A/C also write `w_protect_mask_rgb_<ID>.mp4`.
