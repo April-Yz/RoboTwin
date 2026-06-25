@@ -106,7 +106,7 @@ def first_existing(paths: Iterable[Path]) -> Path:
     return next(iter(paths))
 
 
-def resolve_panels(task: str, video_id: int, include_optional: bool) -> list[Panel]:
+def resolve_panels(task: str, video_id: int, args: argparse.Namespace) -> list[Panel]:
     hand_dir = HAND_ROOT / task
     foundation_candidates = (
         hand_dir / "foundation_replay_d435" / f"foundation_input_{video_id}" / "head_cam_replay.mp4",
@@ -125,12 +125,14 @@ def resolve_panels(task: str, video_id: int, include_optional: bool) -> list[Pan
             True,
         ),
     ]
-    if include_optional:
+    if args.include_optional:
+        final_task_dir = args.final_root / args.final_task_subdir_template.format(task=task, id=video_id)
+        final_episode_dir = final_task_dir / args.final_episode_dir_template.format(task=task, id=video_id)
         panels.extend(
             [
                 Panel(
                     "Stage1 inpaint",
-                    STAGE1_ROOT
+                    args.stage1_root
                     / "stage1_human_object"
                     / task
                     / f"id_{video_id}"
@@ -139,12 +141,8 @@ def resolve_panels(task: str, video_id: int, include_optional: bool) -> list[Pan
                     False,
                 ),
                 Panel(
-                    "Final repaint",
-                    FINAL_ROOT
-                    / "e0_robot_object"
-                    / task
-                    / f"id_{video_id}_l16"
-                    / "final_repainted.mp4",
+                    args.final_label,
+                    final_episode_dir / args.final_video_name.format(task=task, id=video_id),
                     False,
                 ),
             ]
@@ -179,7 +177,7 @@ def build_filter(panels: list[Panel], target_duration: float, args: argparse.Nam
 
 
 def make_montage(task: str, video_id: int, args: argparse.Namespace) -> bool:
-    all_panels = resolve_panels(task, video_id, include_optional=args.include_optional)
+    all_panels = resolve_panels(task, video_id, args)
     missing_required = [panel for panel in all_panels if panel.required and not panel.path.is_file()]
     if missing_required:
         print(f"[skip] {task} id={video_id}: missing required video(s)")
@@ -234,6 +232,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--id", dest="single_id", type=int, help="Single id.")
     parser.add_argument("--ids", default=None, help="Batch ids, for example 0 or 0-4 or 0,2,7-10.")
     parser.add_argument("--output_root", type=Path, default=DEFAULT_OUTPUT_ROOT)
+    parser.add_argument("--stage1_root", type=Path, default=STAGE1_ROOT)
+    parser.add_argument("--final_root", type=Path, default=FINAL_ROOT)
+    parser.add_argument("--final_task_subdir_template", default="e0_robot_object/{task}")
+    parser.add_argument("--final_episode_dir_template", default="id_{id}_l16")
+    parser.add_argument("--final_video_name", default="final_repainted.mp4")
+    parser.add_argument("--final_label", default="Final repaint")
     parser.add_argument("--fps", type=float, default=5.0)
     parser.add_argument("--panel_width", type=int, default=426)
     parser.add_argument("--panel_height", type=int, default=320)
@@ -246,6 +250,8 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     args.output_root = args.output_root.expanduser().resolve()
+    args.stage1_root = args.stage1_root.expanduser().resolve()
+    args.final_root = args.final_root.expanduser().resolve()
     tasks = parse_tasks(args)
     if args.single_id is not None:
         ids = [args.single_id]

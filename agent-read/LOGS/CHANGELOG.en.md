@@ -3007,3 +3007,13 @@ Validation: `python -m py_compile code_painting/l16_stack_cups_debug_variants.py
 - Synchronized `agent-read/COMMANDS/pi0_h2o_training_data.zh.md` and the English version, documenting that L16 has no `world_targets_and_status.npz` and should use `process_repainted_planner_outputs.py`, not the D435 pure replay `process_repainted_headcam_with_wrist.py`.
 
 Validation: `git diff --check`.
+
+
+## 2026-06-25 (L16 ours review and selected pipeline)
+
+- Added configurable final-path arguments to `make_l16_repaint_montage.py`, so the P five-panel montage flow can inspect whitebg/B-variant finals.
+- Added `code_painting/review_l16_ours_montages.py`: discovers finals, generates P montages, lets the user mark episodes with `y/n/m`, and writes per-task JSON compatible with `--review-json`.
+- Added `code_painting/run_l16_ours_selected_pipeline.sh`: reads the review JSON and creates `h2o_<TASK>_ours-120`, `local/h2o_<TASK>_ours`, `local/h2o_<TASK>_ours_25ep`, then packages `robot_ours_<TASK_GROUP>_25ep.zip` and runs rclone dry-run/upload.
+- Updated `COMMAND_LIBRARY.zh.md` P4 and L11.2.6 plus `agent-read/COMMANDS/pi0_h2o_training_data.*.md`.
+
+Validation: `python3 -m py_compile code_painting/make_l16_repaint_montage.py code_painting/review_l16_ours_montages.py`; `bash -n code_painting/run_l16_ours_selected_pipeline.sh`.

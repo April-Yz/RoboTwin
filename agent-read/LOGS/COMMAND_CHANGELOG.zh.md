@@ -2274,3 +2274,10 @@ tmux new-session -d -s l16_stack_debug_variants_gpu1 'GPU=1 IDS="0 1 2 3 4" MAX_
 - 新增 `L9.2`：`process_repainted_planner_outputs.py` 读取 L16 repaint final、`pose_debug.jsonl`、`left_wrist_cam_plan.mp4`、`right_wrist_cam_plan.mp4`，写出 `processed_data/h2o_<TASK>_l16_whitebg_repaint-120`。
 - 新增 `L10.7`：`convert_aloha_data_to_lerobot_R1.py --use-wrist --mode video` 转出 `local/h2o_<TASK>_l16_whitebg_repaint`。
 - 新增 `L11.2.5`：按 `source_episode_id` 抽取 `_25ep`，并记录 `robot_l16_whitebg_repaint_6task_25ep.zip` 与 `stack_cups` B 方案 zip/rclone dry-run 命令。
+
+
+## 2026-06-25（L16 ours review/pipeline 命令）
+
+- 新增 `COMMAND_LIBRARY.zh.md` P4：`review_l16_ours_montages.py` 自动生成/播放 P 五联 montage，并写出 `l16_ours_review/selections/<TASK>/ours_review_selection.json`。
+- 新增 `COMMAND_LIBRARY.zh.md` L11.2.6：`run_l16_ours_selected_pipeline.sh` 按 JSON 生成 `ours` 命名的数据集、抽取 `_25ep`、zip 并 rclone dry-run。
+- `make_l16_repaint_montage.py` 新增 `--final_root`、`--final_task_subdir_template`、`--final_episode_dir_template`、`--final_video_name`、`--final_label`，用于复用同一 montage 脚本查看不同 repaint 根目录。

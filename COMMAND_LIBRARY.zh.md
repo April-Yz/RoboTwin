@@ -3689,6 +3689,58 @@ PY
 done
 ```
 
+
+#### L11.2.6 L16 ours：按 P4 review JSON 一键转换、抽取、打包
+
+用途：用 P4 选出来的 `ours_review_selection.json` 作为过滤表，生成这次的正式 `ours` 数据集。命名规则是用 `ours` 代替之前的 `reinit`：
+
+```text
+processed HDF5: /home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_<TASK>_ours-120
+LeRobot:       /home/zaijia001/.cache/huggingface/lerobot/local/h2o_<TASK>_ours
+25ep subset:   /home/zaijia001/.cache/huggingface/lerobot/local/h2o_<TASK>_ours_25ep
+zip:           /home/zaijia001/.cache/huggingface/lerobot/local/robot_ours_<TASK_GROUP>_25ep.zip
+rclone dst:    gdrive:piper/multi/<TASK_GROUP>/robot_ours
+```
+
+脚本位置：
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/run_l16_ours_selected_pipeline.sh
+```
+
+当前先处理已有五个任务，`stack_cups` 后面 review 完再加入：
+
+```bash
+TASKS="pick_diverse_bottles place_bread_basket handover_bottle pnp_bread pnp_tray" \
+TASK_GROUP=5task \
+DRY_RUN=1 \
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_ours_selected_pipeline.sh
+```
+
+六任务全部选完后：
+
+```bash
+TASKS="pick_diverse_bottles place_bread_basket handover_bottle pnp_bread pnp_tray stack_cups" \
+TASK_GROUP=6task \
+DRY_RUN=1 \
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_ours_selected_pipeline.sh
+```
+
+分阶段运行：
+
+```bash
+# 只做 L9.2: final repaint + pose_debug + wrist -> processed HDF5
+STEPS="process" TASKS="pick_diverse_bottles place_bread_basket handover_bottle pnp_bread pnp_tray" bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_ours_selected_pipeline.sh
+
+# 只做 L10.7: processed HDF5 -> LeRobot
+STEPS="lerobot" TASKS="pick_diverse_bottles place_bread_basket handover_bottle pnp_bread pnp_tray" bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_ours_selected_pipeline.sh
+
+# 只做 L11.2.5 风格的 subset/zip dry-run
+STEPS="subset zip" TASKS="pick_diverse_bottles place_bread_basket handover_bottle pnp_bread pnp_tray" TASK_GROUP=5task DRY_RUN=1 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_ours_selected_pipeline.sh
+```
+
+正式上传时把 `DRY_RUN=1` 改成 `DRY_RUN=0`。如果某个任务 accept 少于 25 条，脚本会按实际 accept 数量生成 subset 并打印 warning；正式六任务建议每个任务先在 P4 里选满 25 条。
+
 ### L11.3 task prompt 设置位置：先改 processed episode 的 `instructions.json`
 
 注意：当前 `examples/aloha_real/convert_aloha_data_to_lerobot_R1.py --task "..."` 对已经写好的 episode prompt 不会生效。该脚本实际读取每个 processed episode 目录里的：
@@ -9681,4 +9733,68 @@ cd /home/zaijia001/ssd/RoboTwin && python3 /home/zaijia001/ssd/RoboTwin/code_pai
 
 ```bash
 --include_optional 0
+```
+
+
+### P4. ours 可视化选择：P montage -> JSON
+
+用途：先把 P 中的 HaMeR / Foundation / L16 / Stage1 / final repaint 五联可视化整合出来，再用交互窗口逐条选择可用 episode。输出 JSON 兼容 L9.2 的 `--review-json`，后续 `ours` 数据集只会整合你标记为 `y` 的 id。
+
+脚本位置：
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/review_l16_ours_montages.py
+```
+
+当前已有的五个非 `stack_cups` 任务先跑这个。脚本会自动发现 `final_repainted.mp4`，生成 montage 后打开窗口播放：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python /home/zaijia001/ssd/RoboTwin/code_painting/review_l16_ours_montages.py \
+  --tasks pick_diverse_bottles place_bread_basket handover_bottle pnp_bread pnp_tray
+```
+
+`stack_cups` 的 B 方案后面跑完后，用同一个脚本单独 review：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python /home/zaijia001/ssd/RoboTwin/code_painting/review_l16_ours_montages.py \
+  --tasks stack_cups \
+  --overwrite_montage
+```
+
+交互按键：
+
+```text
+y: accept 当前 id 并跳到下一条
+n: reject 当前 id 并跳到下一条
+m: maybe，默认 strict 转换不会纳入
+u: 清除当前标记
+space: 暂停/继续
+.: 下一条
+,: 上一条
+]: 加速
+[: 减速
+r: 从头播放当前视频
+s: 保存 JSON
+q/Esc: 保存并退出
+```
+
+输出位置：
+
+```text
+Montage:
+/home/zaijia001/ssd/RoboTwin/code_painting/l16_ours_review/montages/<TASK>/id_<ID>/compare_hamer_foundation_l16_repaint_<TASK>_id<ID>.mp4
+
+每个任务的选择 JSON:
+/home/zaijia001/ssd/RoboTwin/code_painting/l16_ours_review/selections/<TASK>/ours_review_selection.json
+
+合并 JSON:
+/home/zaijia001/ssd/RoboTwin/code_painting/l16_ours_review/selections/ours_review_selection_all.json
+```
+
+如果只想先生成 montage、不想覆盖旧的 review JSON，可以先限制 id：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python /home/zaijia001/ssd/RoboTwin/code_painting/review_l16_ours_montages.py \
+  --tasks pick_diverse_bottles \
+  --ids 0-4
 ```

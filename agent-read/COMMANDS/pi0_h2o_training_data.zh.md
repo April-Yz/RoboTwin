@@ -332,6 +332,48 @@ tmux new-session -d -s l16_vis_id0 'cd /home/zaijia001/ssd/RoboTwin && python3 /
 批处理：`pick_diverse_bottles/place_bread_basket/stack_cups/pnp_tray` 可用 `--ids 0-4`；`handover_bottle` 建议从 `--ids 1-5` 开始；`pnp_bread` 建议从 `--ids 7-11` 开始，因为 L16 没有其 id0-id6。
 
 
+### L16 ours review 与选取后转换
+
+新增脚本：
+
+- `code_painting/review_l16_ours_montages.py`
+- `code_painting/run_l16_ours_selected_pipeline.sh`
+
+推荐流程：
+
+```text
+P4 review_l16_ours_montages.py 生成/播放五联 montage
+-> 逐条按 y/n/m 标记，写出 l16_ours_review/selections/<TASK>/ours_review_selection.json
+-> run_l16_ours_selected_pipeline.sh 读取 JSON
+-> h2o_<TASK>_ours-120 processed HDF5
+-> local/h2o_<TASK>_ours LeRobot
+-> local/h2o_<TASK>_ours_25ep
+-> robot_ours_<TASK_GROUP>_25ep.zip + rclone dry-run/上传
+```
+
+当前五个非 `stack_cups` 任务先运行：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/review_l16_ours_montages.py --tasks pick_diverse_bottles place_bread_basket handover_bottle pnp_bread pnp_tray
+```
+
+`stack_cups` B 方案完成后单独运行：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/review_l16_ours_montages.py --tasks stack_cups --overwrite_montage
+```
+
+交互按键：`y` accept、`n` reject、`m` maybe、`u` 清除、空格暂停/继续、`.` 下一条、`,` 上一条、`]`/`[` 调速、`r` 重播、`s` 保存、`q` 保存退出。
+
+按 JSON 做五任务转换、抽取和打包 dry-run：
+
+```bash
+TASKS="pick_diverse_bottles place_bread_basket handover_bottle pnp_bread pnp_tray" TASK_GROUP=5task DRY_RUN=1 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_ours_selected_pipeline.sh
+```
+
+六任务全部完成后把 `TASKS` 加上 `stack_cups`，并设置 `TASK_GROUP=6task`。正式上传时把 `DRY_RUN=1` 改成 `DRY_RUN=0`。
+
+
 ## L16 白背景反选按任务并行入口
 
 `COMMAND_LIBRARY.zh.md` 的 I3.6.1 新增了两个任务级脚本：

@@ -332,6 +332,48 @@ tmux new-session -d -s l16_vis_id0 'cd /home/zaijia001/ssd/RoboTwin && python3 /
 Batch notes: `pick_diverse_bottles/place_bread_basket/stack_cups/pnp_tray` can use `--ids 0-4`; `handover_bottle` should start with `--ids 1-5`; `pnp_bread` should start with `--ids 7-11` because its L16 outputs do not include id0-id6.
 
 
+### L16 ours review and selected conversion
+
+Added scripts:
+
+- `code_painting/review_l16_ours_montages.py`
+- `code_painting/run_l16_ours_selected_pipeline.sh`
+
+Recommended flow:
+
+```text
+P4 review_l16_ours_montages.py generates/plays five-panel montages
+-> mark each row with y/n/m and write l16_ours_review/selections/<TASK>/ours_review_selection.json
+-> run_l16_ours_selected_pipeline.sh reads that JSON
+-> h2o_<TASK>_ours-120 processed HDF5
+-> local/h2o_<TASK>_ours LeRobot
+-> local/h2o_<TASK>_ours_25ep
+-> robot_ours_<TASK_GROUP>_25ep.zip + rclone dry-run/upload
+```
+
+Run the current five non-`stack_cups` tasks first:
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/review_l16_ours_montages.py --tasks pick_diverse_bottles place_bread_basket handover_bottle pnp_bread pnp_tray
+```
+
+After the `stack_cups` B variant is complete, review it separately:
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/review_l16_ours_montages.py --tasks stack_cups --overwrite_montage
+```
+
+Interactive keys: `y` accept, `n` reject, `m` maybe, `u` clear, space play/pause, `.` next, `,` previous, `]`/`[` speed, `r` replay, `s` save, `q` save and quit.
+
+Run the five-task JSON-selected conversion, subset, and package dry-run:
+
+```bash
+TASKS="pick_diverse_bottles place_bread_basket handover_bottle pnp_bread pnp_tray" TASK_GROUP=5task DRY_RUN=1 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_ours_selected_pipeline.sh
+```
+
+After all six tasks are complete, add `stack_cups` to `TASKS` and set `TASK_GROUP=6task`. For the real upload, change `DRY_RUN=1` to `DRY_RUN=0`.
+
+
 ## L16 White-Background Inverted-Mask Per-Task Entry Points
 
 `COMMAND_LIBRARY.zh.md` section I3.6.1 adds two task-level scripts:

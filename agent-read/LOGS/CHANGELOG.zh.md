@@ -3005,3 +3005,13 @@ Validation: `python -m py_compile code_painting/l16_stack_cups_debug_variants.py
 - 同步更新 `agent-read/COMMANDS/pi0_h2o_training_data.zh.md` 和英文版本，明确 L16 没有 `world_targets_and_status.npz`，应使用 `process_repainted_planner_outputs.py` 而不是 D435 pure replay 的 `process_repainted_headcam_with_wrist.py`。
 
 Validation: `git diff --check`。
+
+
+## 2026-06-25（L16 ours review 与 selected pipeline）
+
+- `make_l16_repaint_montage.py` 新增可配置 final 路径参数，可复用 P 五联可视化逻辑查看 whitebg/B 方案 final。
+- 新增 `code_painting/review_l16_ours_montages.py`：自动发现 final、生成 P montage、交互式按 `y/n/m` 选择 episode，并输出兼容 `--review-json` 的 per-task JSON。
+- 新增 `code_painting/run_l16_ours_selected_pipeline.sh`：按 review JSON 生成 `h2o_<TASK>_ours-120`、`local/h2o_<TASK>_ours`、`local/h2o_<TASK>_ours_25ep`，并打包 `robot_ours_<TASK_GROUP>_25ep.zip` 后执行 rclone dry-run/上传。
+- 同步更新 `COMMAND_LIBRARY.zh.md` P4 和 L11.2.6，以及 `agent-read/COMMANDS/pi0_h2o_training_data.*.md`。
+
+Validation: `python3 -m py_compile code_painting/make_l16_repaint_montage.py code_painting/review_l16_ours_montages.py`；`bash -n code_painting/run_l16_ours_selected_pipeline.sh`。

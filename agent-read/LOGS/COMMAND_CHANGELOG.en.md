@@ -2276,3 +2276,10 @@ tmux new-session -d -s l16_stack_debug_variants_gpu1 'GPU=1 IDS="0 1 2 3 4" MAX_
 - Added `L9.2`: `process_repainted_planner_outputs.py` reads the L16 repaint final, `pose_debug.jsonl`, `left_wrist_cam_plan.mp4`, and `right_wrist_cam_plan.mp4`, then writes `processed_data/h2o_<TASK>_l16_whitebg_repaint-120`.
 - Added `L10.7`: `convert_aloha_data_to_lerobot_R1.py --use-wrist --mode video` converts the data to `local/h2o_<TASK>_l16_whitebg_repaint`.
 - Added `L11.2.5`: creates `_25ep` subsets using `source_episode_id` alignment and records `robot_l16_whitebg_repaint_6task_25ep.zip` plus the separate `stack_cups` B-variant zip/rclone dry-run command.
+
+
+## 2026-06-25 (L16 ours review/pipeline commands)
+
+- Added `COMMAND_LIBRARY.zh.md` P4: `review_l16_ours_montages.py` generates/plays P five-panel montages and writes `l16_ours_review/selections/<TASK>/ours_review_selection.json`.
+- Added `COMMAND_LIBRARY.zh.md` L11.2.6: `run_l16_ours_selected_pipeline.sh` reads the JSON, creates `ours`-named datasets, subsets `_25ep`, zips, and runs rclone dry-run.
+- Added `--final_root`, `--final_task_subdir_template`, `--final_episode_dir_template`, `--final_video_name`, and `--final_label` to `make_l16_repaint_montage.py` so the same montage script can inspect different repaint roots.
