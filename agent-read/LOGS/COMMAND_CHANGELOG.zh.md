@@ -1,6 +1,18 @@
 ## 2026-06-02 00:00:00 +08
 
 
+## 2026-06-25 18:15:00 +08
+
+- 新增任务级 L16 ours 标注脚本：
+  - `annotate_l16_ours_pick_diverse_bottles.sh`
+  - `annotate_l16_ours_place_bread_basket.sh`
+  - `annotate_l16_ours_handover_bottle.sh`
+  - `annotate_l16_ours_pnp_bread.sh`
+  - `annotate_l16_ours_pnp_tray.sh`
+  - `annotate_l16_ours_stack_cups.sh`
+- 更新 P4 交互键说明：`+/-` 为推荐调速键，`[]` 仅作为兼容调速键。
+
+
 ## 2026-06-25 17:20:00 +08
 
 - 更新 P4 `review_l16_ours_montages.py` 命令：

@@ -300,7 +300,7 @@ def review_entries(entries: list[dict[str, Any]], reviews: dict[str, dict[str, A
             lines = [
                 f"{idx + 1}/{len(entries)} task={task} id={video_id} status={status} speed={speed:.2f}x frame={frame_index}/{total_frames}",
                 f"task stats: accepted={accepted}{target_text} remaining={remaining} maybe={counts['M']} reject={counts['N']} unreviewed={counts['-']} total={counts['total']}",
-                "keys: y accept | n reject | m maybe | u clear | space play/pause | . next | , prev | ]/[ speed | r replay | s save | q quit",
+                "keys: y accept | n reject | m maybe | u clear | space play/pause | . next | , prev | +/- speed | r replay | s save | q quit",
             ]
             overlay(frame, lines)
             cv2.imshow(args.window_name, frame)
@@ -328,11 +328,13 @@ def review_entries(entries: list[dict[str, Any]], reviews: dict[str, dict[str, A
             frame_index = 0
             playing = True
             continue
-        if key == ord("]"):
+        if key in (ord("]"), ord("="), ord("+")):
             speed = min(8.0, speed * 1.5)
+            print(f"[speed] {speed:.2f}x")
             continue
-        if key == ord("["):
+        if key in (ord("["), ord("-"), ord("_")):
             speed = max(0.125, speed / 1.5)
+            print(f"[speed] {speed:.2f}x")
             continue
         if key == ord("y"):
             set_label(item, "y")

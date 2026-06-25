@@ -1,6 +1,19 @@
 # CHANGELOG.zh
 
 
+## 2026-06-25（L16 ours 单任务标注脚本与调速键修正）
+
+- 新增六个任务级标注脚本：`code_painting/annotate_l16_ours_<TASK>.sh`。
+  - 默认 `TARGET_COUNT=25`、`OVERWRITE_MONTAGE=1`、`INITIAL_SPEED=1.0`。
+  - 支持在脚本后追加 `--ids` 等参数，便于局部 review。
+- 更新 `review_l16_ours_montages.py` 调速键：
+  - 推荐 `+`/`-` 或 `=`/`_` 调速，并在终端打印当前倍率。
+  - `[`/`]` 保留兼容，但文档提示若被窗口/播放器解释为逐帧，就改用 `+/-`。
+- 文档更新：
+  - `COMMAND_LIBRARY.zh.md` P4 改为任务级标注脚本入口。
+  - `agent-read/COMMANDS/pi0_h2o_training_data.zh.md` / `.en.md` 同步。
+
+
 ## 2026-06-25（L16 ours 七面板 review 与单任务 25 条统计）
 
 - 更新 L16 ours 可视化筛选：

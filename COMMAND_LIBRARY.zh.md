@@ -9742,54 +9742,71 @@ cd /home/zaijia001/ssd/RoboTwin && python3 /home/zaijia001/ssd/RoboTwin/code_pai
 
 用途：先把 P 中的 HaMeR / Foundation / L16 head / L16 left wrist / L16 right wrist / Stage1 / final repaint 七面板可视化整合出来，再用交互窗口逐条选择可用 episode。输出 JSON 兼容 L9.2 的 `--review-json`，后续 `ours` 数据集只会整合你标记为 `y` 的 id。
 
-脚本位置：
+底层脚本：
 
 ```text
 /home/zaijia001/ssd/RoboTwin/code_painting/review_l16_ours_montages.py
 ```
 
-建议按任务单独筛选，每个任务目标先卡 `25` 条。窗口底部和启动终端都会显示当前任务 `accepted/25`、`remaining`、`maybe`、`reject`、`unreviewed` 和 `total`。由于旧 montage 可能是五联版本，第一次升级后建议都带 `--overwrite_montage` 重新生成七面板视频；已有 JSON 标记会保留。
+任务级标注脚本：
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/annotate_l16_ours_pick_diverse_bottles.sh
+/home/zaijia001/ssd/RoboTwin/code_painting/annotate_l16_ours_place_bread_basket.sh
+/home/zaijia001/ssd/RoboTwin/code_painting/annotate_l16_ours_handover_bottle.sh
+/home/zaijia001/ssd/RoboTwin/code_painting/annotate_l16_ours_pnp_bread.sh
+/home/zaijia001/ssd/RoboTwin/code_painting/annotate_l16_ours_pnp_tray.sh
+/home/zaijia001/ssd/RoboTwin/code_painting/annotate_l16_ours_stack_cups.sh
+```
+
+建议按任务单独筛选，每个任务目标先卡 `25` 条。窗口底部和启动终端都会显示当前任务 `accepted/25`、`remaining`、`maybe`、`reject`、`unreviewed` 和 `total`。任务级脚本默认 `TARGET_COUNT=25`、`OVERWRITE_MONTAGE=1`，第一次升级到七面板时会重生成 montage；如果后面只想继续标注、不要重生成视频，使用 `OVERWRITE_MONTAGE=0 bash ...`。
 
 `pick_diverse_bottles`：
 
 ```bash
-source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && \
-python /home/zaijia001/ssd/RoboTwin/code_painting/review_l16_ours_montages.py --tasks pick_diverse_bottles --overwrite_montage --target_count 25
+bash /home/zaijia001/ssd/RoboTwin/code_painting/annotate_l16_ours_pick_diverse_bottles.sh
 ```
 
 `place_bread_basket`：
 
 ```bash
-source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && \
-python /home/zaijia001/ssd/RoboTwin/code_painting/review_l16_ours_montages.py --tasks place_bread_basket --overwrite_montage --target_count 25
+bash /home/zaijia001/ssd/RoboTwin/code_painting/annotate_l16_ours_place_bread_basket.sh
 ```
 
 `handover_bottle`：
 
 ```bash
-source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && \
-python /home/zaijia001/ssd/RoboTwin/code_painting/review_l16_ours_montages.py --tasks handover_bottle --overwrite_montage --target_count 25
+bash /home/zaijia001/ssd/RoboTwin/code_painting/annotate_l16_ours_handover_bottle.sh
 ```
 
 `pnp_bread`：
 
 ```bash
-source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && \
-python /home/zaijia001/ssd/RoboTwin/code_painting/review_l16_ours_montages.py --tasks pnp_bread --overwrite_montage --target_count 25
+bash /home/zaijia001/ssd/RoboTwin/code_painting/annotate_l16_ours_pnp_bread.sh
 ```
 
 `pnp_tray`：
 
 ```bash
-source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && \
-python /home/zaijia001/ssd/RoboTwin/code_painting/review_l16_ours_montages.py --tasks pnp_tray --overwrite_montage --target_count 25
+bash /home/zaijia001/ssd/RoboTwin/code_painting/annotate_l16_ours_pnp_tray.sh
 ```
 
-`stack_cups` 的 B 方案完成后单独筛选。脚本会优先使用 `e0_robot_object_b_points_negative`，如果该目录存在：
+`stack_cups` 的 B 方案完成后单独筛选。底层脚本会优先使用 `e0_robot_object_b_points_negative`，如果该目录存在：
 
 ```bash
-source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && \
-python /home/zaijia001/ssd/RoboTwin/code_painting/review_l16_ours_montages.py --tasks stack_cups --overwrite_montage --target_count 25
+bash /home/zaijia001/ssd/RoboTwin/code_painting/annotate_l16_ours_stack_cups.sh
+```
+
+常用环境变量：
+
+```bash
+TARGET_COUNT=25 OVERWRITE_MONTAGE=0 INITIAL_SPEED=1.5 bash /home/zaijia001/ssd/RoboTwin/code_painting/annotate_l16_ours_pick_diverse_bottles.sh
+```
+
+如果只想先看一小段 id，可以把参数直接追加到任务脚本后面；已有 JSON 标记会保留：
+
+```bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/annotate_l16_ours_pick_diverse_bottles.sh --ids 0-4
 ```
 
 交互按键：
@@ -9802,8 +9819,9 @@ u: 清除当前标记
 space: 暂停/继续
 .: 下一条
 ,: 上一条
-]: 加速
-[: 减速
++ 或 =: 加速播放
+- 或 _: 减速播放
+] / [: 兼容调速键；如果窗口/播放器把它们解释成逐帧，请改用 +/-
 r: 从头播放当前视频
 s: 保存 JSON
 q/Esc: 保存并退出
@@ -9820,11 +9838,4 @@ Montage:
 
 合并 JSON:
 /home/zaijia001/ssd/RoboTwin/code_painting/l16_ours_review/selections/ours_review_selection_all.json
-```
-
-如果只想先看一小段 id，可以限制范围；这仍会读取并保留原有 JSON 标记：
-
-```bash
-source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && \
-python /home/zaijia001/ssd/RoboTwin/code_painting/review_l16_ours_montages.py --tasks pick_diverse_bottles --ids 0-4 --overwrite_montage --target_count 25
 ```

@@ -339,11 +339,12 @@ Added scripts:
 
 - `code_painting/review_l16_ours_montages.py`
 - `code_painting/run_l16_ours_selected_pipeline.sh`
+- six per-task annotation entrypoints: `code_painting/annotate_l16_ours_<TASK>.sh`
 
 Recommended flow:
 
 ```text
-P4 review_l16_ours_montages.py generates/plays seven-panel montages, wrapping after four columns
+P4 annotate_l16_ours_<TASK>.sh generates/plays seven-panel montages, wrapping after four columns
 -> review one task at a time with y/n/m, targeting 25 accepted episodes
 -> write l16_ours_review/selections/<TASK>/ours_review_selection.json
 -> run_l16_ours_selected_pipeline.sh reads that JSON
@@ -353,26 +354,20 @@ P4 review_l16_ours_montages.py generates/plays seven-panel montages, wrapping af
 -> robot_ours_<TASK_GROUP>_25ep.zip + rclone dry-run/upload
 ```
 
-The review overlay and startup terminal summary show `accepted/25`, `remaining`, `maybe`, `reject`, `unreviewed`, and `total` for the current task. If older five-panel montages already exist, pass `--overwrite_montage` on the first rerun; existing JSON labels are preserved.
+The per-task scripts default to `TARGET_COUNT=25`, `OVERWRITE_MONTAGE=1`, and `INITIAL_SPEED=1.0`. To continue labeling without regenerating montages, use `OVERWRITE_MONTAGE=0 bash <script>`.
 
-Single-task command template:
-
-```bash
-source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/review_l16_ours_montages.py --tasks <TASK> --overwrite_montage --target_count 25
-```
-
-Common per-task commands:
+Per-task annotation entrypoints:
 
 ```bash
-source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/review_l16_ours_montages.py --tasks pick_diverse_bottles --overwrite_montage --target_count 25
-source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/review_l16_ours_montages.py --tasks place_bread_basket --overwrite_montage --target_count 25
-source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/review_l16_ours_montages.py --tasks handover_bottle --overwrite_montage --target_count 25
-source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/review_l16_ours_montages.py --tasks pnp_bread --overwrite_montage --target_count 25
-source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/review_l16_ours_montages.py --tasks pnp_tray --overwrite_montage --target_count 25
-source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/review_l16_ours_montages.py --tasks stack_cups --overwrite_montage --target_count 25
+bash /home/zaijia001/ssd/RoboTwin/code_painting/annotate_l16_ours_pick_diverse_bottles.sh
+bash /home/zaijia001/ssd/RoboTwin/code_painting/annotate_l16_ours_place_bread_basket.sh
+bash /home/zaijia001/ssd/RoboTwin/code_painting/annotate_l16_ours_handover_bottle.sh
+bash /home/zaijia001/ssd/RoboTwin/code_painting/annotate_l16_ours_pnp_bread.sh
+bash /home/zaijia001/ssd/RoboTwin/code_painting/annotate_l16_ours_pnp_tray.sh
+bash /home/zaijia001/ssd/RoboTwin/code_painting/annotate_l16_ours_stack_cups.sh
 ```
 
-Interactive keys: `y` accept, `n` reject, `m` maybe, `u` clear, space play/pause, `.` next, `,` previous, `]`/`[` speed, `r` replay, `s` save, `q` save and quit.
+Use `+`/`-` or `=`/`_` for playback speed. `[`/`]` remain supported, but if the window or player interprets them as frame-step keys, use `+/-` instead. Other keys: `y` accept, `n` reject, `m` maybe, `u` clear, space play/pause, `.` next, `,` previous, `r` replay, `s` save, `q` save and quit.
 
 Run the five-task JSON-selected conversion, subset, and package dry-run:
 

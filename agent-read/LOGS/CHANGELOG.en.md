@@ -1,6 +1,19 @@
 # CHANGELOG.en
 
 
+## 2026-06-25 (L16 ours per-task annotation scripts and speed-key fix)
+
+- Added six per-task annotation scripts: `code_painting/annotate_l16_ours_<TASK>.sh`.
+  - Defaults: `TARGET_COUNT=25`, `OVERWRITE_MONTAGE=1`, and `INITIAL_SPEED=1.0`.
+  - Extra arguments such as `--ids` can be appended to the script command for partial review.
+- Updated `review_l16_ours_montages.py` playback speed keys:
+  - Recommended `+`/`-` or `=`/`_` for speed changes, and print the current speed in the terminal.
+  - `[`/`]` remain supported, but the docs now recommend `+/-` if the window/player treats brackets as frame-step keys.
+- Documentation updates:
+  - `COMMAND_LIBRARY.zh.md` P4 now points to the per-task annotation entrypoints.
+  - `agent-read/COMMANDS/pi0_h2o_training_data.zh.md` / `.en.md` are synced.
+
+
 ## 2026-06-25 (L16 ours seven-panel review and per-task 25-episode tracking)
 
 - Updated L16 ours visual review:

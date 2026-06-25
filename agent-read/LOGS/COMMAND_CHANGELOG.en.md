@@ -1,6 +1,18 @@
 ## 2026-06-02 00:00:00 +08
 
 
+## 2026-06-25 18:15:00 +08
+
+- Added per-task L16 ours annotation scripts:
+  - `annotate_l16_ours_pick_diverse_bottles.sh`
+  - `annotate_l16_ours_place_bread_basket.sh`
+  - `annotate_l16_ours_handover_bottle.sh`
+  - `annotate_l16_ours_pnp_bread.sh`
+  - `annotate_l16_ours_pnp_tray.sh`
+  - `annotate_l16_ours_stack_cups.sh`
+- Updated P4 interactive key notes: `+/-` are now the recommended speed keys, while `[]` are compatibility speed keys.
+
+
 ## 2026-06-25 17:20:00 +08
 
 - Updated the P4 `review_l16_ours_montages.py` commands:
