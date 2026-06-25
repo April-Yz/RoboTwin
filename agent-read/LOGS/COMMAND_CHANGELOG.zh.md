@@ -1,6 +1,14 @@
 ## 2026-06-02 00:00:00 +08
 
 
+## 2026-06-25 18:35:00 +08
+
+- 新增 L16 whitebg mask debug 命令：
+  - `python code_painting/make_l16_whitebg_mask_debug.py --task stack_cups --id 0 --max_frames 120`
+  - 输出到 `code_painting/l16_whitebg_mask_debug/<TASK>/id_<ID>/`。
+  - 用于区分保存出的 foreground alpha 和反向背景区域，避免把 `w_box_head_cam_plan.mp4` 中的白背景框误解为最终合成 mask。
+
+
 ## 2026-06-25 18:15:00 +08
 
 - 新增任务级 L16 ours 标注脚本：

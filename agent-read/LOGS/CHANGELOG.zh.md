@@ -1,6 +1,16 @@
 # CHANGELOG.zh
 
 
+## 2026-06-25（L16 whitebg mask 反选 debug）
+
+- 新增 `code_painting/make_l16_whitebg_mask_debug.py`：
+  - 纯后处理读取已有 Stage-2 输出，不重新跑 SAM/GPU。
+  - 并排显示 L16 source、Stage1 BG、保存出的 alpha mask、alpha binary、inverse background check 和 final repaint。
+  - 明确记录当前 `run_l16_whitebg_repaint_task.sh --invert_mask` 下 `mask_head_cam_plan/*.jpg` 已经是 foreground alpha。
+- 生成 stack_cups id0 前 120 帧 debug：`code_painting/l16_whitebg_mask_debug/stack_cups/id_0/whitebg_invert_debug_stack_cups_id0.mp4`。
+- 统计确认非 stack 五个任务均已达到 25 条以上 `Y` 标注；stack 当前还未达到。
+
+
 ## 2026-06-25（L16 ours 单任务标注脚本与调速键修正）
 
 - 新增六个任务级标注脚本：`code_painting/annotate_l16_ours_<TASK>.sh`。

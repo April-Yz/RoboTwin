@@ -1,6 +1,14 @@
 ## 2026-06-02 00:00:00 +08
 
 
+## 2026-06-25 18:35:00 +08
+
+- Added an L16 whitebg mask debug command:
+  - `python code_painting/make_l16_whitebg_mask_debug.py --task stack_cups --id 0 --max_frames 120`
+  - Outputs under `code_painting/l16_whitebg_mask_debug/<TASK>/id_<ID>/`.
+  - This distinguishes the saved foreground alpha from the inverse/background region, avoiding confusion from white-background boxes in `w_box_head_cam_plan.mp4`.
+
+
 ## 2026-06-25 18:15:00 +08
 
 - Added per-task L16 ours annotation scripts:

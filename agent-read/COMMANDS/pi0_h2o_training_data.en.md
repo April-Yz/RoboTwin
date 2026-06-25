@@ -378,6 +378,19 @@ TASKS="pick_diverse_bottles place_bread_basket handover_bottle pnp_bread pnp_tra
 After all six tasks are complete, add `stack_cups` to `TASKS` and set `TASK_GROUP=6task`. For the real upload, change `DRY_RUN=1` to `DRY_RUN=0`.
 
 
+### L16 whitebg mask debug
+
+`code_painting/make_l16_whitebg_mask_debug.py` checks the mask direction for the white-background Stage-2 path. The current `run_l16_whitebg_repaint_task.sh` passes `--invert_mask`, so `mask_head_cam_plan/*.jpg` is the already-inverted foreground alpha, not the raw white-background mask.
+
+Stack id0 debug command:
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/make_l16_whitebg_mask_debug.py --task stack_cups --id 0 --max_frames 120
+```
+
+Output: `code_painting/l16_whitebg_mask_debug/stack_cups/id_0/whitebg_invert_debug_stack_cups_id0.mp4`. Panels 3/4 are the saved foreground alpha, panel 5 is the inverse/background check, and panel 6 is the final repaint.
+
+
 ## L16 White-Background Inverted-Mask Per-Task Entry Points
 
 `COMMAND_LIBRARY.zh.md` section I3.6.1 adds two task-level scripts:

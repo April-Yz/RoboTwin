@@ -1,6 +1,16 @@
 # CHANGELOG.en
 
 
+## 2026-06-25 (L16 whitebg inverted-mask debug)
+
+- Added `code_painting/make_l16_whitebg_mask_debug.py`:
+  - Pure post-processing over existing Stage-2 outputs; it does not rerun SAM/GPU inference.
+  - Shows L16 source, Stage-1 BG, saved alpha mask, alpha binary, inverse background check, and final repaint side by side.
+  - Documents that with the current `run_l16_whitebg_repaint_task.sh --invert_mask`, `mask_head_cam_plan/*.jpg` is already foreground alpha.
+- Generated a 120-frame stack_cups id0 debug video: `code_painting/l16_whitebg_mask_debug/stack_cups/id_0/whitebg_invert_debug_stack_cups_id0.mp4`.
+- Confirmed the five non-stack tasks all have at least 25 `Y` labels; stack is still below target.
+
+
 ## 2026-06-25 (L16 ours per-task annotation scripts and speed-key fix)
 
 - Added six per-task annotation scripts: `code_painting/annotate_l16_ours_<TASK>.sh`.

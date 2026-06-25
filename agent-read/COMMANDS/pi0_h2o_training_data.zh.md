@@ -378,6 +378,19 @@ TASKS="pick_diverse_bottles place_bread_basket handover_bottle pnp_bread pnp_tra
 六任务全部完成后把 `TASKS` 加上 `stack_cups`，并设置 `TASK_GROUP=6task`。正式上传时把 `DRY_RUN=1` 改成 `DRY_RUN=0`.
 
 
+### L16 whitebg mask debug
+
+`code_painting/make_l16_whitebg_mask_debug.py` 用于检查 white-background Stage-2 的 mask 方向。当前 `run_l16_whitebg_repaint_task.sh` 传了 `--invert_mask`，因此 `mask_head_cam_plan/*.jpg` 是已反选的 foreground alpha，不是原始白背景 mask。
+
+stack id0 debug 命令：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/make_l16_whitebg_mask_debug.py --task stack_cups --id 0 --max_frames 120
+```
+
+输出：`code_painting/l16_whitebg_mask_debug/stack_cups/id_0/whitebg_invert_debug_stack_cups_id0.mp4`。面板 3/4 是保存出的 foreground alpha，面板 5 是反向背景检查，面板 6 是最终 repaint。
+
+
 ## L16 白背景反选按任务并行入口
 
 `COMMAND_LIBRARY.zh.md` 的 I3.6.1 新增了两个任务级脚本：

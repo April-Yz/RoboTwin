@@ -9770,13 +9770,13 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/annotate_l16_ours_pick_diverse_b
 `place_bread_basket`：
 
 ```bash
-bash /home/zaijia001/ssd/RoboTwin/code_painting/annotate_l16_ours_place_bread_basket.sh
+OVERWRITE_MONTAGE=0 bash /home/zaijia001/ssd/RoboTwin/code_painting/annotate_l16_ours_place_bread_basket.sh
 ```
 
 `handover_bottle`：
 
 ```bash
-bash /home/zaijia001/ssd/RoboTwin/code_painting/annotate_l16_ours_handover_bottle.sh
+OVERWRITE_MONTAGE=0 bash /home/zaijia001/ssd/RoboTwin/code_painting/annotate_l16_ours_handover_bottle.sh
 ```
 
 `pnp_bread`：
@@ -9839,3 +9839,47 @@ Montage:
 合并 JSON:
 /home/zaijia001/ssd/RoboTwin/code_painting/l16_ours_review/selections/ours_review_selection_all.json
 ```
+
+### P5. L16 whitebg / stack B 方案 mask 反选 debug
+
+用途：检查 I3.6/I3.6.2 的 white-background Stage-2 是否正确。注意 `run_l16_whitebg_repaint_task.sh` 使用了 `--invert_mask`，所以输出目录中的 `mask_head_cam_plan/*.jpg` 已经是**反选后的 foreground alpha**，也就是用于把 L16 robot/object 像素贴回 Stage-1 背景的 mask；它不是原始白背景 mask。`w_box_head_cam_plan.mp4` 仍可能显示白背景检测框，因此不能只用它判断机械臂/杯子有没有被保留。
+
+脚本位置：
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/make_l16_whitebg_mask_debug.py
+```
+
+已生成的 stack id0 debug：
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/l16_whitebg_mask_debug/stack_cups/id_0/whitebg_invert_debug_stack_cups_id0.mp4
+/home/zaijia001/ssd/RoboTwin/code_painting/l16_whitebg_mask_debug/stack_cups/id_0/whitebg_invert_debug_stack_cups_id0.json
+```
+
+重新生成 stack id0 前 120 帧 debug：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && \
+python /home/zaijia001/ssd/RoboTwin/code_painting/make_l16_whitebg_mask_debug.py --task stack_cups --id 0 --max_frames 120
+```
+
+换其它 id：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && \
+python /home/zaijia001/ssd/RoboTwin/code_painting/make_l16_whitebg_mask_debug.py --task stack_cups --id 10 --max_frames 120
+```
+
+debug 视频面板：
+
+```text
+1 L16 head source
+2 Stage1 BG
+3 saved alpha overlay      # 保存出的反选 foreground alpha 叠加图
+4 saved alpha binary       # 保存出的反选 foreground alpha 二值图
+5 inverse bg check         # 反过来看背景区域
+6 final repaint
+```
+
+判断方式：如果第 3/4 面板主要覆盖机械臂和目标杯子、final repaint 正常贴回，说明 Stage-2 反选逻辑是对的；如果第 3/4 面板大面积覆盖白色背景，说明 `--invert_mask` 或后处理方向有问题。
