@@ -5,8 +5,10 @@ Panels:
 1. HaMeR hand_vis_gripper
 2. Foundation object replay
 3. L16 robot head_cam_plan
-4. Optional Stage-1 human/object inpaint
-5. Optional final SAM3 repaint
+4. Optional L16 left wrist plan
+5. Optional L16 right wrist plan
+6. Optional Stage-1 human/object inpaint
+7. Optional final SAM3 repaint
 """
 
 from __future__ import annotations
@@ -125,6 +127,21 @@ def resolve_panels(task: str, video_id: int, args: argparse.Namespace) -> list[P
             True,
         ),
     ]
+    if args.include_wrist:
+        panels.extend(
+            [
+                Panel(
+                    "L16 left wrist",
+                    L16_ROOT / task / f"foundation_input_{video_id}" / "left_wrist_cam_plan.mp4",
+                    False,
+                ),
+                Panel(
+                    "L16 right wrist",
+                    L16_ROOT / task / f"foundation_input_{video_id}" / "right_wrist_cam_plan.mp4",
+                    False,
+                ),
+            ]
+        )
     if args.include_optional:
         final_task_dir = args.final_root / args.final_task_subdir_template.format(task=task, id=video_id)
         final_episode_dir = final_task_dir / args.final_episode_dir_template.format(task=task, id=video_id)
@@ -172,7 +189,19 @@ def build_filter(panels: list[Panel], target_duration: float, args: argparse.Nam
             )
         )
         outputs.append(f"[{out_label}]")
-    filter_parts.append("".join(outputs) + f"hstack=inputs={len(outputs)}:shortest=1[v]")
+    if args.layout == "hstack" or len(outputs) <= args.max_columns:
+        filter_parts.append("".join(outputs) + f"hstack=inputs={len(outputs)}:shortest=1[v]")
+    else:
+        columns = max(1, args.max_columns)
+        layout = []
+        for index in range(len(outputs)):
+            col = index % columns
+            row = index // columns
+            layout.append(f"{col * args.panel_width}_{row * args.panel_height}")
+        filter_parts.append(
+            "".join(outputs)
+            + f"xstack=inputs={len(outputs)}:layout={'|'.join(layout)}:fill=black:shortest=1[v]"
+        )
     return ";".join(filter_parts)
 
 
@@ -241,8 +270,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--fps", type=float, default=5.0)
     parser.add_argument("--panel_width", type=int, default=426)
     parser.add_argument("--panel_height", type=int, default=320)
+    parser.add_argument("--layout", choices=("auto", "hstack"), default="auto")
+    parser.add_argument("--max_columns", type=int, default=4, help="Auto layout wraps to another row after this many panels.")
     parser.add_argument("--max_duration_sec", type=float, default=0.0, help="0 means no output trim.")
     parser.add_argument("--include_optional", type=int, choices=(0, 1), default=1)
+    parser.add_argument("--include_wrist", type=int, choices=(0, 1), default=1)
     parser.add_argument("--overwrite", action="store_true")
     return parser.parse_args()
 

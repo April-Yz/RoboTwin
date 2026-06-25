@@ -1,5 +1,15 @@
 ## 2026-06-02 00:00:00 +08
 
+
+## 2026-06-25 17:20:00 +08
+
+- 更新 P4 `review_l16_ours_montages.py` 命令：
+  - 推荐每个任务单独运行，并用 `--target_count 25` 在窗口/终端显示距离 25 条还差多少。
+  - 因 montage 从五联升级为七面板，第一次重跑建议加 `--overwrite_montage`。
+- 更新 P1 `make_l16_repaint_montage.py` 参数：
+  - 新增默认 wrist 面板：`left_wrist_cam_plan.mp4`、`right_wrist_cam_plan.mp4`。
+  - 新增 `--layout auto|hstack`、`--max_columns`、`--include_wrist`。
+
 - 修复 Mode O viewer 环境传递：
   - `run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh` 在 `--viewer` 时传 `--gpu -1`。
   - `plan_first_frame_foundation_pick_diverse_bottles.py` 在 `--enable_viewer 1` 时移除 `CUDA_VISIBLE_DEVICES`，避免覆盖 wrapper 的 unset。

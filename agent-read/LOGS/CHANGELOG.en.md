@@ -1,5 +1,17 @@
 # CHANGELOG.en
 
+
+## 2026-06-25 (L16 ours seven-panel review and per-task 25-episode tracking)
+
+- Updated L16 ours visual review:
+  - `make_l16_repaint_montage.py` now includes `left_wrist_cam_plan.mp4` and `right_wrist_cam_plan.mp4` by default.
+  - Montages wrap after four panels with `xstack`, keeping seven-panel videos readable instead of extremely wide.
+  - `review_l16_ours_montages.py` adds `--target_count`; both the overlay and startup terminal summary show accepted/remaining/maybe/reject/unreviewed/total for the current task.
+- Documentation updates:
+  - `COMMAND_LIBRARY.zh.md` P1/P4 now document seven-panel montages and per-task review commands.
+  - `agent-read/COMMANDS/pi0_h2o_training_data.zh.md` / `.en.md` are synced with the ours review workflow.
+- Validation: `py_compile` passed; `make_l16_repaint_montage.py --help` and `review_l16_ours_montages.py --help` passed; a one-second `pick_diverse_bottles id0` seven-panel smoke produced `1704x640`; `git diff --check` passed.
+
 ## 2026-06-02 (Mode O First-Frame FoundationPose Direct Strategy Grasp)
 
 - Follow-up viewer fix:

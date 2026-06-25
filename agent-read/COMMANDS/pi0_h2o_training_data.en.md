@@ -311,13 +311,14 @@ Recommended order: run I3.5.2 first for five debug IDs per task and inspect `w_b
 
 ## L16 Visualization Montage: HaMeR / Foundation / L16 / Repaint
 
-Added script: `code_painting/make_l16_repaint_montage.py`. It horizontally stitches each task/id's HaMeR hand visualization, Foundation object replay, and L16 `head_cam_plan.mp4`. When Stage-1 inpaint and final repaint outputs already exist, they are automatically appended as the fourth and fifth panels.
+Added script: `code_painting/make_l16_repaint_montage.py`. It stitches each task/id's HaMeR hand visualization, Foundation object replay, L16 `head_cam_plan.mp4`, `left_wrist_cam_plan.mp4`, `right_wrist_cam_plan.mp4`, Stage-1 inpaint, and final repaint into a seven-panel montage; by default it wraps after four panels into a second row.
 
 Core inputs:
 
 - HaMeR: `/home/zaijia001/ssd/data/piper/hand/<TASK>/harmer_output/hand_vis_gripper_<ID>.mp4`
 - Foundation replay: prefers `foundation_replay_d435/foundation_input_<ID>/head_cam_replay.mp4`, falling back to `foundation_replay`
 - L16 plan: `code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_human_replay_clean/<TASK>/foundation_input_<ID>/head_cam_plan.mp4`
+- L16 wrist plan: `left_wrist_cam_plan.mp4` and `right_wrist_cam_plan.mp4` in the same directory, added when present
 - Optional Stage 1: `/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stage1_human_object/<TASK>/id_<ID>/stage1_human_inpaint/removed_w_mask_rgb_<ID>.mp4`
 - Optional final repaint: `/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_visible_reinit/e0_robot_object/<TASK>/id_<ID>_l16/final_repainted.mp4`
 
@@ -342,8 +343,9 @@ Added scripts:
 Recommended flow:
 
 ```text
-P4 review_l16_ours_montages.py generates/plays five-panel montages
--> mark each row with y/n/m and write l16_ours_review/selections/<TASK>/ours_review_selection.json
+P4 review_l16_ours_montages.py generates/plays seven-panel montages, wrapping after four columns
+-> review one task at a time with y/n/m, targeting 25 accepted episodes
+-> write l16_ours_review/selections/<TASK>/ours_review_selection.json
 -> run_l16_ours_selected_pipeline.sh reads that JSON
 -> h2o_<TASK>_ours-120 processed HDF5
 -> local/h2o_<TASK>_ours LeRobot
@@ -351,16 +353,23 @@ P4 review_l16_ours_montages.py generates/plays five-panel montages
 -> robot_ours_<TASK_GROUP>_25ep.zip + rclone dry-run/upload
 ```
 
-Run the current five non-`stack_cups` tasks first:
+The review overlay and startup terminal summary show `accepted/25`, `remaining`, `maybe`, `reject`, `unreviewed`, and `total` for the current task. If older five-panel montages already exist, pass `--overwrite_montage` on the first rerun; existing JSON labels are preserved.
+
+Single-task command template:
 
 ```bash
-source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/review_l16_ours_montages.py --tasks pick_diverse_bottles place_bread_basket handover_bottle pnp_bread pnp_tray
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/review_l16_ours_montages.py --tasks <TASK> --overwrite_montage --target_count 25
 ```
 
-After the `stack_cups` B variant is complete, review it separately:
+Common per-task commands:
 
 ```bash
-source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/review_l16_ours_montages.py --tasks stack_cups --overwrite_montage
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/review_l16_ours_montages.py --tasks pick_diverse_bottles --overwrite_montage --target_count 25
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/review_l16_ours_montages.py --tasks place_bread_basket --overwrite_montage --target_count 25
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/review_l16_ours_montages.py --tasks handover_bottle --overwrite_montage --target_count 25
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/review_l16_ours_montages.py --tasks pnp_bread --overwrite_montage --target_count 25
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/review_l16_ours_montages.py --tasks pnp_tray --overwrite_montage --target_count 25
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/review_l16_ours_montages.py --tasks stack_cups --overwrite_montage --target_count 25
 ```
 
 Interactive keys: `y` accept, `n` reject, `m` maybe, `u` clear, space play/pause, `.` next, `,` previous, `]`/`[` speed, `r` replay, `s` save, `q` save and quit.

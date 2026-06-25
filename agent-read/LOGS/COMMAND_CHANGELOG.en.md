@@ -1,5 +1,15 @@
 ## 2026-06-02 00:00:00 +08
 
+
+## 2026-06-25 17:20:00 +08
+
+- Updated the P4 `review_l16_ours_montages.py` commands:
+  - Recommended one task per run, with `--target_count 25` showing how many accepted episodes are still needed.
+  - Since the montage changed from five panels to seven panels, the first rerun should use `--overwrite_montage`.
+- Updated P1 `make_l16_repaint_montage.py` arguments:
+  - Added default wrist panels: `left_wrist_cam_plan.mp4` and `right_wrist_cam_plan.mp4`.
+  - Added `--layout auto|hstack`, `--max_columns`, and `--include_wrist`.
+
 - Fixed Mode O viewer environment forwarding:
   - `run_plan_first_frame_foundation_pick_diverse_bottles_piper_d435.sh` now passes `--gpu -1` when `--viewer` is enabled.
   - `plan_first_frame_foundation_pick_diverse_bottles.py` now removes `CUDA_VISIBLE_DEVICES` when `--enable_viewer 1`, so it does not undo the wrapper's unset.

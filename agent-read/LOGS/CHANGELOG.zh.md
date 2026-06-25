@@ -1,5 +1,17 @@
 # CHANGELOG.zh
 
+
+## 2026-06-25（L16 ours 七面板 review 与单任务 25 条统计）
+
+- 更新 L16 ours 可视化筛选：
+  - `make_l16_repaint_montage.py` 默认加入 `left_wrist_cam_plan.mp4` 和 `right_wrist_cam_plan.mp4`。
+  - 超过 4 个面板时自动用两行 `xstack` 拼接，避免七面板横向视频过宽。
+  - `review_l16_ours_montages.py` 新增 `--target_count`，窗口和启动终端显示当前任务 accepted/remaining/maybe/reject/unreviewed/total。
+- 文档更新：
+  - `COMMAND_LIBRARY.zh.md` P1/P4 更新为七面板和按任务单独筛选命令。
+  - `agent-read/COMMANDS/pi0_h2o_training_data.zh.md` / `.en.md` 同步 ours review 流程。
+- 验证：`py_compile` 通过；`make_l16_repaint_montage.py --help` 和 `review_l16_ours_montages.py --help` 通过；`pick_diverse_bottles id0` 1 秒七面板 smoke 输出 `1704x640`；`git diff --check` 通过。
+
 ## 2026-06-02（Mode O 第一帧 FoundationPose 直接策略抓取）
 
 - 后续 viewer 修复：

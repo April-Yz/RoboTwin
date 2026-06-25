@@ -170,6 +170,18 @@ def status_from_entry(entry: dict[str, Any]) -> str:
     return "-"
 
 
+def task_status_counts(task: str, entries: list[dict[str, Any]], review_payload: dict[str, Any]) -> dict[str, int]:
+    counts = {"Y": 0, "N": 0, "M": 0, "-": 0, "total": 0}
+    videos = review_payload.get("videos", {})
+    for entry in entries:
+        if entry["task"] != task:
+            continue
+        counts["total"] += 1
+        status = status_from_entry(videos.get(f"id_{entry['id']}", {}))
+        counts[status] = counts.get(status, 0) + 1
+    return counts
+
+
 def write_reviews(reviews: dict[str, dict[str, Any]], args: argparse.Namespace) -> None:
     now = time.strftime("%Y-%m-%d %H:%M:%S %z")
     combined: dict[str, Any] = {"meta": {"updated_at": now, "kind": "l16_ours_review"}, "tasks": {}}
@@ -281,8 +293,13 @@ def review_entries(entries: list[dict[str, Any]], reviews: dict[str, dict[str, A
             status = status_from_entry(item)
             fps = cap.get(cv2.CAP_PROP_FPS) or 5.0
             total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+            counts = task_status_counts(task, entries, review_payload)
+            accepted = counts["Y"]
+            remaining = max(0, args.target_count - accepted)
+            target_text = f"/{args.target_count}" if args.target_count > 0 else ""
             lines = [
                 f"{idx + 1}/{len(entries)} task={task} id={video_id} status={status} speed={speed:.2f}x frame={frame_index}/{total_frames}",
+                f"task stats: accepted={accepted}{target_text} remaining={remaining} maybe={counts['M']} reject={counts['N']} unreviewed={counts['-']} total={counts['total']}",
                 "keys: y accept | n reject | m maybe | u clear | space play/pause | . next | , prev | ]/[ speed | r replay | s save | q quit",
             ]
             overlay(frame, lines)
@@ -367,6 +384,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--make_montages", type=int, choices=(0, 1), default=1)
     parser.add_argument("--overwrite_montage", action="store_true")
     parser.add_argument("--initial_speed", type=float, default=1.0)
+    parser.add_argument("--target_count", type=int, default=25, help="Accepted episode target shown in the overlay.")
     parser.add_argument("--window_name", default="L16 ours review")
     return parser.parse_args()
 
@@ -401,6 +419,17 @@ def main() -> int:
     entries.sort(key=lambda item: (TASKS.index(item["task"]), item["id"]))
     print(f"[review] entries={len(entries)} review_root={args.review_root}")
     write_reviews(reviews, args)
+    for task in args.tasks:
+        if task not in reviews:
+            continue
+        counts = task_status_counts(task, entries, reviews[task])
+        accepted = counts["Y"]
+        remaining = max(0, args.target_count - accepted)
+        target_text = f"/{args.target_count}" if args.target_count > 0 else ""
+        print(
+            f"[task-summary] {task}: accepted={accepted}{target_text} remaining={remaining} "
+            f"maybe={counts['M']} reject={counts['N']} unreviewed={counts['-']} total={counts['total']}"
+        )
     review_entries(entries, reviews, args)
     return 0
 

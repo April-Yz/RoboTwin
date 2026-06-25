@@ -311,13 +311,14 @@ ROOT=/home/zaijia001/.cache/huggingface/lerobot/local/h2o_pick_diverse_bottles_h
 
 ## L16 可视化拼接：HaMeR / Foundation / L16 / Repaint
 
-新增脚本：`code_painting/make_l16_repaint_montage.py`。该脚本把每个任务/ID 的 HaMeR 人手可视化、Foundation object replay、L16 `head_cam_plan.mp4` 横向拼接；如果当前 Stage1 inpaint 和 final repaint 结果存在，也会自动追加为第 4、第 5 个面板。
+新增脚本：`code_painting/make_l16_repaint_montage.py`。该脚本把每个任务/ID 的 HaMeR 人手可视化、Foundation object replay、L16 `head_cam_plan.mp4`、`left_wrist_cam_plan.mp4`、`right_wrist_cam_plan.mp4`、Stage1 inpaint 和 final repaint 拼成七面板 montage；默认超过 4 个面板会自动折成两行。
 
 核心输入：
 
 - HaMeR：`/home/zaijia001/ssd/data/piper/hand/<TASK>/harmer_output/hand_vis_gripper_<ID>.mp4`
 - Foundation replay：优先 `foundation_replay_d435/foundation_input_<ID>/head_cam_replay.mp4`，缺失时回退到 `foundation_replay`
 - L16 plan：`code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_human_replay_clean/<TASK>/foundation_input_<ID>/head_cam_plan.mp4`
+- L16 wrist plan：同一目录下的 `left_wrist_cam_plan.mp4` 和 `right_wrist_cam_plan.mp4`，存在才加入
 - 可选 Stage1：`/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stage1_human_object/<TASK>/id_<ID>/stage1_human_inpaint/removed_w_mask_rgb_<ID>.mp4`
 - 可选 final repaint：`/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_visible_reinit/e0_robot_object/<TASK>/id_<ID>_l16/final_repainted.mp4`
 
@@ -342,8 +343,9 @@ tmux new-session -d -s l16_vis_id0 'cd /home/zaijia001/ssd/RoboTwin && python3 /
 推荐流程：
 
 ```text
-P4 review_l16_ours_montages.py 生成/播放五联 montage
--> 逐条按 y/n/m 标记，写出 l16_ours_review/selections/<TASK>/ours_review_selection.json
+P4 review_l16_ours_montages.py 生成/播放七面板 montage（超过四列自动两行）
+-> 每个任务单独按 y/n/m 标记，目标先卡 25 条
+-> 写出 l16_ours_review/selections/<TASK>/ours_review_selection.json
 -> run_l16_ours_selected_pipeline.sh 读取 JSON
 -> h2o_<TASK>_ours-120 processed HDF5
 -> local/h2o_<TASK>_ours LeRobot
@@ -351,16 +353,23 @@ P4 review_l16_ours_montages.py 生成/播放五联 montage
 -> robot_ours_<TASK_GROUP>_25ep.zip + rclone dry-run/上传
 ```
 
-当前五个非 `stack_cups` 任务先运行：
+review 窗口底部和启动终端都会显示当前任务 `accepted/25`、`remaining`、`maybe`、`reject`、`unreviewed` 和 `total`。如果之前已经生成过旧五联 montage，第一次重跑单任务时加 `--overwrite_montage`，已有 JSON 标记会保留。
+
+单任务命令模板：
 
 ```bash
-source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/review_l16_ours_montages.py --tasks pick_diverse_bottles place_bread_basket handover_bottle pnp_bread pnp_tray
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/review_l16_ours_montages.py --tasks <TASK> --overwrite_montage --target_count 25
 ```
 
-`stack_cups` B 方案完成后单独运行：
+常用任务分别运行：
 
 ```bash
-source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/review_l16_ours_montages.py --tasks stack_cups --overwrite_montage
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/review_l16_ours_montages.py --tasks pick_diverse_bottles --overwrite_montage --target_count 25
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/review_l16_ours_montages.py --tasks place_bread_basket --overwrite_montage --target_count 25
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/review_l16_ours_montages.py --tasks handover_bottle --overwrite_montage --target_count 25
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/review_l16_ours_montages.py --tasks pnp_bread --overwrite_montage --target_count 25
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/review_l16_ours_montages.py --tasks pnp_tray --overwrite_montage --target_count 25
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/review_l16_ours_montages.py --tasks stack_cups --overwrite_montage --target_count 25
 ```
 
 交互按键：`y` accept、`n` reject、`m` maybe、`u` 清除、空格暂停/继续、`.` 下一条、`,` 上一条、`]`/`[` 调速、`r` 重播、`s` 保存、`q` 保存退出。
@@ -371,7 +380,7 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate R
 TASKS="pick_diverse_bottles place_bread_basket handover_bottle pnp_bread pnp_tray" TASK_GROUP=5task DRY_RUN=1 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_ours_selected_pipeline.sh
 ```
 
-六任务全部完成后把 `TASKS` 加上 `stack_cups`，并设置 `TASK_GROUP=6task`。正式上传时把 `DRY_RUN=1` 改成 `DRY_RUN=0`。
+六任务全部完成后把 `TASKS` 加上 `stack_cups`，并设置 `TASK_GROUP=6task`。正式上传时把 `DRY_RUN=1` 改成 `DRY_RUN=0`.
 
 
 ## L16 白背景反选按任务并行入口
