@@ -2989,3 +2989,11 @@ Validation: `bash -n code_painting/run_l16_stage1_human_object_task.sh code_pain
 - Output root: `/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stack_cups_debug_variants/<VARIANT>/stack_cups/id_<ID>/stage1_human_inpaint/`.
 
 Validation: `python -m py_compile code_painting/l16_stack_cups_debug_variants.py` passed; tmux `l16_stack_debug_variants_gpu1` was started for `id_0..4`.
+
+## 2026-06-25 (stack_cups Full B-Variant Entry Point)
+
+- After reviewing the four debug variants, the user confirmed B `B_points_negative` and C `C_hsv_green_protect` are usable; A `A_protect_dino` and D `D_tight_dino` are documented as wrong routes.
+- Added `--variants` to `l16_stack_cups_debug_variants.py` and the `VARIANTS` environment variable to `run_l16_stack_cups_debug_variants.sh`, so the runner can execute only the B variant.
+- Added section Q to `COMMAND_LIBRARY.zh.md` with the B/C conclusion, A/D failure notes, and the full B Stage-1 plus separate Stage-2 output path.
+
+Validation: `python -m py_compile code_painting/l16_stack_cups_debug_variants.py` and `bash -n code_painting/run_l16_stack_cups_debug_variants.sh` passed.

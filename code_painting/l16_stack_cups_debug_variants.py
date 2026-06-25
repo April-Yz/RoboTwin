@@ -272,6 +272,7 @@ def run_one_id(
     sample_id: int,
     max_frames: int,
     tmp_root: Path,
+    variants: set[str],
 ) -> None:
     frames, fps = read_video(input_video, max_frames)
     video_stem = input_video.stem
@@ -292,97 +293,117 @@ def run_one_id(
         20,
     )
 
-    remove_boxes, remove_labels = runner.dino_boxes(first_frame, remove_prompt)
-    remove_masks_raw = runner.masks_from_boxes(frames, remove_boxes, tmp_root)
-    remove_masks = dilate_masks(remove_masks_raw, remove_prompt.dilate)
+    needs_remove = bool({"A_protect_dino", "C_hsv_green_protect"} & variants)
+    remove_boxes, remove_labels, remove_masks = np.zeros((0, 4)), [], None
+    if needs_remove:
+        remove_boxes, remove_labels = runner.dino_boxes(first_frame, remove_prompt)
+        remove_masks_raw = runner.masks_from_boxes(frames, remove_boxes, tmp_root)
+        remove_masks = dilate_masks(remove_masks_raw, remove_prompt.dilate)
 
-    protect_boxes, protect_labels = runner.dino_boxes(first_frame, protect_prompt)
-    protect_masks_raw = runner.masks_from_boxes(frames, protect_boxes, tmp_root)
-    protect_masks = dilate_masks(protect_masks_raw, protect_prompt.dilate)
+    if "A_protect_dino" in variants:
+        protect_boxes, protect_labels = runner.dino_boxes(first_frame, protect_prompt)
+        protect_masks_raw = runner.masks_from_boxes(frames, protect_boxes, tmp_root)
+        protect_masks = dilate_masks(protect_masks_raw, protect_prompt.dilate)
+        variant_a = [r & ~p for r, p in zip(remove_masks, protect_masks)]
+        write_variant_outputs(
+            output_root / "A_protect_dino" / "stack_cups" / f"id_{sample_id}" / "stage1_human_inpaint",
+            video_stem,
+            frames,
+            variant_a,
+            fps,
+            runner.inpaint(frames, variant_a),
+            {
+                "variant": "A_protect_dino",
+                "remove_prompt": remove_prompt.__dict__,
+                "remove_labels": remove_labels,
+                "remove_box_count": int(len(remove_boxes)),
+                "protect_prompt": protect_prompt.__dict__,
+                "protect_labels": protect_labels,
+                "protect_box_count": int(len(protect_boxes)),
+                "final_rule": "remove_mask - protect_green_cup_mask",
+            },
+            remove_masks=remove_masks,
+            protect_masks=protect_masks,
+        )
 
-    variant_a = [r & ~p for r, p in zip(remove_masks, protect_masks)]
-    write_variant_outputs(
-        output_root / "A_protect_dino" / "stack_cups" / f"id_{sample_id}" / "stage1_human_inpaint",
-        video_stem,
-        frames,
-        variant_a,
-        fps,
-        runner.inpaint(frames, variant_a),
-        {
-            "variant": "A_protect_dino",
-            "remove_prompt": remove_prompt.__dict__,
-            "remove_labels": remove_labels,
-            "remove_box_count": int(len(remove_boxes)),
-            "protect_prompt": protect_prompt.__dict__,
-            "protect_labels": protect_labels,
-            "protect_box_count": int(len(protect_boxes)),
-            "final_rule": "remove_mask - protect_green_cup_mask",
-        },
-        remove_masks=remove_masks,
-        protect_masks=protect_masks,
-    )
+    if "B_points_negative" in variants:
+        point_masks = dilate_masks(
+            runner.masks_from_points(frames, stack_point_objects(), tmp_root), 30
+        )
+        write_variant_outputs(
+            output_root / "B_points_negative" / "stack_cups" / f"id_{sample_id}" / "stage1_human_inpaint",
+            video_stem,
+            frames,
+            point_masks,
+            fps,
+            runner.inpaint(frames, point_masks),
+            {
+                "variant": "B_points_negative",
+                "point_objects": stack_point_objects(),
+                "final_rule": "SAM2 video masks from positive red-cup/hand points with green-cup negative point",
+            },
+        )
 
-    point_masks = dilate_masks(
-        runner.masks_from_points(frames, stack_point_objects(), tmp_root), 30
-    )
-    write_variant_outputs(
-        output_root / "B_points_negative" / "stack_cups" / f"id_{sample_id}" / "stage1_human_inpaint",
-        video_stem,
-        frames,
-        point_masks,
-        fps,
-        runner.inpaint(frames, point_masks),
-        {
-            "variant": "B_points_negative",
-            "point_objects": stack_point_objects(),
-            "final_rule": "SAM2 video masks from positive red-cup/hand points with green-cup negative point",
-        },
-    )
+    if "C_hsv_green_protect" in variants:
+        green_masks = hsv_green_masks(frames, dilate=16)
+        variant_c = [r & ~g for r, g in zip(remove_masks, green_masks)]
+        write_variant_outputs(
+            output_root / "C_hsv_green_protect" / "stack_cups" / f"id_{sample_id}" / "stage1_human_inpaint",
+            video_stem,
+            frames,
+            variant_c,
+            fps,
+            runner.inpaint(frames, variant_c),
+            {
+                "variant": "C_hsv_green_protect",
+                "remove_prompt": remove_prompt.__dict__,
+                "remove_labels": remove_labels,
+                "remove_box_count": int(len(remove_boxes)),
+                "green_hsv_range": {"lower": [35, 40, 35], "upper": [88, 255, 255], "dilate": 16},
+                "final_rule": "remove_mask - HSV_green_mask",
+            },
+            remove_masks=remove_masks,
+            protect_masks=green_masks,
+        )
 
-    green_masks = hsv_green_masks(frames, dilate=16)
-    variant_c = [r & ~g for r, g in zip(remove_masks, green_masks)]
-    write_variant_outputs(
-        output_root / "C_hsv_green_protect" / "stack_cups" / f"id_{sample_id}" / "stage1_human_inpaint",
-        video_stem,
-        frames,
-        variant_c,
-        fps,
-        runner.inpaint(frames, variant_c),
-        {
-            "variant": "C_hsv_green_protect",
-            "remove_prompt": remove_prompt.__dict__,
-            "remove_labels": remove_labels,
-            "remove_box_count": int(len(remove_boxes)),
-            "green_hsv_range": {"lower": [35, 40, 35], "upper": [88, 255, 255], "dilate": 16},
-            "final_rule": "remove_mask - HSV_green_mask",
-        },
-        remove_masks=remove_masks,
-        protect_masks=green_masks,
-    )
-
-    tight_boxes, tight_labels = runner.dino_boxes(first_frame, tight_prompt)
-    tight_masks_raw = runner.masks_from_boxes(frames, tight_boxes, tmp_root)
-    tight_masks = dilate_masks(tight_masks_raw, tight_prompt.dilate)
-    write_variant_outputs(
-        output_root / "D_tight_dino" / "stack_cups" / f"id_{sample_id}" / "stage1_human_inpaint",
-        video_stem,
-        frames,
-        tight_masks,
-        fps,
-        runner.inpaint(frames, tight_masks),
-        {
-            "variant": "D_tight_dino",
-            "prompt": tight_prompt.__dict__,
-            "labels": tight_labels,
-            "box_count": int(len(tight_boxes)),
-            "final_rule": "stricter DINO prompt and thresholds; no green protection",
-        },
-        remove_masks=tight_masks,
-    )
+    if "D_tight_dino" in variants:
+        tight_boxes, tight_labels = runner.dino_boxes(first_frame, tight_prompt)
+        tight_masks_raw = runner.masks_from_boxes(frames, tight_boxes, tmp_root)
+        tight_masks = dilate_masks(tight_masks_raw, tight_prompt.dilate)
+        write_variant_outputs(
+            output_root / "D_tight_dino" / "stack_cups" / f"id_{sample_id}" / "stage1_human_inpaint",
+            video_stem,
+            frames,
+            tight_masks,
+            fps,
+            runner.inpaint(frames, tight_masks),
+            {
+                "variant": "D_tight_dino",
+                "prompt": tight_prompt.__dict__,
+                "labels": tight_labels,
+                "box_count": int(len(tight_boxes)),
+                "final_rule": "stricter DINO prompt and thresholds; no green protection",
+            },
+            remove_masks=tight_masks,
+        )
 
 
 def parse_ids(ids_text: str) -> list[int]:
     return [int(x) for x in ids_text.replace(",", " ").split() if x.strip()]
+
+
+def parse_variants(variants_text: str) -> set[str]:
+    allowed = {
+        "A_protect_dino",
+        "B_points_negative",
+        "C_hsv_green_protect",
+        "D_tight_dino",
+    }
+    variants = {x.strip() for x in variants_text.replace(",", " ").split() if x.strip()}
+    unknown = variants - allowed
+    if unknown:
+        raise ValueError(f"Unknown variants: {sorted(unknown)}")
+    return variants or allowed
 
 
 def main() -> int:
@@ -394,7 +415,13 @@ def main() -> int:
     parser.add_argument("--sttn_ckpt", type=Path, required=True)
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--max_frames", type=int, default=300)
+    parser.add_argument(
+        "--variants",
+        default="A_protect_dino B_points_negative C_hsv_green_protect D_tight_dino",
+        help="Subset of variants to run.",
+    )
     args = parser.parse_args()
+    variants = parse_variants(args.variants)
 
     tmp_root = Path(tempfile.mkdtemp(prefix="stack_debug_variants_"))
     try:
@@ -404,8 +431,8 @@ def main() -> int:
             if not video.exists():
                 print(f"[skip] missing {video}")
                 continue
-            print(f"[run] stack_cups id={sample_id}")
-            run_one_id(runner, video, args.output_root, sample_id, args.max_frames, tmp_root)
+            print(f"[run] stack_cups id={sample_id} variants={','.join(sorted(variants))}")
+            run_one_id(runner, video, args.output_root, sample_id, args.max_frames, tmp_root, variants)
             print(f"[done] stack_cups id={sample_id}")
     finally:
         shutil.rmtree(tmp_root, ignore_errors=True)

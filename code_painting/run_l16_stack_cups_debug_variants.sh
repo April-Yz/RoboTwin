@@ -4,6 +4,7 @@ set -eo pipefail
 GPU=${GPU:-1}
 IDS=${IDS:-"0 1 2 3 4"}
 MAX_FRAMES=${MAX_FRAMES:-300}
+VARIANTS=${VARIANTS:-"A_protect_dino B_points_negative C_hsv_green_protect D_tight_dino"}
 
 ROBOWTIN=${ROBOWTIN:-/home/zaijia001/ssd/RoboTwin}
 SAM2=${SAM2:-/home/zaijia001/ssd/inpainting_sam2_robot}
@@ -21,4 +22,5 @@ CUDA_VISIBLE_DEVICES=$GPU python "$ROBOWTIN/code_painting/l16_stack_cups_debug_v
   --sam2_root "$SAM2" \
   --sttn_ckpt "$SAM2/pretrained_models/sttn.pth" \
   --device cuda \
-  --max_frames "$MAX_FRAMES"
+  --max_frames "$MAX_FRAMES" \
+  --variants "$VARIANTS"

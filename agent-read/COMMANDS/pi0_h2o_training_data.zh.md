@@ -319,10 +319,10 @@ tmux new-session -d -s l16_vis_id0 'cd /home/zaijia001/ssd/RoboTwin && python3 /
 
 四个方案含义：
 
-- `A_protect_dino`：DINO/SAM2 生成 remove mask，再用 `green cup` 生成 protect mask，最终 `remove - protect`。
-- `B_points_negative`：不用 DINO，使用固定正点标注两个红杯和双手，并把绿色杯中心作为负点。
-- `C_hsv_green_protect`：DINO/SAM2 remove mask 减去 HSV 绿色区域保护 mask。
-- `D_tight_dino`：更严格 prompt/threshold 的 DINO 基线，不做绿色保护。
+- `A_protect_dino`：DINO/SAM2 生成 remove mask，再用 `green cup` 生成 protect mask，最终 `remove - protect`。当前 debug 效果不稳定，属于错误路线；remove/protect 都依赖 DINO，大框错误会继续传导。
+- `B_points_negative`：不用 DINO，使用固定正点标注两个红杯和双手，并把绿色杯中心作为负点。当前 `id_0..4` debug 可用，优先采用。
+- `C_hsv_green_protect`：DINO/SAM2 remove mask 减去 HSV 绿色区域保护 mask。当前 `id_0..4` debug 可用，作为 B 的备选。
+- `D_tight_dino`：更严格 prompt/threshold 的 DINO 基线，不做绿色保护。当前 debug 效果不行，属于错误路线；DINO 仍可能给出覆盖绿色杯的大框。
 
 每个目录重点查看：
 
@@ -338,4 +338,23 @@ debug_summary.json
 
 ```bash
 tmux new-session -d -s l16_stack_debug_variants_gpu1 'GPU=1 IDS="0 1 2 3 4" MAX_FRAMES=300 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_stack_cups_debug_variants.sh'
+```
+
+只跑 B 方案全量 Stage-1：
+
+```bash
+IDS=$(find /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_human_replay_clean/stack_cups -path '*/head_cam_plan.mp4' 2>/dev/null | sed 's#.*/foundation_input_\([0-9]*\)/head_cam_plan.mp4#\1#' | sort -n | tr '\n' ' ')
+tmux new-session -d -s l16_stack_B_stage1_gpu1 "IDS=\"$IDS\" GPU=1 VARIANTS=\"B_points_negative\" MAX_FRAMES=300 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_stack_cups_debug_variants.sh"
+```
+
+B 方案 Stage-2 读取 `B_points_negative` 背景，输出到独立结果根目录：
+
+```bash
+tmux new-session -d -s l16_stack_B_stage2_after_s1_gpu1 'while tmux has-session -t l16_stack_B_stage1_gpu1 2>/dev/null; do sleep 60; done; TASK=stack_cups GPU=1 OVERWRITE=1 STAGE1=/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stack_cups_debug_variants/B_points_negative OUTROOT=/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object_b_points_negative bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_whitebg_repaint_task.sh'
+```
+
+B 方案最终视频：
+
+```text
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object_b_points_negative/stack_cups/id_<ID>_l16_whitebg_human_object/final_repainted.mp4
 ```

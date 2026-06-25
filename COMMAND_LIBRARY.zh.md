@@ -9453,3 +9453,67 @@ cd /home/zaijia001/ssd/RoboTwin && python3 /home/zaijia001/ssd/RoboTwin/code_pai
 ```bash
 --include_optional 0
 ```
+
+## Q. L16 stack_cups 绿色杯保护 Stage-1 debug 与 B 方案全量
+
+背景：`stack_cups` 用 DINO 文本框检测 `left light pink cup, right dark red cup` 时，容易产生接近全屏的大框；绿色杯在两个红杯中间，因此会被一起送入 SAM2/video propagation，导致 Stage-1 inpaint 把绿色杯也去掉。
+
+已测四个方案：
+
+- A `A_protect_dino`：DINO remove mask 减 DINO `green cup` protect mask。当前效果不稳定，是错误方法；原因是 remove/protect 都依赖 DINO，大框错误会继续传导。
+- B `B_points_negative`：SAM2 正点标注左右红杯和双手，绿色杯中心作为负点。当前 `id_0..4` debug 可用，优先采用。
+- C `C_hsv_green_protect`：DINO remove mask 减 HSV green protect mask。当前 `id_0..4` debug 也可用，作为 B 的备选。
+- D `D_tight_dino`：只提高 DINO prompt/threshold。当前效果不行，是错误方法；原因是 DINO 仍可能给出覆盖绿色杯的大框。
+
+### Q1. 四方案 debug 输出位置
+
+```text
+/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stack_cups_debug_variants/A_protect_dino/stack_cups/id_<ID>/stage1_human_inpaint/
+/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stack_cups_debug_variants/B_points_negative/stack_cups/id_<ID>/stage1_human_inpaint/
+/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stack_cups_debug_variants/C_hsv_green_protect/stack_cups/id_<ID>/stage1_human_inpaint/
+/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stack_cups_debug_variants/D_tight_dino/stack_cups/id_<ID>/stage1_human_inpaint/
+```
+
+重点看：
+
+```text
+w_mask_rgb_<ID>.mp4
+w_box_rgb_<ID>.mp4
+removed_w_mask_rgb_<ID>.mp4
+w_protect_mask_rgb_<ID>.mp4   # A/C 才有
+debug_summary.json
+```
+
+### Q2. 只跑 B 方案全量 Stage-1
+
+```bash
+IDS=$(find /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_human_replay_clean/stack_cups -path '*/head_cam_plan.mp4' 2>/dev/null | sed 's#.*/foundation_input_\([0-9]*\)/head_cam_plan.mp4#\1#' | sort -n | tr '\n' ' ')
+tmux new-session -d -s l16_stack_B_stage1_gpu1 "IDS=\"$IDS\" GPU=1 VARIANTS=\"B_points_negative\" MAX_FRAMES=300 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_stack_cups_debug_variants.sh"
+```
+
+看进度：
+
+```bash
+tmux capture-pane -pt l16_stack_B_stage1_gpu1 -S -80
+for V in B_points_negative C_hsv_green_protect; do printf '%s ' "$V"; find /home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stack_cups_debug_variants/$V/stack_cups -maxdepth 3 -type f -name 'removed_w_mask_rgb_*.mp4' 2>/dev/null | wc -l; done
+```
+
+### Q3. B 方案 Stage-2 repaint
+
+Stage-2 读取 B 方案 Stage-1 背景，不覆盖默认 `e0_robot_object` 输出，单独写到 `e0_robot_object_b_points_negative`。
+
+```bash
+tmux new-session -d -s l16_stack_B_stage2_after_s1_gpu1 'while tmux has-session -t l16_stack_B_stage1_gpu1 2>/dev/null; do sleep 60; done; TASK=stack_cups GPU=1 OVERWRITE=1 STAGE1=/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stack_cups_debug_variants/B_points_negative OUTROOT=/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object_b_points_negative bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_whitebg_repaint_task.sh'
+```
+
+最终结果位置：
+
+```text
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object_b_points_negative/stack_cups/id_<ID>_l16_whitebg_human_object/final_repainted.mp4
+```
+
+计数检查：
+
+```bash
+find /home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object_b_points_negative/stack_cups -maxdepth 2 -type f -name final_repainted.mp4 2>/dev/null | wc -l
+```

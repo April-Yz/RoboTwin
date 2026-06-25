@@ -319,10 +319,10 @@ Purpose: run Stage-1 mask/inpaint debug only for `stack_cups id_0..4` without ov
 
 Variant meanings:
 
-- `A_protect_dino`: create a DINO/SAM2 remove mask, create a `green cup` protect mask, then use `remove - protect`.
-- `B_points_negative`: bypass DINO and use fixed positive points for the two red cups and hands, with the green cup center as a negative point.
-- `C_hsv_green_protect`: subtract an HSV green-region protect mask from the DINO/SAM2 remove mask.
-- `D_tight_dino`: stricter DINO prompt/threshold baseline with no green protection.
+- `A_protect_dino`: create a DINO/SAM2 remove mask, create a `green cup` protect mask, then use `remove - protect`. The current debug result is unstable and this is treated as a wrong route because both remove/protect masks still depend on DINO and inherit large-box errors.
+- `B_points_negative`: bypass DINO and use fixed positive points for the two red cups and hands, with the green cup center as a negative point. The current `id_0..4` debug result is usable and this is the preferred route.
+- `C_hsv_green_protect`: subtract an HSV green-region protect mask from the DINO/SAM2 remove mask. The current `id_0..4` debug result is also usable and serves as B's fallback.
+- `D_tight_dino`: stricter DINO prompt/threshold baseline with no green protection. The current debug result fails and this is treated as a wrong route because DINO can still return a large box covering the green cup.
 
 Inspect these files in each output directory:
 
@@ -338,4 +338,23 @@ Run command:
 
 ```bash
 tmux new-session -d -s l16_stack_debug_variants_gpu1 'GPU=1 IDS="0 1 2 3 4" MAX_FRAMES=300 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_stack_cups_debug_variants.sh'
+```
+
+Run only the B variant for full Stage-1:
+
+```bash
+IDS=$(find /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_human_replay_clean/stack_cups -path '*/head_cam_plan.mp4' 2>/dev/null | sed 's#.*/foundation_input_\([0-9]*\)/head_cam_plan.mp4#\1#' | sort -n | tr '\n' ' ')
+tmux new-session -d -s l16_stack_B_stage1_gpu1 "IDS=\"$IDS\" GPU=1 VARIANTS=\"B_points_negative\" MAX_FRAMES=300 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_stack_cups_debug_variants.sh"
+```
+
+The B Stage-2 job reads the `B_points_negative` backgrounds and writes to a separate output root:
+
+```bash
+tmux new-session -d -s l16_stack_B_stage2_after_s1_gpu1 'while tmux has-session -t l16_stack_B_stage1_gpu1 2>/dev/null; do sleep 60; done; TASK=stack_cups GPU=1 OVERWRITE=1 STAGE1=/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stack_cups_debug_variants/B_points_negative OUTROOT=/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object_b_points_negative bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_whitebg_repaint_task.sh'
+```
+
+B final videos:
+
+```text
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object_b_points_negative/stack_cups/id_<ID>_l16_whitebg_human_object/final_repainted.mp4
 ```

@@ -2261,3 +2261,9 @@ tmux new-session -d -s l16_stack_debug_variants_gpu1 'GPU=1 IDS="0 1 2 3 4" MAX_
 
 - 输出：`results_repaint_piper_h2_l16/stack_cups_debug_variants/{A_protect_dino,B_points_negative,C_hsv_green_protect,D_tight_dino}/stack_cups/id_<ID>/stage1_human_inpaint/`。
 - 重点查看 `w_mask_rgb_<ID>.mp4`、`w_box_rgb_<ID>.mp4`、`removed_w_mask_rgb_<ID>.mp4`，A/C 还可查看 `w_protect_mask_rgb_<ID>.mp4`。
+
+## 2026-06-25（stack_cups B 方案全量命令）
+
+- `run_l16_stack_cups_debug_variants.sh` 新增 `VARIANTS`，可用 `VARIANTS="B_points_negative"` 只跑 B 方案。
+- B Stage-2 读取 `STAGE1=/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stack_cups_debug_variants/B_points_negative`。
+- B final 输出到：`/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object_b_points_negative/stack_cups/id_<ID>_l16_whitebg_human_object/final_repainted.mp4`。

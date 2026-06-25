@@ -2263,3 +2263,9 @@ tmux new-session -d -s l16_stack_debug_variants_gpu1 'GPU=1 IDS="0 1 2 3 4" MAX_
 
 - Outputs: `results_repaint_piper_h2_l16/stack_cups_debug_variants/{A_protect_dino,B_points_negative,C_hsv_green_protect,D_tight_dino}/stack_cups/id_<ID>/stage1_human_inpaint/`.
 - Inspect `w_mask_rgb_<ID>.mp4`, `w_box_rgb_<ID>.mp4`, and `removed_w_mask_rgb_<ID>.mp4`; A/C also write `w_protect_mask_rgb_<ID>.mp4`.
+
+## 2026-06-25 (stack_cups Full B-Variant Command)
+
+- `run_l16_stack_cups_debug_variants.sh` now accepts `VARIANTS`; use `VARIANTS="B_points_negative"` to run only the B variant.
+- B Stage-2 reads `STAGE1=/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stack_cups_debug_variants/B_points_negative`.
+- B finals are written to `/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object_b_points_negative/stack_cups/id_<ID>_l16_whitebg_human_object/final_repainted.mp4`.

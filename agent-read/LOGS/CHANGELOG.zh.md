@@ -2987,3 +2987,11 @@ Validation: `bash -n code_painting/run_l16_stage1_human_object_task.sh code_pain
 - 输出目录：`/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stack_cups_debug_variants/<VARIANT>/stack_cups/id_<ID>/stage1_human_inpaint/`。
 
 Validation: `python -m py_compile code_painting/l16_stack_cups_debug_variants.py` 通过；已启动 tmux `l16_stack_debug_variants_gpu1` 跑 `id_0..4`。
+
+## 2026-06-25（stack_cups B 方案全量入口）
+
+- 用户检查四方案 debug 后确认 B `B_points_negative` 和 C `C_hsv_green_protect` 可用；A `A_protect_dino` 与 D `D_tight_dino` 记录为错误路线。
+- `l16_stack_cups_debug_variants.py` 新增 `--variants` 参数；`run_l16_stack_cups_debug_variants.sh` 新增 `VARIANTS` 环境变量，因此可只跑 B 方案。
+- `COMMAND_LIBRARY.zh.md` 新增 Q 节，记录 B/C 结论、A/D 错误原因，以及 B 全量 Stage-1 和独立 Stage-2 输出路径。
+
+Validation: `python -m py_compile code_painting/l16_stack_cups_debug_variants.py` 与 `bash -n code_painting/run_l16_stack_cups_debug_variants.sh` 通过。
