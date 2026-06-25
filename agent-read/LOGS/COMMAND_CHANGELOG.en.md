@@ -1,5 +1,12 @@
-## 2026-06-02 00:00:00 +08
+## 2026-06-26 00:20:00 +08
 
+- Added the `stack_cups` redprotect post-processing command:
+  - `python code_painting/recompose_l16_stack_redprotect.py --ids 0-4 --overwrite`
+  - Outputs under `/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object_b_points_negative_redprotect/stack_cups/id_<ID>_l16_whitebg_human_object/`.
+- New documentation locations: `COMMAND_LIBRARY.zh.md` I3.6.2.4 and P6.
+- Note: this protects red/pink cups after mask inversion; it is not a SAM-stage negative text prompt.
+
+## 2026-06-02 00:00:00 +08
 
 ## 2026-06-25 18:35:00 +08
 

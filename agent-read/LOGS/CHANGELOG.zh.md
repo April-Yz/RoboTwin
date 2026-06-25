@@ -1,5 +1,13 @@
 # CHANGELOG.zh
 
+## 2026-06-26（stack_cups redprotect 后处理 debug）
+
+- 新增 `code_painting/recompose_l16_stack_redprotect.py`：读取 I3.6.2 B 方案 Stage-2 foreground alpha，并把 L16 源视频中的红/粉杯颜色区域 OR 回 alpha，输出到独立 `e0_robot_object_b_points_negative_redprotect` 目录。
+- 记录原因：前五个任务和 stack 的白背景阈值相同；stack 的异常更像白背景框/反选把红杯归入背景区域，而不是阈值不一致。当前 SAM3 robot 脚本没有 negative text prompt 参数，因此采用后处理保护。
+- 已生成 `stack_cups id_0..4` redprotect 结果和 P4 风格 montage。
+- 文档同步更新 `COMMAND_LIBRARY.zh.md` 的 I3.6.2.4/P6，以及 `agent-read/COMMANDS/pi0_h2o_training_data.*.md`。
+
+
 
 ## 2026-06-25（L16 whitebg mask 反选 debug）
 

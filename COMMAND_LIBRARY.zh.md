@@ -1937,6 +1937,62 @@ tmux new-session -d -s l16_stack_B_stage2_after_s1_gpu1 'while tmux has-session 
 find /home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object_b_points_negative/stack_cups -maxdepth 2 -type f -name final_repainted.mp4 2>/dev/null | wc -l
 ```
 
+##### I3.6.2.4 B 方案 Stage-2 红/粉杯保护后处理 debug
+
+背景：I3.6.2 的 Stage-2 白背景阈值和前五个任务完全一致，默认仍是 `box_threshold=0.20`、`text_threshold=0.20`，prompt 仍是 `white background, white floor, white table, blank white area.`。`stack_cups` 的问题不是阈值和其它任务不一致，而是白背景检测框会把两个红杯中间的绿色杯区域一起当作背景区域，`--invert_mask` 之后两个红杯也可能没有进入 foreground alpha。
+
+当前 `remove_anything_video_sam3_robot.py` 没有 negative text prompt 参数，所以不能直接在白背景 SAM 阶段加“反向提示词 red cup”。本节采用纯后处理：读取 B 方案 Stage-2 已保存的 foreground alpha，再从 L16 源视频按红/粉颜色规则把左右红杯 OR 回 alpha，写到独立结果目录，不覆盖原 B 结果。
+
+先重跑/查看 `id_0..4`：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && \
+python /home/zaijia001/ssd/RoboTwin/code_painting/recompose_l16_stack_redprotect.py --ids 0-4 --overwrite
+```
+
+跑全部 stack id：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && \
+python /home/zaijia001/ssd/RoboTwin/code_painting/recompose_l16_stack_redprotect.py --all --overwrite
+```
+
+输出位置：
+
+```text
+最终视频：
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object_b_points_negative_redprotect/stack_cups/id_<ID>_l16_whitebg_human_object/final_repainted.mp4
+
+六面板 debug：
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object_b_points_negative_redprotect/stack_cups/id_<ID>_l16_whitebg_human_object/redprotect_debug_stack_cups_id<ID>.mp4
+
+红杯保护 overlay：
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object_b_points_negative_redprotect/stack_cups/id_<ID>_l16_whitebg_human_object/red_protect_overlay.mp4
+
+manifest：
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object_b_points_negative_redprotect/stack_cups/id_<ID>_l16_whitebg_human_object/redprotect_manifest.json
+```
+
+生成用于 P4 标注风格的对比 montage：
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin && \
+python3 code_painting/make_l16_repaint_montage.py \
+  --task stack_cups --ids 0-4 \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/l16_ours_review_redprotect/montages \
+  --final_root /home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object_b_points_negative_redprotect \
+  --final_task_subdir_template '{task}' \
+  --final_episode_dir_template 'id_{id}_l16_whitebg_human_object' \
+  --final_label 'Redprotect repaint' \
+  --overwrite
+```
+
+对比 montage 输出：
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/l16_ours_review_redprotect/montages/stack_cups/id_<ID>/compare_hamer_foundation_l16_repaint_stack_cups_id<ID>.mp4
+```
+
 ## J. AnyGrasp 候选筛选：找离人手朝向/目标物最近的候选
 
 说明：三个任务的 AnyGrasp 结果位于 `/home/zaijia001/ssd/data/piper/hand/<TASK>/<TASK>_output/foundation_input_<ID>`。J0 先检查 id0-id10 需要的 AnyGrasp、Foundation replay、HaMeR NPZ 是否齐全；J1 生成 ranked preview 和 `summary.json`，其中 `orientation_rank` 更偏向“和人手局部轴接近”，`fused_rank` 同时考虑 AnyGrasp score 和人手朝向。
@@ -9883,3 +9939,45 @@ debug 视频面板：
 ```
 
 判断方式：如果第 3/4 面板主要覆盖机械臂和目标杯子、final repaint 正常贴回，说明 Stage-2 反选逻辑是对的；如果第 3/4 面板大面积覆盖白色背景，说明 `--invert_mask` 或后处理方向有问题。
+
+### P6. L16 stack_cups redprotect 后处理重合成 debug
+
+用途：对 I3.6.2 的 `B_points_negative` Stage-2 输出做纯后处理保护，不重新跑 SAM/GPU。它读取已经保存的 foreground alpha，再从 L16 源视频中用红/粉颜色规则把两个目标杯区域 OR 回 alpha，输出到独立 `e0_robot_object_b_points_negative_redprotect` 目录。这个路径用于验证“白背景反选把红杯当背景漏掉”时的修复效果。
+
+说明：这不是在 SAM 阶段加 negative text prompt。当前 `remove_anything_video_sam3_robot.py` 没有 negative text prompt 参数，直接写“不要 red cup”不会生效；这里等价于在反选之后做显式红/粉杯保护。
+
+重跑 `id_0..4`：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && \
+python /home/zaijia001/ssd/RoboTwin/code_painting/recompose_l16_stack_redprotect.py --ids 0-4 --overwrite
+```
+
+看六面板 debug：
+
+```text
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object_b_points_negative_redprotect/stack_cups/id_<ID>_l16_whitebg_human_object/redprotect_debug_stack_cups_id<ID>.mp4
+```
+
+面板含义：
+
+```text
+1 L16 source
+2 Stage1 BG
+3 old alpha          # B 方案 Stage-2 保存的原 foreground alpha
+4 red protect        # 红/粉杯颜色保护区域
+5 new alpha          # old alpha OR red protect
+6 redprotect final   # 新合成结果
+```
+
+看最终视频：
+
+```text
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object_b_points_negative_redprotect/stack_cups/id_<ID>_l16_whitebg_human_object/final_repainted.mp4
+```
+
+看 P4 风格对比 montage：
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/l16_ours_review_redprotect/montages/stack_cups/id_<ID>/compare_hamer_foundation_l16_repaint_stack_cups_id<ID>.mp4
+```

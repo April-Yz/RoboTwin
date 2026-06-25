@@ -457,3 +457,19 @@ B 方案最终视频：
 ```text
 /home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object_b_points_negative/stack_cups/id_<ID>_l16_whitebg_human_object/final_repainted.mp4
 ```
+
+### stack_cups Stage-2 红/粉杯保护重合成
+
+`code_painting/recompose_l16_stack_redprotect.py` 是 `stack_cups` 专用的纯后处理 debug 路径。它不重新跑 SAM/GPU，而是读取 I3.6.2 B 方案 Stage-2 已保存的 foreground alpha，再从 L16 源视频按红/粉颜色规则把左右红杯 OR 回 alpha，输出到独立目录：
+
+```text
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object_b_points_negative_redprotect/stack_cups/id_<ID>_l16_whitebg_human_object/
+```
+
+运行 `id_0..4`：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/recompose_l16_stack_redprotect.py --ids 0-4 --overwrite
+```
+
+重点查看 `redprotect_debug_stack_cups_id<ID>.mp4`、`red_protect_overlay.mp4`、`final_repainted.mp4` 和 `redprotect_manifest.json`。这个方案是反选之后的红/粉杯保护，不是 negative text prompt；当前 SAM3 robot 脚本没有负文本 prompt 参数。

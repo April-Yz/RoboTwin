@@ -1,5 +1,12 @@
-## 2026-06-02 00:00:00 +08
+## 2026-06-26 00:20:00 +08
 
+- 新增 `stack_cups` redprotect 后处理命令：
+  - `python code_painting/recompose_l16_stack_redprotect.py --ids 0-4 --overwrite`
+  - 输出到 `/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object_b_points_negative_redprotect/stack_cups/id_<ID>_l16_whitebg_human_object/`。
+- 新增文档位置：`COMMAND_LIBRARY.zh.md` I3.6.2.4 和 P6。
+- 说明：这是反选后的红/粉杯颜色保护，不是 SAM 阶段 negative text prompt。
+
+## 2026-06-02 00:00:00 +08
 
 ## 2026-06-25 18:35:00 +08
 

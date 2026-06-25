@@ -457,3 +457,19 @@ B final videos:
 ```text
 /home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object_b_points_negative/stack_cups/id_<ID>_l16_whitebg_human_object/final_repainted.mp4
 ```
+
+### stack_cups Stage-2 Red/Pink-Cup Protection Recompose
+
+`code_painting/recompose_l16_stack_redprotect.py` is a `stack_cups`-specific post-processing debug path. It does not rerun SAM/GPU inference. It reads the saved foreground alpha from the I3.6.2 B-variant Stage-2 output, ORs in red/pink cup pixels detected from the L16 source video, and writes a separate output tree:
+
+```text
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object_b_points_negative_redprotect/stack_cups/id_<ID>_l16_whitebg_human_object/
+```
+
+Run `id_0..4`:
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/recompose_l16_stack_redprotect.py --ids 0-4 --overwrite
+```
+
+Inspect `redprotect_debug_stack_cups_id<ID>.mp4`, `red_protect_overlay.mp4`, `final_repainted.mp4`, and `redprotect_manifest.json`. This is red/pink-cup protection after inversion, not a negative text prompt; the current SAM3 robot script does not expose a negative text-prompt argument.

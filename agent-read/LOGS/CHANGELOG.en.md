@@ -1,5 +1,13 @@
 # CHANGELOG.en
 
+## 2026-06-26 (stack_cups redprotect post-processing debug)
+
+- Added `code_painting/recompose_l16_stack_redprotect.py`: it reads the I3.6.2 B-variant Stage-2 foreground alpha and ORs red/pink cup color regions from the L16 source video back into the alpha, writing a separate `e0_robot_object_b_points_negative_redprotect` output tree.
+- Recorded the diagnosis: the five non-stack tasks and stack use the same white-background thresholds; the stack failure is more likely that the white-background box/inversion classifies the red cups as background, not a threshold mismatch. The current SAM3 robot script has no negative text-prompt argument, so this path uses post-processing protection.
+- Generated `stack_cups id_0..4` redprotect outputs and P4-style montages.
+- Synced docs in `COMMAND_LIBRARY.zh.md` I3.6.2.4/P6 and `agent-read/COMMANDS/pi0_h2o_training_data.*.md`.
+
+
 
 ## 2026-06-25 (L16 whitebg inverted-mask debug)
 
