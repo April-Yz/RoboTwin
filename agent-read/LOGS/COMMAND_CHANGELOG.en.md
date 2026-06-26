@@ -2327,3 +2327,8 @@ tmux new-session -d -s l16_stack_debug_variants_gpu1 'GPU=1 IDS="0 1 2 3 4" MAX_
 - New script: `code_painting/convert_lerobot_piper0515_world_to_base.py`.
 - `run_l16_ours_selected_pipeline.sh` now has a default `piper0515` step; use `STEPS="piper0515 zip"` to only convert and package existing `_ours_25ep` repos.
 - Default outputs: `local/h2o_<TASK>_ours_piper0515_25ep`, `robot_ours_piper0515_<TASK_GROUP>_25ep.zip`, and `gdrive:piper/multi/<TASK_GROUP>/robot_ours_piper0515`.
+
+## 2026-06-26 (L16 Stage-2 SAM debug commands)
+
+- Added an `I debug` module to the tail of `COMMAND_LIBRARY.zh.md`: five non-`stack_cups` tasks, five representative ids each, using `run_l16_whitebg_repaint_task.sh` to rerun only Stage-2 white-background SAM plus inverted-mask composition.
+- Default debug output root: `/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_debug/e0_robot_object`.

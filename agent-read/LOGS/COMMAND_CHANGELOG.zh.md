@@ -2325,3 +2325,8 @@ tmux new-session -d -s l16_stack_debug_variants_gpu1 'GPU=1 IDS="0 1 2 3 4" MAX_
 - 新增脚本：`code_painting/convert_lerobot_piper0515_world_to_base.py`。
 - `run_l16_ours_selected_pipeline.sh` 新增默认步骤 `piper0515`，可用 `STEPS="piper0515 zip"` 在已有 `_ours_25ep` repo 上只补转换和打包。
 - 默认输出：`local/h2o_<TASK>_ours_piper0515_25ep`、`robot_ours_piper0515_<TASK_GROUP>_25ep.zip`、`gdrive:piper/multi/<TASK_GROUP>/robot_ours_piper0515`。
+
+## 2026-06-26（L16 Stage-2 SAM debug 命令）
+
+- 在 `COMMAND_LIBRARY.zh.md` 末尾新增 `I debug` 模块：五个非 `stack_cups` 任务各取 5 个代表 id，使用 `run_l16_whitebg_repaint_task.sh` 只重跑 Stage-2 白背景 SAM + 反选合成。
+- 默认 debug 输出根目录：`/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_debug/e0_robot_object`。

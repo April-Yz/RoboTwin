@@ -10067,3 +10067,53 @@ zip:
 默认 rclone 目标:
 gdrive:piper/multi/6task/robot_ours_piper0515
 ```
+
+## I debug. L16 Stage-2 SAM 白背景反选五任务 debug
+
+用途：只重跑 Stage-2 SAM + 反选合成，检查白背景 mask、foreground alpha 和最终 repaint，不覆盖正式 `e0_robot_object`。默认读取 Stage-1 人手+物体 inpaint 背景，输出到独立 debug 根目录。调 SAM 效果时优先改 `MASK_IDX`、`WHITE_PROMPT`、`COMPOSITE_ERODE`、`BLEND_ALPHA_SIGMA`；如果并行跑觉得 GPU 挤，可以把下面的 `GPU=` 改掉。
+
+# pick_diverse_bottles：看 id 0 1 2 3 4，瓶子场景先检查机械臂/瓶子是否完整进入 foreground alpha。
+```bash
+tmux new-session -d -s l16_i_dbg_s2_pick 'TASK=pick_diverse_bottles IDS="0 1 2 3 4" GPU=0 OVERWRITE=1 OUTROOT=/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_debug/e0_robot_object bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_whitebg_repaint_task.sh'
+```
+
+# place_bread_basket：看 id 0 1 2 3 4，重点看 bread/basket 边缘有没有被白背景 mask 吃掉。
+```bash
+tmux new-session -d -s l16_i_dbg_s2_place 'TASK=place_bread_basket IDS="0 1 2 3 4" GPU=1 OVERWRITE=1 OUTROOT=/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_debug/e0_robot_object bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_whitebg_repaint_task.sh'
+```
+
+# handover_bottle：看 id 1 2 3 4 5，L16 里这个任务常从 id1 开始看，重点看交接时双臂/瓶子是否漏 mask。
+```bash
+tmux new-session -d -s l16_i_dbg_s2_handover 'TASK=handover_bottle IDS="1 2 3 4 5" GPU=2 OVERWRITE=1 OUTROOT=/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_debug/e0_robot_object bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_whitebg_repaint_task.sh'
+```
+
+# pnp_bread：看 id 7 8 9 10 11，L16 里 id0-id6 通常缺结果，所以从 id7 开始 debug。
+```bash
+tmux new-session -d -s l16_i_dbg_s2_pnpbread 'TASK=pnp_bread IDS="7 8 9 10 11" GPU=3 OVERWRITE=1 OUTROOT=/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_debug/e0_robot_object bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_whitebg_repaint_task.sh'
+```
+
+# pnp_tray：看 id 0 1 2 3 4，重点看 red cup/bottle/tray 边缘是否被白背景反选保留下来。
+```bash
+tmux new-session -d -s l16_i_dbg_s2_pnptray 'TASK=pnp_tray IDS="0 1 2 3 4" GPU=0 OVERWRITE=1 OUTROOT=/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_debug/e0_robot_object bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_whitebg_repaint_task.sh'
+```
+
+查看 tmux 进度：
+
+```bash
+tmux ls | grep 'l16_i_dbg_s2'
+```
+
+结果位置：
+
+```text
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_debug/e0_robot_object/<TASK>/id_<ID>_l16_whitebg_human_object/
+```
+
+重点看这些文件：
+
+```text
+w_box_head_cam_plan.mp4        # 白背景 DINO/SAM box 可视化
+w_mask_head_cam_plan.mp4       # 反选后的 foreground alpha 可视化
+mask_head_cam_plan/*.jpg       # 实际用于合成的逐帧 foreground alpha
+final_repainted.mp4            # 最终 Stage-2 debug 合成结果
+```
