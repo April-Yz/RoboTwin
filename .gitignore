@@ -78,3 +78,6 @@ galaxea_sim/*
 *.npz
 *.png
 *.log
+
+# Generated LeRobot / processed training datasets
+piper_processed_data/
