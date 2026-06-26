@@ -3074,3 +3074,10 @@ Validation: `python -m py_compile code_painting/convert_lerobot_piper0515_world_
 - `COMMAND_LIBRARY.zh.md` 新增 SAM3/DINO3 参数说明和六任务颜色去白 debug 命令。
 
 Validation: `python -m py_compile code_painting/repaint_l16_white_color_debug.py`；`bash -n code_painting/run_l16_whitebg_repaint_task.sh`；用 `stack_cups id0 --max-frames 20` 验证颜色 debug 输出。
+
+## 2026-06-26（L16 color debug 帧对齐记录）
+
+- 更新 `repaint_l16_white_color_debug.py` manifest：记录原始 robot 帧数、实际处理帧数、Stage-1 背景帧数和 `robot_frames_with_proportional_stage1_sampling` 对齐模式。
+- 文档中区分 `--max-frames` 预览截断命令和全长对齐命令。
+
+Validation: `python -m py_compile code_painting/repaint_l16_white_color_debug.py`；`stack_cups id0 --max-frames 20` smoke。

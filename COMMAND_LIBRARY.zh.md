@@ -10184,7 +10184,15 @@ WHITE_PROMPT="white background, white table, white floor." BOX_THRESHOLD=0.25 TE
 --max-frames 120        先只跑前 120 帧调参；满意后去掉跑全量
 ```
 
-六任务颜色 debug 快速跑前 120 帧：
+帧对齐说明：颜色路线的全量输出默认跟随 L16 robot 视频帧数；Stage-1 背景如果更短或更长，会按 `round(i * (bg_len - 1) / (out_len - 1))` 比例采样，和原来的 Stage-2 compose 思路一致。`--max-frames` 只是预览截断参数，会让输出长度变短；要得到可用于后续检查/转换的全长结果，删掉所有命令里的 `--max-frames 120`。
+
+全长对齐示例（以 stack_cups B 方案为例）：
+
+```bash
+tmux new-session -d -s l16_i_color_stack_full 'source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/repaint_l16_white_color_debug.py --task stack_cups --ids "0 1 2 3 4" --stage1-root /home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stack_cups_debug_variants/B_points_negative --out-root /home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_debug_color/e0_robot_object_b_points_negative --overwrite'
+```
+
+六任务颜色 debug 快速跑前 120 帧（只用于快速看 mask，输出会被 `--max-frames` 截短）：
 
 ```bash
 tmux new-session -d -s l16_i_color_pick 'source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/repaint_l16_white_color_debug.py --task pick_diverse_bottles --ids "0 1 2 3 4" --out-root /home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_debug_color/e0_robot_object --max-frames 120 --overwrite'

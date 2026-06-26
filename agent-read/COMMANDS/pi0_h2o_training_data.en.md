@@ -489,8 +489,10 @@ STEPS="piper0515 zip" TASKS="pick_diverse_bottles place_bread_basket handover_bo
 
 If SAM3/DINO3 over-selects the white background box, use `code_painting/repaint_l16_white_color_debug.py` to bypass SAM and generate the white-background mask directly with HSV/RGB thresholds, then invert it into the foreground alpha. The default `--border-only 1` removes only border-connected white background; `--border-only 0` removes all threshold-matching white pixels but is more likely to delete light robot/object pixels.
 
-Representative command:
+Representative command (`--max-frames 120` is preview-only and shortens the output; remove it for full alignment):
 
 ```bash
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/repaint_l16_white_color_debug.py --task pick_diverse_bottles --ids "0 1 2 3 4" --out-root /home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_debug_color/e0_robot_object --max-frames 120 --overwrite
 ```
+
+Full color-route outputs follow the L16 robot video frame count. The Stage-1 background is sampled proportionally, matching the original Stage-2 compose behavior.

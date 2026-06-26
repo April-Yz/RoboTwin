@@ -2335,3 +2335,7 @@ tmux new-session -d -s l16_stack_debug_variants_gpu1 'GPU=1 IDS="0 1 2 3 4" MAX_
 
 - `code_painting/run_l16_whitebg_repaint_task.sh` 新增可指定环境变量：`DILATE_KERNEL_SIZE`、`ERODE_KERNEL_SIZE`、`BOX_THRESHOLD`、`TEXT_THRESHOLD`、`MAX_MASK_AREA_RATIO`、`EXCLUDE_BOTTOM_RATIO`，用于调 Stage-2 SAM3/DINO3 白背景路线。
 - 新增 `code_painting/repaint_l16_white_color_debug.py`：不跑 SAM，按 HSV/RGB 阈值找白背景并反选 foreground alpha，输出 `stage2_debug_color`。默认只去边界连通白色背景，支持 `--border-only 0` 去掉所有白色。
+
+## 2026-06-26（L16 color debug 帧对齐说明）
+
+- 更新 `COMMAND_LIBRARY.zh.md` 与 `agent-read/COMMANDS/pi0_h2o_training_data.*.md`：明确 `repaint_l16_white_color_debug.py` 默认按 L16 robot 视频帧数输出，Stage-1 背景按比例采样；`--max-frames` 只是快速预览截断参数。

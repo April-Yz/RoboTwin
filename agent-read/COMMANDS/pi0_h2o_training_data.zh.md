@@ -489,8 +489,10 @@ STEPS="piper0515 zip" TASKS="pick_diverse_bottles place_bread_basket handover_bo
 
 若 SAM3/DINO3 白背景框误选严重，可用 `code_painting/repaint_l16_white_color_debug.py` 绕开 SAM，直接按 HSV/RGB 白色阈值生成白背景 mask，再反选成 foreground alpha。默认 `--border-only 1` 只去掉边界连通白背景；若要移除所有白色可设 `--border-only 0`，但更容易吃掉浅色机械臂或物体。
 
-代表命令：
+代表命令（`--max-frames 120` 只用于快速预览，会截短输出；全长对齐时删掉它）：
 
 ```bash
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/repaint_l16_white_color_debug.py --task pick_diverse_bottles --ids "0 1 2 3 4" --out-root /home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_debug_color/e0_robot_object --max-frames 120 --overwrite
 ```
+
+颜色路线全量输出默认跟随 L16 robot 视频帧数；Stage-1 背景按比例采样对齐，和原 Stage-2 compose 一致。

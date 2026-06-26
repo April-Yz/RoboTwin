@@ -2337,3 +2337,7 @@ tmux new-session -d -s l16_stack_debug_variants_gpu1 'GPU=1 IDS="0 1 2 3 4" MAX_
 
 - `code_painting/run_l16_whitebg_repaint_task.sh` now exposes `DILATE_KERNEL_SIZE`, `ERODE_KERNEL_SIZE`, `BOX_THRESHOLD`, `TEXT_THRESHOLD`, `MAX_MASK_AREA_RATIO`, and `EXCLUDE_BOTTOM_RATIO` as environment variables for tuning the Stage-2 SAM3/DINO3 white-background route.
 - Added `code_painting/repaint_l16_white_color_debug.py`: bypasses SAM, detects white background with HSV/RGB thresholds, inverts it into foreground alpha, and writes `stage2_debug_color` outputs. By default it removes only border-connected white background; `--border-only 0` removes all white threshold matches.
+
+## 2026-06-26 (L16 color debug frame-alignment note)
+
+- Updated `COMMAND_LIBRARY.zh.md` and `agent-read/COMMANDS/pi0_h2o_training_data.*.md`: clarified that `repaint_l16_white_color_debug.py` outputs the L16 robot video frame count by default and samples Stage-1 backgrounds proportionally; `--max-frames` is only a quick-preview truncation option.

@@ -145,12 +145,21 @@ def compose_episode(args: argparse.Namespace, task: str, episode_id: int) -> dic
     mask_dir.mkdir(exist_ok=True)
     white_dir.mkdir(exist_ok=True)
 
-    robot_frames = read_video(robot_video)
+    robot_frames_full = read_video(robot_video)
+    original_robot_len = len(robot_frames_full)
     if args.max_frames > 0:
-        robot_frames = robot_frames[: args.max_frames]
+        robot_frames = robot_frames_full[: args.max_frames]
+        frame_limit_note = f"preview_first_{args.max_frames}_robot_frames"
+    else:
+        robot_frames = robot_frames_full
+        frame_limit_note = "full_robot_video"
     bg_frames = read_video(bg_video)
     out_len = len(robot_frames)
     bg_len = len(bg_frames)
+    print(
+        f"[align] output_frames={out_len} original_robot_frames={original_robot_len} "
+        f"stage1_bg_frames={bg_len}; Stage-1 BG is sampled proportionally"
+    )
 
     finals: list[np.ndarray] = []
     fg_overlays: list[np.ndarray] = []
@@ -233,8 +242,14 @@ def compose_episode(args: argparse.Namespace, task: str, episode_id: int) -> dic
             "fg_dilate_kernel": args.fg_dilate_kernel,
             "blend_alpha_sigma": args.blend_alpha_sigma,
         },
+        "alignment": {
+            "mode": "robot_frames_with_proportional_stage1_sampling",
+            "frame_limit": frame_limit_note,
+            "note": "Output follows robot frames (or --max-frames preview); Stage-1 background is sampled by round(i * (bg_len - 1) / (out_len - 1)).",
+        },
         "frames": {
-            "robot": len(robot_frames),
+            "original_robot": original_robot_len,
+            "processed_robot": len(robot_frames),
             "stage1_bg": len(bg_frames),
             "output": len(finals),
         },
@@ -252,7 +267,8 @@ def compose_episode(args: argparse.Namespace, task: str, episode_id: int) -> dic
     (out / "color_white_manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     print(
         f"[ok] task={task} id={episode_id} final={out / 'final_repainted.mp4'} "
-        f"fg_mean={manifest['foreground_ratio']['mean']:.3f} white_mean={manifest['white_bg_ratio']['mean']:.3f}"
+        f"frames={len(finals)}/{original_robot_len} fg_mean={manifest['foreground_ratio']['mean']:.3f} "
+        f"white_mean={manifest['white_bg_ratio']['mean']:.3f}"
     )
     return manifest
 
@@ -266,7 +282,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--out-root", type=Path, default=DEFAULT_OUT_ROOT)
     parser.add_argument("--fps", type=int, default=5)
     parser.add_argument("--overwrite", action="store_true")
-    parser.add_argument("--max-frames", type=int, default=0, help="Only process the first N robot frames; 0 means all frames.")
+    parser.add_argument(
+        "--max-frames",
+        type=int,
+        default=0,
+        help="Preview only: process the first N robot frames. Use 0 for full robot-frame-aligned output.",
+    )
     parser.add_argument("--white-value-min", type=int, default=185)
     parser.add_argument("--white-sat-max", type=int, default=55)
     parser.add_argument("--white-rgb-min", type=int, default=165)

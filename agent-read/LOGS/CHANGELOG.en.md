@@ -3076,3 +3076,10 @@ Validation: `python -m py_compile code_painting/convert_lerobot_piper0515_world_
 - Added SAM3/DINO3 parameter notes and six-task color-white debug commands to `COMMAND_LIBRARY.zh.md`.
 
 Validation: `python -m py_compile code_painting/repaint_l16_white_color_debug.py`; `bash -n code_painting/run_l16_whitebg_repaint_task.sh`; verified color debug output with `stack_cups id0 --max-frames 20`.
+
+## 2026-06-26 (L16 color debug frame-alignment record)
+
+- Updated the `repaint_l16_white_color_debug.py` manifest to record original robot frames, processed robot frames, Stage-1 background frames, and the `robot_frames_with_proportional_stage1_sampling` alignment mode.
+- Documentation now distinguishes `--max-frames` preview truncation commands from full frame-aligned commands.
+
+Validation: `python -m py_compile code_painting/repaint_l16_white_color_debug.py`; `stack_cups id0 --max-frames 20` smoke.
