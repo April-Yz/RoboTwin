@@ -2330,3 +2330,8 @@ tmux new-session -d -s l16_stack_debug_variants_gpu1 'GPU=1 IDS="0 1 2 3 4" MAX_
 
 - 在 `COMMAND_LIBRARY.zh.md` 末尾新增 `I debug` 模块：六个任务各取 5 个代表 id，其中 `stack_cups` 使用 `B_points_negative` Stage-1，使用 `run_l16_whitebg_repaint_task.sh` 只重跑 Stage-2 白背景 SAM + 反选合成。
 - 默认 debug 输出根目录：常规任务使用 `/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_debug/e0_robot_object`，`stack_cups` 使用 `/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_debug/e0_robot_object_b_points_negative`。
+
+## 2026-06-26（L16 Stage-2 SAM 参数化与颜色去白 debug）
+
+- `code_painting/run_l16_whitebg_repaint_task.sh` 新增可指定环境变量：`DILATE_KERNEL_SIZE`、`ERODE_KERNEL_SIZE`、`BOX_THRESHOLD`、`TEXT_THRESHOLD`、`MAX_MASK_AREA_RATIO`、`EXCLUDE_BOTTOM_RATIO`，用于调 Stage-2 SAM3/DINO3 白背景路线。
+- 新增 `code_painting/repaint_l16_white_color_debug.py`：不跑 SAM，按 HSV/RGB 阈值找白背景并反选 foreground alpha，输出 `stage2_debug_color`。默认只去边界连通白色背景，支持 `--border-only 0` 去掉所有白色。

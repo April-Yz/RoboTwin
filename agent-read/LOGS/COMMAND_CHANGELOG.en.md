@@ -2332,3 +2332,8 @@ tmux new-session -d -s l16_stack_debug_variants_gpu1 'GPU=1 IDS="0 1 2 3 4" MAX_
 
 - Added an `I debug` module to the tail of `COMMAND_LIBRARY.zh.md`: all six tasks, five representative ids each, with `stack_cups` using the `B_points_negative` Stage-1, using `run_l16_whitebg_repaint_task.sh` to rerun only Stage-2 white-background SAM plus inverted-mask composition.
 - Default debug output roots: regular tasks use `/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_debug/e0_robot_object`; `stack_cups` uses `/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_debug/e0_robot_object_b_points_negative`.
+
+## 2026-06-26 (L16 Stage-2 SAM parameterization and color-white debug)
+
+- `code_painting/run_l16_whitebg_repaint_task.sh` now exposes `DILATE_KERNEL_SIZE`, `ERODE_KERNEL_SIZE`, `BOX_THRESHOLD`, `TEXT_THRESHOLD`, `MAX_MASK_AREA_RATIO`, and `EXCLUDE_BOTTOM_RATIO` as environment variables for tuning the Stage-2 SAM3/DINO3 white-background route.
+- Added `code_painting/repaint_l16_white_color_debug.py`: bypasses SAM, detects white background with HSV/RGB thresholds, inverts it into foreground alpha, and writes `stage2_debug_color` outputs. By default it removes only border-connected white background; `--border-only 0` removes all white threshold matches.

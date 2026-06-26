@@ -482,3 +482,15 @@ Convert and package only:
 ```bash
 STEPS="piper0515 zip" TASKS="pick_diverse_bottles place_bread_basket handover_bottle pnp_bread pnp_tray stack_cups" TASK_GROUP=6task REVIEW_ROOT=/home/zaijia001/ssd/RoboTwin/code_painting/l16_ours_review_first25 DRY_RUN=1 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_ours_selected_pipeline.sh
 ```
+
+### L16 Stage-2 SAM parameterization and color-white debug
+
+`run_l16_whitebg_repaint_task.sh` runs `inpainting_sam3_robot/remove_anything_video_sam3_robot.py`; in the `inpainting-sam3-dino3` environment it prefers SAM3/DINO3. Stage-2 now accepts `WHITE_PROMPT`, `MASK_IDX`, `BOX_THRESHOLD`, `TEXT_THRESHOLD`, `MAX_MASK_AREA_RATIO`, `EXCLUDE_BOTTOM_RATIO`, `DILATE_KERNEL_SIZE`, `ERODE_KERNEL_SIZE`, `COMPOSITE_ERODE`, and `BLEND_ALPHA_SIGMA` as environment variables.
+
+If SAM3/DINO3 over-selects the white background box, use `code_painting/repaint_l16_white_color_debug.py` to bypass SAM and generate the white-background mask directly with HSV/RGB thresholds, then invert it into the foreground alpha. The default `--border-only 1` removes only border-connected white background; `--border-only 0` removes all threshold-matching white pixels but is more likely to delete light robot/object pixels.
+
+Representative command:
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/repaint_l16_white_color_debug.py --task pick_diverse_bottles --ids "0 1 2 3 4" --out-root /home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_debug_color/e0_robot_object --max-frames 120 --overwrite
+```

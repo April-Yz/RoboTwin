@@ -10126,3 +10126,106 @@ w_mask_head_cam_plan.mp4       # 反选后的 foreground alpha 可视化
 mask_head_cam_plan/*.jpg       # 实际用于合成的逐帧 foreground alpha
 final_repainted.mp4            # 最终 Stage-2 debug 合成结果
 ```
+
+### I debug 参数说明：SAM3/DINO3 白背景 prompt 路线
+
+当前 `run_l16_whitebg_repaint_task.sh` 用的是 `/home/zaijia001/ssd/inpainting_sam3_robot/remove_anything_video_sam3_robot.py`，在 `inpainting-sam3-dino3` 环境里优先加载 `SAM=sam3`、`DINO=dino3`；如果对应包/ckpt 不存在才会回退到 SAM2/DINO2。它不是直接按颜色去白，而是：`WHITE_PROMPT` 找白背景框 -> SAM 分割白背景 -> `--invert_mask` 得到 robot/object foreground alpha -> 合成到 Stage-1 背景。
+
+可直接在一行 tmux 命令里加的参数：
+
+```text
+WHITE_PROMPT              # DINO 文本；越短越偏向白色背景本身
+MASK_IDX                  # 第一帧候选 mask 选择；常试 0/1/2
+BOX_THRESHOLD             # DINO box 阈值；误框太多就升高，例如 0.25/0.30
+TEXT_THRESHOLD            # DINO text 阈值；误匹配太多就升高，例如 0.25/0.30
+MAX_MASK_AREA_RATIO       # 丢弃过大的首帧 mask；白背景本来很大，通常别低于 0.90
+EXCLUDE_BOTTOM_RATIO      # 去掉底部区域，误选底部桌边/机器人底座时可试 0.05
+DILATE_KERNEL_SIZE        # SAM 原始 mask 膨胀；白背景路线一般保持 0
+ERODE_KERNEL_SIZE         # SAM 原始 mask 腐蚀；白背景吃掉物体时可试 3/5
+COMPOSITE_ERODE           # 合成前 foreground alpha 腐蚀；用于减少边缘白边
+BLEND_ALPHA_SIGMA         # 合成 alpha 柔化；常试 0/1/1.5
+```
+
+如果误删 robot/object，优先这样试：
+
+```bash
+WHITE_PROMPT="white background." BOX_THRESHOLD=0.30 TEXT_THRESHOLD=0.30 MASK_IDX=0 OVERWRITE=1 TASK=pick_diverse_bottles IDS="0 1 2 3 4" GPU=0 OUTROOT=/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_debug/e0_robot_object bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_whitebg_repaint_task.sh
+```
+
+如果白边太多、但 robot/object 没被吃掉，再试：
+
+```bash
+WHITE_PROMPT="white background, white table, white floor." BOX_THRESHOLD=0.25 TEXT_THRESHOLD=0.25 COMPOSITE_ERODE=1 BLEND_ALPHA_SIGMA=1.0 OVERWRITE=1 TASK=pick_diverse_bottles IDS="0 1 2 3 4" GPU=0 OUTROOT=/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_debug/e0_robot_object bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_whitebg_repaint_task.sh
+```
+
+### I debug-color. L16 Stage-2 颜色去白 debug（不跑 SAM）
+
+如果 SAM3/DINO3 的大框误选概率太高，可以直接走颜色路线。新增脚本：
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/repaint_l16_white_color_debug.py
+```
+
+逻辑：在 L16 robot 视频中找 HSV/RGB 白色像素；默认只移除**与图像边界连通的白色区域**，避免把孤立的浅色物体也删掉；然后反选成 foreground alpha 并贴到 Stage-1 背景。若你真的想“所有白色都去掉”，把 `--border-only 0` 加上，但这更容易吃掉白色/浅色机械臂。
+
+颜色参数：
+
+```text
+--white-value-min       HSV V 最小值；升高=只去很亮的白，降低=阴影/灰白也去掉
+--white-sat-max         HSV S 最大值；降低=只去低饱和白/灰，升高=更容易误删浅色物体
+--white-rgb-min         RGB 三通道最小值；升高=更严格
+--white-rgb-delta-max   RGB 最大最小差；降低=只去接近中性的白/灰
+--border-only 1         只去边界连通白背景，推荐默认
+--border-only 0         去掉所有满足阈值的白色区域，风险更大
+--white-dilate-kernel   扩大白背景 mask，减少白边，但可能吃掉物体
+--white-erode-kernel    缩小白背景 mask，保留物体，但可能留白边
+--fg-close-kernel       填补 foreground 小洞
+--blend-alpha-sigma     合成边缘柔化
+--max-frames 120        先只跑前 120 帧调参；满意后去掉跑全量
+```
+
+六任务颜色 debug 快速跑前 120 帧：
+
+```bash
+tmux new-session -d -s l16_i_color_pick 'source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/repaint_l16_white_color_debug.py --task pick_diverse_bottles --ids "0 1 2 3 4" --out-root /home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_debug_color/e0_robot_object --max-frames 120 --overwrite'
+```
+
+```bash
+tmux new-session -d -s l16_i_color_place 'source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/repaint_l16_white_color_debug.py --task place_bread_basket --ids "0 1 2 3 4" --out-root /home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_debug_color/e0_robot_object --max-frames 120 --overwrite'
+```
+
+```bash
+tmux new-session -d -s l16_i_color_stack 'source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/repaint_l16_white_color_debug.py --task stack_cups --ids "0 1 2 3 4" --stage1-root /home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stack_cups_debug_variants/B_points_negative --out-root /home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_debug_color/e0_robot_object_b_points_negative --max-frames 120 --overwrite'
+```
+
+```bash
+tmux new-session -d -s l16_i_color_handover 'source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/repaint_l16_white_color_debug.py --task handover_bottle --ids "1 2 3 4 5" --out-root /home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_debug_color/e0_robot_object --max-frames 120 --overwrite'
+```
+
+```bash
+tmux new-session -d -s l16_i_color_pnpbread 'source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/repaint_l16_white_color_debug.py --task pnp_bread --ids "7 8 9 10 11" --out-root /home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_debug_color/e0_robot_object --max-frames 120 --overwrite'
+```
+
+```bash
+tmux new-session -d -s l16_i_color_pnptray 'source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/repaint_l16_white_color_debug.py --task pnp_tray --ids "0 1 2 3 4" --out-root /home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_debug_color/e0_robot_object --max-frames 120 --overwrite'
+```
+
+颜色 debug 结果位置：
+
+```text
+五个常规任务：
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_debug_color/e0_robot_object/<TASK>/id_<ID>_l16_white_color_human_object/
+
+stack_cups B 方案：
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_debug_color/e0_robot_object_b_points_negative/stack_cups/id_<ID>_l16_white_color_human_object/
+```
+
+重点看：
+
+```text
+w_white_bg_mask_head_cam_plan.mp4   # 黄色：被颜色规则判成白背景的区域
+w_mask_head_cam_plan.mp4            # 红色：反选后保留下来的 foreground alpha
+mask_head_cam_plan/*.jpg            # 实际用于合成的 foreground alpha
+final_repainted.mp4                 # 颜色去白最终合成
+color_white_manifest.json           # 参数与 foreground/white 面积比例
+```

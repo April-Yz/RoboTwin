@@ -6,6 +6,12 @@ GPU=${GPU:-0}
 FPS=${FPS:-5}
 OVERWRITE=${OVERWRITE:-0}
 MASK_IDX=${MASK_IDX:-0}
+DILATE_KERNEL_SIZE=${DILATE_KERNEL_SIZE:-0}
+ERODE_KERNEL_SIZE=${ERODE_KERNEL_SIZE:-0}
+BOX_THRESHOLD=${BOX_THRESHOLD:-0.20}
+TEXT_THRESHOLD=${TEXT_THRESHOLD:-0.20}
+MAX_MASK_AREA_RATIO=${MAX_MASK_AREA_RATIO:-1.0}
+EXCLUDE_BOTTOM_RATIO=${EXCLUDE_BOTTOM_RATIO:-0.0}
 COMPOSITE_ERODE=${COMPOSITE_ERODE:-0}
 BLEND_ALPHA_SIGMA=${BLEND_ALPHA_SIGMA:-1.0}
 WHITE_PROMPT=${WHITE_PROMPT:-white background, white floor, white table, blank white area.}
@@ -39,15 +45,15 @@ for ID in $(ids); do
   [[ -f "$BG" ]] || { echo "[repaint skip] task=$TASK id=$ID missing BG=$BG"; continue; }
   [[ -f "$ROBOT" ]] || { echo "[repaint skip] task=$TASK id=$ID missing ROBOT=$ROBOT"; continue; }
   mkdir -p "$OUT"
-  echo "[repaint run] task=$TASK id=$ID mask_idx=$MASK_IDX"
+  echo "[repaint run] task=$TASK id=$ID mask_idx=$MASK_IDX prompt=$WHITE_PROMPT box=$BOX_THRESHOLD text=$TEXT_THRESHOLD max_area=$MAX_MASK_AREA_RATIO"
   CUDA_VISIBLE_DEVICES=$GPU python remove_anything_video_sam3_robot.py \
     --input_video "$ROBOT" --target_video "$BG" --output_dir "$OUT" \
     --coords_type key_in --point_coords 10 80 --point_labels 1 \
-    --dilate_kernel_size 0 \
+    --dilate_kernel_size "$DILATE_KERNEL_SIZE" \
     --text_prompt "$WHITE_PROMPT" \
-    --box_threshold 0.20 --text_threshold 0.20 \
-    --max_mask_area_ratio 1.0 --exclude_bottom_ratio 0.0 \
-    --erode_kernel_size 0 --composite_erode_kernel_size 0 --blend_alpha_sigma 0.0 \
+    --box_threshold "$BOX_THRESHOLD" --text_threshold "$TEXT_THRESHOLD" \
+    --max_mask_area_ratio "$MAX_MASK_AREA_RATIO" --exclude_bottom_ratio "$EXCLUDE_BOTTOM_RATIO" \
+    --erode_kernel_size "$ERODE_KERNEL_SIZE" --composite_erode_kernel_size 0 --blend_alpha_sigma 0.0 \
     --invert_mask --mask_idx "$MASK_IDX" --fps "$FPS" --device cuda \
     --sam_ckpt "$SAM2/pretrained_models/sam_vit_h_4b8939.pth" \
     --lama_config "$SAM2/lama/configs/prediction/default.yaml" \

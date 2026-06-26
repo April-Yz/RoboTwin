@@ -482,3 +482,15 @@ Piper0515 坐标转换说明：`process_repainted_planner_outputs.py` 写出的 
 ```bash
 STEPS="piper0515 zip" TASKS="pick_diverse_bottles place_bread_basket handover_bottle pnp_bread pnp_tray stack_cups" TASK_GROUP=6task REVIEW_ROOT=/home/zaijia001/ssd/RoboTwin/code_painting/l16_ours_review_first25 DRY_RUN=1 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_ours_selected_pipeline.sh
 ```
+
+### L16 Stage-2 SAM 参数化与颜色去白 debug
+
+`run_l16_whitebg_repaint_task.sh` 走 `inpainting_sam3_robot/remove_anything_video_sam3_robot.py`，在 `inpainting-sam3-dino3` 环境中优先使用 SAM3/DINO3。Stage-2 现在可通过环境变量指定 `WHITE_PROMPT`、`MASK_IDX`、`BOX_THRESHOLD`、`TEXT_THRESHOLD`、`MAX_MASK_AREA_RATIO`、`EXCLUDE_BOTTOM_RATIO`、`DILATE_KERNEL_SIZE`、`ERODE_KERNEL_SIZE`、`COMPOSITE_ERODE`、`BLEND_ALPHA_SIGMA`。
+
+若 SAM3/DINO3 白背景框误选严重，可用 `code_painting/repaint_l16_white_color_debug.py` 绕开 SAM，直接按 HSV/RGB 白色阈值生成白背景 mask，再反选成 foreground alpha。默认 `--border-only 1` 只去掉边界连通白背景；若要移除所有白色可设 `--border-only 0`，但更容易吃掉浅色机械臂或物体。
+
+代表命令：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && python code_painting/repaint_l16_white_color_debug.py --task pick_diverse_bottles --ids "0 1 2 3 4" --out-root /home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_debug_color/e0_robot_object --max-frames 120 --overwrite
+```

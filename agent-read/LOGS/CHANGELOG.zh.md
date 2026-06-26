@@ -3066,3 +3066,11 @@ Validation: `python3 -m py_compile code_painting/make_l16_repaint_montage.py cod
 - 同步更新 `COMMAND_LIBRARY.zh.md` 末尾和 `agent-read/COMMANDS/pi0_h2o_training_data.*.md`。
 
 Validation: `python -m py_compile code_painting/convert_lerobot_piper0515_world_to_base.py`；`bash -n code_painting/run_l16_ours_selected_pipeline.sh`；对 `local/h2o_pick_diverse_bottles_ours_25ep` 执行 `--dry-run`，bbox 从 world 坐标转换到 base 坐标区间。
+
+## 2026-06-26（L16 Stage-2 颜色去白 debug）
+
+- `code_painting/run_l16_whitebg_repaint_task.sh` 将 Stage-2 SAM3/DINO3 白背景路线的 DINO/SAM 阈值改为环境变量，便于在 debug 命令中直接调 `WHITE_PROMPT`、`BOX_THRESHOLD`、`TEXT_THRESHOLD` 等参数。
+- 新增 `code_painting/repaint_l16_white_color_debug.py`：不跑 SAM，按 HSV/RGB 白色阈值生成白背景 mask，反选为 foreground alpha 后合成到 Stage-1 背景，输出 `stage2_debug_color`。
+- `COMMAND_LIBRARY.zh.md` 新增 SAM3/DINO3 参数说明和六任务颜色去白 debug 命令。
+
+Validation: `python -m py_compile code_painting/repaint_l16_white_color_debug.py`；`bash -n code_painting/run_l16_whitebg_repaint_task.sh`；用 `stack_cups id0 --max-frames 20` 验证颜色 debug 输出。
