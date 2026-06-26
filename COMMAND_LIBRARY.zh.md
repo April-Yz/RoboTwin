@@ -10068,9 +10068,9 @@ zip:
 gdrive:piper/multi/6task/robot_ours_piper0515
 ```
 
-## I debug. L16 Stage-2 SAM 白背景反选五任务 debug
+## I debug. L16 Stage-2 SAM 白背景反选六任务 debug
 
-用途：只重跑 Stage-2 SAM + 反选合成，检查白背景 mask、foreground alpha 和最终 repaint，不覆盖正式 `e0_robot_object`。默认读取 Stage-1 人手+物体 inpaint 背景，输出到独立 debug 根目录。调 SAM 效果时优先改 `MASK_IDX`、`WHITE_PROMPT`、`COMPOSITE_ERODE`、`BLEND_ALPHA_SIGMA`；如果并行跑觉得 GPU 挤，可以把下面的 `GPU=` 改掉。
+用途：只重跑 Stage-2 SAM + 反选合成，检查白背景 mask、foreground alpha 和最终 repaint，不覆盖正式 `e0_robot_object`。默认读取 Stage-1 人手+物体 inpaint 背景，输出到独立 debug 根目录；`stack_cups` 使用之前确认更稳的 `B_points_negative` Stage-1。调 SAM 效果时优先改 `MASK_IDX`、`WHITE_PROMPT`、`COMPOSITE_ERODE`、`BLEND_ALPHA_SIGMA`；如果并行跑觉得 GPU 挤，可以把下面的 `GPU=` 改掉。
 
 # pick_diverse_bottles：看 id 0 1 2 3 4，瓶子场景先检查机械臂/瓶子是否完整进入 foreground alpha。
 ```bash
@@ -10080,6 +10080,11 @@ tmux new-session -d -s l16_i_dbg_s2_pick 'TASK=pick_diverse_bottles IDS="0 1 2 3
 # place_bread_basket：看 id 0 1 2 3 4，重点看 bread/basket 边缘有没有被白背景 mask 吃掉。
 ```bash
 tmux new-session -d -s l16_i_dbg_s2_place 'TASK=place_bread_basket IDS="0 1 2 3 4" GPU=1 OVERWRITE=1 OUTROOT=/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_debug/e0_robot_object bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_whitebg_repaint_task.sh'
+```
+
+# stack_cups：看 id 0 1 2 3 4，使用 B_points_negative Stage-1，重点看两个红杯/粉杯和绿色杯边界是否被 Stage-2 foreground alpha 保留。
+```bash
+tmux new-session -d -s l16_i_dbg_s2_stack 'TASK=stack_cups IDS="0 1 2 3 4" GPU=1 OVERWRITE=1 STAGE1=/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_l16/stack_cups_debug_variants/B_points_negative OUTROOT=/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_debug/e0_robot_object_b_points_negative bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_whitebg_repaint_task.sh'
 ```
 
 # handover_bottle：看 id 1 2 3 4 5，L16 里这个任务常从 id1 开始看，重点看交接时双臂/瓶子是否漏 mask。
@@ -10106,7 +10111,11 @@ tmux ls | grep 'l16_i_dbg_s2'
 结果位置：
 
 ```text
+五个常规任务：
 /home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_debug/e0_robot_object/<TASK>/id_<ID>_l16_whitebg_human_object/
+
+stack_cups B 方案：
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_debug/e0_robot_object_b_points_negative/stack_cups/id_<ID>_l16_whitebg_human_object/
 ```
 
 重点看这些文件：

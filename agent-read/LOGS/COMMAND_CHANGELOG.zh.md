@@ -2328,5 +2328,5 @@ tmux new-session -d -s l16_stack_debug_variants_gpu1 'GPU=1 IDS="0 1 2 3 4" MAX_
 
 ## 2026-06-26（L16 Stage-2 SAM debug 命令）
 
-- 在 `COMMAND_LIBRARY.zh.md` 末尾新增 `I debug` 模块：五个非 `stack_cups` 任务各取 5 个代表 id，使用 `run_l16_whitebg_repaint_task.sh` 只重跑 Stage-2 白背景 SAM + 反选合成。
-- 默认 debug 输出根目录：`/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_debug/e0_robot_object`。
+- 在 `COMMAND_LIBRARY.zh.md` 末尾新增 `I debug` 模块：六个任务各取 5 个代表 id，其中 `stack_cups` 使用 `B_points_negative` Stage-1，使用 `run_l16_whitebg_repaint_task.sh` 只重跑 Stage-2 白背景 SAM + 反选合成。
+- 默认 debug 输出根目录：常规任务使用 `/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_debug/e0_robot_object`，`stack_cups` 使用 `/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_debug/e0_robot_object_b_points_negative`。

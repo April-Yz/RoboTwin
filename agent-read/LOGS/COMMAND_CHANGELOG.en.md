@@ -2330,5 +2330,5 @@ tmux new-session -d -s l16_stack_debug_variants_gpu1 'GPU=1 IDS="0 1 2 3 4" MAX_
 
 ## 2026-06-26 (L16 Stage-2 SAM debug commands)
 
-- Added an `I debug` module to the tail of `COMMAND_LIBRARY.zh.md`: five non-`stack_cups` tasks, five representative ids each, using `run_l16_whitebg_repaint_task.sh` to rerun only Stage-2 white-background SAM plus inverted-mask composition.
-- Default debug output root: `/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_debug/e0_robot_object`.
+- Added an `I debug` module to the tail of `COMMAND_LIBRARY.zh.md`: all six tasks, five representative ids each, with `stack_cups` using the `B_points_negative` Stage-1, using `run_l16_whitebg_repaint_task.sh` to rerun only Stage-2 white-background SAM plus inverted-mask composition.
+- Default debug output roots: regular tasks use `/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_debug/e0_robot_object`; `stack_cups` uses `/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_debug/e0_robot_object_b_points_negative`.
