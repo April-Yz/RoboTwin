@@ -351,7 +351,8 @@ P4 annotate_l16_ours_<TASK>.sh generates/plays seven-panel montages, wrapping af
 -> h2o_<TASK>_ours-120 processed HDF5
 -> local/h2o_<TASK>_ours LeRobot
 -> local/h2o_<TASK>_ours_25ep
--> robot_ours_<TASK_GROUP>_25ep.zip + rclone dry-run/upload
+-> local/h2o_<TASK>_ours_piper0515_25ep (world frame to per-arm base frame)
+-> robot_ours_piper0515_<TASK_GROUP>_25ep.zip + rclone dry-run/upload
 ```
 
 The per-task scripts default to `TARGET_COUNT=25`, `OVERWRITE_MONTAGE=1`, and `INITIAL_SPEED=1.0`. To continue labeling without regenerating montages, use `OVERWRITE_MONTAGE=0 bash <script>`.
@@ -473,3 +474,11 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate R
 ```
 
 Inspect `redprotect_debug_stack_cups_id<ID>.mp4`, `red_protect_overlay.mp4`, `final_repainted.mp4`, and `redprotect_manifest.json`. This is red/pink-cup protection after inversion, not a negative text prompt; the current SAM3 robot script does not expose a negative text-prompt argument.
+
+Piper0515 coordinate conversion note: `process_repainted_planner_outputs.py` writes L16/ours poses from `current_*_tcp_pose_world_wxyz`, which are in the calibrated world frame. The real robot rows use each arm's own base/cartesian frame. `run_l16_ours_selected_pipeline.sh` now calls `code_painting/convert_lerobot_piper0515_world_to_base.py` between `subset` and `zip`, producing `local/h2o_<TASK>_ours_piper0515_25ep`. This step only edits the LeRobot parquet `observation.state` and `action` columns; videos and episode ordering are unchanged.
+
+Convert and package only:
+
+```bash
+STEPS="piper0515 zip" TASKS="pick_diverse_bottles place_bread_basket handover_bottle pnp_bread pnp_tray stack_cups" TASK_GROUP=6task REVIEW_ROOT=/home/zaijia001/ssd/RoboTwin/code_painting/l16_ours_review_first25 DRY_RUN=1 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_ours_selected_pipeline.sh
+```

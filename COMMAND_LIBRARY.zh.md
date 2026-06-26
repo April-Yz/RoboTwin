@@ -9981,3 +9981,89 @@ python /home/zaijia001/ssd/RoboTwin/code_painting/recompose_l16_stack_redprotect
 ```text
 /home/zaijia001/ssd/RoboTwin/code_painting/l16_ours_review_redprotect/montages/stack_cups/id_<ID>/compare_hamer_foundation_l16_repaint_stack_cups_id<ID>.mp4
 ```
+
+### L11.2.7 ours -> Piper0515 base-frame 坐标转换（rclone 前）
+
+原因：前面检查发现，`ours/baseline/reinit` 的 state/action 里左右臂 `xyz/rpy` 是 Piper0515 标定场景下的 world frame；而当前真机器人 repo 的前 25 条 robot 数据更像每个机械臂自己的 base/cartesian frame。直接把两者合并会导致同一任务中 robot 与 ours 的操作空间不一致。新增这个专门脚本后，在 zip/rclone 前把 ours 的左右臂 pose 转成 Piper0515 左/右 base frame，并把 gripper 从 `[0,1]` 映射到约 `0.0967` 的真机器人开合尺度。
+
+新增脚本：
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/convert_lerobot_piper0515_world_to_base.py
+```
+
+它读取 LeRobot repo 的 `data/chunk-000/episode_*.parquet`，只改：
+
+```text
+observation.state
+action
+```
+
+不改视频、episode 顺序、timestamp。转换公式：
+
+```text
+p_base = R_base.T @ (p_world - t_base)
+R_base_frame = R_base.T @ R_world
+```
+
+默认使用：
+
+```text
+/home/zaijia001/ssd/RoboTwin/robot_config_PiperPika_agx_dual_table_0515.json
+```
+
+单任务 dry-run，只检查 bbox，不写输出：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate simplevla-rl && cd /home/zaijia001/ssd/RoboTwin && \
+python code_painting/convert_lerobot_piper0515_world_to_base.py \
+  --source local/h2o_pick_diverse_bottles_ours_25ep \
+  --dry-run
+```
+
+单任务正式转换，输出一个新 repo，不覆盖原 `_ours_25ep`：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate simplevla-rl && cd /home/zaijia001/ssd/RoboTwin && \
+python code_painting/convert_lerobot_piper0515_world_to_base.py \
+  --source local/h2o_pick_diverse_bottles_ours_25ep \
+  --output-repo-id local/h2o_pick_diverse_bottles_ours_piper0515_25ep \
+  --overwrite
+```
+
+`run_l16_ours_selected_pipeline.sh` 现在默认流程已经变成：
+
+```text
+process -> lerobot -> subset -> piper0515 -> zip/rclone
+```
+
+如果重新从 review JSON 生成六任务、做 Piper0515 转换、打包并先 dry-run 上传：
+
+```bash
+tmux new-session -d -s l16_ours_piper0515_6task_dryrun 'TASKS="pick_diverse_bottles place_bread_basket handover_bottle pnp_bread pnp_tray stack_cups" TASK_GROUP=6task REVIEW_ROOT=/home/zaijia001/ssd/RoboTwin/code_painting/l16_ours_review_first25 DRY_RUN=1 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_ours_selected_pipeline.sh'
+```
+
+确认 dry-run 没问题后正式上传：
+
+```bash
+tmux new-session -d -s l16_ours_piper0515_6task_upload 'TASKS="pick_diverse_bottles place_bread_basket handover_bottle pnp_bread pnp_tray stack_cups" TASK_GROUP=6task REVIEW_ROOT=/home/zaijia001/ssd/RoboTwin/code_painting/l16_ours_review_first25 DRY_RUN=0 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_ours_selected_pipeline.sh'
+```
+
+如果你已经有 `local/h2o_<TASK>_ours_25ep`，只想补 Piper0515 转换和 zip/rclone：
+
+```bash
+tmux new-session -d -s l16_ours_piper0515_convert_zip 'STEPS="piper0515 zip" TASKS="pick_diverse_bottles place_bread_basket handover_bottle pnp_bread pnp_tray stack_cups" TASK_GROUP=6task REVIEW_ROOT=/home/zaijia001/ssd/RoboTwin/code_painting/l16_ours_review_first25 DRY_RUN=1 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_ours_selected_pipeline.sh'
+```
+
+输出位置：
+
+```text
+转换后的每任务 LeRobot repo:
+/home/zaijia001/.cache/huggingface/lerobot/local/h2o_<TASK>_ours_piper0515_25ep
+
+zip:
+/home/zaijia001/.cache/huggingface/lerobot/local/robot_ours_piper0515_6task_25ep.zip
+
+默认 rclone 目标:
+gdrive:piper/multi/6task/robot_ours_piper0515
+```

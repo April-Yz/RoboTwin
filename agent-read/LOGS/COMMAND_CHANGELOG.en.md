@@ -2320,3 +2320,10 @@ tmux new-session -d -s l16_stack_debug_variants_gpu1 'GPU=1 IDS="0 1 2 3 4" MAX_
 - Added `COMMAND_LIBRARY.zh.md` P4: `review_l16_ours_montages.py` generates/plays P five-panel montages and writes `l16_ours_review/selections/<TASK>/ours_review_selection.json`.
 - Added `COMMAND_LIBRARY.zh.md` L11.2.6: `run_l16_ours_selected_pipeline.sh` reads the JSON, creates `ours`-named datasets, subsets `_25ep`, zips, and runs rclone dry-run.
 - Added `--final_root`, `--final_task_subdir_template`, `--final_episode_dir_template`, `--final_video_name`, and `--final_label` to `make_l16_repaint_montage.py` so the same montage script can inspect different repaint roots.
+
+## 2026-06-26 (Piper0515 conversion commands)
+
+- New command location: `COMMAND_LIBRARY.zh.md` L11.2.7.
+- New script: `code_painting/convert_lerobot_piper0515_world_to_base.py`.
+- `run_l16_ours_selected_pipeline.sh` now has a default `piper0515` step; use `STEPS="piper0515 zip"` to only convert and package existing `_ours_25ep` repos.
+- Default outputs: `local/h2o_<TASK>_ours_piper0515_25ep`, `robot_ours_piper0515_<TASK_GROUP>_25ep.zip`, and `gdrive:piper/multi/<TASK_GROUP>/robot_ours_piper0515`.

@@ -2,10 +2,11 @@
 set -eo pipefail
 
 # Build L16 "ours" training datasets from review JSON files.
-# Default flow: process planner outputs -> LeRobot -> selected subset -> zip/rclone dry-run.
+# Default flow: process planner outputs -> LeRobot -> selected subset ->
+# Piper0515 world-to-base conversion -> zip/rclone dry-run.
 
 TASKS=${TASKS:-"pick_diverse_bottles place_bread_basket handover_bottle pnp_bread pnp_tray stack_cups"}
-STEPS=${STEPS:-"process lerobot subset zip"}
+STEPS=${STEPS:-"process lerobot subset piper0515 zip"}
 DATASET_SUFFIX=${DATASET_SUFFIX:-ours}
 N=${N:-120}
 SUBSET_N=${SUBSET_N:-25}
@@ -17,8 +18,11 @@ STACK_HEAD_ROOT=${STACK_HEAD_ROOT:-/home/zaijia001/ssd/inpainting_sam3_robot/res
 PLANNER_ROOT=${PLANNER_ROOT:-/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_human_replay_clean}
 PI0_ROOT=${PI0_ROOT:-/home/zaijia001/ssd/RoboTwin/policy/pi0}
 LEROBOT_LOCAL=${LEROBOT_LOCAL:-/home/zaijia001/.cache/huggingface/lerobot/local}
-RCLONE_DST=${RCLONE_DST:-gdrive:piper/multi/${TASK_GROUP}/robot_ours}
-ZIP_NAME=${ZIP_NAME:-robot_ours_${TASK_GROUP}_${SUBSET_N}ep.zip}
+PIPER0515_SUFFIX=${PIPER0515_SUFFIX:-piper0515}
+PIPER0515_ROBOT_CONFIG=${PIPER0515_ROBOT_CONFIG:-/home/zaijia001/ssd/RoboTwin/robot_config_PiperPika_agx_dual_table_0515.json}
+PIPER0515_GRIPPER_SCALE=${PIPER0515_GRIPPER_SCALE:-0.0967}
+RCLONE_DST_ENV=${RCLONE_DST:-}
+ZIP_NAME_ENV=${ZIP_NAME:-}
 
 has_step() {
   case " ${STEPS} " in
@@ -26,6 +30,26 @@ has_step() {
     *) return 1 ;;
   esac
 }
+
+if [[ -z "$ZIP_NAME_ENV" ]]; then
+  if has_step piper0515; then
+    ZIP_NAME="robot_ours_${PIPER0515_SUFFIX}_${TASK_GROUP}_${SUBSET_N}ep.zip"
+  else
+    ZIP_NAME="robot_ours_${TASK_GROUP}_${SUBSET_N}ep.zip"
+  fi
+else
+  ZIP_NAME="$ZIP_NAME_ENV"
+fi
+
+if [[ -z "$RCLONE_DST_ENV" ]]; then
+  if has_step piper0515; then
+    RCLONE_DST="gdrive:piper/multi/${TASK_GROUP}/robot_ours_${PIPER0515_SUFFIX}"
+  else
+    RCLONE_DST="gdrive:piper/multi/${TASK_GROUP}/robot_ours"
+  fi
+else
+  RCLONE_DST="$RCLONE_DST_ENV"
+fi
 
 instruction_for_task() {
   case "$1" in
@@ -101,6 +125,7 @@ for TASK in $TASKS; do
   DATASET="${PI0_ROOT}/processed_data/h2o_${TASK}_${DATASET_SUFFIX}-${N}"
   SOURCE="local/h2o_${TASK}_${DATASET_SUFFIX}"
   SUBSET_REPO="local/h2o_${TASK}_${DATASET_SUFFIX}_${SUBSET_N}ep"
+  PIPER0515_REPO="local/h2o_${TASK}_${DATASET_SUFFIX}_${PIPER0515_SUFFIX}_${SUBSET_N}ep"
 
   if has_step process; then
     echo "===== process ${TASK}: selected=${COUNT} dataset=${DATASET} ====="
@@ -156,6 +181,18 @@ for TASK in $TASKS; do
       --episodes "$EPISODES" \
       --overwrite
   fi
+
+  if has_step piper0515; then
+    echo "===== piper0515 ${TASK}: output=${PIPER0515_REPO} ====="
+    conda activate simplevla-rl
+    cd /home/zaijia001/ssd/RoboTwin
+    python code_painting/convert_lerobot_piper0515_world_to_base.py \
+      --source "$SUBSET_REPO" \
+      --output-repo-id "$PIPER0515_REPO" \
+      --robot-config "$PIPER0515_ROBOT_CONFIG" \
+      --gripper-scale "$PIPER0515_GRIPPER_SCALE" \
+      --overwrite
+  fi
 done
 
 if has_step zip; then
@@ -163,7 +200,11 @@ if has_step zip; then
   cd "$LEROBOT_LOCAL"
   ZIP_DIRS=()
   for TASK in $TASKS; do
-    D="h2o_${TASK}_${DATASET_SUFFIX}_${SUBSET_N}ep"
+    if has_step piper0515; then
+      D="h2o_${TASK}_${DATASET_SUFFIX}_${PIPER0515_SUFFIX}_${SUBSET_N}ep"
+    else
+      D="h2o_${TASK}_${DATASET_SUFFIX}_${SUBSET_N}ep"
+    fi
     if [[ -d "$D" ]]; then
       ZIP_DIRS+=("$D")
     else

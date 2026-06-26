@@ -2318,3 +2318,10 @@ tmux new-session -d -s l16_stack_debug_variants_gpu1 'GPU=1 IDS="0 1 2 3 4" MAX_
 - 新增 `COMMAND_LIBRARY.zh.md` P4：`review_l16_ours_montages.py` 自动生成/播放 P 五联 montage，并写出 `l16_ours_review/selections/<TASK>/ours_review_selection.json`。
 - 新增 `COMMAND_LIBRARY.zh.md` L11.2.6：`run_l16_ours_selected_pipeline.sh` 按 JSON 生成 `ours` 命名的数据集、抽取 `_25ep`、zip 并 rclone dry-run。
 - `make_l16_repaint_montage.py` 新增 `--final_root`、`--final_task_subdir_template`、`--final_episode_dir_template`、`--final_video_name`、`--final_label`，用于复用同一 montage 脚本查看不同 repaint 根目录。
+
+## 2026-06-26（Piper0515 转换命令）
+
+- 新增命令位置：`COMMAND_LIBRARY.zh.md` L11.2.7。
+- 新增脚本：`code_painting/convert_lerobot_piper0515_world_to_base.py`。
+- `run_l16_ours_selected_pipeline.sh` 新增默认步骤 `piper0515`，可用 `STEPS="piper0515 zip"` 在已有 `_ours_25ep` repo 上只补转换和打包。
+- 默认输出：`local/h2o_<TASK>_ours_piper0515_25ep`、`robot_ours_piper0515_<TASK_GROUP>_25ep.zip`、`gdrive:piper/multi/<TASK_GROUP>/robot_ours_piper0515`。

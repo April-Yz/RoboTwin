@@ -3060,3 +3060,11 @@ Validation: `git diff --check`.
 - Updated `COMMAND_LIBRARY.zh.md` P4 and L11.2.6 plus `agent-read/COMMANDS/pi0_h2o_training_data.*.md`.
 
 Validation: `python3 -m py_compile code_painting/make_l16_repaint_montage.py code_painting/review_l16_ours_montages.py`; `bash -n code_painting/run_l16_ours_selected_pipeline.sh`.
+
+## 2026-06-26 (Piper0515 world-to-base LeRobot conversion)
+
+- Added `code_painting/convert_lerobot_piper0515_world_to_base.py`: converts world-frame L16/ours LeRobot `observation.state`/`action` vectors into Piper0515 per-arm base-frame poses, and maps `[0,1]` gripper commands to the `0.0967` real-robot scale by default.
+- Updated `code_painting/run_l16_ours_selected_pipeline.sh`: the default flow is now `process -> lerobot -> subset -> piper0515 -> zip/rclone`, producing `_ours_piper0515_25ep` repos and `robot_ours_piper0515_<TASK_GROUP>_25ep.zip`.
+- Synchronized the tail of `COMMAND_LIBRARY.zh.md` and `agent-read/COMMANDS/pi0_h2o_training_data.*.md`.
+
+Validation: `python -m py_compile code_painting/convert_lerobot_piper0515_world_to_base.py`; `bash -n code_painting/run_l16_ours_selected_pipeline.sh`; ran `--dry-run` on `local/h2o_pick_diverse_bottles_ours_25ep`, confirming the bbox moves from world coordinates into the base-frame workspace.

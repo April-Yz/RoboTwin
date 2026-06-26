@@ -3058,3 +3058,11 @@ Validation: `git diff --check`。
 - 同步更新 `COMMAND_LIBRARY.zh.md` P4 和 L11.2.6，以及 `agent-read/COMMANDS/pi0_h2o_training_data.*.md`。
 
 Validation: `python3 -m py_compile code_painting/make_l16_repaint_montage.py code_painting/review_l16_ours_montages.py`；`bash -n code_painting/run_l16_ours_selected_pipeline.sh`。
+
+## 2026-06-26（Piper0515 world->base LeRobot 转换）
+
+- 新增 `code_painting/convert_lerobot_piper0515_world_to_base.py`：把 L16/ours LeRobot repo 中的 world-frame `observation.state`/`action` 转为 Piper0515 左右机械臂 base-frame，并默认将 gripper `[0,1]` 映射到 `0.0967` 真机器人尺度。
+- 更新 `code_painting/run_l16_ours_selected_pipeline.sh`：默认流程变为 `process -> lerobot -> subset -> piper0515 -> zip/rclone`，输出 `_ours_piper0515_25ep` repo 和 `robot_ours_piper0515_<TASK_GROUP>_25ep.zip`。
+- 同步更新 `COMMAND_LIBRARY.zh.md` 末尾和 `agent-read/COMMANDS/pi0_h2o_training_data.*.md`。
+
+Validation: `python -m py_compile code_painting/convert_lerobot_piper0515_world_to_base.py`；`bash -n code_painting/run_l16_ours_selected_pipeline.sh`；对 `local/h2o_pick_diverse_bottles_ours_25ep` 执行 `--dry-run`，bbox 从 world 坐标转换到 base 坐标区间。
