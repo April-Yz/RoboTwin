@@ -2,6 +2,8 @@
 
 本仓库在 RoboTwin 仿真、数据采集和策略工作流基础上，维护 Piper/Pika 双臂场景、Cartesian IK 抓放、手部/物体 replay 与 AnyGrasp 规划工具。
 
+当前会话上下文和近期数据状态优先见 `agent-read/ACTIVE_MEMORY.zh.md`。
+
 ## 当前推荐工作流
 
 - Piper IK 双瓶抓放：使用 `pick_diverse_bottles_piper_ik` 与 `demo_piper_ik_seq_v1..v4`。

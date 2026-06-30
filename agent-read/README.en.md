@@ -2,6 +2,8 @@
 
 This repository extends RoboTwin simulation, collection, and policy workflows with Piper/Pika dual-arm scenes, Cartesian IK pick-and-place, hand/object replay, and AnyGrasp planning tools.
 
+For current session context and recent data status, read `agent-read/ACTIVE_MEMORY.en.md` first.
+
 ## Current Recommended Workflow
 
 - Piper IK dual-bottle task: use `pick_diverse_bottles_piper_ik` with `demo_piper_ik_seq_v1..v4`.
