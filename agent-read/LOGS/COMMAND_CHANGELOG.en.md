@@ -2354,3 +2354,9 @@ tmux new-session -d -s l16_stack_debug_variants_gpu1 'GPU=1 IDS="0 1 2 3 4" MAX_
 - Submitted controller tmux `mode_n_n7_noaxes_selected25_pipeline`, with script `/home/zaijia001/tmp/run_mode_n_n7_noaxes_selected25_pipeline_20260630.sh`.
 - Stage1 output: `/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-7_foundation_pose_humanrot_noaxes_selected25_20260630`; Stage2 output: `/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_color_mode_n_n7_fpose_hrot_noaxes_selected25/e0_robot_object`; data suffix: `mode_n_n7_fpose_hrot_noaxes`.
 - The flow reuses the same 25 ids from `l16_ours_review_first25`, creates Piper0515 25ep local repos and a local zip; the remote rclone upload command is printed for manual execution.
+
+## 2026-06-30 (run_l16_ours_selected_pipeline HEAD_DIR_TEMPLATE parameter)
+
+- Added a `HEAD_DIR_TEMPLATE` environment variable to `code_painting/run_l16_ours_selected_pipeline.sh`; the default remains `id_{id}_l16_whitebg_human_object`.
+- Reason: the Mode N no-axis color Stage-2 outputs use `id_{id}_l16_white_color_human_object`; the old hardcoded template made the process step miss `final_repainted.mp4`.
+- This no-axis selected25 downstream run used `HEAD_DIR_TEMPLATE="id_{id}_l16_white_color_human_object"` and successfully produced six Piper0515 25ep repos plus a local zip.

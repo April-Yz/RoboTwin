@@ -15,6 +15,7 @@ DRY_RUN=${DRY_RUN:-1}
 REVIEW_ROOT=${REVIEW_ROOT:-/home/zaijia001/ssd/RoboTwin/code_painting/l16_ours_review}
 HEAD_ROOT=${HEAD_ROOT:-/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object}
 STACK_HEAD_ROOT=${STACK_HEAD_ROOT:-/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/e0_robot_object_b_points_negative}
+HEAD_DIR_TEMPLATE=${HEAD_DIR_TEMPLATE:-"id_{id}_l16_whitebg_human_object"}
 PLANNER_ROOT=${PLANNER_ROOT:-/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_human_replay_clean}
 PI0_ROOT=${PI0_ROOT:-/home/zaijia001/ssd/RoboTwin/policy/pi0}
 LEROBOT_LOCAL=${LEROBOT_LOCAL:-/home/zaijia001/.cache/huggingface/lerobot/local}
@@ -133,7 +134,7 @@ for TASK in $TASKS; do
     cd "$PI0_ROOT"
     python scripts/process_repainted_planner_outputs.py "h2o_${TASK}_${DATASET_SUFFIX}" "$INSTRUCTION" "$N" \
       --head-root "${TASK_HEAD_ROOT}/${TASK}" \
-      --head-dir-template 'id_{id}_l16_whitebg_human_object' \
+      --head-dir-template "$HEAD_DIR_TEMPLATE" \
       --head-video-name final_repainted.mp4 \
       --planner-root "${PLANNER_ROOT}/${TASK}" \
       --planner-dir-template 'foundation_input_{id}' \

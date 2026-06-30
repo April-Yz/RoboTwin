@@ -7132,6 +7132,7 @@ done
 1. Stage1 planner：无 overlay 的 Mode N N-7 robot replay。
 2. Stage2 repaint：颜色去白底，把 robot/object foreground 合成到 Stage-1 人手+物体 inpaint 背景；`stack_cups` 仍使用 `B_points_negative` Stage-1。
 3. `run_l16_ours_selected_pipeline.sh`：`process -> lerobot -> subset -> piper0515`，使用同一批 25 个 id。
+   - 本次颜色去白 Stage2 的目录名是 `id_{id}_l16_white_color_human_object`，所以 downstream 必须传 `HEAD_DIR_TEMPLATE="id_{id}_l16_white_color_human_object"`；默认 ours 旧流程仍使用 `id_{id}_l16_whitebg_human_object`。
 4. 本地 zip。当前执行环境不自动发起 `rclone copy`，脚本结束时会打印手动上传命令。
 
 ```bash

@@ -2352,3 +2352,9 @@ tmux new-session -d -s l16_stack_debug_variants_gpu1 'GPU=1 IDS="0 1 2 3 4" MAX_
 - 提交总控 tmux：`mode_n_n7_noaxes_selected25_pipeline`，脚本为 `/home/zaijia001/tmp/run_mode_n_n7_noaxes_selected25_pipeline_20260630.sh`。
 - Stage1 输出：`/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-7_foundation_pose_humanrot_noaxes_selected25_20260630`；Stage2 输出：`/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_color_mode_n_n7_fpose_hrot_noaxes_selected25/e0_robot_object`；数据后缀：`mode_n_n7_fpose_hrot_noaxes`。
 - 流程复用 `l16_ours_review_first25` 的同一批 25 个 id，生成 Piper0515 25ep 本地 repo 和本地 zip；远端 rclone 上传命令由脚本打印，需手动执行。
+
+## 2026-06-30（run_l16_ours_selected_pipeline HEAD_DIR_TEMPLATE 参数）
+
+- `code_painting/run_l16_ours_selected_pipeline.sh` 新增 `HEAD_DIR_TEMPLATE` 环境变量，默认仍为 `id_{id}_l16_whitebg_human_object`。
+- 原因：Mode N no-axis color Stage2 输出目录为 `id_{id}_l16_white_color_human_object`；旧硬编码模板会导致 process 阶段找不到 `final_repainted.mp4`。
+- 本次 no-axis selected25 downstream 用 `HEAD_DIR_TEMPLATE="id_{id}_l16_white_color_human_object"` 成功生成 6 任务 Piper0515 25ep repo 和本地 zip。
