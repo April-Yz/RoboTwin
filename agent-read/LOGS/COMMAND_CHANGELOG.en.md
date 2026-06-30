@@ -2341,3 +2341,9 @@ tmux new-session -d -s l16_stack_debug_variants_gpu1 'GPU=1 IDS="0 1 2 3 4" MAX_
 ## 2026-06-26 (L16 color debug frame-alignment note)
 
 - Updated `COMMAND_LIBRARY.zh.md` and `agent-read/COMMANDS/pi0_h2o_training_data.*.md`: clarified that `repaint_l16_white_color_debug.py` outputs the L16 robot video frame count by default and samples Stage-1 backgrounds proportionally; `--max-frames` is only a quick-preview truncation option.
+
+## 2026-06-30 (Mode N keyframe debug output relocation)
+
+- Added N-7 keyframe debug notes to `COMMAND_LIBRARY.zh.md`: each arm uses up to two effective keyframes; grasp uses the first Foundation object position plus human hand orientation, action uses the second Foundation object position, and current N-7 keeps the grasp orientation through `--foundation_pose_action_orientation_source grasp`.
+- Moved the 6-task, 5-id-per-task debug outputs to: `/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-7_foundation_pose_humanrot_keyframe_debug_6task5_20260630`.
+- Removed the old generated `/home/zaijia001/ssd/robotwin_debug_outputs/` directory; rerun entrypoint: `/home/zaijia001/tmp/run_mode_n_n7_keyframe_debug_6task5_20260630.sh`.

@@ -29,10 +29,11 @@
 
 - Mode N 是 `COMMAND_LIBRARY.zh.md` 中 `N. 消融实验：Foundation Pose 物体位置 + 人手朝向`。
 - 逻辑：使用 FoundationPose 物体世界位置 + 人手方向，不使用 AnyGrasp 候选排序。
+- 关键帧逻辑：每只手最多两个有效关键帧；grasp 关键帧使用该帧 Foundation 物体位置和该帧人手朝向，action 关键帧使用第二帧 Foundation 物体位置。当前 N-7 通过 `--foundation_pose_action_orientation_source grasp` 保持 grasp 朝向，只更新 action 位置。
 - 当前 debug 使用 N-7 参数：`--foundation_pose_retreat_m 0.10`、`--approach_offset_m 0.07`、`--foundation_pose_action_orientation_source grasp`、`--dual_stage_freeze_reached_arms_on_replan 1`、`--debug_viewer_overlay`。
-- 本次 6 任务各 5 个 id 的输出根目录：`/home/zaijia001/ssd/robotwin_debug_outputs/N-7_foundation_pose_humanrot_debug_6task5_20260630`。
-- 临时提交脚本：`/home/zaijia001/tmp/run_mode_n_n7_debug_6task5_20260630.sh`。
-- tmux sessions：`mode_n_n7_debug_pick_diverse_bottles`、`mode_n_n7_debug_place_bread_basket`、`mode_n_n7_debug_stack_cups`、`mode_n_n7_debug_handover_bottle`、`mode_n_n7_debug_pnp_bread`、`mode_n_n7_debug_pnp_tray`。
+- 本次 6 任务各 5 个 id 的输出根目录：`/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-7_foundation_pose_humanrot_keyframe_debug_6task5_20260630`。
+- 重跑脚本：`/home/zaijia001/tmp/run_mode_n_n7_keyframe_debug_6task5_20260630.sh`。
+- 重跑时会创建 tmux sessions：`mode_n_n7_kf_debug_pick_diverse_bottles`、`mode_n_n7_kf_debug_place_bread_basket`、`mode_n_n7_kf_debug_stack_cups`、`mode_n_n7_kf_debug_handover_bottle`、`mode_n_n7_kf_debug_pnp_bread`、`mode_n_n7_kf_debug_pnp_tray`。
 - 本次 id：`pick_diverse_bottles 0-4`、`place_bread_basket 0-4`、`stack_cups 0-4`、`handover_bottle 1-5`、`pnp_bread 7-11`、`pnp_tray 0-4`。
 - 每个结果优先查看：`foundation_input_<ID>/head_cam_plan.mp4`、`foundation_input_<ID>/debug_execution_preview.mp4`、`foundation_input_<ID>/plan_summary_foundation_pose.json`、`foundation_input_<ID>/pose_debug.jsonl`。
 

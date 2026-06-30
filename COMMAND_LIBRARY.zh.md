@@ -7090,6 +7090,39 @@ bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_foundation_po
   --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-7_action_grasp_rot_freeze_debug_viewer
 ```
 
+
+### N-7 keyframe debug（6 任务 × 每任务 5 个 id）
+
+关键帧逻辑：
+- `hand_keyframes_all.json` 先按任务/视频读入全局或左右手关键帧；每只手最多取两个有效关键帧。
+- 第 1 个有效关键帧是 grasp 目标：位置来自该帧 Foundation 物体 `pose_world_wxyz[:3]`，朝向来自该帧人手 `gripper_rotation_matrix` 经 head camera 外参转到世界系。
+- 第 2 个有效关键帧是 action 目标：位置仍来自该帧 Foundation 物体位置。
+- 当前 N-7 使用 `--foundation_pose_action_orientation_source grasp`，所以 action 关键帧只换物体位置，朝向保持第 1 个 grasp 关键帧；这样可以减少第二帧人手 roll 抖动和 IK 分支切换。
+- 生成的 `plan_summary_foundation_pose.json` 再通过 `--reuse_plan_summary_json` 交给 `plan_anygrasp_keyframes_piper.py` 执行原 keyframe planner；此模式不读取/筛选 AnyGrasp candidates。
+
+本次 debug 结果统一放在 replay axes 总目录下，不再使用 `/home/zaijia001/ssd/robotwin_debug_outputs/`：
+
+```bash
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-7_foundation_pose_humanrot_keyframe_debug_6task5_20260630
+```
+
+如果需要重跑同一组 6 任务 × 每任务 5 个 id：
+
+```bash
+bash /home/zaijia001/tmp/run_mode_n_n7_keyframe_debug_6task5_20260630.sh
+```
+
+查看结果：
+
+```bash
+OUT=/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-7_foundation_pose_humanrot_keyframe_debug_6task5_20260630
+for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do
+  echo "$TASK"
+  find "$OUT/$TASK" -maxdepth 2 -type f \
+    \( -name head_cam_plan.mp4 -o -name debug_execution_preview.mp4 -o -name plan_summary_foundation_pose.json -o -name pose_debug.jsonl \) | sort | head -20
+done
+```
+
 ### retreat 参数调试
 
 `--foundation_pose_retreat_m` 沿夹爪前进轴（蓝轴 local +Z）后退。较大的物体需要更大的 retreat：

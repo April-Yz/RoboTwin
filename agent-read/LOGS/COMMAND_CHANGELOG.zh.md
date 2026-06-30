@@ -2339,3 +2339,9 @@ tmux new-session -d -s l16_stack_debug_variants_gpu1 'GPU=1 IDS="0 1 2 3 4" MAX_
 ## 2026-06-26（L16 color debug 帧对齐说明）
 
 - 更新 `COMMAND_LIBRARY.zh.md` 与 `agent-read/COMMANDS/pi0_h2o_training_data.*.md`：明确 `repaint_l16_white_color_debug.py` 默认按 L16 robot 视频帧数输出，Stage-1 背景按比例采样；`--max-frames` 只是快速预览截断参数。
+
+## 2026-06-30（Mode N keyframe debug 输出迁移）
+
+- 在 `COMMAND_LIBRARY.zh.md` 的 N-7 部分补充 keyframe debug 说明：每只手最多两个有效关键帧，grasp 使用第一帧 Foundation 物体位置 + 人手朝向，action 使用第二帧 Foundation 物体位置；当前 N-7 用 `--foundation_pose_action_orientation_source grasp` 保持 grasp 朝向。
+- 将本次 6 任务 × 每任务 5 个 id 的 debug 输出统一迁移到：`/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-7_foundation_pose_humanrot_keyframe_debug_6task5_20260630`。
+- 删除旧的 `/home/zaijia001/ssd/robotwin_debug_outputs/` 生成目录；重跑入口为：`/home/zaijia001/tmp/run_mode_n_n7_keyframe_debug_6task5_20260630.sh`。

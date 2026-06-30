@@ -29,10 +29,11 @@ Purpose: record high-priority context for the current session and recent data pr
 
 - Mode N is the `N. 消融实验：Foundation Pose 物体位置 + 人手朝向` section in `COMMAND_LIBRARY.zh.md`.
 - Logic: use FoundationPose object world position plus human hand orientation, without AnyGrasp candidate ranking.
+- Keyframe logic: each arm uses up to two effective keyframes; the grasp keyframe uses that frame's Foundation object position and human hand orientation, while the action keyframe uses the second Foundation object position. Current N-7 keeps the grasp orientation for action via `--foundation_pose_action_orientation_source grasp`.
 - Current debug uses the N-7 settings: `--foundation_pose_retreat_m 0.10`, `--approach_offset_m 0.07`, `--foundation_pose_action_orientation_source grasp`, `--dual_stage_freeze_reached_arms_on_replan 1`, and `--debug_viewer_overlay`.
-- Output root for this 6-task, 5-id-per-task run: `/home/zaijia001/ssd/robotwin_debug_outputs/N-7_foundation_pose_humanrot_debug_6task5_20260630`.
-- Temporary launch script: `/home/zaijia001/tmp/run_mode_n_n7_debug_6task5_20260630.sh`.
-- tmux sessions: `mode_n_n7_debug_pick_diverse_bottles`, `mode_n_n7_debug_place_bread_basket`, `mode_n_n7_debug_stack_cups`, `mode_n_n7_debug_handover_bottle`, `mode_n_n7_debug_pnp_bread`, `mode_n_n7_debug_pnp_tray`.
+- Output root for this 6-task, 5-id-per-task run: `/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-7_foundation_pose_humanrot_keyframe_debug_6task5_20260630`.
+- Rerun script: `/home/zaijia001/tmp/run_mode_n_n7_keyframe_debug_6task5_20260630.sh`.
+- Reruns create tmux sessions: `mode_n_n7_kf_debug_pick_diverse_bottles`, `mode_n_n7_kf_debug_place_bread_basket`, `mode_n_n7_kf_debug_stack_cups`, `mode_n_n7_kf_debug_handover_bottle`, `mode_n_n7_kf_debug_pnp_bread`, `mode_n_n7_kf_debug_pnp_tray`.
 - IDs in this run: `pick_diverse_bottles 0-4`, `place_bread_basket 0-4`, `stack_cups 0-4`, `handover_bottle 1-5`, `pnp_bread 7-11`, `pnp_tray 0-4`.
 - For each result, inspect first: `foundation_input_<ID>/head_cam_plan.mp4`, `foundation_input_<ID>/debug_execution_preview.mp4`, `foundation_input_<ID>/plan_summary_foundation_pose.json`, and `foundation_input_<ID>/pose_debug.jsonl`.
 
