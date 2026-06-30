@@ -2345,3 +2345,10 @@ tmux new-session -d -s l16_stack_debug_variants_gpu1 'GPU=1 IDS="0 1 2 3 4" MAX_
 - 在 `COMMAND_LIBRARY.zh.md` 的 N-7 部分补充 keyframe debug 说明：每只手最多两个有效关键帧，grasp 使用第一帧 Foundation 物体位置 + 人手朝向，action 使用第二帧 Foundation 物体位置；当前 N-7 用 `--foundation_pose_action_orientation_source grasp` 保持 grasp 朝向。
 - 将本次 6 任务 × 每任务 5 个 id 的 debug 输出统一迁移到：`/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-7_foundation_pose_humanrot_keyframe_debug_6task5_20260630`。
 - 删除旧的 `/home/zaijia001/ssd/robotwin_debug_outputs/` 生成目录；重跑入口为：`/home/zaijia001/tmp/run_mode_n_n7_keyframe_debug_6task5_20260630.sh`。
+
+## 2026-06-30（Mode N no-axis selected25 pipeline）
+
+- 新增 `COMMAND_LIBRARY.zh.md` N-7 no-axis selected25 说明：去掉 `--debug_viewer_overlay`，显式使用 `--pure_scene_output 1`、`--debug_visualize_cameras 0`、`--viewer_show_camera_frustums 0`、`--debug_candidate_top_k 0`。
+- 提交总控 tmux：`mode_n_n7_noaxes_selected25_pipeline`，脚本为 `/home/zaijia001/tmp/run_mode_n_n7_noaxes_selected25_pipeline_20260630.sh`。
+- Stage1 输出：`/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-7_foundation_pose_humanrot_noaxes_selected25_20260630`；Stage2 输出：`/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_color_mode_n_n7_fpose_hrot_noaxes_selected25/e0_robot_object`；数据后缀：`mode_n_n7_fpose_hrot_noaxes`。
+- 流程复用 `l16_ours_review_first25` 的同一批 25 个 id，生成 Piper0515 25ep 本地 repo 和本地 zip；远端 rclone 上传命令由脚本打印，需手动执行。

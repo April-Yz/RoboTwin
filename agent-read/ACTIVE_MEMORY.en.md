@@ -37,6 +37,17 @@ Purpose: record high-priority context for the current session and recent data pr
 - IDs in this run: `pick_diverse_bottles 0-4`, `place_bread_basket 0-4`, `stack_cups 0-4`, `handover_bottle 1-5`, `pnp_bread 7-11`, `pnp_tray 0-4`.
 - For each result, inspect first: `foundation_input_<ID>/head_cam_plan.mp4`, `foundation_input_<ID>/debug_execution_preview.mp4`, `foundation_input_<ID>/plan_summary_foundation_pose.json`, and `foundation_input_<ID>/pose_debug.jsonl`.
 
+
+## Mode N No-Axis Selected25 Pipeline
+
+- Controller tmux: `mode_n_n7_noaxes_selected25_pipeline`.
+- Rerun script: `/home/zaijia001/tmp/run_mode_n_n7_noaxes_selected25_pipeline_20260630.sh`.
+- Stage1 no-axis planner root: `/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-7_foundation_pose_humanrot_noaxes_selected25_20260630`.
+- Stage2 repaint root: `/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_color_mode_n_n7_fpose_hrot_noaxes_selected25/e0_robot_object`.
+- Data suffix: `mode_n_n7_fpose_hrot_noaxes`; reuses the same 25 ids from `l16_ours_review_first25`.
+- Local zip: `/home/zaijia001/.cache/huggingface/lerobot/local/robot_mode_n_n7_fpose_hrot_noaxes_piper0515_6task_25ep.zip`.
+- rclone target: `gdrive:piper/multi/6task/robot_mode_n_n7_fpose_hrot_noaxes_piper0515`; the script prints the manual upload command instead of running remote upload from this environment.
+
 ## Open Notes
 
 - `make_l16_repaint_montage.py` may still default to the old `L16_human_replay_clean`; reviewing rightcam m003 wrist views needs explicit support for, or a parameter pointing to, the new L16 root.

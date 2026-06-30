@@ -7123,6 +7123,57 @@ for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle p
 done
 ```
 
+
+### N-7 no-axis selected25 pipeline（复用 ours 25 个 id）
+
+用途：去掉 Mode N debug 中的朝向坐标/相机 frustum/C-gripper overlay，复用 `l16_ours_review_first25` 中每个任务已选好的 25 个 id，按 ours 后处理逻辑生成训练数据。
+
+运行状态：已提交到 tmux `mode_n_n7_noaxes_selected25_pipeline`。该脚本顺序执行：
+1. Stage1 planner：无 overlay 的 Mode N N-7 robot replay。
+2. Stage2 repaint：颜色去白底，把 robot/object foreground 合成到 Stage-1 人手+物体 inpaint 背景；`stack_cups` 仍使用 `B_points_negative` Stage-1。
+3. `run_l16_ours_selected_pipeline.sh`：`process -> lerobot -> subset -> piper0515`，使用同一批 25 个 id。
+4. 本地 zip。当前执行环境不自动发起 `rclone copy`，脚本结束时会打印手动上传命令。
+
+```bash
+# 查看总控进度
+tmux attach -t mode_n_n7_noaxes_selected25_pipeline
+
+# 查看每个任务 Stage1/Stage2 日志
+ls -lh /home/zaijia001/tmp/mode_n_n7_noaxes_selected25_logs_20260630
+tail -f /home/zaijia001/tmp/mode_n_n7_noaxes_selected25_logs_20260630/stage1_pick_diverse_bottles.log
+```
+
+输出位置：
+
+```text
+Stage1 no-axis planner root:
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-7_foundation_pose_humanrot_noaxes_selected25_20260630
+
+Stage2 repaint root:
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_color_mode_n_n7_fpose_hrot_noaxes_selected25/e0_robot_object
+
+processed HDF5:
+/home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_<TASK>_mode_n_n7_fpose_hrot_noaxes-120
+
+Piper0515 LeRobot 25ep:
+/home/zaijia001/.cache/huggingface/lerobot/local/h2o_<TASK>_mode_n_n7_fpose_hrot_noaxes_piper0515_25ep
+
+local zip:
+/home/zaijia001/.cache/huggingface/lerobot/local/robot_mode_n_n7_fpose_hrot_noaxes_piper0515_6task_25ep.zip
+```
+
+重跑入口：
+
+```bash
+bash /home/zaijia001/tmp/run_mode_n_n7_noaxes_selected25_pipeline_20260630.sh
+```
+
+本地 zip 生成后，手动上传命令：
+
+```bash
+rclone copy /home/zaijia001/.cache/huggingface/lerobot/local/robot_mode_n_n7_fpose_hrot_noaxes_piper0515_6task_25ep.zip gdrive:piper/multi/6task/robot_mode_n_n7_fpose_hrot_noaxes_piper0515 -P --drive-chunk-size 64M --transfers 4
+```
+
 ### retreat 参数调试
 
 `--foundation_pose_retreat_m` 沿夹爪前进轴（蓝轴 local +Z）后退。较大的物体需要更大的 retreat：

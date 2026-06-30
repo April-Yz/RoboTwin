@@ -37,6 +37,17 @@
 - 本次 id：`pick_diverse_bottles 0-4`、`place_bread_basket 0-4`、`stack_cups 0-4`、`handover_bottle 1-5`、`pnp_bread 7-11`、`pnp_tray 0-4`。
 - 每个结果优先查看：`foundation_input_<ID>/head_cam_plan.mp4`、`foundation_input_<ID>/debug_execution_preview.mp4`、`foundation_input_<ID>/plan_summary_foundation_pose.json`、`foundation_input_<ID>/pose_debug.jsonl`。
 
+
+## Mode N no-axis selected25 pipeline
+
+- 总控 tmux：`mode_n_n7_noaxes_selected25_pipeline`。
+- 重跑脚本：`/home/zaijia001/tmp/run_mode_n_n7_noaxes_selected25_pipeline_20260630.sh`。
+- Stage1 no-axis planner root：`/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-7_foundation_pose_humanrot_noaxes_selected25_20260630`。
+- Stage2 repaint root：`/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_color_mode_n_n7_fpose_hrot_noaxes_selected25/e0_robot_object`。
+- 数据后缀：`mode_n_n7_fpose_hrot_noaxes`；复用 `l16_ours_review_first25` 中同一批 25 个 id。
+- 本地 zip：`/home/zaijia001/.cache/huggingface/lerobot/local/robot_mode_n_n7_fpose_hrot_noaxes_piper0515_6task_25ep.zip`。
+- rclone 目标：`gdrive:piper/multi/6task/robot_mode_n_n7_fpose_hrot_noaxes_piper0515`；当前由脚本打印手动上传命令，不在本环境自动执行。
+
 ## 近期未解决或需要注意
 
 - `make_l16_repaint_montage.py` 仍可能默认指向旧 `L16_human_replay_clean`；如果要复查 rightcam m003 的 wrist 视角，需要显式支持或传入新的 L16 root。

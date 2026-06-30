@@ -2347,3 +2347,10 @@ tmux new-session -d -s l16_stack_debug_variants_gpu1 'GPU=1 IDS="0 1 2 3 4" MAX_
 - Added N-7 keyframe debug notes to `COMMAND_LIBRARY.zh.md`: each arm uses up to two effective keyframes; grasp uses the first Foundation object position plus human hand orientation, action uses the second Foundation object position, and current N-7 keeps the grasp orientation through `--foundation_pose_action_orientation_source grasp`.
 - Moved the 6-task, 5-id-per-task debug outputs to: `/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-7_foundation_pose_humanrot_keyframe_debug_6task5_20260630`.
 - Removed the old generated `/home/zaijia001/ssd/robotwin_debug_outputs/` directory; rerun entrypoint: `/home/zaijia001/tmp/run_mode_n_n7_keyframe_debug_6task5_20260630.sh`.
+
+## 2026-06-30 (Mode N no-axis selected25 pipeline)
+
+- Added `COMMAND_LIBRARY.zh.md` N-7 no-axis selected25 notes: remove `--debug_viewer_overlay` and explicitly use `--pure_scene_output 1`, `--debug_visualize_cameras 0`, `--viewer_show_camera_frustums 0`, and `--debug_candidate_top_k 0`.
+- Submitted controller tmux `mode_n_n7_noaxes_selected25_pipeline`, with script `/home/zaijia001/tmp/run_mode_n_n7_noaxes_selected25_pipeline_20260630.sh`.
+- Stage1 output: `/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/N-7_foundation_pose_humanrot_noaxes_selected25_20260630`; Stage2 output: `/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_color_mode_n_n7_fpose_hrot_noaxes_selected25/e0_robot_object`; data suffix: `mode_n_n7_fpose_hrot_noaxes`.
+- The flow reuses the same 25 ids from `l16_ours_review_first25`, creates Piper0515 25ep local repos and a local zip; the remote rclone upload command is printed for manual execution.
