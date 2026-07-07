@@ -136,7 +136,7 @@ run_stage1_hands_only() {
   local human="$HOME/ssd/data/piper/hand/$task/harmer_input/rgb_$id.mp4"
   local out="$STAGE1_ROOT/$task/id_$id"
   local dummy_robot
-  dummy_robot=$(find "$HOME/ssd/human_replay/h2_pure_d435/$task" -maxdepth 2 -type f -name zed_replay_d435.mp4 2>/dev/null | head -n 1)
+  dummy_robot=$(find "$HOME/ssd/human_replay/h2_pure_d435/$task" -maxdepth 2 -type f -name zed_replay_d435.mp4 -print -quit 2>/dev/null)
 
   if [[ ! -f "$human" ]]; then
     echo "[error] missing human video: $human" >&2
