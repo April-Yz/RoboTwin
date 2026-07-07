@@ -52,3 +52,16 @@
 
 - `make_l16_repaint_montage.py` 仍可能默认指向旧 `L16_human_replay_clean`；如果要复查 rightcam m003 的 wrist 视角，需要显式支持或传入新的 L16 root。
 - 工作区已有用户/历史修改，提交时应只 stage 当前任务相关文件，避免混入 `COMMAND_LIBRARY.zh.md` 和已有 command log 修改。
+
+## SKEYP 关键帧消融
+
+- `skeyp` 使用方案 B：复用 `ours` 的 planner-output 转换格式，不创建 reinit 风格的 `world_targets_and_status.npz`。
+- 总控脚本：`/home/zaijia001/ssd/RoboTwin/code_painting/run_skeyp_selected25_pipeline.sh`。
+- tmux session：`skeyp_selected25_pipeline`。
+- 复用选集：`/home/zaijia001/ssd/RoboTwin/code_painting/l16_ours_review_first25/selections/<TASK>/ours_review_selection.json`。
+- Stage-1 输出：`/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_skeyp/stage1`，只去人手/手腕/手表/手臂，保留操作物体。
+- Planner 输出：`/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/skeyp_selected25_rightcam_m003_20260708`。
+- Stage-2 输出：`/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_skeyp_visible_reinit/e0_robot`，只 repaint 机器人，不重新贴物体。
+- 最终数据：`/home/zaijia001/.cache/huggingface/lerobot/local/h2o_<TASK>_skeyp_piper0515_25ep`。
+- 本地 zip：`/home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_piper0515_6task_25ep.zip`。
+- 远端上传需要手动运行脚本打印的 `rclone copy ... gdrive:piper/multi/6task/robot_skeyp_piper0515` 命令。

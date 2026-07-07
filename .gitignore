@@ -37,6 +37,7 @@ code_painting/*
 !code_painting/build_piper_calibration_bundle.py
 !code_painting/convert_lerobot_piper0515_world_to_base.py
 !code_painting/repaint_l16_white_color_debug.py
+!code_painting/run_skeyp_selected25_pipeline.sh
 code_painting/anygrasp*
 code_painting/replay*
 !code_painting/replay_pose_debug_smooth.py

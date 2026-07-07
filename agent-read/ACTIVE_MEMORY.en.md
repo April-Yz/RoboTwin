@@ -52,3 +52,16 @@ Purpose: record high-priority context for the current session and recent data pr
 
 - `make_l16_repaint_montage.py` may still default to the old `L16_human_replay_clean`; reviewing rightcam m003 wrist views needs explicit support for, or a parameter pointing to, the new L16 root.
 - The working tree already contains user/history edits. Commits should stage only task-related files and avoid mixing in existing `COMMAND_LIBRARY.zh.md` and command-log edits.
+
+## SKEYP Keyframe Ablation
+
+- `skeyp` uses option B: reuse the `ours` planner-output conversion format instead of creating reinit-style `world_targets_and_status.npz`.
+- Controller script: `/home/zaijia001/ssd/RoboTwin/code_painting/run_skeyp_selected25_pipeline.sh`.
+- tmux session: `skeyp_selected25_pipeline`.
+- Reused selection root: `/home/zaijia001/ssd/RoboTwin/code_painting/l16_ours_review_first25/selections/<TASK>/ours_review_selection.json`.
+- Stage-1 output: `/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_skeyp/stage1`; removes only hands, wrists, watch, and arms while preserving manipulated objects.
+- Planner output: `/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/skeyp_selected25_rightcam_m003_20260708`.
+- Stage-2 output: `/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_skeyp_visible_reinit/e0_robot`; repaints only the robot and does not paste objects again.
+- Final data: `/home/zaijia001/.cache/huggingface/lerobot/local/h2o_<TASK>_skeyp_piper0515_25ep`.
+- Local zip: `/home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_piper0515_6task_25ep.zip`.
+- Remote upload should be run manually with the `rclone copy ... gdrive:piper/multi/6task/robot_skeyp_piper0515` command printed by the script.
