@@ -134,16 +134,10 @@ run_stage1_hands_only() {
   local id=$2
   local gpu=$3
   local human="$HOME/ssd/data/piper/hand/$task/harmer_input/rgb_$id.mp4"
-  local out="$STAGE1_ROOT/$task/id_$id"
-  local dummy_robot
-  dummy_robot=$(find "$HOME/ssd/human_replay/h2_pure_d435/$task" -maxdepth 2 -type f -name zed_replay_d435.mp4 -print -quit 2>/dev/null)
+  local out="$STAGE1_ROOT/$task/id_$id/stage1_human_inpaint"
 
   if [[ ! -f "$human" ]]; then
     echo "[error] missing human video: $human" >&2
-    return 1
-  fi
-  if [[ -z "$dummy_robot" || ! -f "$dummy_robot" ]]; then
-    echo "[error] missing dummy robot video under $HOME/ssd/human_replay/h2_pure_d435/$task" >&2
     return 1
   fi
 
@@ -151,31 +145,23 @@ run_stage1_hands_only() {
   source "$CONDA_SH"
   conda activate inpainting-sam2-r1
   cd "$SAM2_ROOT"
-  CUDA_VISIBLE_DEVICES="$gpu" python run_human_robot_inpaint_repaint.py \
-    --human_video "$human" \
-    --robot_video "$dummy_robot" \
-    --output_root "$out" \
+  mkdir -p "$out"
+  CUDA_VISIBLE_DEVICES="$gpu" python remove_anything_video_sam2.py \
+    --input_video "$human" \
     --coords_type key_in --point_coords 10 80 --point_labels 1 \
-    --human_text_prompt "arms, hands, wrists, watch." \
-    --robot_text_prompt "left robot arm, right robot arm, forearm, wrist, gripper, end effector." \
-    --human_box_threshold 0.35 --human_text_threshold 0.25 \
-    --robot_box_threshold 0.20 --robot_text_threshold 0.20 \
-    --human_dilate_kernel_size 100 \
-    --robot_dilate_kernel_size 0 \
-    --robot_max_mask_area_ratio 1.0 \
-    --robot_erode_kernel_size 3 \
-    --robot_composite_erode_kernel_size 1 \
-    --robot_blend_alpha_sigma 1.0 \
-    --robot_exclude_bottom_ratio 0.14 \
-    --fps "$STAGE1_FPS" --device cuda --mask_idx 2 \
-    --human_save_debug_artifacts 0 \
-    --robot_save_removed_video 0 \
-    --robot_save_mask_artifacts 0 \
-    --robot_save_debug_videos 0 \
-    --robot_save_composite_video 0
+    --dilate_kernel_size 100 \
+    --text_prompt "arms, hands, wrists, watch." \
+    --box_threshold 0.35 --text_threshold 0.25 \
+    --output_dir "$out" \
+    --sam_ckpt "$SAM2_ROOT/pretrained_models/sam_vit_h_4b8939.pth" \
+    --lama_config "$SAM2_ROOT/lama/configs/prediction/default.yaml" \
+    --lama_ckpt "$SAM2_ROOT/pretrained_models/big-lama" \
+    --tracker_ckpt vitb_384_mae_ce_32x4_ep300 \
+    --vi_ckpt "$SAM2_ROOT/pretrained_models/sttn.pth" \
+    --mask_idx 2 --fps "$STAGE1_FPS" --device cuda \
+    --save_mask_frames 0 --save_mask_video 0 --save_vis_mask_video 0 --save_vis_box_video 0
   cd "$ROOT"
 }
-
 ensure_stage1_bg() {
   local task=$1
   local id=$2
