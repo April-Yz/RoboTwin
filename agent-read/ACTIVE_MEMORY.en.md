@@ -65,3 +65,5 @@ Purpose: record high-priority context for the current session and recent data pr
 - Final data: `/home/zaijia001/.cache/huggingface/lerobot/local/h2o_<TASK>_skeyp_piper0515_25ep`.
 - Local zip: `/home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_piper0515_6task_25ep.zip`.
 - Remote upload should be run manually with the `rclone copy ... gdrive:piper/multi/6task/robot_skeyp_piper0515` command printed by the script.
+
+- 2026-07-08 completed one `skeyp_selected25_pipeline` run: Stage-2 reached 25/25 for all six tasks; final zip is `/home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_piper0515_6task_25ep.zip`, validated with 150 parquet files and 6 piper0515 markers.

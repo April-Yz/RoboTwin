@@ -55,3 +55,11 @@ rclone copy /home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_piper05
 - 关键帧 planner：`code_painting/run_plan_keyframes_human_replay_piper_d435.sh`
 - Planner 数据转换：`policy/pi0/scripts/process_repainted_planner_outputs.py`
 - piper0515 坐标对齐：`code_painting/convert_lerobot_piper0515_world_to_base.py`
+
+## 2026-07-08 运行结果
+
+- tmux session：`skeyp_selected25_pipeline`，已结束。
+- Stage-2 `final_repainted.mp4`：6 个任务均为 25/25。
+- 本地 zip：`/home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_piper0515_6task_25ep.zip`，约 191 MB。
+- zip 校验：150 个 parquet，6 个 `piper0515_world_to_base_conversion.json`。
+- 每个 `h2o_<TASK>_skeyp_piper0515_25ep` repo 均为 25 个 parquet，并包含 piper0515 坐标转换标记。

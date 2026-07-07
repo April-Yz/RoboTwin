@@ -55,3 +55,11 @@ rclone copy /home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_piper05
 - Keyframe planner: `code_painting/run_plan_keyframes_human_replay_piper_d435.sh`
 - Planner-output conversion: `policy/pi0/scripts/process_repainted_planner_outputs.py`
 - piper0515 frame alignment: `code_painting/convert_lerobot_piper0515_world_to_base.py`
+
+## 2026-07-08 Run Result
+
+- tmux session: `skeyp_selected25_pipeline`, finished.
+- Stage-2 `final_repainted.mp4`: 25/25 for all six tasks.
+- Local zip: `/home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_piper0515_6task_25ep.zip`, about 191 MB.
+- Zip validation: 150 parquet files and 6 `piper0515_world_to_base_conversion.json` markers.
+- Each `h2o_<TASK>_skeyp_piper0515_25ep` repo has 25 parquet files and the piper0515 frame-conversion marker.

@@ -65,3 +65,5 @@
 - 最终数据：`/home/zaijia001/.cache/huggingface/lerobot/local/h2o_<TASK>_skeyp_piper0515_25ep`。
 - 本地 zip：`/home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_piper0515_6task_25ep.zip`。
 - 远端上传需要手动运行脚本打印的 `rclone copy ... gdrive:piper/multi/6task/robot_skeyp_piper0515` 命令。
+
+- 2026-07-08 已完成一次 `skeyp_selected25_pipeline`：Stage-2 六任务均 25/25；最终 zip 为 `/home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_piper0515_6task_25ep.zip`，校验为 150 个 parquet 和 6 个 piper0515 marker。
