@@ -3121,3 +3121,14 @@ Validation: `python -m py_compile code_painting/visualize_vr_hand_data.py`; 30-f
 - Local zip: `/home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_reinit_whitebg_piper0515_6task_25ep.zip`, about 126 MB.
 
 Validation: final/HDF5/parquet counts are 25 per task; the zip contains 150 parquet files and 6 `piper0515_world_to_base_conversion.json` markers.
+
+
+## 2026-07-08 (VR HaMeR Detection and Axis-Projection Diagnostics)
+
+- `visualize_vr_hand_data.py` now supports `--projection-mode norm_xz|norm_xy|norm_yz|norm_zx|eye_center` and `--output-suffix` for VR-joint axis-swap diagnostics and center-eye approximate projection.
+- Added `code_painting/prepare_vr_hamer_input.py` to convert VR JPG episodes into HaMeR-readable `rgb_<ID>.mp4 + params_<ID>.json` files.
+- Added `code_painting/compare_vr_hamer_results.py` to summarize VR tracking/validation versus HaMeR detections and generate side-by-side VSCode MP4 comparisons.
+- Current outputs: copied baseline visualizations under `/home/zaijia001/ssd/data/piper/vr/0vis/datav1`; axis debug outputs under `/home/zaijia001/ssd/data/piper/vr/0vis/datav1_axis_debug/<MODE>`; HaMeR outputs under `/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1`.
+- Conclusion: local `camera_real/*_video.json` still has no camera extrinsics; VR JSON joints are in the RUF tracking/world frame, while HaMeR is image-detection based, so the observed offset cannot be strictly fixed by axis swaps alone.
+
+Validation: `python -m py_compile code_painting/visualize_vr_hand_data.py code_painting/prepare_vr_hamer_input.py code_painting/compare_vr_hamer_results.py`; VR-to-HaMeR input produced 15 RGB MP4 files; HaMeR produced 15 `hand_detections_*.npz` and 15 `hand_vis_gripper_*.mp4` files; the comparison script produced `compare_vr_hamer_stats.md` and 15 side-by-side comparison videos.

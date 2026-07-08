@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Visualize Meta Quest VR hand-tracking data over captured JPG frames.
 
-The VR dataset currently has no usable camera intrinsics/extrinsics in the
-camera_real metadata. The overlay therefore uses an episode-normalized x/z
-projection of the 3D joints. It is intended for temporal/data-quality review,
-not calibrated image-space projection.
+Some episodes have camera intrinsics, but the camera_real metadata still lacks
+a usable camera extrinsic/camera pose. The default overlay uses an
+episode-normalized x/z projection of the 3D joints. Optional axis-swapped and
+center-eye approximate projections are available for diagnostics; these are not
+calibrated image-space projections.
 """
 
 from __future__ import annotations
@@ -54,6 +55,13 @@ RIGHT_COLOR = (50, 80, 255)
 UNTRACKED_COLOR = (160, 160, 160)
 TEXT_COLOR = (255, 255, 255)
 WARN_COLOR = (0, 220, 255)
+AXIS_INDEX = {"x": 0, "y": 1, "z": 2}
+NORM_PROJECTION_AXES = {
+    "norm_xz": ("x", "z", False, True),
+    "norm_xy": ("x", "y", False, True),
+    "norm_yz": ("y", "z", False, True),
+    "norm_zx": ("z", "x", False, True),
+}
 
 
 @dataclass
@@ -87,6 +95,13 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--overwrite", action="store_true")
     ap.add_argument("--keep-temp", action="store_true")
     ap.add_argument("--draw-untracked", action="store_true", help="Always draw untracked hand poses in gray.")
+    ap.add_argument(
+        "--projection-mode",
+        choices=["norm_xz", "norm_xy", "norm_yz", "norm_zx", "eye_center"],
+        default="norm_xz",
+        help="Diagnostic projection mode. norm_* uses episode-normalized axes; eye_center uses center_eye_pose plus intrinsics as an approximation.",
+    )
+    ap.add_argument("--output-suffix", default="", help="Suffix appended before _hand_overlay_vscode.mp4, useful for projection variants.")
     return ap.parse_args()
 
 
@@ -141,26 +156,128 @@ def bounds_for_episode(frames: list[dict[str, Any]]) -> tuple[np.ndarray, np.nda
     return lo, lo + span, used_untracked_fallback
 
 
-def project_points(poses: list[list[float]], lo: np.ndarray, hi: np.ndarray, width: int, height: int) -> list[tuple[int, int]]:
+def quat_xyzw_to_matrix(q: list[float]) -> np.ndarray:
+    x, y, z, w = [float(v) for v in q]
+    n = x * x + y * y + z * z + w * w
+    if n < 1e-12:
+        return np.eye(3, dtype=np.float32)
+    s = 2.0 / n
+    xx, yy, zz = x * x * s, y * y * s, z * z * s
+    xy, xz, yz = x * y * s, x * z * s, y * z * s
+    wx, wy, wz = w * x * s, w * y * s, w * z * s
+    return np.asarray(
+        [
+            [1.0 - (yy + zz), xy - wz, xz + wy],
+            [xy + wz, 1.0 - (xx + zz), yz - wx],
+            [xz - wy, yz + wx, 1.0 - (xx + yy)],
+        ],
+        dtype=np.float32,
+    )
+
+
+def project_norm_points(
+    poses: list[list[float]],
+    lo: np.ndarray,
+    hi: np.ndarray,
+    width: int,
+    height: int,
+    projection_mode: str,
+) -> list[tuple[int, int]]:
     margin_x = int(width * 0.08)
     margin_y = int(height * 0.10)
     usable_w = max(1, width - 2 * margin_x)
     usable_h = max(1, height - 2 * margin_y)
     span = hi - lo
+    u_axis, v_axis, flip_u, flip_v = NORM_PROJECTION_AXES[projection_mode]
+    ui = AXIS_INDEX[u_axis]
+    vi = AXIS_INDEX[v_axis]
     out = []
     for pose in poses:
         if len(pose) < 3:
             out.append((-9999, -9999))
             continue
-        x = (float(pose[0]) - float(lo[0])) / float(span[0])
-        z = (float(pose[2]) - float(lo[2])) / float(span[2])
-        u = margin_x + int(np.clip(x, 0.0, 1.0) * usable_w)
-        v = margin_y + int((1.0 - np.clip(z, 0.0, 1.0)) * usable_h)
+        uu = (float(pose[ui]) - float(lo[ui])) / float(span[ui])
+        vv = (float(pose[vi]) - float(lo[vi])) / float(span[vi])
+        if flip_u:
+            uu = 1.0 - uu
+        if flip_v:
+            vv = 1.0 - vv
+        u = margin_x + int(np.clip(uu, 0.0, 1.0) * usable_w)
+        v = margin_y + int(np.clip(vv, 0.0, 1.0) * usable_h)
         out.append((u, v))
     return out
 
 
-def draw_hand(img: np.ndarray, hand: dict[str, Any], lo: np.ndarray, hi: np.ndarray, color: tuple[int, int, int], draw_untracked: bool) -> None:
+def camera_intrinsics(video: dict[str, Any], width: int, height: int) -> tuple[float, float, float, float]:
+    intr = video.get("camera_intrinsics") or {}
+    focal = intr.get("focal_length") or []
+    principal = intr.get("principal_point") or []
+    fx = float(focal[0]) if len(focal) >= 1 else width / 2.0
+    fy = float(focal[1]) if len(focal) >= 2 else height / 2.0
+    cx = float(principal[0]) if len(principal) >= 1 else width / 2.0
+    cy = float(principal[1]) if len(principal) >= 2 else height / 2.0
+    return fx, fy, cx, cy
+
+
+def project_eye_points(
+    poses: list[list[float]],
+    frame: dict[str, Any],
+    video: dict[str, Any],
+    width: int,
+    height: int,
+) -> list[tuple[int, int]]:
+    eye = frame.get("center_eye_pose") or []
+    if len(eye) < 7:
+        return [(-9999, -9999) for _ in poses]
+    eye_pos = np.asarray(eye[:3], dtype=np.float32)
+    rot_eye_to_world = quat_xyzw_to_matrix(eye[3:7])
+    fx, fy, cx, cy = camera_intrinsics(video, width, height)
+    out = []
+    for pose in poses:
+        if len(pose) < 3:
+            out.append((-9999, -9999))
+            continue
+        p_world = np.asarray(pose[:3], dtype=np.float32)
+        p_eye = rot_eye_to_world.T @ (p_world - eye_pos)
+        # RUF convention: +x right, +y up, +z forward. Image y points down.
+        if float(p_eye[2]) <= 1e-4:
+            out.append((-9999, -9999))
+            continue
+        u = int(fx * float(p_eye[0]) / float(p_eye[2]) + cx)
+        v = int(cy - fy * float(p_eye[1]) / float(p_eye[2]))
+        if u < -width or u > 2 * width or v < -height or v > 2 * height:
+            out.append((-9999, -9999))
+        else:
+            out.append((u, v))
+    return out
+
+
+def project_points(
+    poses: list[list[float]],
+    lo: np.ndarray,
+    hi: np.ndarray,
+    width: int,
+    height: int,
+    projection_mode: str,
+    frame: dict[str, Any],
+    video: dict[str, Any],
+) -> list[tuple[int, int]]:
+    if projection_mode == "eye_center":
+        return project_eye_points(poses, frame, video, width, height)
+    return project_norm_points(poses, lo, hi, width, height, projection_mode)
+
+
+def draw_hand(
+    img: np.ndarray,
+    hand: dict[str, Any],
+    lo: np.ndarray,
+    hi: np.ndarray,
+    color: tuple[int, int, int],
+    draw_untracked: bool,
+    projection_mode: str,
+    frame: dict[str, Any],
+    video: dict[str, Any],
+) -> None:
     poses = hand.get("poses") or []
     if not poses:
         return
@@ -168,7 +285,7 @@ def draw_hand(img: np.ndarray, hand: dict[str, Any], lo: np.ndarray, hi: np.ndar
     if not tracked and not draw_untracked:
         return
     color = color if tracked else UNTRACKED_COLOR
-    pts = project_points(poses, lo, hi, img.shape[1], img.shape[0])
+    pts = project_points(poses, lo, hi, img.shape[1], img.shape[0], projection_mode, frame, video)
     name_to_idx = hand_name_index(hand)
     for a, b in HAND_CONNECTION_NAMES:
         ia = name_to_idx.get(a)
@@ -218,15 +335,26 @@ def transcode_to_vscode(src: Path, dst: Path) -> bool:
         return False
 
 
-def render_episode(ep_dir: Path, out_root: Path, fps_override: float | None, max_frames: int, overwrite: bool, keep_temp: bool, always_draw_untracked: bool) -> EpisodeStats:
+def render_episode(
+    ep_dir: Path,
+    out_root: Path,
+    fps_override: float | None,
+    max_frames: int,
+    overwrite: bool,
+    keep_temp: bool,
+    always_draw_untracked: bool,
+    projection_mode: str,
+    output_suffix: str,
+) -> EpisodeStats:
     main, meta, video = load_episode(ep_dir)
     frames = main.get("frames") or []
     cam_dir = ep_dir / "camera_real"
     image_paths = sorted(cam_dir.glob("real_frame_*.jpg"), key=frame_number)
     out_dir = out_root / ep_dir.name
     out_dir.mkdir(parents=True, exist_ok=True)
-    out_video = out_dir / f"{ep_dir.name}_hand_overlay_vscode.mp4"
-    tmp_video = out_dir / f"{ep_dir.name}_hand_overlay_tmp.mp4"
+    suffix = output_suffix or ""
+    out_video = out_dir / f"{ep_dir.name}{suffix}_hand_overlay_vscode.mp4"
+    tmp_video = out_dir / f"{ep_dir.name}{suffix}_hand_overlay_tmp.mp4"
 
     left_tracked = sum(bool(f.get("left_hand", {}).get("is_tracked")) for f in frames)
     right_tracked = sum(bool(f.get("right_hand", {}).get("is_tracked")) for f in frames)
@@ -258,12 +386,12 @@ def render_episode(ep_dir: Path, out_root: Path, fps_override: float | None, max
             if frame_idx >= len(frames):
                 frame_idx = min(out_idx, len(frames) - 1)
             fr = frames[frame_idx] if frames else {}
-            draw_hand(img, fr.get("left_hand") or {}, lo, hi, LEFT_COLOR, draw_untracked_when_empty)
-            draw_hand(img, fr.get("right_hand") or {}, lo, hi, RIGHT_COLOR, draw_untracked_when_empty)
+            draw_hand(img, fr.get("left_hand") or {}, lo, hi, LEFT_COLOR, draw_untracked_when_empty, projection_mode, fr, video)
+            draw_hand(img, fr.get("right_hand") or {}, lo, hi, RIGHT_COLOR, draw_untracked_when_empty, projection_mode, fr, video)
             lines = [
                 f"{ep_dir.name} frame={frame_idx} img={img_path.name} fps={fps:g}",
                 f"L tracked={bool((fr.get('left_hand') or {}).get('is_tracked'))} valid={bool((fr.get('left_validation') or {}).get('is_valid'))}  R tracked={bool((fr.get('right_hand') or {}).get('is_tracked'))} valid={bool((fr.get('right_validation') or {}).get('is_valid'))}",
-                "overlay: episode-normalized VR joint x/z; camera intrinsics/extrinsics missing, not calibrated projection",
+                f"overlay: {projection_mode}; no camera_real extrinsics, diagnostic not calibrated projection",
             ]
             if draw_untracked_when_empty:
                 lines.append("gray/untracked poses are shown because no tracked hand was found or --draw-untracked is enabled")
@@ -312,7 +440,7 @@ def write_stats(stats: list[EpisodeStats], out_root: Path) -> None:
         f"Total JSON frames: {total_json}",
         f"Total JPG frames: {total_jpg}",
         "",
-        "Note: camera_intrinsics.focal_length/principal_point and cameras/extrinsics are empty in the inspected camera_real metadata, so overlay videos use episode-normalized VR joint x/z, not calibrated image projection.",
+        "Note: cameras/extrinsics are empty in the inspected camera_real metadata. norm_* overlays use episode-normalized joint axes; eye_center uses center_eye_pose plus intrinsics as an approximation. Neither is calibrated external-camera projection.",
         "",
         "| episode | json_frames | jpg_frames | video_frames | fps | left_tracked | right_tracked | left_valid | right_valid | intrinsics | extrinsics | integrity_flags | output |",
         "|---|---:|---:|---:|---:|---:|---:|---:|---:|---|---|---:|---|",
@@ -340,7 +468,19 @@ def main() -> None:
             print(f"[skip] missing episode: {ep_dir}")
             continue
         print(f"[episode] {ep_dir.name}")
-        stats.append(render_episode(ep_dir, output_root, args.fps, args.max_frames, args.overwrite, args.keep_temp, args.draw_untracked))
+        stats.append(
+            render_episode(
+                ep_dir,
+                output_root,
+                args.fps,
+                args.max_frames,
+                args.overwrite,
+                args.keep_temp,
+                args.draw_untracked,
+                args.projection_mode,
+                args.output_suffix,
+            )
+        )
     write_stats(stats, output_root)
     print(f"[done] output_root={output_root}")
     print(f"[done] stats={output_root / 'vr_data_stats.md'}")

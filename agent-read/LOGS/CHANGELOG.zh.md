@@ -3119,3 +3119,14 @@ Validation: `python -m py_compile code_painting/visualize_vr_hand_data.py`；smo
 - 本地 zip：`/home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_reinit_whitebg_piper0515_6task_25ep.zip`，约 126 MB。
 
 Validation: final/HDF5/parquet 均为每任务 25；zip 内 150 个 parquet 和 6 个 `piper0515_world_to_base_conversion.json`。
+
+
+## 2026-07-08（VR HaMeR 检测与坐标轴诊断）
+
+- `visualize_vr_hand_data.py` 新增 `--projection-mode norm_xz|norm_xy|norm_yz|norm_zx|eye_center` 和 `--output-suffix`，用于检查 VR joint 轴交换和 center-eye 近似投影。
+- 新增 `code_painting/prepare_vr_hamer_input.py`：把 VR JPG episode 转成 HaMeR 可读的 `rgb_<ID>.mp4 + params_<ID>.json`。
+- 新增 `code_painting/compare_vr_hamer_results.py`：汇总 VR tracking/validation 与 HaMeR detection，并生成 VR overlay vs HaMeR 的横向 VSCode MP4。
+- 本轮输出：旧可视化复制到 `/home/zaijia001/ssd/data/piper/vr/0vis/datav1`；四种轴投影 debug 位于 `/home/zaijia001/ssd/data/piper/vr/0vis/datav1_axis_debug/<MODE>`；HaMeR 输出位于 `/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1`。
+- 结论：本地 `camera_real/*_video.json` 仍无 camera extrinsics；VR JSON joints 是 RUF tracking/world 坐标，HaMeR 是图像检测坐标，偏移不能靠简单轴交换严格修复。
+
+Validation: `python -m py_compile code_painting/visualize_vr_hand_data.py code_painting/prepare_vr_hamer_input.py code_painting/compare_vr_hamer_results.py`；VR->HaMeR 输入生成 15 个 RGB MP4；HaMeR 输出 15 个 `hand_detections_*.npz` 和 15 个 `hand_vis_gripper_*.mp4`；对比脚本生成 `compare_vr_hamer_stats.md` 与 15 个横向对比视频。
