@@ -81,3 +81,5 @@
 - 训练数据后缀：`skeyp_reinit_gripperonly`；最终本地 repo 形如 `/home/zaijia001/.cache/huggingface/lerobot/local/h2o_<TASK>_skeyp_reinit_gripperonly_piper0515_25ep`。
 - 本地 zip：`/home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_reinit_gripperonly_piper0515_6task_25ep.zip`。
 - 当前实现复用已有 reinit 风格逐帧轨迹；如果之后需要严格“只关键帧插值生成 `world_targets_and_status.npz`”，还要新增 reinit-compatible keyframe 轨迹生成器。
+
+- 2026-07-08 v2 已跑完：Stage-2 final、processed HDF5、Piper0515 LeRobot repo 均为 6 任务 * 25 条；本地 zip `/home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_reinit_gripperonly_piper0515_6task_25ep.zip` 约 130 MB，zip 内 150 个 parquet 和 6 个 piper0515 marker。

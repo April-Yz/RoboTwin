@@ -3091,3 +3091,10 @@ Validation: `python -m py_compile code_painting/repaint_l16_white_color_debug.py
 - Updated `agent-read/COMMANDS/skeyp_pipeline.*.md` and `agent-read/ACTIVE_MEMORY.*.md` with v1/v2 semantic differences, run commands, and intermediate output paths.
 
 Validation: `bash -n code_painting/run_skeyp_v2_reinit_gripperonly_pipeline.sh` passed.
+
+## 2026-07-08 (SKEYP v2 pipeline run finished)
+
+- `skeyp_v2_reinit_gripperonly_pipeline` finished: Stage-2 finals, processed HDF5, and Piper0515 LeRobot repos all reached 6 tasks * 25 episodes.
+- Local zip: `/home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_reinit_gripperonly_piper0515_6task_25ep.zip`, about 130 MB.
+
+Validation: final/HDF5/parquet counts are 25 per task; the zip contains 150 parquet files and 6 `piper0515_world_to_base_conversion.json` markers.

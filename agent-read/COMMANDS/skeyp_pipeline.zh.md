@@ -123,3 +123,12 @@ rclone copy /home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_reinit_
 - Stage-2 gripper-only repaint：`/home/zaijia001/ssd/inpainting_sam3_robot/remove_anything_video_sam3_robot_visible_reinit.py`
 - reinit/D435 数据转换：`policy/pi0/scripts/process_repainted_headcam_with_wrist.py`
 - piper0515 坐标对齐：`code_painting/convert_lerobot_piper0515_world_to_base.py`
+
+### 2026-07-08 v2 运行结果
+
+- tmux session：`skeyp_v2_reinit_gripperonly_pipeline`，已结束。
+- Stage-2 `final_repainted.mp4`：6 个任务均为 25/25。
+- 中间 HDF5：6 个任务均为 25/25。
+- Piper0515 LeRobot repo：6 个任务均为 25 个 parquet，并包含 `meta/piper0515_world_to_base_conversion.json`。
+- 本地 zip：`/home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_reinit_gripperonly_piper0515_6task_25ep.zip`，约 130 MB。
+- zip 校验：150 个 parquet，6 个 `piper0515_world_to_base_conversion.json`。

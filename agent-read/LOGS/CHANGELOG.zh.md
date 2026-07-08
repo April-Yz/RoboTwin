@@ -3089,3 +3089,10 @@ Validation: `python -m py_compile code_painting/repaint_l16_white_color_debug.py
 - 更新 `agent-read/COMMANDS/skeyp_pipeline.*.md` 与 `agent-read/ACTIVE_MEMORY.*.md`，记录 v1/v2 语义差异、运行命令和中间产物路径。
 
 Validation: `bash -n code_painting/run_skeyp_v2_reinit_gripperonly_pipeline.sh` 通过。
+
+## 2026-07-08（SKEYP v2 管线运行完成）
+
+- `skeyp_v2_reinit_gripperonly_pipeline` 已完成：Stage-2、processed HDF5、Piper0515 LeRobot repo 均为 6 任务 * 25 条。
+- 本地 zip：`/home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_reinit_gripperonly_piper0515_6task_25ep.zip`，约 130 MB。
+
+Validation: final/HDF5/parquet 均为每任务 25；zip 内 150 个 parquet 和 6 个 `piper0515_world_to_base_conversion.json`。

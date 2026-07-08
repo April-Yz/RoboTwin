@@ -81,3 +81,5 @@ Purpose: record high-priority context for the current session and recent data pr
 - Training-data suffix: `skeyp_reinit_gripperonly`; final local repos look like `/home/zaijia001/.cache/huggingface/lerobot/local/h2o_<TASK>_skeyp_reinit_gripperonly_piper0515_25ep`.
 - Local zip: `/home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_reinit_gripperonly_piper0515_6task_25ep.zip`.
 - The current implementation reuses existing reinit-style per-frame trajectories. A stricter "keyframes only to `world_targets_and_status.npz`" version still needs a new reinit-compatible keyframe trajectory generator.
+
+- 2026-07-08 v2 finished: Stage-2 finals, processed HDF5, and Piper0515 LeRobot repos all reached 6 tasks * 25 episodes. Local zip `/home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_reinit_gripperonly_piper0515_6task_25ep.zip` is about 130 MB and contains 150 parquet files plus 6 piper0515 markers.
