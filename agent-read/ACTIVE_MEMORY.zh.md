@@ -67,3 +67,17 @@
 - 远端上传需要手动运行脚本打印的 `rclone copy ... gdrive:piper/multi/6task/robot_skeyp_piper0515` 命令。
 
 - 2026-07-08 已完成一次 `skeyp_selected25_pipeline`：Stage-2 六任务均 25/25；最终 zip 为 `/home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_piper0515_6task_25ep.zip`，校验为 150 个 parquet 和 6 个 piper0515 marker。
+
+## SKEYP v2 reinit gripper-only
+
+- 更新时间：2026-07-08。
+- 目的：修正 `skeyp` v1 过于接近 `ours` planner-output 的问题，做一个和 reinit/pinpointing 对齐的 gripper-only 消融。
+- 总控脚本：`/home/zaijia001/ssd/RoboTwin/code_painting/run_skeyp_v2_reinit_gripperonly_pipeline.sh`。
+- tmux session：`skeyp_v2_reinit_gripperonly_pipeline`。
+- 复用选集：`/home/zaijia001/ssd/RoboTwin/code_painting/l16_ours_review_first25/selections/<TASK>/ours_review_selection.json`。
+- Stage-1 背景：`/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_skeyp/v2_reinit_gripperonly/stage1`；prompt 为 `arms, hands, wrists, watch.`，保留真实物体。
+- reinit 轨迹软链接：`/home/zaijia001/ssd/RoboTwin/code_painting/human_replay/skeyp_v2_reinit_gripperonly/h2_pure_d435_selected25`；源为已有 `human_replay/h2_pure_d435`，包含 `world_targets_and_status.npz` 和三路 replay 视频。
+- Stage-2 gripper-only 输出：`/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_skeyp_visible_reinit/v2_reinit_gripperonly/e0_gripper`；重点看每个 id 目录中的 `w_box_zed_replay_d435.mp4`、`w_mask_zed_replay_d435.mp4`、`mask_zed_replay_d435.mp4`、`final_repainted.mp4`。
+- 训练数据后缀：`skeyp_reinit_gripperonly`；最终本地 repo 形如 `/home/zaijia001/.cache/huggingface/lerobot/local/h2o_<TASK>_skeyp_reinit_gripperonly_piper0515_25ep`。
+- 本地 zip：`/home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_reinit_gripperonly_piper0515_6task_25ep.zip`。
+- 当前实现复用已有 reinit 风格逐帧轨迹；如果之后需要严格“只关键帧插值生成 `world_targets_and_status.npz`”，还要新增 reinit-compatible keyframe 轨迹生成器。

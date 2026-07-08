@@ -3083,3 +3083,11 @@ Validation: `python -m py_compile code_painting/repaint_l16_white_color_debug.py
 - Documentation now distinguishes `--max-frames` preview truncation commands from full frame-aligned commands.
 
 Validation: `python -m py_compile code_painting/repaint_l16_white_color_debug.py`; `stack_cups id0 --max-frames 20` smoke.
+
+## 2026-07-08 (SKEYP v2 reinit gripper-only pipeline)
+
+- Added `code_painting/run_skeyp_v2_reinit_gripperonly_pipeline.sh`: reuse the same selected25 ids, keep Stage-1 hands-only with real objects preserved, repaint only the gripper in Stage-2, and convert through the reinit/D435 `process_repainted_headcam_with_wrist.py` path.
+- v2 outputs live beside the v1 roots: Stage-1 under `results_repaint_piper_h2_skeyp/v2_reinit_gripperonly/stage1`, Stage-2 under `results_repaint_piper_h2_skeyp_visible_reinit/v2_reinit_gripperonly/e0_gripper`.
+- Updated `agent-read/COMMANDS/skeyp_pipeline.*.md` and `agent-read/ACTIVE_MEMORY.*.md` with v1/v2 semantic differences, run commands, and intermediate output paths.
+
+Validation: `bash -n code_painting/run_skeyp_v2_reinit_gripperonly_pipeline.sh` passed.

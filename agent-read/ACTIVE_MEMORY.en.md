@@ -67,3 +67,17 @@ Purpose: record high-priority context for the current session and recent data pr
 - Remote upload should be run manually with the `rclone copy ... gdrive:piper/multi/6task/robot_skeyp_piper0515` command printed by the script.
 
 - 2026-07-08 completed one `skeyp_selected25_pipeline` run: Stage-2 reached 25/25 for all six tasks; final zip is `/home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_piper0515_6task_25ep.zip`, validated with 150 parquet files and 6 piper0515 markers.
+
+## SKEYP v2 reinit gripper-only
+
+- Updated: 2026-07-08.
+- Purpose: fix the semantic mismatch in `skeyp` v1, which was too close to the `ours` planner-output path, by adding a gripper-only ablation aligned with reinit/pinpointing.
+- Controller script: `/home/zaijia001/ssd/RoboTwin/code_painting/run_skeyp_v2_reinit_gripperonly_pipeline.sh`.
+- tmux session: `skeyp_v2_reinit_gripperonly_pipeline`.
+- Reused selections: `/home/zaijia001/ssd/RoboTwin/code_painting/l16_ours_review_first25/selections/<TASK>/ours_review_selection.json`.
+- Stage-1 backgrounds: `/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_skeyp/v2_reinit_gripperonly/stage1`; prompt is `arms, hands, wrists, watch.`, preserving real objects.
+- Reinit retarget symlinks: `/home/zaijia001/ssd/RoboTwin/code_painting/human_replay/skeyp_v2_reinit_gripperonly/h2_pure_d435_selected25`; source is the existing `human_replay/h2_pure_d435`, including `world_targets_and_status.npz` and three replay videos.
+- Stage-2 gripper-only outputs: `/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_skeyp_visible_reinit/v2_reinit_gripperonly/e0_gripper`; inspect `w_box_zed_replay_d435.mp4`, `w_mask_zed_replay_d435.mp4`, `mask_zed_replay_d435.mp4`, and `final_repainted.mp4` under each id directory.
+- Training-data suffix: `skeyp_reinit_gripperonly`; final local repos look like `/home/zaijia001/.cache/huggingface/lerobot/local/h2o_<TASK>_skeyp_reinit_gripperonly_piper0515_25ep`.
+- Local zip: `/home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_reinit_gripperonly_piper0515_6task_25ep.zip`.
+- The current implementation reuses existing reinit-style per-frame trajectories. A stricter "keyframes only to `world_targets_and_status.npz`" version still needs a new reinit-compatible keyframe trajectory generator.

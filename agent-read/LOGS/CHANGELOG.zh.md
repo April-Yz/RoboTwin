@@ -3081,3 +3081,11 @@ Validation: `python -m py_compile code_painting/repaint_l16_white_color_debug.py
 - 文档中区分 `--max-frames` 预览截断命令和全长对齐命令。
 
 Validation: `python -m py_compile code_painting/repaint_l16_white_color_debug.py`；`stack_cups id0 --max-frames 20` smoke。
+
+## 2026-07-08（SKEYP v2 reinit gripper-only 管线）
+
+- 新增 `code_painting/run_skeyp_v2_reinit_gripperonly_pipeline.sh`：复用同一批 selected25 id，Stage-1 只去手并保留真实物体，Stage-2 只检测/贴回夹爪，数据转换走 reinit/D435 的 `process_repainted_headcam_with_wrist.py`。
+- v2 输出与 v1 放在相邻父目录下：Stage-1 位于 `results_repaint_piper_h2_skeyp/v2_reinit_gripperonly/stage1`，Stage-2 位于 `results_repaint_piper_h2_skeyp_visible_reinit/v2_reinit_gripperonly/e0_gripper`。
+- 更新 `agent-read/COMMANDS/skeyp_pipeline.*.md` 与 `agent-read/ACTIVE_MEMORY.*.md`，记录 v1/v2 语义差异、运行命令和中间产物路径。
+
+Validation: `bash -n code_painting/run_skeyp_v2_reinit_gripperonly_pipeline.sh` 通过。
