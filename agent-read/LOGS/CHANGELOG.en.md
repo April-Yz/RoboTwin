@@ -3098,3 +3098,11 @@ Validation: `bash -n code_painting/run_skeyp_v2_reinit_gripperonly_pipeline.sh` 
 - Local zip: `/home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_reinit_gripperonly_piper0515_6task_25ep.zip`, about 130 MB.
 
 Validation: final/HDF5/parquet counts are 25 per task; the zip contains 150 parquet files and 6 `piper0515_world_to_base_conversion.json` markers.
+
+## 2026-07-08 (SKEYP v2 whitebg Stage-2)
+
+- Added `code_painting/repaint_skeyp_reinit_white_color.py`: color-threshold white-background inversion for reinit-style `zed_replay_d435.mp4`, composited onto the Stage-1 hands-only background.
+- Added `code_painting/run_skeyp_v2_whitebg_pipeline.sh`: reuses selected25 ids, reinit retarget outputs, piper0515 conversion, and zip packaging with suffix `skeyp_reinit_whitebg`.
+- Single-id debug: `pick_diverse_bottles id0` produced a full-length final in the debug root, with foreground mean about 0.165, confirming the mask is not empty.
+
+Validation: `bash -n code_painting/run_skeyp_v2_whitebg_pipeline.sh`; `python -m py_compile code_painting/repaint_skeyp_reinit_white_color.py`; `DRY_RUN=1 TASKS=pick_diverse_bottles SUBSET_N=1 bash code_painting/run_skeyp_v2_whitebg_pipeline.sh`; full debug for `pick_diverse_bottles id0`.

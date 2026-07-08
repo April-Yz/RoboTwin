@@ -132,3 +132,36 @@ rclone copy /home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_reinit_
 - Piper0515 LeRobot repos: each of the six tasks has 25 parquet files and `meta/piper0515_world_to_base_conversion.json`.
 - Local zip: `/home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_reinit_gripperonly_piper0515_6task_25ep.zip`, about 130 MB.
 - Zip validation: 150 parquet files and 6 `piper0515_world_to_base_conversion.json` markers.
+
+## SKEYP v2 whitebg: reinit white-background inversion
+
+### Purpose
+
+`skeyp_reinit_whitebg` is the Stage-2 fix for `skeyp_reinit_gripperonly`. The gripper-only DINO/SAM prompt did not reliably repaint the gripper in some videos. This route mirrors the `ours` white-background inversion method: it bypasses SAM/DINO, detects the white background in the reinit-style `zed_replay_d435.mp4` by color thresholding, inverts that mask into foreground, and composites the foreground onto the Stage-1 hands-only background.
+
+### One-Shot Run
+
+```bash
+tmux new-session -d -s skeyp_v2_whitebg_pipeline \
+  'bash /home/zaijia001/ssd/RoboTwin/code_painting/run_skeyp_v2_whitebg_pipeline.sh'
+```
+
+### Outputs
+
+- Stage-2 whitebg repaint: `/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_skeyp_visible_reinit/v2_reinit_whitebg/e0_robot_color/<TASK>/id_<ID>_skeyp_whitebg/final_repainted.mp4`
+- Stage-2 debug: `mask_zed_replay_d435.mp4`, `w_mask_zed_replay_d435.mp4`, `w_white_bg_mask_zed_replay_d435.mp4`, and `color_white_manifest.json` in the same directory.
+- Intermediate HDF5: `/home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_<TASK>_skeyp_reinit_whitebg-120`
+- Piper0515 LeRobot: `/home/zaijia001/.cache/huggingface/lerobot/local/h2o_<TASK>_skeyp_reinit_whitebg_piper0515_25ep`
+- Local zip: `/home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_reinit_whitebg_piper0515_6task_25ep.zip`
+
+### Manual Upload
+
+```bash
+rclone copy /home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_reinit_whitebg_piper0515_6task_25ep.zip \
+  gdrive:piper/multi/6task/robot_skeyp_reinit_whitebg_piper0515 \
+  -P --drive-chunk-size 64M --transfers 4
+```
+
+### Tuning
+
+The default thresholds are conservative to avoid deleting light-colored gripper pixels as white background: `WHITE_VALUE_MIN=210`, `WHITE_SAT_MAX=45`, `WHITE_RGB_MIN=200`, `WHITE_RGB_DELTA_MAX=55`, `BORDER_ONLY=1`. If gray background remains, increase `WHITE_DILATE_KERNEL` or loosen the white threshold. If gripper pixels disappear, raise `WHITE_VALUE_MIN`/`WHITE_RGB_MIN` so the white-background definition is stricter.

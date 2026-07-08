@@ -39,6 +39,8 @@ code_painting/*
 !code_painting/repaint_l16_white_color_debug.py
 !code_painting/run_skeyp_selected25_pipeline.sh
 !code_painting/run_skeyp_v2_reinit_gripperonly_pipeline.sh
+!code_painting/run_skeyp_v2_whitebg_pipeline.sh
+!code_painting/repaint_skeyp_reinit_white_color.py
 code_painting/anygrasp*
 code_painting/replay*
 !code_painting/replay_pose_debug_smooth.py

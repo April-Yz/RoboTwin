@@ -3096,3 +3096,11 @@ Validation: `bash -n code_painting/run_skeyp_v2_reinit_gripperonly_pipeline.sh` 
 - 本地 zip：`/home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_reinit_gripperonly_piper0515_6task_25ep.zip`，约 130 MB。
 
 Validation: final/HDF5/parquet 均为每任务 25；zip 内 150 个 parquet 和 6 个 `piper0515_world_to_base_conversion.json`。
+
+## 2026-07-08（SKEYP v2 whitebg Stage-2）
+
+- 新增 `code_painting/repaint_skeyp_reinit_white_color.py`：对 reinit-style `zed_replay_d435.mp4` 做白背景颜色反选，合成到 Stage-1 hands-only 背景。
+- 新增 `code_painting/run_skeyp_v2_whitebg_pipeline.sh`：复用 selected25、reinit retarget、piper0515 转换和 zip 流程，输出后缀 `skeyp_reinit_whitebg`。
+- 单 id debug：`pick_diverse_bottles id0` 在 debug root 生成 full-length final，foreground mean 约 0.165，说明不是空 mask。
+
+Validation: `bash -n code_painting/run_skeyp_v2_whitebg_pipeline.sh`；`python -m py_compile code_painting/repaint_skeyp_reinit_white_color.py`；`DRY_RUN=1 TASKS=pick_diverse_bottles SUBSET_N=1 bash code_painting/run_skeyp_v2_whitebg_pipeline.sh`；`pick_diverse_bottles id0` full debug。

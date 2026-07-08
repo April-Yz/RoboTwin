@@ -132,3 +132,36 @@ rclone copy /home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_reinit_
 - Piper0515 LeRobot repo：6 个任务均为 25 个 parquet，并包含 `meta/piper0515_world_to_base_conversion.json`。
 - 本地 zip：`/home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_reinit_gripperonly_piper0515_6task_25ep.zip`，约 130 MB。
 - zip 校验：150 个 parquet，6 个 `piper0515_world_to_base_conversion.json`。
+
+## SKEYP v2 whitebg: reinit white-background inversion
+
+### 目的
+
+`skeyp_reinit_whitebg` 是对 `skeyp_reinit_gripperonly` 的 Stage-2 修正版。原因是 gripper-only DINO/SAM prompt 在部分视频中没有稳定把夹爪 repaint 回来；本路线仿照 `ours` 的白背景反选方式，不跑 SAM/DINO，直接从 reinit 风格 `zed_replay_d435.mp4` 中按颜色检测白底，反选非白 foreground 后合成到 Stage-1 hands-only 背景上。
+
+### 一键运行
+
+```bash
+tmux new-session -d -s skeyp_v2_whitebg_pipeline \
+  'bash /home/zaijia001/ssd/RoboTwin/code_painting/run_skeyp_v2_whitebg_pipeline.sh'
+```
+
+### 输出位置
+
+- Stage-2 whitebg repaint：`/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_skeyp_visible_reinit/v2_reinit_whitebg/e0_robot_color/<TASK>/id_<ID>_skeyp_whitebg/final_repainted.mp4`
+- Stage-2 debug：同目录下的 `mask_zed_replay_d435.mp4`、`w_mask_zed_replay_d435.mp4`、`w_white_bg_mask_zed_replay_d435.mp4`、`color_white_manifest.json`
+- 中间 HDF5：`/home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_<TASK>_skeyp_reinit_whitebg-120`
+- Piper0515 LeRobot：`/home/zaijia001/.cache/huggingface/lerobot/local/h2o_<TASK>_skeyp_reinit_whitebg_piper0515_25ep`
+- 本地 zip：`/home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_reinit_whitebg_piper0515_6task_25ep.zip`
+
+### 手动上传
+
+```bash
+rclone copy /home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_reinit_whitebg_piper0515_6task_25ep.zip \
+  gdrive:piper/multi/6task/robot_skeyp_reinit_whitebg_piper0515 \
+  -P --drive-chunk-size 64M --transfers 4
+```
+
+### 调参
+
+默认颜色阈值偏保守，避免把浅色夹爪误当白底删掉：`WHITE_VALUE_MIN=210`、`WHITE_SAT_MAX=45`、`WHITE_RGB_MIN=200`、`WHITE_RGB_DELTA_MAX=55`、`BORDER_ONLY=1`。若灰色背景残留太多，可提高 `WHITE_DILATE_KERNEL` 或降低白底阈值；若夹爪被吃掉，则提高 `WHITE_VALUE_MIN`/`WHITE_RGB_MIN` 让“白底”更严格。
