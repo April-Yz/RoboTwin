@@ -165,3 +165,12 @@ rclone copy /home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_reinit_
 ### Tuning
 
 The default thresholds are conservative to avoid deleting light-colored gripper pixels as white background: `WHITE_VALUE_MIN=210`, `WHITE_SAT_MAX=45`, `WHITE_RGB_MIN=200`, `WHITE_RGB_DELTA_MAX=55`, `BORDER_ONLY=1`. If gray background remains, increase `WHITE_DILATE_KERNEL` or loosen the white threshold. If gripper pixels disappear, raise `WHITE_VALUE_MIN`/`WHITE_RGB_MIN` so the white-background definition is stricter.
+
+### 2026-07-08 whitebg Run Result
+
+- tmux session: `skeyp_v2_whitebg_pipeline`, finished.
+- Stage-2 `final_repainted.mp4`: 25/25 for all six tasks.
+- Intermediate HDF5: 25/25 for all six tasks.
+- Piper0515 LeRobot repos: each of the six tasks has 25 parquet files and `meta/piper0515_world_to_base_conversion.json`.
+- Local zip: `/home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_reinit_whitebg_piper0515_6task_25ep.zip`, about 126 MB.
+- Zip validation: 150 parquet files and 6 `piper0515_world_to_base_conversion.json` markers.

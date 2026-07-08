@@ -83,3 +83,11 @@ Purpose: record high-priority context for the current session and recent data pr
 - The current implementation reuses existing reinit-style per-frame trajectories. A stricter "keyframes only to `world_targets_and_status.npz`" version still needs a new reinit-compatible keyframe trajectory generator.
 
 - 2026-07-08 v2 finished: Stage-2 finals, processed HDF5, and Piper0515 LeRobot repos all reached 6 tasks * 25 episodes. Local zip `/home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_reinit_gripperonly_piper0515_6task_25ep.zip` is about 130 MB and contains 150 parquet files plus 6 piper0515 markers.
+
+## SKEYP v2 whitebg
+
+- 2026-07-08 completed `skeyp_v2_whitebg_pipeline`: this is the white-background color-inversion Stage-2 replacement for gripper-only SAM.
+- Output suffix: `skeyp_reinit_whitebg`.
+- Stage-2 output: `/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_skeyp_visible_reinit/v2_reinit_whitebg/e0_robot_color`.
+- Local zip: `/home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_reinit_whitebg_piper0515_6task_25ep.zip`, about 126 MB, with 150 parquet files and 6 piper0515 markers.
+- Manual upload target: `gdrive:piper/multi/6task/robot_skeyp_reinit_whitebg_piper0515`.

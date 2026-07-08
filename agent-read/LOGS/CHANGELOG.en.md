@@ -3114,3 +3114,10 @@ Validation: `bash -n code_painting/run_skeyp_v2_whitebg_pipeline.sh`; `python -m
 - Conclusion: 16 episodes, 3772 JSON frames, 3231 JPG frames; 13/16 have camera intrinsics and 0/16 have camera extrinsics, so overlay videos use episode-normalized joint x/z for diagnostics, not calibrated projection.
 
 Validation: `python -m py_compile code_painting/visualize_vr_hand_data.py`; 30-frame smoke test produced an H.264 MP4; the full run produced 15 `*_hand_overlay_vscode.mp4` files.
+
+## 2026-07-08 (SKEYP v2 whitebg pipeline run finished)
+
+- `skeyp_v2_whitebg_pipeline` finished: Stage-2 finals, processed HDF5, and Piper0515 LeRobot repos all reached 6 tasks * 25 episodes.
+- Local zip: `/home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_reinit_whitebg_piper0515_6task_25ep.zip`, about 126 MB.
+
+Validation: final/HDF5/parquet counts are 25 per task; the zip contains 150 parquet files and 6 `piper0515_world_to_base_conversion.json` markers.

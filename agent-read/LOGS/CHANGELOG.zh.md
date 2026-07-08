@@ -3112,3 +3112,10 @@ Validation: `bash -n code_painting/run_skeyp_v2_whitebg_pipeline.sh`；`python -
 - 结论：16 个 episode，3772 个 JSON frames，3231 个 JPG frames；13/16 有相机内参，0/16 有相机外参，因此叠加视频是 episode-normalized joint x/z 诊断图，不是标定投影。
 
 Validation: `python -m py_compile code_painting/visualize_vr_hand_data.py`；smoke test 30 帧输出 H.264 MP4；全量输出 15 个 `*_hand_overlay_vscode.mp4`。
+
+## 2026-07-08（SKEYP v2 whitebg 管线运行完成）
+
+- `skeyp_v2_whitebg_pipeline` 已完成：Stage-2、processed HDF5、Piper0515 LeRobot repo 均为 6 任务 * 25 条。
+- 本地 zip：`/home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_reinit_whitebg_piper0515_6task_25ep.zip`，约 126 MB。
+
+Validation: final/HDF5/parquet 均为每任务 25；zip 内 150 个 parquet 和 6 个 `piper0515_world_to_base_conversion.json`。

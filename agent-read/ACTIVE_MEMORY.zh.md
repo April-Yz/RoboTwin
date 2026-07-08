@@ -83,3 +83,11 @@
 - 当前实现复用已有 reinit 风格逐帧轨迹；如果之后需要严格“只关键帧插值生成 `world_targets_and_status.npz`”，还要新增 reinit-compatible keyframe 轨迹生成器。
 
 - 2026-07-08 v2 已跑完：Stage-2 final、processed HDF5、Piper0515 LeRobot repo 均为 6 任务 * 25 条；本地 zip `/home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_reinit_gripperonly_piper0515_6task_25ep.zip` 约 130 MB，zip 内 150 个 parquet 和 6 个 piper0515 marker。
+
+## SKEYP v2 whitebg
+
+- 2026-07-08 已完成 `skeyp_v2_whitebg_pipeline`：这是替代 gripper-only SAM 的白背景颜色反选 Stage-2。
+- 输出后缀：`skeyp_reinit_whitebg`。
+- Stage-2 输出：`/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_skeyp_visible_reinit/v2_reinit_whitebg/e0_robot_color`。
+- 本地 zip：`/home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_reinit_whitebg_piper0515_6task_25ep.zip`，约 126 MB，zip 内 150 个 parquet 和 6 个 piper0515 marker。
+- 手动上传目标：`gdrive:piper/multi/6task/robot_skeyp_reinit_whitebg_piper0515`。

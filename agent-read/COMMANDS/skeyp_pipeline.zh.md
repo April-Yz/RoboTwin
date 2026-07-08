@@ -165,3 +165,12 @@ rclone copy /home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_reinit_
 ### 调参
 
 默认颜色阈值偏保守，避免把浅色夹爪误当白底删掉：`WHITE_VALUE_MIN=210`、`WHITE_SAT_MAX=45`、`WHITE_RGB_MIN=200`、`WHITE_RGB_DELTA_MAX=55`、`BORDER_ONLY=1`。若灰色背景残留太多，可提高 `WHITE_DILATE_KERNEL` 或降低白底阈值；若夹爪被吃掉，则提高 `WHITE_VALUE_MIN`/`WHITE_RGB_MIN` 让“白底”更严格。
+
+### 2026-07-08 whitebg 运行结果
+
+- tmux session：`skeyp_v2_whitebg_pipeline`，已结束。
+- Stage-2 `final_repainted.mp4`：6 个任务均为 25/25。
+- 中间 HDF5：6 个任务均为 25/25。
+- Piper0515 LeRobot repo：6 个任务均为 25 个 parquet，并包含 `meta/piper0515_world_to_base_conversion.json`。
+- 本地 zip：`/home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_reinit_whitebg_piper0515_6task_25ep.zip`，约 126 MB。
+- zip 校验：150 个 parquet，6 个 `piper0515_world_to_base_conversion.json`。
