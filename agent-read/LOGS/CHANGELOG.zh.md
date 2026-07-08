@@ -3104,3 +3104,11 @@ Validation: final/HDF5/parquet 均为每任务 25；zip 内 150 个 parquet 和 
 - 单 id debug：`pick_diverse_bottles id0` 在 debug root 生成 full-length final，foreground mean 约 0.165，说明不是空 mask。
 
 Validation: `bash -n code_painting/run_skeyp_v2_whitebg_pipeline.sh`；`python -m py_compile code_painting/repaint_skeyp_reinit_white_color.py`；`DRY_RUN=1 TASKS=pick_diverse_bottles SUBSET_N=1 bash code_painting/run_skeyp_v2_whitebg_pipeline.sh`；`pick_diverse_bottles id0` full debug。
+
+## 2026-07-08（VR 人手数据可视化）
+
+- 新增 `code_painting/visualize_vr_hand_data.py`：读取 `/home/zaijia001/ssd/data/piper/vr/data` 下的 Quest 3 hand-tracking JSON 和 `camera_real` JPG，生成 VSCode 可播放的手部关节诊断叠加视频。
+- 输出目录：`/home/zaijia001/ssd/RoboTwin/code_painting/vr_hand_visualization`；本次生成 15 个视频和 `vr_data_stats.md/json`。
+- 结论：16 个 episode，3772 个 JSON frames，3231 个 JPG frames；13/16 有相机内参，0/16 有相机外参，因此叠加视频是 episode-normalized joint x/z 诊断图，不是标定投影。
+
+Validation: `python -m py_compile code_painting/visualize_vr_hand_data.py`；smoke test 30 帧输出 H.264 MP4；全量输出 15 个 `*_hand_overlay_vscode.mp4`。

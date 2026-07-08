@@ -3106,3 +3106,11 @@ Validation: final/HDF5/parquet counts are 25 per task; the zip contains 150 parq
 - Single-id debug: `pick_diverse_bottles id0` produced a full-length final in the debug root, with foreground mean about 0.165, confirming the mask is not empty.
 
 Validation: `bash -n code_painting/run_skeyp_v2_whitebg_pipeline.sh`; `python -m py_compile code_painting/repaint_skeyp_reinit_white_color.py`; `DRY_RUN=1 TASKS=pick_diverse_bottles SUBSET_N=1 bash code_painting/run_skeyp_v2_whitebg_pipeline.sh`; full debug for `pick_diverse_bottles id0`.
+
+## 2026-07-08 (VR hand-data visualization)
+
+- Added `code_painting/visualize_vr_hand_data.py`: reads Quest 3 hand-tracking JSON and `camera_real` JPG frames under `/home/zaijia001/ssd/data/piper/vr/data`, then generates VSCode-playable hand-joint diagnostic overlay videos.
+- Output root: `/home/zaijia001/ssd/RoboTwin/code_painting/vr_hand_visualization`; this run generated 15 videos plus `vr_data_stats.md/json`.
+- Conclusion: 16 episodes, 3772 JSON frames, 3231 JPG frames; 13/16 have camera intrinsics and 0/16 have camera extrinsics, so overlay videos use episode-normalized joint x/z for diagnostics, not calibrated projection.
+
+Validation: `python -m py_compile code_painting/visualize_vr_hand_data.py`; 30-frame smoke test produced an H.264 MP4; the full run produced 15 `*_hand_overlay_vscode.mp4` files.
