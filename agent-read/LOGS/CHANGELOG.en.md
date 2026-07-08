@@ -3132,3 +3132,13 @@ Validation: final/HDF5/parquet counts are 25 per task; the zip contains 150 parq
 - Conclusion: local `camera_real/*_video.json` still has no camera extrinsics; VR JSON joints are in the RUF tracking/world frame, while HaMeR is image-detection based, so the observed offset cannot be strictly fixed by axis swaps alone.
 
 Validation: `python -m py_compile code_painting/visualize_vr_hand_data.py code_painting/prepare_vr_hamer_input.py code_painting/compare_vr_hamer_results.py`; VR-to-HaMeR input produced 15 RGB MP4 files; HaMeR produced 15 `hand_detections_*.npz` and 15 `hand_vis_gripper_*.mp4` files; the comparison script produced `compare_vr_hamer_stats.md` and 15 side-by-side comparison videos.
+
+
+## 2026-07-08 (VR-HaMeR Eye/Lag Alignment Sweep)
+
+- Added `code_painting/analyze_vr_hamer_alignment.py`: filters to `20260708` episodes, compares `world_xyz`, `center_eye_xyz`, `left_eye_xyz`, and `right_eye_xyz`, fits both `linear_xyz` and `perspective_xy_over_z`, and sweeps `lag=-10..+10`.
+- Output path: `/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/compare_bestfit_20260708`.
+- Out of 11 20260708 episodes, 10 produced best-fit comparison videos. `NTU-PINE_20260708_143622` was not fit because it had fewer than 20 matched samples.
+- Conclusion: left/right eye poses are useful episode-local approximations, but no single eye consistently wins; most best lags are -3 to -6 frames; most best models are `linear_xyz` rather than perspective, suggesting a user-view/screen-composited image rather than a raw pinhole camera.
+
+Validation: `python -m py_compile code_painting/analyze_vr_hamer_alignment.py`; generated 10 nonblank 1280x640/30fps best-fit comparison MP4 files.

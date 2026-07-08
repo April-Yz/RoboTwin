@@ -158,3 +158,55 @@ Outputs:
 - `center_eye_pose/left_eye_pose/right_eye_pose` are eye/head-related poses and are not the external RGB camera pose for the `camera_real` JPG frames.
 - Therefore the offset in the VR joint overlay is not something a simple axis swap can fully fix; the external camera-to-VR-world/headset extrinsic is missing.
 - Meta's official PCA docs indicate the proper capture path is to save the intrinsics, extrinsics, timestamp, or camera pose returned by `PassthroughCameraAccess`. Official PCA currently targets Quest 3/Quest 3S; if the real device is Quest 2, do not assume there is a fixed official intrinsic table matching these JPG frames.
+
+
+## Q.5 20260708 VR-HaMeR Eye/Lag Alignment Sweep
+
+Entrypoint:
+
+```text
+code_painting/analyze_vr_hamer_alignment.py
+```
+
+Purpose: use only `NTU-PINE_20260708_*` episodes, compare four coordinate candidates (`world_xyz`, `center_eye_xyz`, `left_eye_xyz`, `right_eye_xyz`), and fit each candidate with:
+
+```text
+linear_xyz: u_norm,v_norm = linear(x,y,z)
+perspective_xy_over_z: u_norm,v_norm = linear(x/z,y/z)
+lag: -10..+10, with hamer_frame = vr_frame + lag
+```
+
+Command:
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && \
+cd /home/zaijia001/ssd/RoboTwin && \
+python code_painting/analyze_vr_hamer_alignment.py \
+  --episode-substr 20260708 \
+  --lag-min -10 \
+  --lag-max 10 \
+  --min-samples 20 \
+  --render-videos 1 \
+  --overwrite \
+  --out-dir /home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/compare_bestfit_20260708
+```
+
+Outputs:
+
+```text
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/compare_bestfit_20260708/alignment_sweep_20260708.md
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/compare_bestfit_20260708/alignment_sweep_20260708.json
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/compare_bestfit_20260708/videos/id_<ID>_<EPISODE>_bestfit_vr_vs_hamer_vscode.mp4
+```
+
+Current result: out of 11 20260708 episodes, 10 produced best-fit comparison videos. `NTU-PINE_20260708_143622` was not fit because it had fewer than 20 matched VR-tracked + HaMeR-detected samples.
+
+Key conclusion:
+
+```text
+best pose counts: right_eye_xyz=6, left_eye_xyz=4, center_eye_xyz=0, world_xyz=0
+best lag counts: -6=3, -3=3, -5=2, -1=1, +10=1; +10 is from low-sample id5 and should be treated cautiously
+best model: 9/10 are linear_xyz, 1/10 is perspective_xy_over_z
+```
+
+Interpretation: `left_eye_pose/right_eye_pose` help, but no single eye pose consistently wins. The global weighted metrics for center/left/right are very close, so eye choice is not the main issue. Most best lags are negative; with `hamer_frame = vr_frame + lag`, this means the matching VR hand frame is usually later than the RGB/HaMeR frame by about 3-6 frames, or 100-200 ms at 30 fps. `linear_xyz` beating most perspective fits suggests the images are closer to a Quest user-view/screen-composited space than to an uncropped raw pinhole passthrough camera.

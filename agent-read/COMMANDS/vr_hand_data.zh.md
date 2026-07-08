@@ -158,3 +158,55 @@ python code_painting/compare_vr_hamer_results.py \
 - `center_eye_pose/left_eye_pose/right_eye_pose` 是眼/头相关 pose，不等同于 `camera_real` JPG 的 RGB 相机外参。
 - 因此 VR joint overlay 偏移不是简单交换轴能修好的问题；缺少外部相机到 VR world/headset 的外参。
 - 官方 Meta PCA 文档显示，正确采集方式应保存 PassthroughCameraAccess 返回的 intrinsics、extrinsics、timestamp 或 camera pose。官方 PCA 当前面向 Quest 3/Quest 3S；如果实际设备是 Quest 2，不能假设存在能匹配这些 JPG 的固定官方内参。
+
+
+## Q.5 20260708 VR-HaMeR eye/lag 对齐 sweep
+
+入口脚本：
+
+```text
+code_painting/analyze_vr_hamer_alignment.py
+```
+
+用途：只使用 `NTU-PINE_20260708_*` episode，比较 `world_xyz`、`center_eye_xyz`、`left_eye_xyz`、`right_eye_xyz` 四组候选坐标，并对每组分别拟合：
+
+```text
+linear_xyz: u_norm,v_norm = linear(x,y,z)
+perspective_xy_over_z: u_norm,v_norm = linear(x/z,y/z)
+lag: -10..+10，约定 hamer_frame = vr_frame + lag
+```
+
+运行命令：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && \
+cd /home/zaijia001/ssd/RoboTwin && \
+python code_painting/analyze_vr_hamer_alignment.py \
+  --episode-substr 20260708 \
+  --lag-min -10 \
+  --lag-max 10 \
+  --min-samples 20 \
+  --render-videos 1 \
+  --overwrite \
+  --out-dir /home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/compare_bestfit_20260708
+```
+
+输出：
+
+```text
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/compare_bestfit_20260708/alignment_sweep_20260708.md
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/compare_bestfit_20260708/alignment_sweep_20260708.json
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/compare_bestfit_20260708/videos/id_<ID>_<EPISODE>_bestfit_vr_vs_hamer_vscode.mp4
+```
+
+本轮结果：11 个 20260708 episode 中，10 个生成 best-fit compare 视频；`NTU-PINE_20260708_143622` 因为 VR tracked + HaMeR detected 的匹配样本少于 20，未拟合。
+
+关键结论：
+
+```text
+best pose counts: right_eye_xyz=6, left_eye_xyz=4, center_eye_xyz=0, world_xyz=0
+best lag counts: -6=3, -3=3, -5=2, -1=1, +10=1；+10 来自低样本 id5，不建议重视
+best model: 9/10 是 linear_xyz，1/10 是 perspective_xy_over_z
+```
+
+解释：`left_eye_pose/right_eye_pose` 有帮助，但没有单一 eye pose 稳定胜出；center/left/right 的全局加权指标非常接近，说明 eye 选择不是主因。多数 episode 的最佳 lag 是负数，按 `hamer_frame = vr_frame + lag` 约定，意味着同一事件更像是 `VR hand frame` 需要取比 RGB/HaMeR 更晚的帧，存在约 3-6 帧（100-200ms @30fps）的时间偏移。`linear_xyz` 明显优于 raw world 和大多 perspective，说明当前图像更像 Quest 用户视角/屏幕合成空间，而不是未裁剪的 raw pinhole passthrough camera。

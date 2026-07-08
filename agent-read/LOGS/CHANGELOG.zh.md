@@ -3130,3 +3130,13 @@ Validation: final/HDF5/parquet 均为每任务 25；zip 内 150 个 parquet 和 
 - 结论：本地 `camera_real/*_video.json` 仍无 camera extrinsics；VR JSON joints 是 RUF tracking/world 坐标，HaMeR 是图像检测坐标，偏移不能靠简单轴交换严格修复。
 
 Validation: `python -m py_compile code_painting/visualize_vr_hand_data.py code_painting/prepare_vr_hamer_input.py code_painting/compare_vr_hamer_results.py`；VR->HaMeR 输入生成 15 个 RGB MP4；HaMeR 输出 15 个 `hand_detections_*.npz` 和 15 个 `hand_vis_gripper_*.mp4`；对比脚本生成 `compare_vr_hamer_stats.md` 与 15 个横向对比视频。
+
+
+## 2026-07-08（VR-HaMeR eye/lag 对齐 sweep）
+
+- 新增 `code_painting/analyze_vr_hamer_alignment.py`：只筛 `20260708` episode，比较 `world_xyz`、`center_eye_xyz`、`left_eye_xyz`、`right_eye_xyz` 四类坐标，分别拟合 `linear_xyz` 和 `perspective_xy_over_z`，并 sweep `lag=-10..+10`。
+- 输出路径：`/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/compare_bestfit_20260708`。
+- 本轮 11 个 20260708 episode 中，10 个生成 best-fit compare 视频；`NTU-PINE_20260708_143622` 因匹配样本少于 20 未拟合。
+- 结论：left/right eye pose 可作为 episode-local 近似，但没有单一 eye 稳定胜出；大多数最佳 lag 为 -3 到 -6 帧；多数最佳模型是 `linear_xyz` 而不是 perspective，说明当前图像更像用户视角/屏幕合成空间而非 raw pinhole camera。
+
+Validation: `python -m py_compile code_painting/analyze_vr_hamer_alignment.py`；生成 10 个 1280x640/30fps best-fit compare MP4，首帧非空。
