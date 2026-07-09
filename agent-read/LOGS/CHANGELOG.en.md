@@ -1,5 +1,12 @@
 # CHANGELOG.en
 
+## 2026-07-09 (20260708 VR-HaMeR Both-Hands v2 Local Alignment Validation)
+
+- Added `code_painting/validate_vr_hamer_local_hand_alignment_bothhands.py`: it builds on Q.7 hand-local validation, separately reports `left_only`, `right_only`, and `both_hands`, and explicitly compares identity/swapped mappings plus `none/mirror_x/mirror_y/mirror_xy` variants.
+- Outputs under `/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708_bothhands/`: 9 episodes rendered, 2 skipped due to insufficient samples, 135 VSCode-readable mp4 files total.
+- Conclusion: all successful left/right/both results are `medium`; best both-hands mapping is `identity=8`, `swapped=1`, with `id13` as the only swapped case; all best mirror variants are `none`.
+- Validation: `py_compile` passed; the single-episode smoke output produced 15 OpenCV-readable mp4 files; the full output was OpenCV-sampled successfully and `summary_bothhands_local_alignment_20260708.md/json/csv` were generated.
+
 ## 2026-07-09 (20260708 VR-HaMeR Hand-Local Alignment Validation)
 
 - Added `code_painting/validate_vr_hamer_local_hand_alignment.py`: it uses only `NTU-PINE_20260708_*` episodes and compares VR-26 joints with HaMeR-21 keypoints in hand-local normalized coordinates for local bone-structure and motion-trend consistency.

@@ -1,3 +1,10 @@
+## 2026-07-09（Q.8 20260708 both-hands v2 local alignment validation 命令）
+
+- 新增入口：`python code_painting/validate_vr_hamer_local_hand_alignment_bothhands.py --episode-substr 20260708 --overwrite --out-dir /home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708_bothhands`。
+- 新增文档位置：`agent-read/COMMANDS/vr_hand_data.zh.md` Q.8；英文同步在 `agent-read/COMMANDS/vr_hand_data.en.md` Q.8。
+- 输出：每个成功 episode 为 `left/right/bothhands` 各输出 `image_overlay`、`local_skeleton_comparison`、`error_heatmap_timeplot`、`motion_trend` 和 `quadview`，并生成 `summary_bothhands_local_alignment_20260708.md/json/csv`。
+- 用途：同时验证左手、右手和双手相对关系的 hand-local shape/motion consistency，并显式报告 identity/swapped/mirror mapping hypothesis。
+
 ## 2026-07-09（Q.7 20260708 hand-local alignment validation 命令）
 
 - 新增入口：`python code_painting/validate_vr_hamer_local_hand_alignment.py --episode-substr 20260708 --overwrite --out-dir /home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708`。

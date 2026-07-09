@@ -355,3 +355,70 @@ pinky_mcp/pip/dip/tip -> little_proximal/intermediate/distal/tip
 - `id7/id10/id12/id13`：hand-local medium，但上一轮 global/world projection 指标弱；更像录屏/用户视角合成、裁剪、同步或外参缺失问题，而不是 VR hand local tracking 完全失败。
 - `id4/id5`：样本不足，不建议用于 hand-local 或 world trajectory 判断。
 - 所有 rendered episode 的 best alignment 都是 affine；similarity 结果保存在 JSON 的 `best_similarity`。这说明局部运动趋势很强，但严格刚性/相似变换下的骨架形状只能算中等，不应把这些数据当作精确 3D 手骨架标定结果。
+
+## Q.8 20260708 both-hands v2 local alignment validation
+
+入口脚本：
+
+```text
+code_painting/validate_vr_hamer_local_hand_alignment_bothhands.py
+```
+
+用途：在 Q.7 的 hand-local 验证基础上，不再只选单个 best side，而是分别输出 `left_only`、`right_only`、`both_hands`。该流程继续只使用 `NTU-PINE_20260708_*`，不要求真实 raw camera 外参或 world/camera 全局投影对齐。
+
+运行命令：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && \
+cd /home/zaijia001/ssd/RoboTwin && \
+python code_painting/validate_vr_hamer_local_hand_alignment_bothhands.py \
+  --episode-substr 20260708 \
+  --overwrite \
+  --out-dir /home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708_bothhands
+```
+
+输出：
+
+```text
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708_bothhands/summary_bothhands_local_alignment_20260708.md
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708_bothhands/summary_bothhands_local_alignment_20260708.json
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708_bothhands/summary_bothhands_local_alignment_20260708.csv
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708_bothhands/id_<ID>_<EPISODE>/left_quadview_local_alignment_vscode.mp4
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708_bothhands/id_<ID>_<EPISODE>/right_quadview_local_alignment_vscode.mp4
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708_bothhands/id_<ID>_<EPISODE>/bothhands_quadview_local_alignment_vscode.mp4
+```
+
+每个成功 episode 实际还会为 `left/right/bothhands` 各自输出四个组件视频：`image_overlay`、`local_skeleton_comparison`、`error_heatmap_timeplot`、`motion_trend`，以及一个 `quadview`。
+
+mapping hypotheses：
+
+```text
+identity: VR_left -> HaMeR_left, VR_right -> HaMeR_right
+swapped:  VR_left -> HaMeR_right, VR_right -> HaMeR_left
+```
+
+mirror/canonical variants：
+
+```text
+none, mirror_x, mirror_y, mirror_xy
+```
+
+这些 mirror 变体是在 VR hand-local 坐标进入 similarity/affine alignment 前应用的，用于显式测试 HaMeR 可能使用 right-hand MANO 或 canonicalized hand 约定导致的左右/镜像问题。注意：affine alignment 本身也可以吸收 reflection，因此严格判断局部骨架形状时要看 JSON 中的 `best_similarity`，不要只看 best affine。
+
+本次运行结果：
+
+- 输入：11 个 `NTU-PINE_20260708_*` episode。
+- 成功：9 个 episode，每个输出 15 个 VSCode 可读 mp4，共 135 个视频。
+- 跳过：`id4 NTU-PINE_20260708_143622` 和 `id5 NTU-PINE_20260708_143721`，原因是 `left_only/right_only/both_hands` 的匹配样本都不足。
+- `left_only`：9 个成功 episode 均为 `medium`。
+- `right_only`：9 个成功 episode 均为 `medium`。
+- `both_hands`：9 个成功 episode 均为 `medium`。
+- both-hands 最佳 mapping：`identity=8`、`swapped=1`。`swapped` 只出现在 `id13 NTU-PINE_20260708_145832`。
+- both-hands 最佳 mirror：全部是 `none`，没有 episode 需要 mirror_x/mirror_y/mirror_xy 才达到最佳。
+
+解释：
+
+- 双手 v2 进一步支持：大多数 20260708 episode 的左右手 side label 在双手关系上更接近 identity，不需要整体左右交换。
+- 单手 `left_only` 经常会独立选择 `VR_left -> HaMeR_right`，但 both-hands 联合约束下大多数 episode 仍选择 identity；说明单手局部形状 alone 不足以稳定判断 side label，双手相对关系更可靠。
+- `id13` 的 both-hands 选择 swapped，且 score 仅中等偏低，建议作为 side-label/同步异常样例检查，不要直接用于世界坐标双手轨迹。
+- 所有成功 episode 仍是 `medium` 而非 `good`，说明局部运动趋势可用，但严格骨架形状与双手关系不能当成精确标定结果。

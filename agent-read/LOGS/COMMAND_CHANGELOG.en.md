@@ -1,3 +1,10 @@
+## 2026-07-09 (Q.8 20260708 Both-Hands v2 Local Alignment Validation Command)
+
+- Added entrypoint: `python code_painting/validate_vr_hamer_local_hand_alignment_bothhands.py --episode-substr 20260708 --overwrite --out-dir /home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708_bothhands`.
+- New documentation location: `agent-read/COMMANDS/vr_hand_data.zh.md` Q.8, synchronized with `agent-read/COMMANDS/vr_hand_data.en.md` Q.8.
+- Outputs: for each rendered episode, writes `image_overlay`, `local_skeleton_comparison`, `error_heatmap_timeplot`, `motion_trend`, and `quadview` for each of `left/right/bothhands`, plus `summary_bothhands_local_alignment_20260708.md/json/csv`.
+- Purpose: validate left-hand, right-hand, and two-hand relative hand-local shape/motion consistency while explicitly reporting identity/swapped/mirror mapping hypotheses.
+
 ## 2026-07-09 (Q.7 20260708 Hand-Local Alignment Validation Command)
 
 - Added entrypoint: `python code_painting/validate_vr_hamer_local_hand_alignment.py --episode-substr 20260708 --overwrite --out-dir /home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708`.

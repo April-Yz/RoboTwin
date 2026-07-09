@@ -355,3 +355,70 @@ Interpretation:
 - `id7/id10/id12/id13`: hand-local medium but previous global/world projection metrics are weak; this points more to recording/user-view composition, cropping, synchronization, or missing extrinsics than to total VR local hand-tracking failure.
 - `id4/id5`: insufficient samples, not recommended for hand-local or world-trajectory conclusions.
 - Every rendered episode selected affine as the best alignment; similarity summaries are stored under `best_similarity` in JSON. This means local motion trend is strong, but strict rigid/similarity hand shape is only medium quality, so these data should not be treated as precise calibrated 3D hand skeletons.
+
+## Q.8 20260708 Both-Hands v2 Local Alignment Validation
+
+Entrypoint:
+
+```text
+code_painting/validate_vr_hamer_local_hand_alignment_bothhands.py
+```
+
+Purpose: build on Q.7 but stop selecting only one best side. This v2 workflow separately reports `left_only`, `right_only`, and `both_hands`. It still uses only `NTU-PINE_20260708_*` and does not require a true raw-camera extrinsic or global world/camera projection alignment.
+
+Command:
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && \
+cd /home/zaijia001/ssd/RoboTwin && \
+python code_painting/validate_vr_hamer_local_hand_alignment_bothhands.py \
+  --episode-substr 20260708 \
+  --overwrite \
+  --out-dir /home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708_bothhands
+```
+
+Outputs:
+
+```text
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708_bothhands/summary_bothhands_local_alignment_20260708.md
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708_bothhands/summary_bothhands_local_alignment_20260708.json
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708_bothhands/summary_bothhands_local_alignment_20260708.csv
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708_bothhands/id_<ID>_<EPISODE>/left_quadview_local_alignment_vscode.mp4
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708_bothhands/id_<ID>_<EPISODE>/right_quadview_local_alignment_vscode.mp4
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708_bothhands/id_<ID>_<EPISODE>/bothhands_quadview_local_alignment_vscode.mp4
+```
+
+Each rendered episode also writes four component videos for each of `left/right/bothhands`: `image_overlay`, `local_skeleton_comparison`, `error_heatmap_timeplot`, and `motion_trend`, plus the quadview.
+
+Mapping hypotheses:
+
+```text
+identity: VR_left -> HaMeR_left, VR_right -> HaMeR_right
+swapped:  VR_left -> HaMeR_right, VR_right -> HaMeR_left
+```
+
+Mirror/canonical variants:
+
+```text
+none, mirror_x, mirror_y, mirror_xy
+```
+
+The mirror variants are applied to VR hand-local coordinates before similarity/affine alignment to explicitly test possible right-hand MANO or canonicalized-hand conventions in HaMeR. Note that affine alignment can also absorb reflection, so use the JSON `best_similarity` fields when strict local bone shape matters.
+
+Current run result:
+
+- Input: 11 `NTU-PINE_20260708_*` episodes.
+- Rendered: 9 episodes, each with 15 VSCode-readable mp4 files, 135 videos total.
+- Skipped: `id4 NTU-PINE_20260708_143622` and `id5 NTU-PINE_20260708_143721`, because `left_only/right_only/both_hands` all had insufficient matched samples.
+- `left_only`: all 9 rendered episodes are `medium`.
+- `right_only`: all 9 rendered episodes are `medium`.
+- `both_hands`: all 9 rendered episodes are `medium`.
+- Best both-hands mapping: `identity=8`, `swapped=1`. The only swapped case is `id13 NTU-PINE_20260708_145832`.
+- Best both-hands mirror: all rendered episodes use `none`; no episode required mirror_x/mirror_y/mirror_xy to win.
+
+Interpretation:
+
+- Both-hands v2 further supports that most 20260708 episodes have side labels closer to identity under a joint two-hand constraint.
+- Single-hand `left_only` often independently selects `VR_left -> HaMeR_right`, but most episodes return to identity under the both-hands constraint. This means single-hand local shape alone is not stable enough to infer side labels; the two-hand relation is more reliable.
+- `id13` selects swapped under both-hands and has only a medium-low score, so treat it as a side-label/sync anomaly example and do not use it directly for world-coordinate two-hand trajectories.
+- All rendered episodes remain `medium`, not `good`; local motion trends are usable, but strict local shape and both-hand relation should not be treated as precisely calibrated 3D hand data.
