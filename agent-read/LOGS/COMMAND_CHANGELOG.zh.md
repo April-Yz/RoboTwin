@@ -1,3 +1,10 @@
+## 2026-07-09（Q.7 20260708 hand-local alignment validation 命令）
+
+- 新增入口：`python code_painting/validate_vr_hamer_local_hand_alignment.py --episode-substr 20260708 --overwrite --out-dir /home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708`。
+- 新增文档位置：`agent-read/COMMANDS/vr_hand_data.zh.md` Q.7；英文同步在 `agent-read/COMMANDS/vr_hand_data.en.md` Q.7。
+- 输出：每个可用 episode 生成 `image_overlay_local_alignment_vscode.mp4`、`local_skeleton_comparison_vscode.mp4`、`error_heatmap_timeplot_vscode.mp4`、`motion_trend_vscode.mp4`、`quadview_local_hand_alignment_vscode.mp4`，并生成 `summary_local_hand_alignment_20260708.md/json/csv`。
+- 用途：不依赖 raw camera 外参，只在 hand-local normalized 坐标中验证 VR hand local shape/motion 与 HaMeR 2D keypoint 的一致性。
+
 ## 2026-07-09（Q.6 20260708 VR-HaMeR 3D diagnostic visualization 命令）
 
 - 新增入口：`python code_painting/visualize_vr_hamer_3d_diagnostics.py --episode-substr 20260708 --overwrite --out-dir /home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/compare_3d_20260708`。

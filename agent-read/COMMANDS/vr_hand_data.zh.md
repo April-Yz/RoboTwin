@@ -276,3 +276,82 @@ id_14_NTU-PINE_20260708_145845/quadview_3d_vscode.mp4
 - 多数 best lag 为 -3 到 -6 帧，说明存在约 100-200ms 级别的同步偏移。
 - 大多数 best model 是 `linear_xyz` 而不是 pinhole-style perspective，支持“录屏/用户视角经过合成、裁剪、缩放或 warp”的判断。
 - 可做 episode-local 粗校正：id6、id8、id9、id11、id14；id13 中等；id7/id10 只能局部参考；id12 不可信；id5 样本少且 +10 lag，需要谨慎；id4 不可用。
+
+## Q.7 20260708 hand-local alignment validation
+
+入口脚本：
+
+```text
+code_painting/validate_vr_hamer_local_hand_alignment.py
+```
+
+用途：只使用 `NTU-PINE_20260708_*` episode，验证 VR hand joints 和 HaMeR 2D keypoints 的手部局部骨架关系与运动趋势是否一致。该流程不要求 `camera_real` JPG 的真实 raw camera 外参，也不要求 world/camera 全局投影对齐。
+
+运行命令：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && \
+cd /home/zaijia001/ssd/RoboTwin && \
+python code_painting/validate_vr_hamer_local_hand_alignment.py \
+  --episode-substr 20260708 \
+  --overwrite \
+  --out-dir /home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708
+```
+
+不重转视频、只复算 summary 时可以去掉 `--overwrite`。
+
+输出：
+
+```text
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708/summary_local_hand_alignment_20260708.md
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708/summary_local_hand_alignment_20260708.json
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708/summary_local_hand_alignment_20260708.csv
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708/id_<ID>_<EPISODE>/image_overlay_local_alignment_vscode.mp4
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708/id_<ID>_<EPISODE>/local_skeleton_comparison_vscode.mp4
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708/id_<ID>_<EPISODE>/error_heatmap_timeplot_vscode.mp4
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708/id_<ID>_<EPISODE>/motion_trend_vscode.mp4
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708/id_<ID>_<EPISODE>/quadview_local_hand_alignment_vscode.mp4
+```
+
+VR 26 joint 到 HaMeR 21 keypoint 的映射：
+
+```text
+wrist -> wrist
+thumb_cmc/mcp/ip/tip -> thumb_metacarpal/proximal/distal/tip
+index_mcp/pip/dip/tip -> index_proximal/intermediate/distal/tip
+middle_mcp/pip/dip/tip -> middle_proximal/intermediate/distal/tip
+ring_mcp/pip/dip/tip -> ring_proximal/intermediate/distal/tip
+pinky_mcp/pip/dip/tip -> little_proximal/intermediate/distal/tip
+```
+
+忽略的 VR joint：`palm`、`index_metacarpal`、`middle_metacarpal`、`ring_metacarpal`、`little_metacarpal`。原因是 HaMeR 21 点没有这些额外 palm/metacarpal 点；这里优先比较可见手指关节。
+
+局部坐标定义：
+
+- HaMeR 侧：以 wrist 为原点，用 `index_mcp - pinky_mcp` 定义局部 x 轴，用 `middle_mcp - wrist` 的正交分量定义局部 y 轴，并用 palm scale 归一化。
+- VR 侧：以 wrist 为原点，用对应的 VR index/pinky/middle 点构造 3D palm basis，再投到局部 2D palm plane，并用同类 palm scale 归一化。
+- 每个 episode 独立 sweep `lag=-10..10`，每只手分别评估 similarity/Procrustes 与 2D affine，对每个 episode 选择最佳 side/lag/alignment。
+
+指标：
+
+- `rmse_mean`：best alignment 后的 21 点局部 RMSE。
+- `per_keypoint_rmse` / `per_finger_rmse`：逐点和逐手指误差，保存在 JSON。
+- `pairwise_distance_rmse`：局部归一化点集的两两距离矩阵误差。
+- `bone_length_log_error`：骨长比例误差。
+- `joint_angle_deg_error`：手指关节角误差。
+- `velocity_corr` / `delta_direction_agreement`：hand-local 形状变化趋势的一致性。
+- `local_shape_score`：综合局部形状和运动趋势的 0-100 分。
+
+本次运行结果：
+
+- 输入：11 个 `NTU-PINE_20260708_*` episode。
+- 成功：9 个 episode，每个输出 5 个 VSCode 可读 mp4，共 45 个视频。
+- 跳过：`id4 NTU-PINE_20260708_143622` 和 `id5 NTU-PINE_20260708_143721`，原因是所有 side/lag 的 VR tracked + HaMeR detected 匹配样本都少于 20。
+- 分类：9 个成功 episode 全部为 `medium`，没有 `good` / `bad`。
+
+解释：
+
+- `id6/id8/id9/id11/id14`：hand-local medium，并且上一轮 global bestfit 也相对合理；这些 episode 更适合继续做 episode-local 粗校正。
+- `id7/id10/id12/id13`：hand-local medium，但上一轮 global/world projection 指标弱；更像录屏/用户视角合成、裁剪、同步或外参缺失问题，而不是 VR hand local tracking 完全失败。
+- `id4/id5`：样本不足，不建议用于 hand-local 或 world trajectory 判断。
+- 所有 rendered episode 的 best alignment 都是 affine；similarity 结果保存在 JSON 的 `best_similarity`。这说明局部运动趋势很强，但严格刚性/相似变换下的骨架形状只能算中等，不应把这些数据当作精确 3D 手骨架标定结果。

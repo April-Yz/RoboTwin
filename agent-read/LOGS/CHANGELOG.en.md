@@ -1,5 +1,12 @@
 # CHANGELOG.en
 
+## 2026-07-09 (20260708 VR-HaMeR Hand-Local Alignment Validation)
+
+- Added `code_painting/validate_vr_hamer_local_hand_alignment.py`: it uses only `NTU-PINE_20260708_*` episodes and compares VR-26 joints with HaMeR-21 keypoints in hand-local normalized coordinates for local bone-structure and motion-trend consistency.
+- Outputs under `/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708/`: 9 episodes rendered, 2 skipped due to insufficient matched samples, 45 VSCode-readable mp4 files total.
+- Conclusion: all 9 rendered episodes are `medium`; local motion trends are strong but strict similarity hand shape is only medium quality. `id7/id10/id12/id13` look more like projection/recording/sync/extrinsic issues than total VR local hand-tracking failure.
+- Validation: `py_compile` passed; the single-episode smoke output produced five OpenCV-readable mp4 files; the full output was OpenCV-sampled successfully and `summary_local_hand_alignment_20260708.md/json/csv` were generated.
+
 ## 2026-07-09 (20260708 VR-HaMeR 3D Diagnostic Visualization)
 
 - Added `code_painting/visualize_vr_hamer_3d_diagnostics.py`: it processes only `NTU-PINE_20260708_*` episodes and renders high_back, front, top, and quadview diagnostic videos in VR/world RUF coordinates.

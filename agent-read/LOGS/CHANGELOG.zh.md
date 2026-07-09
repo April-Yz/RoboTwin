@@ -1,5 +1,12 @@
 # CHANGELOG.zh
 
+## 2026-07-09（20260708 VR-HaMeR hand-local alignment validation）
+
+- 新增 `code_painting/validate_vr_hamer_local_hand_alignment.py`：只使用 `NTU-PINE_20260708_*` episode，在 hand-local normalized 坐标中比较 VR 26 joint 和 HaMeR 21 keypoint 的局部骨架关系与运动趋势。
+- 输出到 `/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708/`：9 个 episode 成功、2 个 episode 因 matched 样本不足跳过，共生成 45 个 VSCode 可读 mp4。
+- 结论：9 个成功 episode 都是 `medium`，局部运动趋势强但严格 similarity 骨架形状只有中等；`id7/id10/id12/id13` 更像投影/录屏/同步/外参问题而不是 VR hand local tracking 完全失败。
+- 验证：脚本 `py_compile` 通过；单 episode smoke 输出 5 个 mp4 且 OpenCV 可读；完整输出 45 个 mp4 抽样可读，`summary_local_hand_alignment_20260708.md/json/csv` 已生成。
+
 ## 2026-07-09（20260708 VR-HaMeR 3D diagnostic visualization）
 
 - 新增 `code_painting/visualize_vr_hamer_3d_diagnostics.py`：只处理 `NTU-PINE_20260708_*` episode，在 VR/world RUF 坐标中渲染 high_back、front、top 和 quadview 四类诊断视频。

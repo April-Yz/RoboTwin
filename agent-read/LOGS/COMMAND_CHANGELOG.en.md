@@ -1,3 +1,10 @@
+## 2026-07-09 (Q.7 20260708 Hand-Local Alignment Validation Command)
+
+- Added entrypoint: `python code_painting/validate_vr_hamer_local_hand_alignment.py --episode-substr 20260708 --overwrite --out-dir /home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708`.
+- New documentation location: `agent-read/COMMANDS/vr_hand_data.zh.md` Q.7, synchronized with `agent-read/COMMANDS/vr_hand_data.en.md` Q.7.
+- Outputs: for each usable episode, writes `image_overlay_local_alignment_vscode.mp4`, `local_skeleton_comparison_vscode.mp4`, `error_heatmap_timeplot_vscode.mp4`, `motion_trend_vscode.mp4`, and `quadview_local_hand_alignment_vscode.mp4`, plus `summary_local_hand_alignment_20260708.md/json/csv`.
+- Purpose: validate VR hand local shape/motion against HaMeR 2D keypoints in hand-local normalized coordinates, without relying on raw-camera extrinsics.
+
 ## 2026-07-09 (Q.6 20260708 VR-HaMeR 3D Diagnostic Visualization Command)
 
 - Added entrypoint: `python code_painting/visualize_vr_hamer_3d_diagnostics.py --episode-substr 20260708 --overwrite --out-dir /home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/compare_3d_20260708`.

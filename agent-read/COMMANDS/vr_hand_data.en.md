@@ -276,3 +276,82 @@ Current conclusion:
 - Most best lags are -3 to -6 frames, indicating an approximately 100-200 ms synchronization offset.
 - Most best models are `linear_xyz` rather than pinhole-style perspective, supporting the hypothesis that the RGB is a composited/cropped/scaled/warped Quest user view rather than an uncropped raw camera image.
 - Episode-local coarse correction is plausible for id6, id8, id9, id11, and id14; id13 is moderate; id7/id10 are only partially useful; id12 is not trusted; id5 has low samples and +10 lag, so treat it cautiously; id4 is unusable.
+
+## Q.7 20260708 Hand-Local Alignment Validation
+
+Entrypoint:
+
+```text
+code_painting/validate_vr_hamer_local_hand_alignment.py
+```
+
+Purpose: use only `NTU-PINE_20260708_*` episodes to validate whether VR hand joints and HaMeR 2D keypoints agree in hand-local bone structure and motion trend. This workflow does not require the true raw-camera extrinsic for `camera_real` JPG frames and does not require global world/camera projection alignment.
+
+Command:
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && \
+cd /home/zaijia001/ssd/RoboTwin && \
+python code_painting/validate_vr_hamer_local_hand_alignment.py \
+  --episode-substr 20260708 \
+  --overwrite \
+  --out-dir /home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708
+```
+
+Remove `--overwrite` when only recomputing summaries and reusing existing videos.
+
+Outputs:
+
+```text
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708/summary_local_hand_alignment_20260708.md
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708/summary_local_hand_alignment_20260708.json
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708/summary_local_hand_alignment_20260708.csv
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708/id_<ID>_<EPISODE>/image_overlay_local_alignment_vscode.mp4
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708/id_<ID>_<EPISODE>/local_skeleton_comparison_vscode.mp4
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708/id_<ID>_<EPISODE>/error_heatmap_timeplot_vscode.mp4
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708/id_<ID>_<EPISODE>/motion_trend_vscode.mp4
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708/id_<ID>_<EPISODE>/quadview_local_hand_alignment_vscode.mp4
+```
+
+VR-26 to HaMeR-21 mapping:
+
+```text
+wrist -> wrist
+thumb_cmc/mcp/ip/tip -> thumb_metacarpal/proximal/distal/tip
+index_mcp/pip/dip/tip -> index_proximal/intermediate/distal/tip
+middle_mcp/pip/dip/tip -> middle_proximal/intermediate/distal/tip
+ring_mcp/pip/dip/tip -> ring_proximal/intermediate/distal/tip
+pinky_mcp/pip/dip/tip -> little_proximal/intermediate/distal/tip
+```
+
+Ignored VR joints: `palm`, `index_metacarpal`, `middle_metacarpal`, `ring_metacarpal`, and `little_metacarpal`. HaMeR-21 has no matching extra palm/metacarpal points, so this diagnostic compares the visible finger joints.
+
+Local coordinate definition:
+
+- HaMeR: wrist origin; `index_mcp - pinky_mcp` defines local x; the orthogonal component of `middle_mcp - wrist` defines local y; coordinates are palm-scale normalized.
+- VR: wrist origin; corresponding VR index/pinky/middle points build a 3D palm basis; points are projected into the local 2D palm plane and palm-scale normalized.
+- Each episode independently sweeps `lag=-10..10`; each hand is evaluated separately with similarity/Procrustes and 2D affine alignment; the best side/lag/alignment is selected per episode.
+
+Metrics:
+
+- `rmse_mean`: local 21-keypoint RMSE after the best alignment.
+- `per_keypoint_rmse` / `per_finger_rmse`: per-keypoint and per-finger errors in JSON.
+- `pairwise_distance_rmse`: pairwise distance-matrix error for normalized local keypoints.
+- `bone_length_log_error`: bone-length ratio error.
+- `joint_angle_deg_error`: finger joint-angle error.
+- `velocity_corr` / `delta_direction_agreement`: consistency of hand-local shape-motion trends.
+- `local_shape_score`: combined local shape and motion score from 0 to 100.
+
+Current run result:
+
+- Input: 11 `NTU-PINE_20260708_*` episodes.
+- Rendered: 9 episodes, each with five VSCode-readable mp4 files, 45 videos total.
+- Skipped: `id4 NTU-PINE_20260708_143622` and `id5 NTU-PINE_20260708_143721`, because every side/lag had fewer than 20 matched VR-tracked + HaMeR-detected samples.
+- Classification: all 9 rendered episodes are `medium`; none are `good` or `bad`.
+
+Interpretation:
+
+- `id6/id8/id9/id11/id14`: hand-local medium and previous global bestfit is also relatively reasonable; these are better candidates for episode-local coarse correction.
+- `id7/id10/id12/id13`: hand-local medium but previous global/world projection metrics are weak; this points more to recording/user-view composition, cropping, synchronization, or missing extrinsics than to total VR local hand-tracking failure.
+- `id4/id5`: insufficient samples, not recommended for hand-local or world-trajectory conclusions.
+- Every rendered episode selected affine as the best alignment; similarity summaries are stored under `best_similarity` in JSON. This means local motion trend is strong, but strict rigid/similarity hand shape is only medium quality, so these data should not be treated as precise calibrated 3D hand skeletons.
