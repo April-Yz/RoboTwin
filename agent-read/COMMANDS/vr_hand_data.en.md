@@ -422,3 +422,59 @@ Interpretation:
 - Single-hand `left_only` often independently selects `VR_left -> HaMeR_right`, but most episodes return to identity under the both-hands constraint. This means single-hand local shape alone is not stable enough to infer side labels; the two-hand relation is more reliable.
 - `id13` selects swapped under both-hands and has only a medium-low score, so treat it as a side-label/sync anomaly example and do not use it directly for world-coordinate two-hand trajectories.
 - All rendered episodes remain `medium`, not `good`; local motion trends are usable, but strict local shape and both-hand relation should not be treated as precisely calibrated 3D hand data.
+
+## Q.9 20260708 Cross-Episode Transform Pattern Aggregation
+
+Entrypoint:
+
+```text
+code_painting/analyze_vr_hamer_cross_episode_transform_patterns.py
+```
+
+Purpose: use only `NTU-PINE_20260708_*` episodes and aggregate Q.5 bestfit, Q.6 3D diagnostic, Q.7 hand-local, and Q.8 both-hands results to decide whether the VR-hand to HaMeR-image relation is better explained by one global transform, two standing-position cluster transforms, or episode-local transforms. The script does not modify raw data.
+
+Command:
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && \
+cd /home/zaijia001/ssd/RoboTwin && \
+python code_painting/analyze_vr_hamer_cross_episode_transform_patterns.py \
+  --episode-substr 20260708 \
+  --overwrite \
+  --out-dir /home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/cross_episode_transform_patterns_20260708
+```
+
+Inputs:
+
+```text
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/compare_bestfit_20260708/alignment_sweep_20260708.json
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/compare_3d_20260708/summary_3d_20260708.json
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708/summary_local_hand_alignment_20260708.json
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708_bothhands/summary_bothhands_local_alignment_20260708.json
+/home/zaijia001/ssd/data/piper/vr/data/NTU-PINE_20260708_*/NTU-PINE_20260708_*.json
+```
+
+Outputs:
+
+```text
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/cross_episode_transform_patterns_20260708/cross_episode_transform_patterns_20260708.json
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/cross_episode_transform_patterns_20260708/cross_episode_transform_patterns_20260708.md
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/cross_episode_transform_patterns_20260708/episode_transform_table_20260708.csv
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/cross_episode_transform_patterns_20260708/cluster_transform_table_20260708.csv
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/cross_episode_transform_patterns_20260708/transform_parameter_scatter_20260708.png
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/cross_episode_transform_patterns_20260708/cluster_eye_pose_20260708.png
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/cross_episode_transform_patterns_20260708/lag_distribution_20260708.png
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/cross_episode_transform_patterns_20260708/axis_contribution_heatmap_20260708.png
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/cross_episode_transform_patterns_20260708/global_cluster_self_r2_rmse_20260708.png
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/cross_episode_transform_patterns_20260708/transform_similarity_distance_heatmap_20260708.png
+```
+
+Current result:
+
+- Input: 11 `20260708` episodes. 9 episodes entered cross-episode fitting: `6,7,8,9,10,11,12,13,14`. `id4` has no bestfit; `id5` has only 20 bestfit samples and skipped local/bothhands validation, so it is excluded from global/cluster fitting.
+- Best common global config: `right_eye_xyz + linear_xyz`, 2873 samples across 9 episodes. The shared global transform has weighted mean R2 `0.492` and weighted mean RMSE `122.6 px`, so a single global transform is not supported.
+- k=2 separates standing/eye-pose clusters, but cluster transforms are only partially useful. Cluster 1 (`6,13,14`) reaches about `67.1 px / 0.832 R2` and can be used as a group-transform reference; cluster 0 (`7,8,9,10,11,12`) is about `136.8 px / 0.417 R2` and remains diagnostic-only.
+- Axis pattern: `no_axis_swap_xy=7`, `perspective_xy_over_z=1`, `yz_axis_candidate=1`, `zx_axis_candidate=1`. The data do not support “axis swap + small-angle tuning”; they better support eye-frame `u≈+x`, `v≈-y` plus lag, z/crop/warp terms, and episode-local affine correction.
+- Lag: 9 of the 10 bestfit episodes have negative lag, median lag `-4`. With `hamer_frame = vr_frame + lag`, this means the matching VR hand frame is usually later than the RGB/HaMeR frame.
+- Both-hands mapping: `identity=8`, `swapped=1`; `id13` is explicitly marked as side-label swapped.
+- Recommendation: `id6,id8,id9,id11,id14` are usable for world-coordinate coarse correction; `id7,id10,id13` are reference-only; `id4,id5,id12` should be dropped or kept only as failure examples.

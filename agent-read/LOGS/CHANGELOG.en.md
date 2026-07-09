@@ -3163,3 +3163,12 @@ Validation: `python -m py_compile code_painting/visualize_vr_hand_data.py code_p
 - Conclusion: left/right eye poses are useful episode-local approximations, but no single eye consistently wins; most best lags are -3 to -6 frames; most best models are `linear_xyz` rather than perspective, suggesting a user-view/screen-composited image rather than a raw pinhole camera.
 
 Validation: `python -m py_compile code_painting/analyze_vr_hamer_alignment.py`; generated 10 nonblank 1280x640/30fps best-fit comparison MP4 files.
+
+## 2026-07-09 (VR-HaMeR Cross-Episode Transform Pattern Aggregation)
+
+- Added `code_painting/analyze_vr_hamer_cross_episode_transform_patterns.py`: filters only `NTU-PINE_20260708_*`, aggregates bestfit, 3D diagnostic, hand-local, and both-hands results, decomposes episode-local affine/linear coefficients, and compares self/global/cluster transforms.
+- Output directory: `/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/cross_episode_transform_patterns_20260708`.
+- Current conclusion: one shared global transform is not supported; k=2 separates standing/eye-pose clusters but cluster transforms are only partially useful; the data better support `eye-frame + lag + episode-local affine/crop/warp`, not a simple “axis swap + small-angle tuning” explanation.
+- Recommendations: `id6,id8,id9,id11,id14` are usable for world-coordinate coarse correction; `id7,id10,id13` are reference-only; `id4,id5,id12` should be dropped or kept only as failure examples. `id13` is explicitly marked side-label swapped.
+
+Validation: `python -m py_compile code_painting/analyze_vr_hamer_cross_episode_transform_patterns.py`; full run generated JSON/MD/CSV plus 6 PNG plots for 11 episodes.

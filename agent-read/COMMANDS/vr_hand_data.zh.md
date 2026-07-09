@@ -422,3 +422,59 @@ none, mirror_x, mirror_y, mirror_xy
 - 单手 `left_only` 经常会独立选择 `VR_left -> HaMeR_right`，但 both-hands 联合约束下大多数 episode 仍选择 identity；说明单手局部形状 alone 不足以稳定判断 side label，双手相对关系更可靠。
 - `id13` 的 both-hands 选择 swapped，且 score 仅中等偏低，建议作为 side-label/同步异常样例检查，不要直接用于世界坐标双手轨迹。
 - 所有成功 episode 仍是 `medium` 而非 `good`，说明局部运动趋势可用，但严格骨架形状与双手关系不能当成精确标定结果。
+
+## Q.9 20260708 cross-episode transform pattern aggregation
+
+入口脚本：
+
+```text
+code_painting/analyze_vr_hamer_cross_episode_transform_patterns.py
+```
+
+用途：只使用 `NTU-PINE_20260708_*`，汇总 Q.5 bestfit、Q.6 3D diagnostic、Q.7 hand-local、Q.8 both-hands 结果，判断 VR hand 到 HaMeR 图像结果之间更像统一全局转换、两个站位 cluster 转换，还是只能 episode-local 转换。该脚本不修改原始数据。
+
+运行命令：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && \
+cd /home/zaijia001/ssd/RoboTwin && \
+python code_painting/analyze_vr_hamer_cross_episode_transform_patterns.py \
+  --episode-substr 20260708 \
+  --overwrite \
+  --out-dir /home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/cross_episode_transform_patterns_20260708
+```
+
+输入：
+
+```text
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/compare_bestfit_20260708/alignment_sweep_20260708.json
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/compare_3d_20260708/summary_3d_20260708.json
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708/summary_local_hand_alignment_20260708.json
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/local_hand_alignment_20260708_bothhands/summary_bothhands_local_alignment_20260708.json
+/home/zaijia001/ssd/data/piper/vr/data/NTU-PINE_20260708_*/NTU-PINE_20260708_*.json
+```
+
+输出：
+
+```text
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/cross_episode_transform_patterns_20260708/cross_episode_transform_patterns_20260708.json
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/cross_episode_transform_patterns_20260708/cross_episode_transform_patterns_20260708.md
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/cross_episode_transform_patterns_20260708/episode_transform_table_20260708.csv
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/cross_episode_transform_patterns_20260708/cluster_transform_table_20260708.csv
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/cross_episode_transform_patterns_20260708/transform_parameter_scatter_20260708.png
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/cross_episode_transform_patterns_20260708/cluster_eye_pose_20260708.png
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/cross_episode_transform_patterns_20260708/lag_distribution_20260708.png
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/cross_episode_transform_patterns_20260708/axis_contribution_heatmap_20260708.png
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/cross_episode_transform_patterns_20260708/global_cluster_self_r2_rmse_20260708.png
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/cross_episode_transform_patterns_20260708/transform_similarity_distance_heatmap_20260708.png
+```
+
+本次结果：
+
+- 输入 11 个 `20260708` episode；进入 cross-episode 拟合的有效 episode 为 9 个：`6,7,8,9,10,11,12,13,14`。`id4` 无 bestfit，`id5` 只有 20 个 bestfit 样本且 local/bothhands 均 skipped，因此不参与全局/cluster 拟合。
+- 最佳 common global config：`right_eye_xyz + linear_xyz`，9 个 episode 共 2873 样本；全局 shared transform 的 weighted mean R2 为 `0.492`，weighted mean RMSE 为 `122.6 px`，不支持单一全局转换。
+- k=2 可以分出站位/eye-pose cluster，但 cluster transform 只部分成立：cluster 1（`6,13,14`）RMSE/R2 约 `67.1/0.832`，可作为 group transform 参考；cluster 0（`7,8,9,10,11,12`）RMSE/R2 约 `136.8/0.417`，仍只能诊断参考。
+- 轴模式：`no_axis_swap_xy=7`，`perspective_xy_over_z=1`，`yz_axis_candidate=1`，`zx_axis_candidate=1`。整体不支持“轴交换 + 小角度微调”；更支持 eye-frame 下 `u≈+x`、`v≈-y`，再叠加 lag、z/crop/warp 和 episode-local affine。
+- lag：10 个 bestfit 中 9 个为负 lag，median lag 为 `-4`；按 `hamer_frame = vr_frame + lag`，说明 VR hand frame 通常需要取比 RGB/HaMeR 更晚的帧。
+- both-hands mapping：`identity=8`、`swapped=1`；`id13` 已单独标注为 side-label swapped。
+- 推荐：`id6,id8,id9,id11,id14` 可用于 world-coordinate 粗校正；`id7,id10,id13` 只建议参考；`id4,id5,id12` 建议剔除或只作失败样例。

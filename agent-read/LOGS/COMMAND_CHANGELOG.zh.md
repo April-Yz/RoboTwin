@@ -2379,3 +2379,9 @@ tmux new-session -d -s l16_stack_debug_variants_gpu1 'GPU=1 IDS="0 1 2 3 4" MAX_
 - `code_painting/run_l16_ours_selected_pipeline.sh` 新增 `HEAD_DIR_TEMPLATE` 环境变量，默认仍为 `id_{id}_l16_whitebg_human_object`。
 - 原因：Mode N no-axis color Stage2 输出目录为 `id_{id}_l16_white_color_human_object`；旧硬编码模板会导致 process 阶段找不到 `final_repainted.mp4`。
 - 本次 no-axis selected25 downstream 用 `HEAD_DIR_TEMPLATE="id_{id}_l16_white_color_human_object"` 成功生成 6 任务 Piper0515 25ep repo 和本地 zip。
+
+## 2026-07-09（Q.9 VR-HaMeR cross-episode transform 聚合命令）
+
+- 新增入口：`python code_painting/analyze_vr_hamer_cross_episode_transform_patterns.py --episode-substr 20260708 --overwrite --out-dir /home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/cross_episode_transform_patterns_20260708`。
+- 新增命令文档位置：`agent-read/COMMANDS/vr_hand_data.zh.md` 的 Q.9。
+- 输出包括：`cross_episode_transform_patterns_20260708.json/md`、`episode_transform_table_20260708.csv`、`cluster_transform_table_20260708.csv`、transform scatter、cluster、lag、axis heatmap、self/cluster/global 对比和 transform similarity 图。

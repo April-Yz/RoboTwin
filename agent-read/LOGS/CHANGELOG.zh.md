@@ -3161,3 +3161,12 @@ Validation: `python -m py_compile code_painting/visualize_vr_hand_data.py code_p
 - 结论：left/right eye pose 可作为 episode-local 近似，但没有单一 eye 稳定胜出；大多数最佳 lag 为 -3 到 -6 帧；多数最佳模型是 `linear_xyz` 而不是 perspective，说明当前图像更像用户视角/屏幕合成空间而非 raw pinhole camera。
 
 Validation: `python -m py_compile code_painting/analyze_vr_hamer_alignment.py`；生成 10 个 1280x640/30fps best-fit compare MP4，首帧非空。
+
+## 2026-07-09（VR-HaMeR cross-episode transform pattern 聚合）
+
+- 新增 `code_painting/analyze_vr_hamer_cross_episode_transform_patterns.py`：只筛 `NTU-PINE_20260708_*`，汇总 bestfit、3D diagnostic、hand-local、both-hands 结果，分解 episode-local affine/linear 系数，并比较 self/global/cluster transform。
+- 输出目录：`/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/cross_episode_transform_patterns_20260708`。
+- 本轮结论：单一全局 transform 不成立；k=2 可以分出站位/eye-pose cluster，但 cluster transform 只部分成立；整体更支持 `eye-frame + lag + episode-local affine/crop/warp`，不支持简单“轴交换 + 小角度微调”。
+- 推荐分组：`id6,id8,id9,id11,id14` 可用于 world-coordinate 粗校正；`id7,id10,id13` 仅参考；`id4,id5,id12` 建议剔除或保留为失败样例。`id13` 已标注 side-label swapped。
+
+Validation: `python -m py_compile code_painting/analyze_vr_hamer_cross_episode_transform_patterns.py`；完整运行生成 11 个 episode 的 JSON/MD/CSV 与 6 张 PNG 图表。

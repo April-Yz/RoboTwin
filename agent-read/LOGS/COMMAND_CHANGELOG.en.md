@@ -2381,3 +2381,9 @@ tmux new-session -d -s l16_stack_debug_variants_gpu1 'GPU=1 IDS="0 1 2 3 4" MAX_
 - Added a `HEAD_DIR_TEMPLATE` environment variable to `code_painting/run_l16_ours_selected_pipeline.sh`; the default remains `id_{id}_l16_whitebg_human_object`.
 - Reason: the Mode N no-axis color Stage-2 outputs use `id_{id}_l16_white_color_human_object`; the old hardcoded template made the process step miss `final_repainted.mp4`.
 - This no-axis selected25 downstream run used `HEAD_DIR_TEMPLATE="id_{id}_l16_white_color_human_object"` and successfully produced six Piper0515 25ep repos plus a local zip.
+
+## 2026-07-09 (Q.9 VR-HaMeR Cross-Episode Transform Aggregation Command)
+
+- Added entrypoint: `python code_painting/analyze_vr_hamer_cross_episode_transform_patterns.py --episode-substr 20260708 --overwrite --out-dir /home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/cross_episode_transform_patterns_20260708`.
+- Added command documentation under Q.9 in `agent-read/COMMANDS/vr_hand_data.en.md`.
+- Outputs include `cross_episode_transform_patterns_20260708.json/md`, `episode_transform_table_20260708.csv`, `cluster_transform_table_20260708.csv`, transform scatter, cluster, lag, axis heatmap, self/cluster/global comparison, and transform similarity plots.
