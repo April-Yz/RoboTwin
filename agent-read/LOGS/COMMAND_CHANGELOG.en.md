@@ -1,3 +1,10 @@
+## 2026-07-09 (Q.6 20260708 VR-HaMeR 3D Diagnostic Visualization Command)
+
+- Added entrypoint: `python code_painting/visualize_vr_hamer_3d_diagnostics.py --episode-substr 20260708 --overwrite --out-dir /home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/compare_3d_20260708`.
+- New documentation location: `agent-read/COMMANDS/vr_hand_data.zh.md` Q.6, synchronized with `agent-read/COMMANDS/vr_hand_data.en.md` Q.6.
+- Outputs: for each usable episode, writes `high_back_3d_vscode.mp4`, `front_3d_vscode.mp4`, `top_3d_vscode.mp4`, and `quadview_3d_vscode.mp4`, plus `summary_3d_20260708.md/json`.
+- Purpose: inspect VR hand trajectories, eye-pose frustums, and HaMeR best-eye back-projection rays in VR/world RUF coordinates, then separate tracking, time-sync, coordinate-conversion, and user-view/screen-composite projection issues.
+
 ## 2026-06-26 00:20:00 +08
 
 - Added the `stack_cups` redprotect post-processing command:

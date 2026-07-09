@@ -1,3 +1,10 @@
+## 2026-07-09（Q.6 20260708 VR-HaMeR 3D diagnostic visualization 命令）
+
+- 新增入口：`python code_painting/visualize_vr_hamer_3d_diagnostics.py --episode-substr 20260708 --overwrite --out-dir /home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/compare_3d_20260708`。
+- 新增文档位置：`agent-read/COMMANDS/vr_hand_data.zh.md` Q.6；英文同步在 `agent-read/COMMANDS/vr_hand_data.en.md` Q.6。
+- 输出：每个可用 episode 生成 `high_back_3d_vscode.mp4`、`front_3d_vscode.mp4`、`top_3d_vscode.mp4`、`quadview_3d_vscode.mp4`，并生成 `summary_3d_20260708.md/json`。
+- 用途：在 VR/world RUF 坐标中检查 VR hand trajectory、eye pose frustum、HaMeR best-eye back-projection ray，并判断偏移来自 tracking、时间同步、坐标转换还是录屏/用户视角合成投影。
+
 ## 2026-06-26 00:20:00 +08
 
 - 新增 `stack_cups` redprotect 后处理命令：

@@ -1,5 +1,12 @@
 # CHANGELOG.zh
 
+## 2026-07-09（20260708 VR-HaMeR 3D diagnostic visualization）
+
+- 新增 `code_painting/visualize_vr_hamer_3d_diagnostics.py`：只处理 `NTU-PINE_20260708_*` episode，在 VR/world RUF 坐标中渲染 high_back、front、top 和 quadview 四类诊断视频。
+- 该脚本读取 VR hand joints/tracked flag、center/left/right eye poses、HaMeR 2D detections，以及 `compare_bestfit_20260708/alignment_sweep_20260708.json` 中的 best pose/model/lag。
+- 运行完整批处理后输出到 `/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/compare_3d_20260708/`：10 个 episode 成功、1 个 episode 因 matched 样本不足跳过，共生成 40 个 VSCode 可读 mp4。
+- 验证：脚本 `py_compile` 通过；20 帧 smoke 输出 4 个 mp4 且 OpenCV 可读；完整输出抽样 OpenCV 可读，`summary_3d_20260708.md/json` 已生成。
+
 ## 2026-06-26（stack_cups redprotect 后处理 debug）
 
 - 新增 `code_painting/recompose_l16_stack_redprotect.py`：读取 I3.6.2 B 方案 Stage-2 foreground alpha，并把 L16 源视频中的红/粉杯颜色区域 OR 回 alpha，输出到独立 `e0_robot_object_b_points_negative_redprotect` 目录。

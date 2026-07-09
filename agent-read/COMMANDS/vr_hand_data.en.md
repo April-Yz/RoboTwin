@@ -210,3 +210,69 @@ best model: 9/10 are linear_xyz, 1/10 is perspective_xy_over_z
 ```
 
 Interpretation: `left_eye_pose/right_eye_pose` help, but no single eye pose consistently wins. The global weighted metrics for center/left/right are very close, so eye choice is not the main issue. Most best lags are negative; with `hamer_frame = vr_frame + lag`, this means the matching VR hand frame is usually later than the RGB/HaMeR frame by about 3-6 frames, or 100-200 ms at 30 fps. `linear_xyz` beating most perspective fits suggests the images are closer to a Quest user-view/screen-composited space than to an uncropped raw pinhole passthrough camera.
+
+## Q.6 20260708 VR-HaMeR 3D Diagnostic Visualization
+
+Entrypoint:
+
+```text
+code_painting/visualize_vr_hamer_3d_diagnostics.py
+```
+
+Purpose: use only `NTU-PINE_20260708_*` episodes to explain why the HaMeR 2D overlay follows the hands in the RGB image while the VR hand-joint overlay is offset. The scene is rendered in VR/world RUF coordinates. The script reads VR hand joints, `is_tracked`, `center_eye_pose/left_eye_pose/right_eye_pose`, HaMeR 2D detections, and the best pose/model/lag from Q.5.
+
+Command:
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && \
+cd /home/zaijia001/ssd/RoboTwin && \
+python code_painting/visualize_vr_hamer_3d_diagnostics.py \
+  --episode-substr 20260708 \
+  --overwrite \
+  --out-dir /home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/compare_3d_20260708
+```
+
+Outputs:
+
+```text
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/compare_3d_20260708/summary_3d_20260708.md
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/compare_3d_20260708/summary_3d_20260708.json
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/compare_3d_20260708/id_<ID>_<EPISODE>/high_back_3d_vscode.mp4
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/compare_3d_20260708/id_<ID>_<EPISODE>/front_3d_vscode.mp4
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/compare_3d_20260708/id_<ID>_<EPISODE>/top_3d_vscode.mp4
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/compare_3d_20260708/id_<ID>_<EPISODE>/quadview_3d_vscode.mp4
+```
+
+Visualization rules:
+
+- The 3D scene uses VR/world RUF: `X right`, `Y up`, `Z forward`.
+- Draw left/right VR hand skeletons, recent trajectories, and `center/left/right_eye_pose` axes plus frustums.
+- HaMeR is not treated as true world 3D. It is rendered as image detections and a 2D back-projection ray from the best eye pose.
+- The quadview first panel is RGB + HaMeR 2D + bestfit pseudo VR overlay; the other panels are high_back, front, and top 3D views.
+- Each frame overlays the episode id, frame, best pose/model/lag, R2/RMSE, and valid sample count.
+
+Current run result:
+
+- Input: 11 `NTU-PINE_20260708_*` episodes.
+- Rendered: 10 episodes, each with four VSCode-viewable mp4 files, 40 videos total.
+- Skipped: `NTU-PINE_20260708_143622`, because every pose/model/lag configuration had fewer than 20 matched tracked+detected samples, so Q.5 had no reliable bestfit.
+
+Recommended first videos:
+
+```text
+id_11_NTU-PINE_20260708_145659/quadview_3d_vscode.mp4
+id_9_NTU-PINE_20260708_145601/quadview_3d_vscode.mp4
+id_8_NTU-PINE_20260708_145546/quadview_3d_vscode.mp4
+id_6_NTU-PINE_20260708_145454/quadview_3d_vscode.mp4
+id_14_NTU-PINE_20260708_145845/quadview_3d_vscode.mp4
+```
+
+These episodes have relatively reliable Q.5 bestfit metrics and are useful for checking whether the VR world hand trajectory is smooth and whether the HaMeR back-projection ray roughly passes through the VR hand volume. For failure modes, inspect `id_12_NTU-PINE_20260708_145729`, `id_7_NTU-PINE_20260708_145505`, and `id_10_NTU-PINE_20260708_145638`; they are better examples of vertical mismatch, low R2, or likely time/projection issues.
+
+Current conclusion:
+
+- In good episodes, the VR hand trajectory is continuous in world space, so this does not look like a simple axis-swap bug.
+- The best pose alternates between left and right eye; center/world do not win. This supports the interpretation that eye poses are only approximate user/render views, not the true `camera_real` JPG extrinsic.
+- Most best lags are -3 to -6 frames, indicating an approximately 100-200 ms synchronization offset.
+- Most best models are `linear_xyz` rather than pinhole-style perspective, supporting the hypothesis that the RGB is a composited/cropped/scaled/warped Quest user view rather than an uncropped raw camera image.
+- Episode-local coarse correction is plausible for id6, id8, id9, id11, and id14; id13 is moderate; id7/id10 are only partially useful; id12 is not trusted; id5 has low samples and +10 lag, so treat it cautiously; id4 is unusable.

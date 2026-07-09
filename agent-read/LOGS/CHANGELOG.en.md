@@ -1,5 +1,12 @@
 # CHANGELOG.en
 
+## 2026-07-09 (20260708 VR-HaMeR 3D Diagnostic Visualization)
+
+- Added `code_painting/visualize_vr_hamer_3d_diagnostics.py`: it processes only `NTU-PINE_20260708_*` episodes and renders high_back, front, top, and quadview diagnostic videos in VR/world RUF coordinates.
+- The script reads VR hand joints/tracked flags, center/left/right eye poses, HaMeR 2D detections, and the best pose/model/lag from `compare_bestfit_20260708/alignment_sweep_20260708.json`.
+- The full run writes to `/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/compare_3d_20260708/`: 10 episodes rendered, one skipped due to insufficient matched samples, 40 VSCode-readable mp4 files total.
+- Validation: `py_compile` passed; the 20-frame smoke run produced four OpenCV-readable mp4 files; the full output was OpenCV-sampled successfully and `summary_3d_20260708.md/json` were generated.
+
 ## 2026-06-26 (stack_cups redprotect post-processing debug)
 
 - Added `code_painting/recompose_l16_stack_redprotect.py`: it reads the I3.6.2 B-variant Stage-2 foreground alpha and ORs red/pink cup color regions from the L16 source video back into the alpha, writing a separate `e0_robot_object_b_points_negative_redprotect` output tree.
