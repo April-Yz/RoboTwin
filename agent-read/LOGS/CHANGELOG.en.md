@@ -3181,3 +3181,4 @@ Validation: `python -m py_compile code_painting/analyze_vr_hamer_cross_episode_t
 - Added SKIP_UPLOAD=1 so long local builds can finish without invoking external storage.
 - Fixed the AnyGrasp wrapper to invoke the absolute conda executable under env CUDA_VISIBLE_DEVICES; the shell-function form caused all graspnet Stage-1 jobs to exit before Python.
 - Top-score preview reuse now reads per-arm keyframe numbers only, resolves empty keyframes to nearest non-empty grasp frames, recomputes raw AnyGrasp candidates, and supports disabling the distance threshold.
+- Top-score summaries now record selection_source=top_score_auto_from_preview_frames and the resolved per-arm keyframes for auditability.

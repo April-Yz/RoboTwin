@@ -6952,10 +6952,18 @@ def main() -> None:
         "reuse_preview_candidate_group": str(args.reuse_preview_candidate_group),
         "reuse_preview_top_rank": int(args.reuse_preview_top_rank),
         "selection_source": (
-            "reused_preview_summary_json"
-            if args.reuse_preview_summary_json is not None
-            else ("reused_plan_summary_json" if args.reuse_plan_summary_json is not None else "recomputed_from_anygrasp")
+            "top_score_auto_from_preview_frames"
+            if args.reuse_preview_summary_json is not None and str(args.candidate_selection_mode) == "top_score_auto"
+            else (
+                "reused_preview_summary_json"
+                if args.reuse_preview_summary_json is not None
+                else ("reused_plan_summary_json" if args.reuse_plan_summary_json is not None else "recomputed_from_anygrasp")
+            )
         ),
+        "top_score_keyframes_by_arm": {
+            arm_name: [int(frame) for frame in arm_frames]
+            for arm_name, arm_frames in preview_keyframes_by_arm.items()
+        },
         "requested_keyframes": [int(v) for v in args.requested_keyframes],
         "resolved_keyframes": [int(v) for v in args.resolved_keyframes],
         "resolved_keyframe_pairs": [{"requested": int(req), "resolved": int(res)} for req, res in args.resolved_keyframe_pairs],
