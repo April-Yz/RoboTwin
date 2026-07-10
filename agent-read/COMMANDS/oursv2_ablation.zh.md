@@ -78,3 +78,9 @@ zip:
 rclone:
 gdrive:piper/multi/6task/robot_graspnet_piper0515
 ~~~
+
+## 2026-07-10 本地完成状态
+
+- R：六个任务各 49 episode，六个目录均存在 `piper0515_world_to_base_conversion.json`；压缩包 1.3 GB。
+- S：六个任务各 25 episode，六个目录均存在 `piper0515_world_to_base_conversion.json`；压缩包 351 MB。
+- 两个流水线均以 `SKIP_UPLOAD=1` 完成；rclone 目标已记录，但尚未向外部 Google Drive 上传。

@@ -59,3 +59,9 @@ tmux new-session -d -s graspnet_selected25_pipeline \
 /home/zaijia001/.cache/huggingface/lerobot/local/robot_graspnet_piper0515_6task_25ep.zip
 gdrive:piper/multi/6task/robot_graspnet_piper0515
 ~~~
+
+## Local Completion Status (2026-07-10)
+
+- R: all six tasks contain 49 episodes and all six repositories include `piper0515_world_to_base_conversion.json`; the archive is 1.3 GB.
+- S: all six tasks contain 25 episodes and all six repositories include `piper0515_world_to_base_conversion.json`; the archive is 351 MB.
+- Both pipelines completed with `SKIP_UPLOAD=1`. The rclone destinations are documented, but no data has been exported to external Google Drive yet.
