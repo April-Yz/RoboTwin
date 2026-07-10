@@ -43,3 +43,8 @@ O.1/O.1.2 Foundation Piper IK 的 `foundation_grasp_standoff` 默认值现在是
 ## 2026-06-16：Wrist 相机俯视与右手偏心
 
 0515 wrist 标定与 `piper_pika_agx` adapter 的结果是 camera forward 基本沿 gripper `+X` 平视，而不是俯视夹爪；右手相机中心 `Y=-2.74cm`，左手 `Y=+2.07cm`。Viewer 已增加 pitch/lateral 调参入口，先用左右 pitch `15deg`、右手 lateral `+0.0067m` 观察 wrist 画面。
+
+## 2026-07-10 R/S 实验
+- R：oursv2 49ep 只改变数据配比；入口 code_painting/run_oursv2_49ep_pipeline.sh。
+- S：graspnet 使用同一 25 ID，在关键帧选择 AnyGrasp top score 且不使用人手朝向限制。
+- 当前 oursv2_piper0515 已是双臂 base frame；旧 300 条合并 repo 的 ours 半段仍是 world frame。

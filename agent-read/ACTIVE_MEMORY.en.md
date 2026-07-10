@@ -91,3 +91,8 @@ Purpose: record high-priority context for the current session and recent data pr
 - Stage-2 output: `/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_skeyp_visible_reinit/v2_reinit_whitebg/e0_robot_color`.
 - Local zip: `/home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_reinit_whitebg_piper0515_6task_25ep.zip`, about 126 MB, with 150 parquet files and 6 piper0515 markers.
 - Manual upload target: `gdrive:piper/multi/6task/robot_skeyp_reinit_whitebg_piper0515`.
+
+## 2026-07-10 R/S experiments
+- R: oursv2 49ep changes only data composition; entrypoint code_painting/run_oursv2_49ep_pipeline.sh.
+- S: graspnet uses the same 25 IDs and AnyGrasp top score without hand-orientation constraints.
+- Current oursv2_piper0515 is in per-arm base frames; the old 300-episode repo has world-frame ours rows.

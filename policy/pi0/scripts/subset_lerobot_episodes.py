@@ -12,7 +12,8 @@ import pandas as pd
 from lerobot.common.datasets.lerobot_dataset import HF_LEROBOT_HOME
 
 
-def parse_episode_spec(spec: str) -> list[int]:
+def parse_episode_spec(spec: str, allow_duplicates: bool = False) -> list[int]:
+    selected: list[int] = []
     seen: set[int] = set()
     for part in spec.split(","):
         part = part.strip()
@@ -30,7 +31,14 @@ def parse_episode_spec(spec: str) -> list[int]:
         for value in values:
             if value < 0:
                 raise ValueError(f"Episode index must be non-negative: {value}")
-            seen.add(value)
+            if allow_duplicates:
+                selected.append(value)
+            else:
+                seen.add(value)
+    if allow_duplicates:
+        if not selected:
+            raise ValueError("No episodes selected.")
+        return selected
     if not seen:
         raise ValueError("No episodes selected.")
     return sorted(seen)
@@ -91,6 +99,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--source", required=True, help="Source dataset path or repo id under HF_LEROBOT_HOME.")
     parser.add_argument("--output-repo-id", required=True, help="Destination repo id under HF_LEROBOT_HOME, e.g. local/name_25ep.")
     parser.add_argument("--episodes", required=True, help="Episode spec, e.g. '0,1-5,7' or '0-24'.")
+    parser.add_argument(
+        "--allow-duplicates",
+        action="store_true",
+        help="Preserve input order and repeated episode indexes. Default remains sorted unique episodes.",
+    )
     parser.add_argument("--overwrite", action="store_true", help="Remove the destination dataset if it already exists.")
     return parser.parse_args()
 
@@ -99,7 +112,7 @@ def main() -> None:
     args = parse_args()
     source_dir = resolve_dataset_path(args.source)
     output_dir = HF_LEROBOT_HOME / args.output_repo_id
-    selected = parse_episode_spec(args.episodes)
+    selected = parse_episode_spec(args.episodes, allow_duplicates=args.allow_duplicates)
 
     if output_dir.exists():
         if not args.overwrite:

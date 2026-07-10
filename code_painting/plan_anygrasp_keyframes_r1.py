@@ -1546,7 +1546,6 @@ def select_top_score_candidates_for_frames(
         frame_candidates.sort(
             key=lambda cand: (
                 -float(cand.score),
-                float(cand.rotation_distance_deg),
                 float(cand.nearest_object_distance_m),
                 int(cand.candidate_idx),
             )

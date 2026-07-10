@@ -3172,3 +3172,9 @@ Validation: `python -m py_compile code_painting/analyze_vr_hamer_alignment.py`; 
 - Recommendations: `id6,id8,id9,id11,id14` are usable for world-coordinate coarse correction; `id7,id10,id13` are reference-only; `id4,id5,id12` should be dropped or kept only as failure examples. `id13` is explicitly marked side-label swapped.
 
 Validation: `python -m py_compile code_painting/analyze_vr_hamer_cross_episode_transform_patterns.py`; full run generated JSON/MD/CSV plus 6 PNG plots for 11 episodes.
+
+## 2026-07-10: OursV2 49ep and GraspNet ablations
+- Added priority-based 49ep selection with explicit provenance and repeat fallback.
+- Added opt-in duplicate-preserving LeRobot subsetting; the sorted-unique default is unchanged.
+- Added AnyGrasp top-score selection without hand-rotation tie-break and a 6-task pipeline.
+- Validation: Python compilation, shell syntax, selection generation, and wrapper dry-run passed.

@@ -32,6 +32,9 @@ IK_MAX_POSITION_THRESHOLD_M=0.02
 IK_MAX_ROTATION_THRESHOLD_RAD=0.12
 PIPER_APPLY_GLOBAL_TRANS_TO_IK=0
 CANDIDATE_ORIENTATION_REMAP_LABEL=identity
+CANDIDATE_SELECTION_MODE=planner
+CANDIDATE_MAX_ROTATION_DISTANCE_DEG=-1.0
+CANDIDATE_KEEP_CAMERA_UP=0
 CANDIDATE_TARGET_LOCAL_X_OFFSET_M=-0.05
 CANDIDATE_TARGET_LOCAL_Z_OFFSET_M=0.0
 APPROACH_AXIS=local_x
@@ -42,6 +45,17 @@ DEBUG_CANDIDATE_TOP_K=5
 DEBUG_COMMON_CANDIDATE_TOP_K=0
 DEBUG_VISUALIZE_SELECTED_KEYFRAME_AXES=1
 DEBUG_VISUALIZE_IK_WAYPOINTS=1
+PIPER_CALIBRATION_BUNDLE=""
+WRIST_LEFT_FORWARD_OFFSET_M=0.0
+WRIST_RIGHT_FORWARD_OFFSET_M=0.0
+WRIST_LEFT_LATERAL_OFFSET_M=0.0
+WRIST_RIGHT_LATERAL_OFFSET_M=0.0
+WRIST_LEFT_ROLL_DEG=0.0
+WRIST_RIGHT_ROLL_DEG=0.0
+WRIST_LEFT_YAW_DEG=0.0
+WRIST_RIGHT_YAW_DEG=0.0
+WRIST_LEFT_PITCH_DEG=0.0
+WRIST_RIGHT_PITCH_DEG=0.0
 IDS_FILTER=()
 ID_START=""
 ID_END=""
@@ -184,6 +198,18 @@ while (($# > 0)); do
       CANDIDATE_ORIENTATION_REMAP_LABEL="$2"
       shift 2
       ;;
+    --candidate_selection_mode)
+      CANDIDATE_SELECTION_MODE="$2"
+      shift 2
+      ;;
+    --candidate_max_rotation_distance_deg)
+      CANDIDATE_MAX_ROTATION_DISTANCE_DEG="$2"
+      shift 2
+      ;;
+    --candidate_keep_camera_up)
+      CANDIDATE_KEEP_CAMERA_UP="$2"
+      shift 2
+      ;;
     --candidate_target_local_x_offset_m)
       CANDIDATE_TARGET_LOCAL_X_OFFSET_M="$2"
       shift 2
@@ -202,6 +228,50 @@ while (($# > 0)); do
       ;;
     --debug_gripper_actor_forward_axis)
       DEBUG_GRIPPER_ACTOR_FORWARD_AXIS="$2"
+      shift 2
+      ;;
+    --piper_calibration_bundle)
+      PIPER_CALIBRATION_BUNDLE="$2"
+      shift 2
+      ;;
+    --wrist_left_forward_offset_m)
+      WRIST_LEFT_FORWARD_OFFSET_M="$2"
+      shift 2
+      ;;
+    --wrist_right_forward_offset_m)
+      WRIST_RIGHT_FORWARD_OFFSET_M="$2"
+      shift 2
+      ;;
+    --wrist_left_lateral_offset_m)
+      WRIST_LEFT_LATERAL_OFFSET_M="$2"
+      shift 2
+      ;;
+    --wrist_right_lateral_offset_m)
+      WRIST_RIGHT_LATERAL_OFFSET_M="$2"
+      shift 2
+      ;;
+    --wrist_left_roll_deg)
+      WRIST_LEFT_ROLL_DEG="$2"
+      shift 2
+      ;;
+    --wrist_right_roll_deg)
+      WRIST_RIGHT_ROLL_DEG="$2"
+      shift 2
+      ;;
+    --wrist_left_yaw_deg)
+      WRIST_LEFT_YAW_DEG="$2"
+      shift 2
+      ;;
+    --wrist_right_yaw_deg)
+      WRIST_RIGHT_YAW_DEG="$2"
+      shift 2
+      ;;
+    --wrist_left_pitch_deg)
+      WRIST_LEFT_PITCH_DEG="$2"
+      shift 2
+      ;;
+    --wrist_right_pitch_deg)
+      WRIST_RIGHT_PITCH_DEG="$2"
       shift 2
       ;;
     --ids)
@@ -359,6 +429,10 @@ for TASK in "${TASKS[@]}"; do
     if ((DEBUG_STOP_AFTER_KEYFRAME1)); then
       DEBUG_STOP_ARGS=(--debug_stop_after_keyframe1 1)
     fi
+    CALIBRATION_ARGS=()
+    if [[ -n "$PIPER_CALIBRATION_BUNDLE" ]]; then
+      CALIBRATION_ARGS=(--piper_calibration_bundle "$PIPER_CALIBRATION_BUNDLE")
+    fi
     if ! "${RUN_ENV[@]}" conda run -n RoboTwin_bw python /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_piper.py \
       --anygrasp_dir "$ANY" \
       --replay_dir "$REPLAY" \
@@ -386,7 +460,9 @@ for TASK in "${TASKS[@]}"; do
       --urdfik_max_position_threshold_m ${IK_MAX_POSITION_THRESHOLD_M} \
       --urdfik_max_rotation_threshold_rad ${IK_MAX_ROTATION_THRESHOLD_RAD} \
       --piper_urdfik_apply_global_trans_to_ik ${PIPER_APPLY_GLOBAL_TRANS_TO_IK} \
-      --candidate_selection_mode planner \
+      --candidate_selection_mode ${CANDIDATE_SELECTION_MODE} \
+      --candidate_max_rotation_distance_deg ${CANDIDATE_MAX_ROTATION_DISTANCE_DEG} \
+      --candidate_keep_camera_up ${CANDIDATE_KEEP_CAMERA_UP} \
       --candidate_orientation_remap_label ${CANDIDATE_ORIENTATION_REMAP_LABEL} \
       --left_target_object "$LEFT_OBJ" \
       --right_target_object "$RIGHT_OBJ" \
@@ -431,6 +507,17 @@ for TASK in "${TASKS[@]}"; do
       --lighting_mode front_no_shadow \
       --robot_config /home/zaijia001/ssd/RoboTwin/robot_config_PiperPika_agx_dual_table_0515.json \
       --camera_cv_axis_mode legacy_r1 \
+      "${CALIBRATION_ARGS[@]}" \
+      --wrist_left_forward_offset_m ${WRIST_LEFT_FORWARD_OFFSET_M} \
+      --wrist_right_forward_offset_m ${WRIST_RIGHT_FORWARD_OFFSET_M} \
+      --wrist_left_lateral_offset_m ${WRIST_LEFT_LATERAL_OFFSET_M} \
+      --wrist_right_lateral_offset_m ${WRIST_RIGHT_LATERAL_OFFSET_M} \
+      --wrist_left_roll_deg ${WRIST_LEFT_ROLL_DEG} \
+      --wrist_right_roll_deg ${WRIST_RIGHT_ROLL_DEG} \
+      --wrist_left_yaw_deg ${WRIST_LEFT_YAW_DEG} \
+      --wrist_right_yaw_deg ${WRIST_RIGHT_YAW_DEG} \
+      --wrist_left_pitch_deg ${WRIST_LEFT_PITCH_DEG} \
+      --wrist_right_pitch_deg ${WRIST_RIGHT_PITCH_DEG} \
       --head_camera_local_pos 0.11210396690038413 -0.39189397826604927 0.4753892624100325 \
       --head_camera_local_quat_wxyz 0.8524694864910365 -0.0011011947849308937 0.5226654778798345 0.010740586780925399 \
       "${VIEWER_ARGS[@]}" \

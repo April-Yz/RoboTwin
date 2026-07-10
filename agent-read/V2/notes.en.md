@@ -43,3 +43,8 @@ O.1/O.1.2 Foundation Piper IK now defaults `foundation_grasp_standoff` to `0.105
 ## 2026-06-16: Wrist Downward View And Right-Side Lateral Bias
 
 The 0515 wrist calibration plus `piper_pika_agx` adapter makes camera forward nearly parallel to gripper `+X`, not downward-looking at the fingers. The right camera center is `Y=-2.74cm`, while the left is `Y=+2.07cm`. The viewer now exposes pitch/lateral tuning; start with left/right pitch `15deg` and right lateral `+0.0067m` when inspecting wrist images.
+
+## 2026-07-10 R/S experiments
+- R: oursv2 49ep changes only data composition; entrypoint code_painting/run_oursv2_49ep_pipeline.sh.
+- S: graspnet uses the same 25 IDs and AnyGrasp top score without hand-orientation constraints.
+- Current oursv2_piper0515 is in per-arm base frames; the old 300-episode repo has world-frame ours rows.

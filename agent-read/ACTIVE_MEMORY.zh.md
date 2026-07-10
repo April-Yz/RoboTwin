@@ -91,3 +91,8 @@
 - Stage-2 输出：`/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_skeyp_visible_reinit/v2_reinit_whitebg/e0_robot_color`。
 - 本地 zip：`/home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_reinit_whitebg_piper0515_6task_25ep.zip`，约 126 MB，zip 内 150 个 parquet 和 6 个 piper0515 marker。
 - 手动上传目标：`gdrive:piper/multi/6task/robot_skeyp_reinit_whitebg_piper0515`。
+
+## 2026-07-10 R/S 实验
+- R：oursv2 49ep 只改变数据配比；入口 code_painting/run_oursv2_49ep_pipeline.sh。
+- S：graspnet 使用同一 25 ID，在关键帧选择 AnyGrasp top score 且不使用人手朝向限制。
+- 当前 oursv2_piper0515 已是双臂 base frame；旧 300 条合并 repo 的 ours 半段仍是 world frame。

@@ -87,3 +87,6 @@ galaxea_sim/*
 
 # Generated LeRobot / processed training datasets
 piper_processed_data/
+!code_painting/prepare_oursv2_49ep_selection.py
+!code_painting/run_oursv2_49ep_pipeline.sh
+!code_painting/run_graspnet_selected25_pipeline.sh
