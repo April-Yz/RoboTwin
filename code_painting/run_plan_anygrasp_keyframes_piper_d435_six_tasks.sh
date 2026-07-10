@@ -2,6 +2,7 @@
 set -euo pipefail
 
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
+CONDA_BIN=/home/zaijia001/ssd/miniconda3/bin/conda
 cd /home/zaijia001/ssd/RoboTwin
 
 GPU=2
@@ -433,7 +434,7 @@ for TASK in "${TASKS[@]}"; do
     if [[ -n "$PIPER_CALIBRATION_BUNDLE" ]]; then
       CALIBRATION_ARGS=(--piper_calibration_bundle "$PIPER_CALIBRATION_BUNDLE")
     fi
-    if ! "${RUN_ENV[@]}" conda run -n RoboTwin_bw python /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_piper.py \
+    if ! "${RUN_ENV[@]}" "$CONDA_BIN" run -n RoboTwin_bw python /home/zaijia001/ssd/RoboTwin/code_painting/plan_anygrasp_keyframes_piper.py \
       --anygrasp_dir "$ANY" \
       --replay_dir "$REPLAY" \
       --hand_npz "$HAND" \
