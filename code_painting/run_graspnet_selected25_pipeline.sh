@@ -53,6 +53,7 @@ run_stage1_task() {
     --candidate_selection_mode top_score_auto \
     --candidate_max_rotation_distance_deg -1 \
     --candidate_keep_camera_up 0 \
+    --enforce_candidate_distance_constraint 0 \
     --trajectory_mode joint_interp \
     --ik_max_rotation_threshold_rad 3.14 \
     --replan_attempts 5 \

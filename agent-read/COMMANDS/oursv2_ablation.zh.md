@@ -48,9 +48,10 @@ gdrive:piper/multi/6task/robot_oursv2_piper0515_49ep
 candidate_selection_mode=top_score_auto
 candidate_max_rotation_distance_deg=-1
 candidate_keep_camera_up=0
+enforce_candidate_distance_constraint=0
 ~~~
 
-top-score 不使用人手朝向阈值或人手旋转 tie-break；仍保留目标物体匹配和候选到物体的有效距离过滤。
+top-score 不使用人手朝向阈值或人手旋转 tie-break；保留目标物体匹配，但关闭候选距离阈值。精确关键帧无候选时映射到最近的非空 AnyGrasp 帧。
 
 运行入口：
 

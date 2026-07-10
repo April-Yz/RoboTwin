@@ -36,6 +36,7 @@ CANDIDATE_ORIENTATION_REMAP_LABEL=identity
 CANDIDATE_SELECTION_MODE=planner
 CANDIDATE_MAX_ROTATION_DISTANCE_DEG=-1.0
 CANDIDATE_KEEP_CAMERA_UP=0
+ENFORCE_CANDIDATE_DISTANCE_CONSTRAINT=1
 CANDIDATE_TARGET_LOCAL_X_OFFSET_M=-0.05
 CANDIDATE_TARGET_LOCAL_Z_OFFSET_M=0.0
 APPROACH_AXIS=local_x
@@ -209,6 +210,10 @@ while (($# > 0)); do
       ;;
     --candidate_keep_camera_up)
       CANDIDATE_KEEP_CAMERA_UP="$2"
+      shift 2
+      ;;
+    --enforce_candidate_distance_constraint)
+      ENFORCE_CANDIDATE_DISTANCE_CONSTRAINT="$2"
       shift 2
       ;;
     --candidate_target_local_x_offset_m)
@@ -464,6 +469,7 @@ for TASK in "${TASKS[@]}"; do
       --candidate_selection_mode ${CANDIDATE_SELECTION_MODE} \
       --candidate_max_rotation_distance_deg ${CANDIDATE_MAX_ROTATION_DISTANCE_DEG} \
       --candidate_keep_camera_up ${CANDIDATE_KEEP_CAMERA_UP} \
+      --enforce_candidate_distance_constraint ${ENFORCE_CANDIDATE_DISTANCE_CONSTRAINT} \
       --candidate_orientation_remap_label ${CANDIDATE_ORIENTATION_REMAP_LABEL} \
       --left_target_object "$LEFT_OBJ" \
       --right_target_object "$RIGHT_OBJ" \

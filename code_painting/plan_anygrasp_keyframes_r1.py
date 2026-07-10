@@ -877,6 +877,26 @@ def list_available_grasp_frames(anygrasp_dir: Path) -> List[int]:
     return sorted(frames)
 
 
+def list_nonempty_grasp_frames(anygrasp_dir: Path) -> List[int]:
+    nonempty: List[int] = []
+    for frame in list_available_grasp_frames(anygrasp_dir):
+        if load_anygrasp_candidates(anygrasp_dir, frame):
+            nonempty.append(int(frame))
+    if not nonempty:
+        raise RuntimeError(f"No non-empty grasp frames found in {anygrasp_dir / 'grasps'}")
+    return nonempty
+
+
+def resolve_to_nearest_nonempty_grasp_frames(
+    anygrasp_dir: Path, requested_frames: Sequence[int]
+) -> List[int]:
+    available = list_nonempty_grasp_frames(anygrasp_dir)
+    return [
+        min(available, key=lambda frame: (abs(int(frame) - int(requested)), int(frame)))
+        for requested in requested_frames
+    ]
+
+
 def resolve_requested_frames(requested_frames: Sequence[int], available_frames: Sequence[int]) -> List[Tuple[int, int]]:
     available = [int(v) for v in available_frames]
     resolved: List[Tuple[int, int]] = []
@@ -1681,6 +1701,63 @@ def select_keyframes_for_arm(
     )
 
 
+def resolve_top_score_object_keyframes(
+    renderer: ReplayRenderer,
+    args: argparse.Namespace,
+    hand_data: Dict[str, np.ndarray],
+    keyframes_by_arm: Dict[str, Sequence[int]],
+) -> Tuple[Dict[str, List[int]], Dict[int, Dict[str, ObjectState]]]:
+    available = list_nonempty_grasp_frames(args.anygrasp_dir)
+    state_cache: Dict[int, Dict[str, ObjectState]] = {}
+    resolved_by_arm: Dict[str, List[int]] = {}
+
+    def states_for(frame: int) -> Dict[str, ObjectState]:
+        if int(frame) not in state_cache:
+            state_cache[int(frame)] = load_object_states(
+                args.replay_dir,
+                int(frame),
+                args.object_mesh_overrides,
+                args.execution_object_visual_scale_overrides,
+                args.execution_object_collision_scale_overrides,
+            )
+        return state_cache[int(frame)]
+
+    for arm, requested_frames in keyframes_by_arm.items():
+        resolved_frames: List[int] = []
+        for requested in requested_frames:
+            resolved = None
+            for candidate_frame in sorted(
+                available, key=lambda frame: (abs(int(frame) - int(requested)), int(frame))
+            ):
+                ranked, _, _ = build_ranked_candidates_for_arm(
+                    renderer=renderer,
+                    args=args,
+                    anygrasp_dir=args.anygrasp_dir,
+                    hand_data=hand_data,
+                    keyframes=[int(candidate_frame)],
+                    arm=arm,
+                    object_states_per_frame={int(candidate_frame): states_for(int(candidate_frame))},
+                )
+                if ranked and ranked.get(int(candidate_frame)):
+                    resolved = int(candidate_frame)
+                    break
+            if resolved is None:
+                raise RuntimeError(
+                    f"No AnyGrasp frame contains a valid target-object candidate for "
+                    f"arm={arm} requested_frame={requested}"
+                )
+            resolved_frames.append(resolved)
+        resolved_by_arm[arm] = resolved_frames
+        if list(map(int, requested_frames)) != resolved_frames:
+            print(
+                "[top-score-object-frame-resolve] "
+                f"arm={arm} requested={list(map(int, requested_frames))} "
+                f"resolved={resolved_frames}"
+            )
+    used_frames = {frame for frames in resolved_by_arm.values() for frame in frames}
+    return resolved_by_arm, {frame: states_for(frame) for frame in used_frames}
+
+
 def choose_keyframes(
     renderer: ReplayRenderer,
     args: argparse.Namespace,
@@ -1689,6 +1766,7 @@ def choose_keyframes(
     keyframes: Sequence[int],
     arm_mode: str,
     object_states_per_frame: Dict[int, Dict[str, ObjectState]],
+    keyframes_by_arm: Optional[Dict[str, Sequence[int]]] = None,
 ) -> Tuple[ArmSelectionResult, Dict[str, ArmDebugInfo]]:
     candidate_arms = [arm_mode] if arm_mode in ("left", "right") else ["left", "right"]
     best: Optional[ArmSelectionResult] = None
@@ -1696,7 +1774,8 @@ def choose_keyframes(
     diagnostic_lines: List[str] = []
     arm_debugs: Dict[str, ArmDebugInfo] = {}
     for arm in candidate_arms:
-        selection = select_keyframes_for_arm(renderer, args, anygrasp_dir, hand_data, keyframes, arm, object_states_per_frame)
+        arm_keyframes = list((keyframes_by_arm or {}).get(arm, keyframes))
+        selection = select_keyframes_for_arm(renderer, args, anygrasp_dir, hand_data, arm_keyframes, arm, object_states_per_frame)
         if selection is None:
             expected_object = expected_object_for_arm(args, arm)
             ranked, diagnostics, all_candidates = build_ranked_candidates_for_arm(
@@ -1704,7 +1783,7 @@ def choose_keyframes(
                 args=args,
                 anygrasp_dir=anygrasp_dir,
                 hand_data=hand_data,
-                keyframes=keyframes,
+                keyframes=arm_keyframes,
                 arm=arm,
                 object_states_per_frame=object_states_per_frame,
             )
@@ -1717,7 +1796,7 @@ def choose_keyframes(
                 selected_keyframes=None,
             )
             diag_chunks = []
-            for frame in keyframes:
+            for frame in arm_keyframes:
                 info = diagnostics.get(int(frame), {})
                 diag_chunks.append(
                     f"frame={int(frame)} hand_valid={info.get('hand_valid', 0)} "
@@ -5227,6 +5306,42 @@ def main() -> None:
             if len(keyframes) >= 2:
                 keyframes[1] = max(int(keyframes[1]), int(resolved_rel))
                 args.resolved_keyframes = list(keyframes)
+    preview_keyframes_by_arm: Dict[str, List[int]] = {}
+    if (
+        args.reuse_preview_summary_json is not None
+        and str(args.candidate_selection_mode) == "top_score_auto"
+        and str(args.reuse_preview_frame_mode) == "annotated_json_keyframes"
+    ):
+        frame_selection = preview_summary_for_resolution.get("frame_selection", {})
+        resolved_map = {
+            int(item["requested"]): int(item["resolved"])
+            for item in preview_summary_for_resolution.get("resolved_frames", [])
+            if isinstance(item, dict) and "requested" in item and "resolved" in item
+        }
+        candidate_arms = [str(args.arm)] if str(args.arm) in ("left", "right") else ["left", "right"]
+        for arm_name in candidate_arms:
+            requested_for_arm = preview_frame_selection_keyframes_for_arm(frame_selection, arm_name)[:2]
+            if len(requested_for_arm) >= 2:
+                preview_resolved = [
+                    int(resolved_map.get(int(frame), int(frame))) for frame in requested_for_arm
+                ]
+                preview_keyframes_by_arm[arm_name] = resolve_to_nearest_nonempty_grasp_frames(
+                    args.anygrasp_dir, preview_resolved
+                )
+                if preview_keyframes_by_arm[arm_name] != preview_resolved:
+                    print(
+                        "[top-score-frame-resolve] "
+                        f"arm={arm_name} requested={preview_resolved} "
+                        f"nonempty={preview_keyframes_by_arm[arm_name]}"
+                    )
+        if preview_keyframes_by_arm:
+            keyframes = sorted({
+                int(frame)
+                for arm_frames in preview_keyframes_by_arm.values()
+                for frame in arm_frames
+            })
+            print(f"[reuse-preview-frames-only] keyframes_by_arm={preview_keyframes_by_arm}")
+
     args.requested_keyframes = requested_keyframes
     args.resolved_keyframes = list(keyframes)
     args.resolved_keyframe_pairs = [(int(req), int(res)) for req, res in resolved_keyframe_pairs]
@@ -5252,19 +5367,36 @@ def main() -> None:
     hand_data = load_hand_data(args.hand_npz)
     replay_frame_indices, object_tracks = load_object_tracks(args.replay_dir, args.object_mesh_overrides)
     replay_head_camera_pose_by_frame = load_replay_head_camera_poses(args.replay_dir)
-    object_states_per_frame = {
-        frame: load_object_states(
-            args.replay_dir,
-            frame,
-            args.object_mesh_overrides,
-            args.execution_object_visual_scale_overrides,
-            args.execution_object_collision_scale_overrides,
+    if preview_keyframes_by_arm and str(args.candidate_selection_mode) == "top_score_auto":
+        preview_keyframes_by_arm, object_states_per_frame = resolve_top_score_object_keyframes(
+            renderer=renderer,
+            args=args,
+            hand_data=hand_data,
+            keyframes_by_arm=preview_keyframes_by_arm,
         )
-        for frame in keyframes
-    }
+        keyframes = sorted({
+            int(frame)
+            for arm_frames in preview_keyframes_by_arm.values()
+            for frame in arm_frames
+        })
+        args.resolved_keyframes = list(keyframes)
+    else:
+        object_states_per_frame = {
+            frame: load_object_states(
+                args.replay_dir,
+                frame,
+                args.object_mesh_overrides,
+                args.execution_object_visual_scale_overrides,
+                args.execution_object_collision_scale_overrides,
+            )
+            for frame in keyframes
+        }
     reused_plan_summary: Optional[Dict] = None
     reused_preview_summary: Optional[Dict] = None
-    if args.reuse_preview_summary_json is not None:
+    if (
+        args.reuse_preview_summary_json is not None
+        and str(args.candidate_selection_mode) != "top_score_auto"
+    ):
         selection_result, arm_debugs, execution_sequences, reused_preview_summary, requested_keyframes_used, keyframes, resolved_keyframe_pairs, resolved_relative_frame = load_reused_preview_summary(
             renderer=renderer,
             args=args,
@@ -5354,6 +5486,7 @@ def main() -> None:
             keyframes=keyframes,
             arm_mode=args.arm,
             object_states_per_frame=object_states_per_frame,
+            keyframes_by_arm=preview_keyframes_by_arm or None,
         )
         selected_keyframes = selection_result.selected_keyframes
         ranked_candidates_per_frame = selection_result.ranked_candidates_per_frame

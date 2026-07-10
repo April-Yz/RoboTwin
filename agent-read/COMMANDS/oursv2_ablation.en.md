@@ -44,9 +44,10 @@ This uses the same 25 IDs, keyframes, right-wrist camera configuration, Stage-1/
 candidate_selection_mode=top_score_auto
 candidate_max_rotation_distance_deg=-1
 candidate_keep_camera_up=0
+enforce_candidate_distance_constraint=0
 ~~~
 
-Top-score selection does not use a hand-orientation threshold or hand-rotation tie-break. Expected-object and candidate-distance validity checks remain enabled.
+Top-score selection does not use a hand-orientation threshold or hand-rotation tie-break. Expected-object matching remains enabled, while the candidate-distance threshold is disabled. Empty keyframes resolve to the nearest non-empty AnyGrasp frame.
 
 ~~~bash
 tmux new-session -d -s graspnet_selected25_pipeline \
