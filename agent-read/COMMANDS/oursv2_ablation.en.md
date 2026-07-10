@@ -65,3 +65,13 @@ gdrive:piper/multi/6task/robot_graspnet_piper0515
 - R: all six tasks contain 49 episodes and all six repositories include `piper0515_world_to_base_conversion.json`; the archive is 1.3 GB.
 - S: all six tasks contain 25 episodes and all six repositories include `piper0515_world_to_base_conversion.json`; the archive is 351 MB.
 - Both pipelines completed with `SKIP_UPLOAD=1`. The rclone destinations are documented, but no data has been exported to external Google Drive yet.
+
+### Manual Upload
+
+~~~bash
+tmux new-session -d -s upload_oursv2_49ep "rclone copy /home/zaijia001/.cache/huggingface/lerobot/local/robot_oursv2_piper0515_6task_49ep.zip gdrive:piper/multi/6task/robot_oursv2_piper0515_49ep -P --drive-chunk-size 64M --transfers 4"
+tmux set-option -t upload_oursv2_49ep remain-on-exit on
+
+tmux new-session -d -s upload_graspnet_25ep "rclone copy /home/zaijia001/.cache/huggingface/lerobot/local/robot_graspnet_piper0515_6task_25ep.zip gdrive:piper/multi/6task/robot_graspnet_piper0515 -P --drive-chunk-size 64M --transfers 4"
+tmux set-option -t upload_graspnet_25ep remain-on-exit on
+~~~
