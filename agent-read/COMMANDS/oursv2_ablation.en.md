@@ -23,7 +23,7 @@ Run:
 
 ~~~bash
 tmux new-session -d -s oursv2_49ep_pipeline \
-  'bash /home/zaijia001/ssd/RoboTwin/code_painting/run_oursv2_49ep_pipeline.sh'
+  'SKIP_UPLOAD=1 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_oursv2_49ep_pipeline.sh'
 ~~~
 
 Final paths:
@@ -50,7 +50,7 @@ Top-score selection does not use a hand-orientation threshold or hand-rotation t
 
 ~~~bash
 tmux new-session -d -s graspnet_selected25_pipeline \
-  'bash /home/zaijia001/ssd/RoboTwin/code_painting/run_graspnet_selected25_pipeline.sh'
+  'SKIP_UPLOAD=1 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_graspnet_selected25_pipeline.sh'
 ~~~
 
 ~~~text

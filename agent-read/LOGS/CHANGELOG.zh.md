@@ -3176,3 +3176,4 @@ Validation: `python -m py_compile code_painting/analyze_vr_hamer_cross_episode_t
 - Added opt-in duplicate-preserving LeRobot subsetting; the sorted-unique default is unchanged.
 - Added AnyGrasp top-score selection without hand-rotation tie-break and a 6-task pipeline.
 - Validation: Python compilation, shell syntax, selection generation, and wrapper dry-run passed.
+- Added SKIP_UPLOAD=1 so long local builds can finish without invoking external storage.

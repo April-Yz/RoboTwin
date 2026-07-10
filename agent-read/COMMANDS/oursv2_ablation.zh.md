@@ -25,7 +25,7 @@
 
 ~~~bash
 tmux new-session -d -s oursv2_49ep_pipeline \
-  'bash /home/zaijia001/ssd/RoboTwin/code_painting/run_oursv2_49ep_pipeline.sh'
+  'SKIP_UPLOAD=1 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_oursv2_49ep_pipeline.sh'
 ~~~
 
 输出：
@@ -56,7 +56,7 @@ top-score 不使用人手朝向阈值或人手旋转 tie-break；仍保留目标
 
 ~~~bash
 tmux new-session -d -s graspnet_selected25_pipeline \
-  'bash /home/zaijia001/ssd/RoboTwin/code_painting/run_graspnet_selected25_pipeline.sh'
+  'SKIP_UPLOAD=1 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_graspnet_selected25_pipeline.sh'
 ~~~
 
 中间与最终输出：

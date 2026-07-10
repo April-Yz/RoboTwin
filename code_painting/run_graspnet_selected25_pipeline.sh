@@ -19,6 +19,7 @@ ZIP_NAME=robot_graspnet_piper0515_6task_25ep.zip
 RCLONE_DST=gdrive:piper/multi/6task/robot_graspnet_piper0515
 HEAD_DIR_TEMPLATE="id_{id}_l16_white_color_human_object"
 DRY_RUN=${DRY_RUN:-0}
+SKIP_UPLOAD=${SKIP_UPLOAD:-0}
 
 TASKS=(pick_diverse_bottles place_bread_basket handover_bottle pnp_bread pnp_tray stack_cups)
 declare -A IDS=(
@@ -161,7 +162,9 @@ for task in "${TASKS[@]}"; do
 done
 zip -r "$ZIP_NAME" "${dirs[@]}"
 
-if [[ "$DRY_RUN" == "1" ]]; then
+if [[ "$SKIP_UPLOAD" == "1" ]]; then
+  echo "[upload/skip] local zip is ready; rclone was not called"
+elif [[ "$DRY_RUN" == "1" ]]; then
   rclone copy "$LEROBOT_LOCAL/$ZIP_NAME" "$RCLONE_DST" -P --drive-chunk-size 64M --transfers 4 --dry-run
 else
   rclone copy "$LEROBOT_LOCAL/$ZIP_NAME" "$RCLONE_DST" -P --drive-chunk-size 64M --transfers 4

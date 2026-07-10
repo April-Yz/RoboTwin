@@ -20,6 +20,7 @@ SUBSET_N=49
 ZIP_NAME=robot_oursv2_piper0515_6task_49ep.zip
 RCLONE_DST=gdrive:piper/multi/6task/robot_oursv2_piper0515_49ep
 DRY_RUN=${DRY_RUN:-0}
+SKIP_UPLOAD=${SKIP_UPLOAD:-0}
 SKIP_BUILD=${SKIP_BUILD:-0}
 
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh
@@ -93,7 +94,9 @@ for task in "${TASKS[@]}"; do
 done
 zip -r "$ZIP_NAME" "${zip_dirs[@]}"
 
-if [[ "$DRY_RUN" == "1" ]]; then
+if [[ "$SKIP_UPLOAD" == "1" ]]; then
+  echo "[upload/skip] local zip is ready; rclone was not called"
+elif [[ "$DRY_RUN" == "1" ]]; then
   rclone copy "$zip_path" "$RCLONE_DST" -P --drive-chunk-size 64M --transfers 4 --dry-run
 else
   rclone copy "$zip_path" "$RCLONE_DST" -P --drive-chunk-size 64M --transfers 4
