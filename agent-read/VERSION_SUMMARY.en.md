@@ -16,6 +16,10 @@ The unified sequential-trajectory protocol includes three later variants: V2 use
 
 Use `demo_piper_ik_seq_v1` by default. Use V2 for smoother interpolation, V3 for MotionGen experiments, and V4 for multi-seed IK. Old `demo_piper_ik_v*` pickles are incompatible with the current interface.
 
+## Piper TCP/EE IK V3 (Separate Conversion Line)
+
+An isolated Piper TCP/EE IK V3 was added on 2026-07-13 to fix the non-reversible pose-to-link6 IK caused by current OursV2 fields being named EE while actually containing a TCP with a 12 cm offset. This V3 is not the MotionGen V3 above. It uses new renderer/planner/runner entries, defaults to `ours_tcp` semantics, writes under `human_replay_v3/`, and does not modify OursV2. See `agent-read/PIPER_IK_V3.en.md`.
+
 ## O.1 Foundation Variants
 
 `demo_piper_ik_foundation_v1..v4` retain the same IK-version semantics while replacing random RoboTwin bottle assets with positions and source OBJ meshes from Foundation NPZ files. O.1 uses an explicit frame, O.1.1 sets up from the first annotated keyframe, O.1.2 replaces lift/place with second-keyframe EE xyz, and O.1.2.1 adds per-side wrist forward/roll tuning without changing the original 0515 files. Start with V1. Defaults include a base-only `support_proxy` and no-teleport grasp-state gating. Pickles require an exact Foundation mode/source/keyframe/action/geometry context match. Batch collection isolates outputs with run tags, runs one episode per ID, bounds seed retries, and can index videos by Foundation ID as `episode<ID>`.

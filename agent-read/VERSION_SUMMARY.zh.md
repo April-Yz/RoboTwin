@@ -16,6 +16,10 @@ Piper Cartesian IK 基础版。单次 IK 后使用线性关节插值。当前作
 
 默认使用 `demo_piper_ik_seq_v1`。需要更平滑轨迹时使用 V2；研究 MotionGen 时使用 V3；需要多种子 IK 时使用 V4。旧 `demo_piper_ik_v*` pickle 与当前接口不兼容。
 
+## Piper TCP/EE IK V3（独立坐标转换线）
+
+2026-07-13 新增隔离的 Piper TCP/EE IK V3，用于修复 current OursV2 中“字段名是 EE、内容实际是带 12 cm 的 TCP”所导致的 pose->link6 IK 不可逆问题。该 V3 与上面的 MotionGen V3 不是同一条版本线；它使用新 renderer/planner/runner，默认 `ours_tcp` 语义和 `human_replay_v3/` 输出，不修改现有 OursV2。详见 `agent-read/PIPER_IK_V3.zh.md`。
+
 ## O.1 Foundation 变体
 
 `demo_piper_ik_foundation_v1..v4` 保留相同 IK 版本语义，但把随机 RoboTwin bottle 替换为 Foundation NPZ 的位置和原始 OBJ。O.1 使用显式 frame；O.1.1 用第一标注关键帧建场；O.1.2 使用第二关键帧 EE xyz 替代 lift/place；O.1.2.1 增加不改原始 0515 文件的逐侧 wrist 前移/roll tuning。推荐从 V1 开始；默认使用底部 `support_proxy` 和无瞬移抓取状态门控。pickle 要求 Foundation mode/source/keyframes/action/几何上下文完全匹配。批采集使用 run tag 隔离输出、每 ID 一个 episode 和有限 seed 重试；视频可再按 Foundation ID 索引为 `episode<ID>`。

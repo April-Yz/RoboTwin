@@ -3173,6 +3173,16 @@ Validation: `python -m py_compile code_painting/analyze_vr_hamer_alignment.py`; 
 
 Validation: `python -m py_compile code_painting/analyze_vr_hamer_cross_episode_transform_patterns.py`; full run generated JSON/MD/CSV plus 6 PNG plots for 11 episodes.
 
+## 2026-07-13 (Isolated Piper TCP/EE IK V3)
+
+- Verified on the piper server that real FK and IK share the `Ry(-pi/2) * Tx(0.19)` tool transform; real TCP red `+X` is the physical forward axis and is approximately Ours `-Z`.
+- Confirmed that current OursV2 `*_ee_*` fields actually read `current_*_tcp_pose_world_wxyz`; the old IK target path does not remove the 12 cm TCP translation or `global_trans_matrix`, producing the V5 12.6–12.8 cm round-trip delta.
+- Added isolated `piper_ik_v3_transforms.py`, V3 renderer/planner/human-replay entries, and a separate runner; no existing OursV2 file was modified, and V3 writes to `human_replay_v3/` by default.
+- V3 supports explicit `ours_tcp`, `ours_ee`, and `real_piper_tcp` target semantics. The V3 runner caps rotation acceptance at `0.12 rad` so the old `pi` threshold cannot report 90–180 degree orientation errors as successful IK.
+- Added `agent-read/PIPER_IK_V3.*.md`, `agent-read/COMMANDS/piper_ik_v3.*.md`, and transform unit tests.
+
+Validation: 300 random round-trip unit checks passed; max position/rotation round-trip error over 4236 arm poses from the 12 V5 episodes was `9.7e-17 m / 7.7e-16 rad`; direct-q-seeded URDFIK succeeded on `2118/2118` frames for both arms; Python compilation, shell syntax, both V3 `--help` entries, and the isolated smoke entry were exercised.
+
 ## 2026-07-10: OursV2 49ep and GraspNet ablations
 - Added priority-based 49ep selection with explicit provenance and repeat fallback.
 - Added opt-in duplicate-preserving LeRobot subsetting; the sorted-unique default is unchanged.
