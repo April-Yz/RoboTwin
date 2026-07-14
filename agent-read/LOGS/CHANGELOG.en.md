@@ -3201,3 +3201,14 @@ Validation: 300 random round-trip unit checks passed; max position/rotation roun
 - Added metadata and per-frame execution audit, plus aligned Chinese/English command, environment, troubleshooting, and decision documentation.
 
 Validation: `python -m py_compile` passed; `bash -n` passed; an 8-frame dual-arm probe achieved `16/16` IK successes, mean planned/executed TCP position errors of `5.48/4.72 mm`, maximum executed error of `14.50 mm`, all joint errors `<0.01 rad`, and about `2.65e-7 m` mean Curobo-FK/SAPIEN-TCP discrepancy. Across all 106 frames, left/right success counts are `85/83`; the 168 successful plans have 4.70 mm mean executed error, while missing, invalid, and unreachable human targets remain baseline failures.
+
+## 2026-07-14 (Read-only Selection Strategy Audit V4)
+
+- Added `code_painting/render_selection_strategy_compare_v4.py`. It only reads existing OursV2, Orientation/Fused preview, Top-score plan summary, AnyGrasp JSON, Foundation replay, and 0515 calibration data; it does not invoke a planner or modify legacy outputs.
+- Uses `selected_candidates_by_executed_arm` as the actual Top-score source while rendering raw/legacy semantics and an audit-only canonical reconstruction. OursV2 is explicitly a synthetic hand-retarget target and never receives a fabricated AnyGrasp candidate.
+- Each keyframe has Selection Pose and Planner Target rows. Distinct resolved frames use separate side-by-side Foundation backgrounds and record requested/resolved/delta provenance.
+- Full output at `code_painting/selection_strategy_compare_v4/`: six tasks, 150 episodes, 461 PNG files, 2192 arm-strategy records, and zero audit failures. Legacy rank-1 matches actual Top-score in 78/600 pairs, while the actual candidate appears in exported top-N for only 204/600.
+- Raw-to-canonical rotation is fixed at 90 degrees; the legacy/corrected Top target position gap is 0.0707106781 m. Empty requested-frame Orientation/Fused lists produce 208 explicit record gaps.
+- Added aligned audit, command, environment, troubleshooting, decision, and version documentation. Batch PNG/JSON remain ignored; only the V4 script is unignored.
+
+Validation: local and remote `RoboTwin_bw` `py_compile` passed; `handover_bottle/id1/frame39` confirmed Top candidate 0; `place_bread_basket/id0/frame64` confirmed separate Foundation 64/63 columns; full metadata/schema/image-dimension validation passed; the combined legacy-input summary SHA-256 remained `345226256cadb99935a0af49e7a95fdc7f72889d21bcda354819e9def0002bd1` before and after the run.

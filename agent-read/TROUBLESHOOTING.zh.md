@@ -18,3 +18,14 @@
 
 - 原因：Dense 直接复制人手姿态，而该姿态对 Piper 可能不可达。
 - 处理：这是 baseline 限制；需要机器人原生抓取姿态时使用 Ours v2，不应把 rotation threshold 再强行收紧到导致整帧 IK 失败。
+
+## 非交互 SSH 报 `conda: command not found`
+
+- 原因：远端 shell 没有加载 Conda 初始化脚本，不代表环境不存在。
+- 处理：先 `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh`，或直接调用 `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python3.10`。
+
+## Audit V4 拒绝已有输出目录
+
+- 症状：`Refusing to overwrite non-empty output root`。
+- 原因：V4 默认保护已有 PNG、metadata 和报告。
+- 处理：使用新的 `--output-root`。只有明确要重建 V4 自身产物时才使用 `--overwrite`；该选项也不会授权修改旧策略目录。

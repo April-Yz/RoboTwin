@@ -18,3 +18,14 @@
 
 - Cause: Dense directly copies a human orientation that may be unreachable by Piper.
 - Handling: this is a baseline limitation. Use Ours v2 for robot-native grasp orientation; do not force a tighter rotation threshold that would turn the whole frame into an IK failure.
+
+## Non-interactive SSH reports `conda: command not found`
+
+- Cause: the remote shell did not load Conda initialization; this does not mean the environment is absent.
+- Handling: source `/home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh`, or call `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python3.10` directly.
+
+## Audit V4 refuses an existing output root
+
+- Symptom: `Refusing to overwrite non-empty output root`.
+- Cause: V4 protects existing PNG, metadata, and reports by default.
+- Handling: choose a new `--output-root`. Use `--overwrite` only when deliberately rebuilding V4-owned artifacts; it never authorizes changes to legacy strategy directories.

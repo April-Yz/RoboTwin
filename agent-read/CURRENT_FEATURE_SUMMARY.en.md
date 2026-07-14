@@ -7,15 +7,16 @@
 
 ## Added in this change
 
-- Added the isolated `Dense Replay URDF-match v2` without modifying legacy Dense logic or outputs.
-- Fixed the fixed Curobo/SAPIEN `link6` `Ry(-90 deg)` frame mismatch, exact 0.12 m TCP inversion, overwritten interpolation parameter, and lack of measured joint convergence.
-- Entry point: `code_painting/run_dense_replay_urdfmatch_v2.sh`.
-- Code: `render_hand_retarget_piper_dual_npz_urdfmatch_v2*.py`.
-- Diagnosis, commands, and limitations: `COMMANDS/dense_replay_urdfmatch_v2.en.md`.
+- Added the read-only `Selection Strategy Audit V4`; it neither invokes a planner nor modifies OursV2, Orientation, Fused, Top-score, or legacy outputs.
+- Recovers the actual Top-score candidate from `selected_candidates_by_executed_arm` while exposing both historical raw/legacy semantics and the canonical reconstruction.
+- Each keyframe has Selection Pose and Planner Target panels. Distinct resolved frames use their own Foundation images in side-by-side columns.
+- The full audit covers 6 tasks, 150 episodes, 461 keyframe images, and 2192 arm-strategy records; see `SELECTION_STRATEGY_AUDIT_V4.en.md`.
+- The preceding isolated correction line remains `Dense Replay URDF-match v2`; see `COMMANDS/dense_replay_urdfmatch_v2.en.md`.
 
 ## Reading order
 
 1. `README.en.md`
 2. `CURRENT_FEATURE_SUMMARY.en.md`
 3. `VERSION_SUMMARY.en.md`
-4. The task-specific `COMMANDS/*.en.md`
+4. `SELECTION_STRATEGY_AUDIT_V4.en.md`
+5. The task-specific `COMMANDS/*.en.md`

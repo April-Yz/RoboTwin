@@ -3199,3 +3199,14 @@ Validation: 300 个随机 round-trip 单元测试通过；12 个 V5 episode 共 
 - 新增 metadata 与逐帧 execution audit，以及中英文命令、环境、故障排查和决策文档。
 
 Validation: `python -m py_compile` 通过；`bash -n` 通过；8 帧双臂 probe 为 `16/16` IK 成功，平均规划/执行 TCP 位置误差 `5.48/4.72 mm`，最大执行误差 `14.50 mm`，全部关节误差 `<0.01 rad`，Curobo FK/SAPIEN TCP 平均差约 `2.65e-7 m`。完整 106 帧左/右成功数为 `85/83`，168 个成功计划平均执行误差 `4.70 mm`；缺失、无效和不可达人手目标仍记为 baseline failure。
+
+## 2026-07-14（只读 Selection Strategy Audit V4）
+
+- 新增 `code_painting/render_selection_strategy_compare_v4.py`；只读取现有 OursV2、Orientation/Fused preview、Top-score plan summary、AnyGrasp JSON、Foundation replay 和 0515 标定，不调用 planner，不修改旧结果。
+- Top-score 以 `selected_candidates_by_executed_arm` 为真实来源，同时可视化 raw/legacy 语义与 audit-only canonical 重建；OursV2 明确标为 synthetic hand-retarget target，不伪造 AnyGrasp candidate。
+- 每个关键帧生成 Selection Pose / Planner Target 两行；不同 resolved frame 使用各自 Foundation 背景横向拼接，并记录 requested/resolved/delta。
+- 全量结果位于 `code_painting/selection_strategy_compare_v4/`：6 个任务、150 个 episode、461 张 PNG、2192 条 arm-strategy 记录、0 个审计失败。旧 rank-1 与真实 Top-score 一致 78/600，实际候选只在导出 top-N 中出现 204/600。
+- raw-to-canonical 固定旋转 90°；旧/修正 Top target 的位置差为 0.0707106781 m。Orientation/Fused requested-frame 候选为空产生 208 个显式 record gap。
+- 新增双语审计、命令、环境、故障排查、决策和版本说明；大批量 PNG/JSON 继续忽略，仅反忽略 V4 脚本。
+
+Validation: 本地和 `RoboTwin_bw` 远端 `py_compile` 通过；`handover_bottle/id1/frame39` 确认 Top candidate 0；`place_bread_basket/id0/frame64` 确认 Foundation 64/63 分栏；全量 metadata/schema/图片尺寸校验通过；旧输入 summary 组合 SHA-256 运行前后均为 `345226256cadb99935a0af49e7a95fdc7f72889d21bcda354819e9def0002bd1`。

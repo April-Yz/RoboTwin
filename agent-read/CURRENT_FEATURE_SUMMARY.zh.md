@@ -7,15 +7,16 @@
 
 ## 本轮新增
 
-- 新增隔离的 `Dense Replay URDF-match v2`，不修改旧 Dense 逻辑或旧输出。
-- 修复 Curobo 与 SAPIEN `link6` 固定 `Ry(-90 deg)` 局部轴差、0.12 m TCP 反变换、插值参数被覆盖和执行未按关节收敛的问题。
-- 入口：`code_painting/run_dense_replay_urdfmatch_v2.sh`。
-- 代码：`render_hand_retarget_piper_dual_npz_urdfmatch_v2*.py`。
-- 诊断、命令和限制：`COMMANDS/dense_replay_urdfmatch_v2.zh.md`。
+- 新增只读 `Selection Strategy Audit V4`；不调用 planner，不修改 OursV2、Orientation、Fused、Top-score 或旧输出。
+- 从 `selected_candidates_by_executed_arm` 恢复真实 Top-score 候选，同时显示旧 raw/legacy 语义和 canonical 重建。
+- 每个关键帧输出 Selection Pose 与 Planner Target 双面板；不同 resolved frame 使用各自 Foundation 图并横向拼接。
+- 全量覆盖 6 个任务、150 个 episode、461 张关键帧图和 2192 条 arm-strategy 记录；详见 `SELECTION_STRATEGY_AUDIT_V4.zh.md`。
+- 上一条隔离修复线仍为 `Dense Replay URDF-match v2`，详见 `COMMANDS/dense_replay_urdfmatch_v2.zh.md`。
 
 ## 读取顺序
 
 1. `README.zh.md`
 2. `CURRENT_FEATURE_SUMMARY.zh.md`
 3. `VERSION_SUMMARY.zh.md`
-4. 与任务对应的 `COMMANDS/*.zh.md`
+4. `SELECTION_STRATEGY_AUDIT_V4.zh.md`
+5. 与任务对应的 `COMMANDS/*.zh.md`

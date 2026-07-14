@@ -24,6 +24,10 @@ An isolated Piper TCP/EE IK V3 was added on 2026-07-13 to fix the non-reversible
 
 The isolated Dense Replay v2 was added on 2026-07-14. It retains Dense's frame-wise human retargeting definition and only fixes legacy planning/execution correspondence: matched `piper_pika_agx` models, the fixed Curobo-to-SAPIEN link6 `Ry(-90 deg)` adapter, exact 0.12 m TCP inversion, restoration of 10 interpolation waypoints, and measured joint convergence. Legacy code and outputs remain intact. See `agent-read/COMMANDS/dense_replay_urdfmatch_v2.en.md`.
 
+## Selection Strategy Audit V4 (Read-only Audit)
+
+The independent V4 audit was added on 2026-07-14. It reads existing OursV2 data, hand-keyframe previews, Top-score plan summaries, AnyGrasp JSON, Foundation replay, and the 0515 calibration without invoking a planner. It obtains the actual Top-score candidate from `selected_candidates_by_executed_arm`, preserves historical raw/legacy semantics, and adds an audit-only canonical reconstruction. Its Selection/Planner panels display distinct resolved Foundation frames in separate columns. Generated artifacts live under `code_painting/selection_strategy_compare_v4/` and are not versioned. See `agent-read/SELECTION_STRATEGY_AUDIT_V4.en.md`.
+
 ## O.1 Foundation Variants
 
 `demo_piper_ik_foundation_v1..v4` retain the same IK-version semantics while replacing random RoboTwin bottle assets with positions and source OBJ meshes from Foundation NPZ files. O.1 uses an explicit frame, O.1.1 sets up from the first annotated keyframe, O.1.2 replaces lift/place with second-keyframe EE xyz, and O.1.2.1 adds per-side wrist forward/roll tuning without changing the original 0515 files. Start with V1. Defaults include a base-only `support_proxy` and no-teleport grasp-state gating. Pickles require an exact Foundation mode/source/keyframe/action/geometry context match. Batch collection isolates outputs with run tags, runs one episode per ID, bounds seed retries, and can index videos by Foundation ID as `episode<ID>`.

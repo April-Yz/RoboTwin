@@ -7,3 +7,11 @@
 - 关节顺序保持 `joint1..joint6`；固定误差通过显式坐标 adapter 修复，不通过交换或手工偏置关节修复。
 - HaMeR 指尖中点统一解释为 TCP；link6 仅是 IK 的内部目标帧。
 - Dense 仍是 dense retargeting baseline。机器人不可达的人手姿态不由该修复伪装为 Ours v2 能力。
+
+## 2026-07-14：Selection Strategy V4 仅作为只读审计
+
+- 保留 OursV2、Orientation、Fused、Top-score 的旧算法、summary 和可视化，不用 V4 回写或“修正”历史结果。
+- Top-score 的真实选择以 `plan_summary.json -> selected_candidates_by_executed_arm` 为准；旧 rank preview 仅作为历史错误证据。
+- raw/legacy Top-score 和 canonical 重建同时保留，canonical 结果明确标为 audit-only，不冒充历史执行结果。
+- resolved frame 不同则使用各自 Foundation 背景分栏，不跨帧静默投影。
+- 批量 PNG/JSON/报告保持 Git ignore；只版本化脚本和双语说明。
