@@ -44,9 +44,9 @@ STRATEGY_COLORS = {
     "oursv2": (255, 255, 0),       # cyan
     "orientation": (255, 0, 255), # magenta
     "fused": (0, 255, 255),       # yellow
-    "top_score": (0, 0, 255),     # red
-    "top_raw": (80, 80, 180),
-    "top_legacy": (0, 110, 180),
+    "top_score": (20, 20, 20),    # near-black
+    "top_raw": (0, 140, 255),     # orange
+    "top_legacy": (255, 90, 20),  # cobalt blue
 }
 AXIS_COLORS = {
     "x": (0, 0, 255),
@@ -392,6 +392,15 @@ def preview_strategy_record(
             ),
         },
         "selection_pose": pose_payload(selection_pose),
+        "selection_metrics": {
+            "ranking_strategy": strategy,
+            "anygrasp_score_raw": float(candidate["anygrasp_score"]),
+            "rotation_distance_deg": float(candidate["rotation_distance_deg"]),
+            "orientation_score": float(candidate["orientation_score"]),
+            "fused_score": float(candidate["fused_score"]),
+            "fused_formula": "0.25 * raw_anygrasp_score + 0.75 * orientation_score",
+            "hard_rotation_filter_deg": 90.0,
+        },
         "planner_target": {
             "status": "preview reconstruction" if strategy == "orientation" else "hypothetical; fused preview was not the executed group",
             "effective_world_pose": pose_payload(stored_target),
@@ -457,6 +466,11 @@ def top_score_record(
             "rotation_change_deg": rotation_distance_deg(raw_world_rot, pose_matrix(canonical_pose)[:3, :3]),
         },
         "selection_pose": pose_payload(canonical_pose),
+        "selection_metrics": {
+            "ranking_strategy": "top_score",
+            "anygrasp_score_raw": float(entry["score"]),
+            "human_orientation_used_for_ranking": False,
+        },
         "planner_target": {
             "status": "legacy actual semantics plus canonical audit reconstruction",
             "legacy_actual_world_pose": pose_payload(legacy_target),
@@ -585,7 +599,8 @@ def draw_pose(
     camera: Mapping[str, Any],
     *, color: Tuple[int, int, int], label: str, width_m: float, depth_m: float,
     axis_length_m: float, forward_axis: str = "local_z", dashed: bool = False,
-    draw_axes: bool = True,
+    draw_axes: bool = True, line_thickness: int = 2,
+    marker: str = "circle", label_offset: Tuple[int, int] = (5, -5),
 ) -> None:
     position, rotation = world_pose_to_camera(pose_wxyz, head_pose_wxyz)
     x_axis, y_axis, z_axis = rotation[:, 0], rotation[:, 1], rotation[:, 2]
@@ -607,19 +622,35 @@ def draw_pose(
         if p0 is None or p1 is None:
             continue
         if dashed:
-            draw_dashed_line(image, p0, p1, color, 1)
+            draw_dashed_line(image, p0, p1, color, line_thickness)
         else:
-            cv2.line(image, p0, p1, color, 2, cv2.LINE_AA)
+            cv2.line(image, p0, p1, color, line_thickness, cv2.LINE_AA)
     origin = project_point(position, camera)
     if origin is None:
         return
-    cv2.circle(image, origin, 4, color, -1, cv2.LINE_AA)
+    ox, oy = origin
+    if marker == "square":
+        cv2.rectangle(image, (ox - 5, oy - 5), (ox + 5, oy + 5), color, 2, cv2.LINE_AA)
+    elif marker == "diamond":
+        points_2d = np.asarray([[ox, oy - 7], [ox + 7, oy], [ox, oy + 7], [ox - 7, oy]], dtype=np.int32)
+        cv2.polylines(image, [points_2d], True, color, 2, cv2.LINE_AA)
+    elif marker == "triangle":
+        points_2d = np.asarray([[ox, oy - 7], [ox + 7, oy + 6], [ox - 7, oy + 6]], dtype=np.int32)
+        cv2.polylines(image, [points_2d], True, color, 2, cv2.LINE_AA)
+    elif marker == "cross":
+        cv2.line(image, (ox - 6, oy - 6), (ox + 6, oy + 6), color, 2, cv2.LINE_AA)
+        cv2.line(image, (ox - 6, oy + 6), (ox + 6, oy - 6), color, 2, cv2.LINE_AA)
+    else:
+        cv2.circle(image, origin, 4, color, -1, cv2.LINE_AA)
     if draw_axes:
         for axis, axis_name in ((x_axis, "x"), (y_axis, "y"), (z_axis, "z")):
             endpoint = project_point(position + axis * float(axis_length_m), camera)
             if endpoint is not None:
                 cv2.arrowedLine(image, origin, endpoint, AXIS_COLORS[axis_name], 1, cv2.LINE_AA, tipLength=0.18)
-    cv2.putText(image, label, (origin[0] + 5, origin[1] - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.42, color, 1, cv2.LINE_AA)
+    cv2.putText(
+        image, label, (origin[0] + label_offset[0], origin[1] + label_offset[1]),
+        cv2.FONT_HERSHEY_SIMPLEX, 0.42, color, 1, cv2.LINE_AA,
+    )
 
 
 def draw_pregrasp(
@@ -687,11 +718,17 @@ def draw_selection_record(image: np.ndarray, record: Mapping[str, Any], head_pos
     arm = str(record["arm"])[0].upper()
     selection = payload_pose(record.get("selection_pose"))
     if selection is not None:
+        style = {
+            "oursv2": {"dashed": False, "line_thickness": 2, "marker": "circle", "label_offset": (6, 17)},
+            "orientation": {"dashed": False, "line_thickness": 5, "marker": "square", "label_offset": (6, -10)},
+            "fused": {"dashed": True, "line_thickness": 2, "marker": "diamond", "label_offset": (6, 18)},
+            "top_score": {"dashed": False, "line_thickness": 3, "marker": "triangle", "label_offset": (6, -10)},
+        }[strategy]
         draw_pose(
             image, selection, head_pose, camera,
             color=STRATEGY_COLORS[strategy], label=f"{strategy[:3].upper()}-{arm}",
             width_m=float(record.get("gripper_width_m", 0.08)), depth_m=float(record.get("gripper_depth_m", 0.04)),
-            axis_length_m=axis_length_m,
+            axis_length_m=axis_length_m, **style,
         )
     if strategy == "top_score":
         raw = payload_pose(record.get("raw_pose"))
@@ -701,6 +738,7 @@ def draw_selection_record(image: np.ndarray, record: Mapping[str, Any], head_pos
                 color=STRATEGY_COLORS["top_raw"], label=f"TOP-RAW-{arm}",
                 width_m=float(record.get("gripper_width_m", 0.08)), depth_m=float(record.get("gripper_depth_m", 0.04)),
                 axis_length_m=axis_length_m, forward_axis="local_x", dashed=True, draw_axes=False,
+                line_thickness=2, marker="cross", label_offset=(6, 18),
             )
 
 
@@ -717,6 +755,7 @@ def draw_planner_record(image: np.ndarray, record: Mapping[str, Any], head_pose:
                 color=STRATEGY_COLORS["top_legacy"], label=f"TOP-OLD-{arm}",
                 width_m=float(record.get("gripper_width_m", 0.08)), depth_m=float(record.get("gripper_depth_m", 0.04)),
                 axis_length_m=axis_length_m, forward_axis="local_z", dashed=True, draw_axes=False,
+                line_thickness=2, marker="cross", label_offset=(6, 18),
             )
             draw_pregrasp(image, legacy, payload_pose(planner.get("legacy_pregrasp_world_pose")), head_pose, camera, STRATEGY_COLORS["top_legacy"], "pre-old")
         if canonical is not None:
@@ -724,18 +763,23 @@ def draw_planner_record(image: np.ndarray, record: Mapping[str, Any], head_pose:
                 image, canonical, head_pose, camera,
                 color=STRATEGY_COLORS["top_score"], label=f"TOP-CAN-{arm}",
                 width_m=float(record.get("gripper_width_m", 0.08)), depth_m=float(record.get("gripper_depth_m", 0.04)),
-                axis_length_m=axis_length_m,
+                axis_length_m=axis_length_m, line_thickness=3, marker="triangle", label_offset=(6, -10),
             )
             draw_pregrasp(image, canonical, payload_pose(planner.get("canonical_pregrasp_world_pose")), head_pose, camera, STRATEGY_COLORS["top_score"], "pre-can")
         return
     target = payload_pose(planner.get("effective_world_pose"))
     if target is None:
         return
+    style = {
+        "oursv2": {"dashed": False, "line_thickness": 2, "marker": "circle", "label_offset": (6, 17)},
+        "orientation": {"dashed": False, "line_thickness": 5, "marker": "square", "label_offset": (6, -10)},
+        "fused": {"dashed": True, "line_thickness": 2, "marker": "diamond", "label_offset": (6, 18)},
+    }[strategy]
     draw_pose(
         image, target, head_pose, camera,
         color=STRATEGY_COLORS[strategy], label=f"{strategy[:3].upper()}-{arm}",
         width_m=float(record.get("gripper_width_m", 0.08)), depth_m=float(record.get("gripper_depth_m", 0.04)),
-        axis_length_m=axis_length_m,
+        axis_length_m=axis_length_m, **style,
     )
     draw_pregrasp(image, target, payload_pose(planner.get("pregrasp_world_pose")), head_pose, camera, STRATEGY_COLORS[strategy], "pre")
 
@@ -752,8 +796,8 @@ def render_overlay(
     header_h, row_title_h = 126, 30
     canvas = np.full((header_h + 2 * (row_title_h + cell_height), max(1, len(resolved_frames)) * cell_width, 3), 250, dtype=np.uint8)
     cv2.putText(canvas, f"Selection Strategy Audit V4 | {task} id={episode} requested={requested_frame}", (12, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (20, 20, 20), 2, cv2.LINE_AA)
-    cv2.putText(canvas, "OURS cyan | ORI magenta | FUSED yellow | TOP canonical red", (12, 47), cv2.FONT_HERSHEY_SIMPLEX, 0.40, (40, 40, 40), 1, cv2.LINE_AA)
-    cv2.putText(canvas, "TOP raw/legacy dashed | axes X red, Y green, Z blue | L/R are arms", (12, 68), cv2.FONT_HERSHEY_SIMPLEX, 0.37, (40, 40, 40), 1, cv2.LINE_AA)
+    cv2.putText(canvas, "OURS cyan solid | ORI magenta thick-square | FUSED yellow dashed-diamond", (12, 47), cv2.FONT_HERSHEY_SIMPLEX, 0.37, (40, 40, 40), 1, cv2.LINE_AA)
+    cv2.putText(canvas, "TOP-CAN black | TOP-RAW orange dashed | TOP-OLD blue dashed | axes X red Y green Z blue", (12, 68), cv2.FONT_HERSHEY_SIMPLEX, 0.34, (40, 40, 40), 1, cv2.LINE_AA)
     cv2.putText(canvas, "Panel A Selection: no retreat, offset, pregrasp, or TCP compensation", (12, 89), cv2.FONT_HERSHEY_SIMPLEX, 0.37, (40, 40, 40), 1, cv2.LINE_AA)
     cv2.putText(canvas, "Panel B Planner: historical target + canonical TOP rebuild; pregrasp path dashed", (12, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.37, (40, 40, 40), 1, cv2.LINE_AA)
     frame_sources: List[Dict[str, Any]] = []
@@ -1009,10 +1053,11 @@ def run(args: argparse.Namespace) -> Dict[str, Any]:
                             "event_index": event_index, "requested_frame": requested_frame,
                             "strategy": "oursv2", "reason": "human target or hand pose missing",
                         })
-            episode_dir = args.output_root / task / f"foundation_input_{episode}"
+            task_dir = args.output_root / task
             for requested_frame, records in sorted(episode_records.items()):
-                png_path = episode_dir / f"keyframe_{requested_frame:06d}_overlay.png"
-                metadata_path = episode_dir / f"keyframe_{requested_frame:06d}_metadata.json"
+                stem = f"id{episode}_keyframe_{requested_frame:06d}"
+                png_path = task_dir / f"{stem}_overlay.png"
+                metadata_path = task_dir / f"{stem}_metadata.json"
                 if args.overwrite or not png_path.is_file() or not metadata_path.is_file():
                     frame_sources = render_overlay(
                         records=records, requested_frame=requested_frame, replay=replay,
@@ -1021,10 +1066,12 @@ def run(args: argparse.Namespace) -> Dict[str, Any]:
                         axis_length_m=args.axis_length_m,
                     )
                     metadata = {
-                        "schema": "selection_strategy_audit_v4.keyframe.v1",
+                        "schema": "selection_strategy_audit_v4.keyframe.v2",
                         "read_only_audit": True,
+                        "output_layout": "flat_task_directory",
                         "task": task,
                         "episode": f"foundation_input_{episode}",
+                        "episode_id": int(episode),
                         "requested_frame": int(requested_frame),
                         "frame_columns": frame_sources,
                         "records": records,

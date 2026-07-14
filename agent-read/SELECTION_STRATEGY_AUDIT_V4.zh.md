@@ -8,6 +8,7 @@ V4 是只读审计工具，用于把 OursV2、Orientation、Fused 和 Top-score 
 
 ```text
 code_painting/render_selection_strategy_compare_v4.py
+code_painting/analyze_selection_strategy_agreement_v4.py
 ```
 
 本轮输出：
@@ -16,12 +17,15 @@ code_painting/render_selection_strategy_compare_v4.py
 code_painting/selection_strategy_compare_v4/
   audit_report.json
   audit_report.zh.md
-  <TASK>/foundation_input_<ID>/
-    keyframe_<FRAME>_overlay.png
-    keyframe_<FRAME>_metadata.json
+  strategy_agreement_stats.json
+  strategy_agreement_stats.zh.md
+  strategy_agreement_stats.en.md
+  <TASK>/
+    id<ID>_keyframe_<FRAME>_overlay.png
+    id<ID>_keyframe_<FRAME>_metadata.json
 ```
 
-生成目录仍由 `code_painting/*` 忽略；`.gitignore` 只反忽略 V4 脚本。
+生成目录仍由 `code_painting/*` 忽略；`.gitignore` 只反忽略两个 V4 脚本。
 
 ## 四种记录的真实含义
 
@@ -136,11 +140,12 @@ Panel B `Planner Target` 展示历史链路准备送给 IK 的 target，并在 m
 
 ## 颜色和线型
 
-- OursV2：青色；
-- Orientation：品红；
-- Fused：黄色；
-- Top-score canonical：红色；
-- Top-score raw/legacy：暗红/橙色虚线；
+- OursV2：青色实线和圆点；
+- Orientation：粗品红实线和方框；
+- Fused：黄色虚线和菱形，因此与 Orientation 完全重合时仍能同时看到；
+- Top-score canonical：黑色实线和三角形；
+- Top-score raw：橙色虚线和叉号；
+- Top-score legacy：蓝色虚线和叉号；
 - pregrasp 路径：同策略颜色虚线；
 - `L` / `R`：执行手臂。
 
@@ -150,7 +155,7 @@ Panel B `Planner Target` 展示历史链路准备送给 IK 的 target，并在 m
 - 关键帧对比图：461。
 - arm-strategy records：2192。
 - 审计异常：0。
-- 生成物：461 PNG、462 JSON、1 Markdown，约 166 MB。
+- 生成物：461 PNG、463 JSON、3 Markdown，约 169 MB。
 - 旧输入 summary 的组合 SHA-256 在全量运行前后相同：`345226256cadb99935a0af49e7a95fdc7f72889d21bcda354819e9def0002bd1`。
 
 真实 Top-score 与旧 rank preview：
@@ -161,6 +166,12 @@ Panel B `Planner Target` 展示历史链路准备送给 IK 的 target，并在 m
 - 实际候选不在导出 top-N：396/600。
 
 `handover_bottle/foundation_input_1/frame 39/right` 的旧 rank-1 是 candidate 13，V4 从实际 plan summary 读取 candidate 0。
+
+扁平输出示例：
+
+```text
+code_painting/selection_strategy_compare_v4/pnp_tray/id2_keyframe_000052_overlay.png
+```
 
 Top-score raw-to-canonical 的 600 条记录全部旋转 90°。旧 legacy target 和 canonical rebuild 的平均/最小/最大位置差都为：
 
@@ -178,6 +189,32 @@ Top-score requested/resolved frame delta 分布：
 ```
 
 最大绝对偏移为 18 帧。
+
+## Fused 一致率与位置差统计
+
+统计单位是一个 arm-event，左右手分别计一次。只有 `resolved_frame` 和 `candidate_idx` 同时相同才记为同 candidate。位置使用 canonical Selection Pose 的 world xyz。
+
+Fused 与 Orientation：
+
+- 配对 496；同 candidate 465/496，93.75%；
+- 左手 229/245，93.47%；右手 236/251，94.02%；
+- xyz 欧氏距离：平均 2.979 mm，中位数 0，p95 28.050 mm，最大 107.584 mm；
+- 31 个非零样本的平均距离为 47.669 mm。
+
+Fused 与 Top canonical：
+
+- 配对 496；同 candidate 44/496，8.87%；
+- 左手 26/245，10.61%；右手 18/251，7.17%；
+- xyz 欧氏距离：平均 42.718 mm，中位数 23.626 mm，p95 133.854 mm；
+- 最大 868.614 mm 来自 `stack_cups/id17/right/frame36`。该旧 Top target 的 world Z 约为 0.00075 m，是被忠实保留的历史异常值，因此不能只看 mean；JSON 同时保留 median、p95 和最大差样本。
+
+六任务的真实 Fused 公式仍是：
+
+\[
+F=0.25s_{AG}+0.75o.
+\]
+
+在本批 496 个 Fused 候选上，平均加权 raw-score contribution 为 0.050557，平均 orientation contribution 为 0.559351；orientation 在最终 Fused score 中平均占 91.75%，而且 496/496 个样本都是 orientation contribution 更大。结合 93.75% 与 Orientation 相同、只有 8.87% 与 Top 相同，当前 Fused 明显偏向 rotation，而且由于 raw AnyGrasp score 未归一化，实际偏向比名义 75% 更强。
 
 共有 208 条 record gap，全部来自 requested frame 上旧 Orientation/Fused preview 候选为空：各 104 条。任务分布为：
 

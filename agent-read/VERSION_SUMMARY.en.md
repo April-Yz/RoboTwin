@@ -26,7 +26,7 @@ The isolated Dense Replay v2 was added on 2026-07-14. It retains Dense's frame-w
 
 ## Selection Strategy Audit V4 (Read-only Audit)
 
-The independent V4 audit was added on 2026-07-14. It reads existing OursV2 data, hand-keyframe previews, Top-score plan summaries, AnyGrasp JSON, Foundation replay, and the 0515 calibration without invoking a planner. It obtains the actual Top-score candidate from `selected_candidates_by_executed_arm`, preserves historical raw/legacy semantics, and adds an audit-only canonical reconstruction. Its Selection/Planner panels display distinct resolved Foundation frames in separate columns. Generated artifacts live under `code_painting/selection_strategy_compare_v4/` and are not versioned. See `agent-read/SELECTION_STRATEGY_AUDIT_V4.en.md`.
+The independent V4 audit was added on 2026-07-14. It reads existing OursV2 data, hand-keyframe previews, Top-score plan summaries, AnyGrasp JSON, Foundation replay, and the 0515 calibration without invoking a planner. It obtains the actual Top-score candidate from `selected_candidates_by_executed_arm`, preserves historical raw/legacy semantics, and adds an audit-only canonical reconstruction. Its Selection/Planner panels display distinct resolved Foundation frames in separate columns. A same-day update adds flat `id<ID>_keyframe_*` files, overlap-safe line styles, and an independent agreement/position/contribution statistics script. Generated artifacts live under `code_painting/selection_strategy_compare_v4/` and are not versioned. See `agent-read/SELECTION_STRATEGY_AUDIT_V4.en.md`.
 
 ## O.1 Foundation Variants
 

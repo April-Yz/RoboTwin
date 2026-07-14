@@ -3212,3 +3212,14 @@ Validation: `python -m py_compile` passed; `bash -n` passed; an 8-frame dual-arm
 - Added aligned audit, command, environment, troubleshooting, decision, and version documentation. Batch PNG/JSON remain ignored; only the V4 script is unignored.
 
 Validation: local and remote `RoboTwin_bw` `py_compile` passed; `handover_bottle/id1/frame39` confirmed Top candidate 0; `place_bread_basket/id0/frame64` confirmed separate Foundation 64/63 columns; full metadata/schema/image-dimension validation passed; the combined legacy-input summary SHA-256 remained `345226256cadb99935a0af49e7a95fdc7f72889d21bcda354819e9def0002bd1` before and after the run.
+
+## 2026-07-14 (Selection Strategy Audit V4 Flat Output and Statistics)
+
+- Added `code_painting/analyze_selection_strategy_agreement_v4.py`. It counts arm-events, requires both resolved frame and candidate index to match, and reports Fused–Orientation/Fused–canonical-Top agreement, canonical xyz distances, per-arm breakdowns, and weighted Fused-score contributions.
+- Fused matches Orientation in 465/496 pairs (93.75%): 229/245 left and 236/251 right. It matches canonical Top in 44/496 pairs (8.87%): 26/245 left and 18/251 right.
+- Mean Fused–Orientation xyz distance is 2.979 mm with zero median; the 31 nonzero cases average 47.669 mm. Fused–Top has 42.718 mm mean, 23.626 mm median, and 133.854 mm p95; the 868.614 mm maximum is a historical Top outlier with world Z near zero.
+- Mean weighted raw/orientation contributions are 0.050557/0.559351. Orientation supplies 91.75% of the final Fused score on average and is the larger contribution for all 496 candidates.
+- Flattened outputs to `<TASK>/id<ID>_keyframe_<FRAME>_{overlay,metadata}`. Orientation/Fused use thick-magenta-square/dashed-yellow-diamond styles; canonical/raw/legacy Top use black/orange/blue to avoid same-pose and red-axis occlusion.
+- Moved the old nested artifacts to `selection_strategy_compare_v4_nested_backup_20260714_5c2788f`; the regenerated full result remains at `selection_strategy_compare_v4/`. Legacy strategy inputs remain unchanged.
+
+Validation: local and remote `py_compile` passed for both scripts; visually inspected overlapping pnp_tray id2/frame52 and separated id30/frame37 samples; assertions passed for flat paths/schema/image loading across 461 PNG, 461 metadata files, and 2192 records; the combined input-summary SHA-256 remains `345226256cadb99935a0af49e7a95fdc7f72889d21bcda354819e9def0002bd1`.

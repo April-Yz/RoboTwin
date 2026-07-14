@@ -26,7 +26,7 @@ Piper Cartesian IK 基础版。单次 IK 后使用线性关节插值。当前作
 
 ## Selection Strategy Audit V4（只读审计线）
 
-2026-07-14 新增独立 V4 审计工具。它只读取现有 OursV2、人手关键帧 preview、Top-score plan summary、AnyGrasp JSON、Foundation replay 和 0515 标定，不调用 planner。V4 从 `selected_candidates_by_executed_arm` 获取真实 Top-score 候选，分别保留旧 raw/legacy 语义和 audit-only canonical 重建；Selection/Planner 双面板会把不同 resolved frame 的 Foundation 画面分栏显示。输出位于 `code_painting/selection_strategy_compare_v4/` 且不进入 Git。详见 `agent-read/SELECTION_STRATEGY_AUDIT_V4.zh.md`。
+2026-07-14 新增独立 V4 审计工具。它只读取现有 OursV2、人手关键帧 preview、Top-score plan summary、AnyGrasp JSON、Foundation replay 和 0515 标定，不调用 planner。V4 从 `selected_candidates_by_executed_arm` 获取真实 Top-score 候选，分别保留旧 raw/legacy 语义和 audit-only canonical 重建；Selection/Planner 双面板会把不同 resolved frame 的 Foundation 画面分栏显示。后续同日更新加入扁平 `id<ID>_keyframe_*` 文件、抗遮挡线型和独立 agreement/position/contribution 统计脚本。输出位于 `code_painting/selection_strategy_compare_v4/` 且不进入 Git。详见 `agent-read/SELECTION_STRATEGY_AUDIT_V4.zh.md`。
 
 ## O.1 Foundation 变体
 

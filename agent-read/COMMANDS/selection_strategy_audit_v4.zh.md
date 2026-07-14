@@ -25,6 +25,8 @@ cd /home/zaijia001/ssd/RoboTwin
 - `--approach-offset-m`：仅控制第一事件 pregrasp 审计显示，默认 0.12 m。
 - `--axis-length-m`：坐标轴显示长度，默认 0.045 m。
 
+每个任务目录直接保存 `id<ID>_keyframe_<FRAME>_{overlay,metadata}`，不再创建 `foundation_input_<ID>/` 中间层。
+
 ## 可运行 smoke：Top-score candidate 修正
 
 ```bash
@@ -66,10 +68,33 @@ cd /home/zaijia001/ssd/RoboTwin
 
 ## 校验
 
+### 一致率统计非运行模板
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin
+/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python3.10 \
+  code_painting/analyze_selection_strategy_agreement_v4.py \
+  --audit-root <AUDIT_OUTPUT_ROOT>
+```
+
+### 当前全量统计
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin
+/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python3.10 \
+  code_painting/analyze_selection_strategy_agreement_v4.py \
+  --audit-root /home/zaijia001/ssd/RoboTwin/code_painting/selection_strategy_compare_v4
+```
+
+该命令生成 `strategy_agreement_stats.json`、`.zh.md` 和 `.en.md`；左右手分别计数，并输出 Fused–Orientation、Fused–Top canonical 的同 candidate 次数、xyz 距离以及 Fused 加权 contribution。
+
+### 语法和输出校验
+
 ```bash
 cd /home/zaijia001/ssd/RoboTwin
 /home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python3.10 -m py_compile \
-  code_painting/render_selection_strategy_compare_v4.py
+  code_painting/render_selection_strategy_compare_v4.py \
+  code_painting/analyze_selection_strategy_agreement_v4.py
 ```
 
 检查 `audit_report.json` 的 `failures`、`record_gaps` 和覆盖计数；图片拥挤时以 metadata 为准。

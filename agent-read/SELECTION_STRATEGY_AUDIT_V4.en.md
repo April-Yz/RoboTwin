@@ -8,6 +8,7 @@ Code:
 
 ```text
 code_painting/render_selection_strategy_compare_v4.py
+code_painting/analyze_selection_strategy_agreement_v4.py
 ```
 
 Outputs from this run:
@@ -16,12 +17,15 @@ Outputs from this run:
 code_painting/selection_strategy_compare_v4/
   audit_report.json
   audit_report.zh.md
-  <TASK>/foundation_input_<ID>/
-    keyframe_<FRAME>_overlay.png
-    keyframe_<FRAME>_metadata.json
+  strategy_agreement_stats.json
+  strategy_agreement_stats.zh.md
+  strategy_agreement_stats.en.md
+  <TASK>/
+    id<ID>_keyframe_<FRAME>_overlay.png
+    id<ID>_keyframe_<FRAME>_metadata.json
 ```
 
-The generated directory remains covered by `code_painting/*`; `.gitignore` only unignores the V4 script.
+The generated directory remains covered by `code_painting/*`; `.gitignore` only unignores the two V4 scripts.
 
 ## What the four records mean
 
@@ -136,11 +140,12 @@ Distinct frames are stitched as side-by-side columns; the two rows are Selection
 
 ## Colors and line styles
 
-- OursV2: cyan;
-- Orientation: magenta;
-- Fused: yellow;
-- canonical Top-score: red;
-- raw/legacy Top-score: dark-red/orange dashed;
+- OursV2: solid cyan with a circle;
+- Orientation: thick solid magenta with a square;
+- Fused: dashed yellow with a diamond, so an exact Orientation overlap remains visible;
+- canonical Top-score: solid black with a triangle;
+- raw Top-score: dashed orange with a cross;
+- legacy Top-score: dashed blue with a cross;
 - pregrasp path: dashed in the strategy color;
 - `L` / `R`: executed arm.
 
@@ -150,7 +155,7 @@ Distinct frames are stitched as side-by-side columns; the two rows are Selection
 - 461 keyframe comparison images.
 - 2192 arm-strategy records.
 - Zero audit failures.
-- 461 PNG, 462 JSON, and one Markdown artifact, about 166 MB.
+- 461 PNG, 463 JSON, and three Markdown artifacts, about 169 MB.
 - The combined SHA-256 of legacy input summaries was unchanged before and after the full run: `345226256cadb99935a0af49e7a95fdc7f72889d21bcda354819e9def0002bd1`.
 
 Actual Top-score versus legacy rank previews:
@@ -161,6 +166,12 @@ Actual Top-score versus legacy rank previews:
 - actual candidate is absent from exported top-N: 396/600.
 
 For `handover_bottle/foundation_input_1/frame 39/right`, the old rank-1 is candidate 13, while V4 reads actual candidate 0 from the plan summary.
+
+Flat output example:
+
+```text
+code_painting/selection_strategy_compare_v4/pnp_tray/id2_keyframe_000052_overlay.png
+```
 
 All 600 Top-score raw-to-canonical records rotate by 90 degrees. The mean, minimum, and maximum legacy/canonical target position gap are all:
 
@@ -178,6 +189,32 @@ Top-score requested/resolved frame delta histogram:
 ```
 
 The maximum absolute shift is 18 frames.
+
+## Fused agreement and position differences
+
+One arm-event is one counting unit, so left and right count separately. Candidate equality requires both `resolved_frame` and `candidate_idx` to match. Positions are canonical Selection Pose world xyz.
+
+Fused versus Orientation:
+
+- 496 pairs; 465/496, or 93.75%, use the same candidate;
+- left: 229/245, 93.47%; right: 236/251, 94.02%;
+- xyz Euclidean distance: 2.979 mm mean, 0 median, 28.050 mm p95, and 107.584 mm maximum;
+- the 31 nonzero cases have a 47.669 mm mean distance.
+
+Fused versus canonical Top:
+
+- 496 pairs; 44/496, or 8.87%, use the same candidate;
+- left: 26/245, 10.61%; right: 18/251, 7.17%;
+- xyz Euclidean distance: 42.718 mm mean, 23.626 mm median, and 133.854 mm p95;
+- the 868.614 mm maximum is `stack_cups/id17/right/frame36`. That legacy Top target has world Z near 0.00075 m and is retained as a historical outlier, so mean alone is insufficient; the JSON also records median, p95, and the largest-gap samples.
+
+The actual six-task Fused formula remains:
+
+\[
+F=0.25s_{AG}+0.75o.
+\]
+
+Across the 496 selected Fused candidates, the mean weighted raw-score contribution is 0.050557 and the mean orientation contribution is 0.559351. Orientation contributes 91.75% of the final Fused score on average, and its contribution is larger in 496/496 cases. Together with 93.75% agreement with Orientation and only 8.87% with Top, this shows a strong rotation bias; because raw AnyGrasp scores are not normalized, the empirical bias is stronger than the nominal 75% weight.
 
 There are 208 record gaps, all caused by an empty historical Orientation/Fused candidate list at the requested frame: 104 each. Counts by task are:
 

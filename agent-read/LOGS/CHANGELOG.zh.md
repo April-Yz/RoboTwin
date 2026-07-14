@@ -3210,3 +3210,14 @@ Validation: `python -m py_compile` 通过；`bash -n` 通过；8 帧双臂 probe
 - 新增双语审计、命令、环境、故障排查、决策和版本说明；大批量 PNG/JSON 继续忽略，仅反忽略 V4 脚本。
 
 Validation: 本地和 `RoboTwin_bw` 远端 `py_compile` 通过；`handover_bottle/id1/frame39` 确认 Top candidate 0；`place_bread_basket/id0/frame64` 确认 Foundation 64/63 分栏；全量 metadata/schema/图片尺寸校验通过；旧输入 summary 组合 SHA-256 运行前后均为 `345226256cadb99935a0af49e7a95fdc7f72889d21bcda354819e9def0002bd1`。
+
+## 2026-07-14（Selection Strategy Audit V4 扁平输出与统计）
+
+- 新增 `code_painting/analyze_selection_strategy_agreement_v4.py`，按 arm-event 计数，要求 resolved frame 与 candidate index 同时相同；输出 Fused–Orientation、Fused–Top canonical 一致率、canonical xyz 距离、左右手分项和 Fused score contribution。
+- Fused 与 Orientation 同 candidate 为 465/496（93.75%），左/右分别为 229/245 与 236/251；与 Top canonical 同 candidate 为 44/496（8.87%），左/右分别为 26/245 与 18/251。
+- Fused–Orientation xyz 平均差 2.979 mm，中位数 0；31 个非零样本平均 47.669 mm。Fused–Top 平均 42.718 mm，中位数 23.626 mm，p95 133.854 mm；最大 868.614 mm 是旧 Top world-Z 接近 0 的历史异常值。
+- Fused 的平均 weighted raw/orientation contribution 为 0.050557/0.559351；orientation 平均占最终 Fused score 的 91.75%，且 496/496 个候选都是 orientation contribution 更大。
+- 输出层级改为 `<TASK>/id<ID>_keyframe_<FRAME>_{overlay,metadata}`。Orientation/Fused 使用粗品红实线方框/黄色虚线菱形；Top canonical/raw/legacy 改为黑/橙/蓝，避免同 pose 与红色坐标轴互相遮挡。
+- 旧嵌套结果移到 `selection_strategy_compare_v4_nested_backup_20260714_5c2788f`，新全量结果仍位于 `selection_strategy_compare_v4/`；旧策略输入未修改。
+
+Validation: 两个脚本本地/远端 `py_compile` 通过；pnp_tray id2/frame52 重叠样本和 id30/frame37 分离样本完成视觉检查；全量 461 PNG、461 metadata、2192 records 的 flat path/schema/图片读取断言通过；输入 summary 组合 SHA-256 仍为 `345226256cadb99935a0af49e7a95fdc7f72889d21bcda354819e9def0002bd1`。

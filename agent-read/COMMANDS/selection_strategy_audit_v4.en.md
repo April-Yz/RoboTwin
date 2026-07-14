@@ -25,6 +25,8 @@ cd /home/zaijia001/ssd/RoboTwin
 - `--approach-offset-m`: first-event pregrasp audit display, default 0.12 m.
 - `--axis-length-m`: rendered coordinate-axis length, default 0.045 m.
 
+Each task directory directly stores `id<ID>_keyframe_<FRAME>_{overlay,metadata}`; there is no intermediate `foundation_input_<ID>/` directory.
+
 ## Runnable smoke: corrected Top-score candidate
 
 ```bash
@@ -66,10 +68,33 @@ cd /home/zaijia001/ssd/RoboTwin
 
 ## Validation
 
+### Non-runnable agreement-statistics template
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin
+/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python3.10 \
+  code_painting/analyze_selection_strategy_agreement_v4.py \
+  --audit-root <AUDIT_OUTPUT_ROOT>
+```
+
+### Current full-batch statistics
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin
+/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python3.10 \
+  code_painting/analyze_selection_strategy_agreement_v4.py \
+  --audit-root /home/zaijia001/ssd/RoboTwin/code_painting/selection_strategy_compare_v4
+```
+
+This writes `strategy_agreement_stats.json`, `.zh.md`, and `.en.md`. Left and right count separately; results include Fused–Orientation and Fused–canonical-Top candidate agreement, xyz distances, and weighted Fused-score contributions.
+
+### Syntax and output validation
+
 ```bash
 cd /home/zaijia001/ssd/RoboTwin
 /home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python3.10 -m py_compile \
-  code_painting/render_selection_strategy_compare_v4.py
+  code_painting/render_selection_strategy_compare_v4.py \
+  code_painting/analyze_selection_strategy_agreement_v4.py
 ```
 
 Inspect `failures`, `record_gaps`, and coverage in `audit_report.json`. Metadata is authoritative when an overlay is crowded.

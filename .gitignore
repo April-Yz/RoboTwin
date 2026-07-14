@@ -42,6 +42,7 @@ code_painting/*
 !code_painting/run_skeyp_v2_whitebg_pipeline.sh
 !code_painting/repaint_skeyp_reinit_white_color.py
 !code_painting/render_selection_strategy_compare_v4.py
+!code_painting/analyze_selection_strategy_agreement_v4.py
 code_painting/anygrasp*
 code_painting/replay*
 !code_painting/replay_pose_debug_smooth.py

@@ -14,4 +14,6 @@
 - Treat `plan_summary.json -> selected_candidates_by_executed_arm` as the actual Top-score selection. Legacy rank previews remain only as evidence of the historical mismatch.
 - Preserve raw/legacy Top-score and the canonical reconstruction together. Label the canonical pose audit-only rather than presenting it as historical execution.
 - When resolved frames differ, use separate Foundation background columns; never silently project a pose onto another frame.
-- Keep batch PNG/JSON/reports ignored by Git, and version only the script and bilingual documentation.
+- Do not displace identical Orientation/Fused poses for visualization. Use thick-solid/thin-dashed lines and distinct markers at the same pose so data semantics remain unchanged.
+- Use `<TASK>/id<ID>_keyframe_<FRAME>_*` task outputs without an episode directory; keep the old nested output as a separate rollback backup.
+- Keep batch PNG/JSON/reports ignored by Git, and version only the two scripts and bilingual documentation.
