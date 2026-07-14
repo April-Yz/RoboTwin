@@ -11083,3 +11083,91 @@ zip:
 rclone:
 gdrive:piper/multi/6task/robot_graspnet_piper0515
 ~~~
+
+## T. OursV2 最小补充实验：GPT 关键帧提议与双臂轨迹碰撞检查
+
+本节的两个实验完全独立，只读取现有数据，不修改 OursV2 planner、人工关键帧 JSON 或原始轨迹。生成结果都在各自 `output/` 中，并由实验目录的 `.gitignore` 排除。
+
+### T.1 GPT 辅助的关键帧提议
+
+实验入口：
+
+~~~text
+/home/zaijia001/ssd/RoboTwin/code_painting/experiments/gpt_keyframe_mvp
+~~~
+
+逻辑：
+
+1. 从 LeRobot `meta/tasks.jsonl` 读取 task prompt，从项目 Markdown 中抽取任务策略。
+2. 提示词明确忽略人工加入的 `pregrasp` / approach offset / IK waypoint，只选人类视频中可见的语义状态转换。
+3. 左手、右手、双手联合关键帧分开输出，`handover_bottle` 中最小评估事件为右手稳定抓取、双手同时接触/交接、左手稳定接收。
+4. 源 episode 实际只有 head D435；contact sheet 的三列是同一相机的 RGB、HaMeR 手部 overlay 和 FoundationPose 物体 overlay，不是三个物理视角。
+5. `prepare` 阶段不读取人工帧号到 GPT 输入；只有 GPT JSON 回填后，`evaluate` 才读人工标注并计算 ±3 / ±5 / ±10 帧 precision、recall、F1 和帧误差。
+
+非可运行模板：
+
+~~~bash
+bash <EXPERIMENT_DIR>/run_keyframe_mvp.sh \
+  --task <TASK> --episodes <EPISODE_IDS> --mode prepare \
+  --coarse-stride <FRAME_STRIDE>
+
+# 将每个 episode 的 gpt_prompt.md + coarse/*.jpg 给 GPT，
+# 只把 JSON 结果保存为 gpt_response.json，然后：
+bash <EXPERIMENT_DIR>/run_keyframe_mvp.sh \
+  --task <TASK> --episodes <EPISODE_IDS> --mode evaluate
+~~~
+
+`handover_bottle` episode 1/2 的可运行例子：
+
+~~~bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/experiments/gpt_keyframe_mvp/run_keyframe_mvp.sh \
+  --task handover_bottle --episodes 1,2 --mode prepare --coarse-stride 5
+
+bash /home/zaijia001/ssd/RoboTwin/code_painting/experiments/gpt_keyframe_mvp/run_keyframe_mvp.sh \
+  --task handover_bottle --episodes 1,2 --mode evaluate
+~~~
+
+`evaluate` 如果找不到 `gpt_response.json` 会明确输出 `[pause]`，不会伪造 GPT 预测。
+
+### T.2 OursV2 双臂轨迹碰撞检查和最小时序避碰
+
+实验入口：
+
+~~~text
+/home/zaijia001/ssd/RoboTwin/code_painting/experiments/interarm_collision_mvp
+~~~
+
+逻辑：
+
+1. 只读 OursV2 `pose_debug.jsonl` 中左/右臂关节角和夹爪关节角，用 Piper0515 双 base 标定在新 SAPIEN scene 中回放。
+2. 只保留左 Piper articulation link 与右 Piper articulation link 之间的 contact；不把单臂自碰、桌面或其他物体 contact 混入。
+3. 相邻帧线性插值，保证任一手臂关节单步变化不超过 `max_joint_step_rad`，默认 0.02 rad，防止稀疏帧跳过碰撞。
+4. 运行前必须通过两个 sanity test：0515 标定初始位形无碰撞；人为把两个 base 重合时必须检出碰撞。
+5. 如果 baseline 碰撞，分别搜索“左先右等待”和“右先左等待”的最小启动延迟。这只改 timing，不改关节路径，不是 joint bimanual planning；对 handover 还必须验证接收手在交接时刻已就位。
+6. 所有 report 和 timing 搜索结果只写实验 `output/`，永不回写原始 `pose_debug.jsonl`。
+
+非可运行模板：
+
+~~~bash
+bash <EXPERIMENT_DIR>/run_collision_mvp.sh \
+  --task <TASK> --episodes <EPISODE_IDS> \
+  --source-root <OURS_V2_TRAJECTORY_ROOT> \
+  --max-joint-step-rad <RAD> --max-delay-frames <FRAMES>
+~~~
+
+`handover_bottle` episode 1/2 的可运行例子：
+
+~~~bash
+bash /home/zaijia001/ssd/RoboTwin/code_painting/experiments/interarm_collision_mvp/run_collision_mvp.sh \
+  --task handover_bottle --episodes 1,2 \
+  --max-joint-step-rad 0.02 --max-delay-frames 20
+~~~
+
+2026-07-14 最小运行结果：
+
+| episode | 原帧数 | 稠密检查数 | 碰撞步 | 非夹爪碰撞步 | 最大穿透 | 20 帧内 timing-only 解 |
+|---:|---:|---:|---:|---:|---:|---|
+| 1 | 224 | 390 | 85 | 0 | 1.090 mm | 无 |
+| 2 | 224 | 385 | 68 | 0 | 0.944 mm | 无 |
+
+两条轨迹的 contact 全部是左右夹爪之间的接触，没有手臂 link 对手臂 link 碰撞。这不能直接当作“handover 意图正确”：正常交接可能允许两只夹爪靠近，但几何穿透仍是无效状态。由于 20 帧内的纯时序延迟没有消除碰撞，本 MVP 不输出虚假的“已解决”轨迹；下一步需要在交接段对夹爪位姿做几何重规划，或加入瓶子附着/碰撞体后再验证。
