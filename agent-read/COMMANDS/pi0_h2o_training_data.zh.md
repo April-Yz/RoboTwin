@@ -508,6 +508,7 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate R
 ```
 
 颜色路线全量输出默认跟随 L16 robot 视频帧数；Stage-1 背景按比例采样对齐，和原 Stage-2 compose 一致。
+
 ### L16 four-camera montage preview
 
 用于把 L16 planner 输出目录中的 `head_cam_plan.mp4`、`third_cam_plan.mp4`、`left_wrist_cam_plan.mp4`、`right_wrist_cam_plan.mp4` 拼成 `four_cam_montage_vscode.mp4`。完整命令记录在 `COMMAND_LIBRARY.zh.md` 末尾的 `I debug. L16 四相机拼接预览`；输出只用于人工检查，不参与训练转换。

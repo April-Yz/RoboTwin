@@ -2370,6 +2370,7 @@ tmux new-session -d -s l16_stack_debug_variants_gpu1 'GPU=1 IDS="0 1 2 3 4" MAX_
 ## 2026-06-26（L16 color debug 帧对齐说明）
 
 - 更新 `COMMAND_LIBRARY.zh.md` 与 `agent-read/COMMANDS/pi0_h2o_training_data.*.md`：明确 `repaint_l16_white_color_debug.py` 默认按 L16 robot 视频帧数输出，Stage-1 背景按比例采样；`--max-frames` 只是快速预览截断参数。
+
 ## 2026-06-26（L16 四相机拼接预览命令）
 
 - 在 `COMMAND_LIBRARY.zh.md` 末尾新增四相机 2x2 montage 命令：输入 `head_cam_plan.mp4`、`third_cam_plan.mp4`、`left_wrist_cam_plan.mp4`、`right_wrist_cam_plan.mp4`，输出 `four_cam_montage_vscode.mp4`。
@@ -2394,6 +2395,18 @@ tmux new-session -d -s l16_stack_debug_variants_gpu1 'GPU=1 IDS="0 1 2 3 4" MAX_
 - 原因：Mode N no-axis color Stage2 输出目录为 `id_{id}_l16_white_color_human_object`；旧硬编码模板会导致 process 阶段找不到 `final_repainted.mp4`。
 - 本次 no-axis selected25 downstream 用 `HEAD_DIR_TEMPLATE="id_{id}_l16_white_color_human_object"` 成功生成 6 任务 Piper0515 25ep repo 和本地 zip。
 
+## 2026-07-08（SKEYP v2 reinit gripper-only 命令）
+
+- 新增一键入口：`bash /home/zaijia001/ssd/RoboTwin/code_painting/run_skeyp_v2_reinit_gripperonly_pipeline.sh`。
+- 推荐 tmux：`tmux new-session -d -s skeyp_v2_reinit_gripperonly_pipeline 'bash /home/zaijia001/ssd/RoboTwin/code_painting/run_skeyp_v2_reinit_gripperonly_pipeline.sh'`。
+- 关键参数：`TASKS`、`SUBSET_N`、`OVERWRITE_REPAINT`、`GRIPPER_PROMPT`、`GRIPPER_BOX_THRESHOLD`、`GRIPPER_TEXT_THRESHOLD`、`GRIPPER_MAX_MASK_AREA_RATIO`、各任务 GPU 环境变量。
+- 输出路径见 `agent-read/COMMANDS/skeyp_pipeline.zh.md` 的 `SKEYP v2: reinit gripper-only` 小节。
+
+## 2026-07-08（SKEYP v2 whitebg 命令）
+
+- 新增入口：`bash /home/zaijia001/ssd/RoboTwin/code_painting/run_skeyp_v2_whitebg_pipeline.sh`。
+- 推荐 tmux：`tmux new-session -d -s skeyp_v2_whitebg_pipeline 'bash /home/zaijia001/ssd/RoboTwin/code_painting/run_skeyp_v2_whitebg_pipeline.sh'`。
+- 输出后缀：`skeyp_reinit_whitebg`；本地 zip：`robot_skeyp_reinit_whitebg_piper0515_6task_25ep.zip`；手动上传目标：`gdrive:piper/multi/6task/robot_skeyp_reinit_whitebg_piper0515`。
 ## 2026-07-09（Q.9 VR-HaMeR cross-episode transform 聚合命令）
 
 - 新增入口：`python code_painting/analyze_vr_hamer_cross_episode_transform_patterns.py --episode-substr 20260708 --overwrite --out-dir /home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/cross_episode_transform_patterns_20260708`。

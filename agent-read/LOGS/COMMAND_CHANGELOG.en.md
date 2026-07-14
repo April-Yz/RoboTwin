@@ -2372,6 +2372,7 @@ tmux new-session -d -s l16_stack_debug_variants_gpu1 'GPU=1 IDS="0 1 2 3 4" MAX_
 ## 2026-06-26 (L16 color debug frame-alignment note)
 
 - Updated `COMMAND_LIBRARY.zh.md` and `agent-read/COMMANDS/pi0_h2o_training_data.*.md`: clarified that `repaint_l16_white_color_debug.py` outputs the L16 robot video frame count by default and samples Stage-1 backgrounds proportionally; `--max-frames` is only a quick-preview truncation option.
+
 ## 2026-06-26 (L16 four-camera montage preview command)
 
 - Added a 2x2 four-camera montage command to the tail of `COMMAND_LIBRARY.zh.md`: inputs are `head_cam_plan.mp4`, `third_cam_plan.mp4`, `left_wrist_cam_plan.mp4`, and `right_wrist_cam_plan.mp4`; output is `four_cam_montage_vscode.mp4`.
@@ -2396,6 +2397,18 @@ tmux new-session -d -s l16_stack_debug_variants_gpu1 'GPU=1 IDS="0 1 2 3 4" MAX_
 - Reason: the Mode N no-axis color Stage-2 outputs use `id_{id}_l16_white_color_human_object`; the old hardcoded template made the process step miss `final_repainted.mp4`.
 - This no-axis selected25 downstream run used `HEAD_DIR_TEMPLATE="id_{id}_l16_white_color_human_object"` and successfully produced six Piper0515 25ep repos plus a local zip.
 
+## 2026-07-08 (SKEYP v2 reinit gripper-only command)
+
+- Added one-shot entrypoint: `bash /home/zaijia001/ssd/RoboTwin/code_painting/run_skeyp_v2_reinit_gripperonly_pipeline.sh`.
+- Recommended tmux: `tmux new-session -d -s skeyp_v2_reinit_gripperonly_pipeline 'bash /home/zaijia001/ssd/RoboTwin/code_painting/run_skeyp_v2_reinit_gripperonly_pipeline.sh'`.
+- Important parameters: `TASKS`, `SUBSET_N`, `OVERWRITE_REPAINT`, `GRIPPER_PROMPT`, `GRIPPER_BOX_THRESHOLD`, `GRIPPER_TEXT_THRESHOLD`, `GRIPPER_MAX_MASK_AREA_RATIO`, and per-task GPU environment variables.
+- Output paths are documented in the `SKEYP v2: reinit gripper-only` section of `agent-read/COMMANDS/skeyp_pipeline.en.md`.
+
+## 2026-07-08 (SKEYP v2 whitebg command)
+
+- Added entrypoint: `bash /home/zaijia001/ssd/RoboTwin/code_painting/run_skeyp_v2_whitebg_pipeline.sh`.
+- Recommended tmux: `tmux new-session -d -s skeyp_v2_whitebg_pipeline 'bash /home/zaijia001/ssd/RoboTwin/code_painting/run_skeyp_v2_whitebg_pipeline.sh'`.
+- Output suffix: `skeyp_reinit_whitebg`; local zip: `robot_skeyp_reinit_whitebg_piper0515_6task_25ep.zip`; manual upload target: `gdrive:piper/multi/6task/robot_skeyp_reinit_whitebg_piper0515`.
 ## 2026-07-09 (Q.9 VR-HaMeR Cross-Episode Transform Aggregation Command)
 
 - Added entrypoint: `python code_painting/analyze_vr_hamer_cross_episode_transform_patterns.py --episode-substr 20260708 --overwrite --out-dir /home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/cross_episode_transform_patterns_20260708`.

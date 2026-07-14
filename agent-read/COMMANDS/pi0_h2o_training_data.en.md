@@ -508,6 +508,7 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate R
 ```
 
 Full color-route outputs follow the L16 robot video frame count. The Stage-1 background is sampled proportionally, matching the original Stage-2 compose behavior.
+
 ### L16 four-camera montage preview
 
 Combines `head_cam_plan.mp4`, `third_cam_plan.mp4`, `left_wrist_cam_plan.mp4`, and `right_wrist_cam_plan.mp4` from an L16 planner output episode into `four_cam_montage_vscode.mp4`. The full command is recorded at the tail of `COMMAND_LIBRARY.zh.md` under `I debug. L16 four-camera montage preview`; the output is for manual inspection only and is not used by training conversion.

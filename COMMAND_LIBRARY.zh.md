@@ -10379,6 +10379,7 @@ mask_head_cam_plan/*.jpg            # 实际用于合成的 foreground alpha
 final_repainted.mp4                 # 颜色去白最终合成
 color_white_manifest.json           # 参数与 foreground/white 面积比例
 ```
+
 ## I debug. L16 四相机拼接预览：head / third / left wrist / right wrist
 
 用途：把单个 episode 的 `head_cam_plan.mp4`、`third_cam_plan.mp4`、`left_wrist_cam_plan.mp4`、`right_wrist_cam_plan.mp4` 拼成 2x2 四宫格，方便一起检查右手相机前后偏移、腕部相机视角和第三视角执行。输出为 VSCode 友好的 H.264 + `yuv420p`：`four_cam_montage_vscode.mp4`。
@@ -10440,4 +10441,305 @@ done
 
 ```bash
 find /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_de_human_replay_clean_right_cam -type f -name 'four_cam_montage_vscode.mp4' | wc -l
+```
+
+## SKEYP. 关键帧消融实验记录与下一版规划（2026-07-08）
+
+### SKEYP v1 已运行版本：planner-output 方案（已完成，但不是最终想要的 reinit-style 定义）
+
+这版对应脚本：
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/run_skeyp_selected25_pipeline.sh
+```
+
+运行入口：
+
+```bash
+tmux new-session -d -s skeyp_selected25_pipeline \
+  'bash /home/zaijia001/ssd/RoboTwin/code_painting/run_skeyp_selected25_pipeline.sh'
+```
+
+v1 的实际语义：它复用了 `ours` 的 planner-output 转换格式，核心 action/state 来自 `plan_keyframes_human_replay.py -> plan_anygrasp_keyframes_piper.py` 产出的 `pose_debug.jsonl`，不是 reinit 的 `world_targets_and_status.npz`。因此它更接近“带物体/场景上下文的 keyframe planner replay + robot-only repaint”，不能当成“只有人手映射夹爪、没有物体 foundation replay”的 reinit-style 消融。
+
+v1 阶段链路：
+
+1. 选取 id：复用 `ours` 的 6 任务前 25 条选择结果。
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/l16_ours_review_first25/selections/<TASK>/ours_review_selection.json
+```
+
+2. Stage-1 背景：复用旧 reinit hands-only inpainting 结果；缺失时只补跑人手/手腕/手表/手臂 inpainting，保留真实物体。
+
+```text
+默认复用源：/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2/stage1/<TASK>/id_<ID>/stage1_human_inpaint/removed_w_mask_rgb_<ID>.mp4
+skeyp v1 统一入口：/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_skeyp/stage1/<TASK>/id_<ID>/stage1_human_inpaint/removed_w_mask_rgb_<ID>.mp4
+```
+
+3. Keyframe planner replay：使用人手关键帧生成 planner 输出；该阶段会生成 robot/scene 的 planner 视频、左右 wrist 视频和 `pose_debug.jsonl`，供后续 `process_repainted_planner_outputs.py` 使用。
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/skeyp_selected25_rightcam_m003_20260708/<TASK>/foundation_input_<ID>/head_cam_plan.mp4
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/skeyp_selected25_rightcam_m003_20260708/<TASK>/foundation_input_<ID>/left_wrist_cam_plan.mp4
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/skeyp_selected25_rightcam_m003_20260708/<TASK>/foundation_input_<ID>/right_wrist_cam_plan.mp4
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/skeyp_selected25_rightcam_m003_20260708/<TASK>/foundation_input_<ID>/pose_debug.jsonl
+/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/skeyp_selected25_rightcam_m003_20260708/<TASK>/foundation_input_<ID>/plan_summary_human_replay.json
+```
+
+4. Stage-2 repaint：对 v1 planner 的 `head_cam_plan.mp4` 做 SAM visible-reinit，只 prompt robot，不 prompt object；贴到 Stage-1 hands-only 背景上。注意：虽然 Stage-2 只贴 robot mask，v1 的 robot 源视频和 action/state 仍来自 planner-output 体系。
+
+```text
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_skeyp_visible_reinit/e0_robot/<TASK>/id_<ID>_skeyp/final_repainted.mp4
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_skeyp_visible_reinit/e0_robot/<TASK>/id_<ID>_skeyp/w_box_head_cam_plan.mp4
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_skeyp_visible_reinit/e0_robot/<TASK>/id_<ID>_skeyp/w_mask_head_cam_plan.mp4
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_skeyp_visible_reinit/e0_robot/<TASK>/id_<ID>_skeyp/mask_head_cam_plan.mp4
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_skeyp_visible_reinit/e0_robot/<TASK>/id_<ID>_skeyp/visible_reinit_meta.json
+```
+
+5. 转 pi0 processed HDF5：走 `run_l16_ours_selected_pipeline.sh` 的 planner-output 分支，使用 Stage-2 head + planner wrist/action/state。
+
+```text
+/home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_<TASK>_skeyp-120
+```
+
+6. 转 LeRobot、抽 25ep、做 Piper0515 坐标对齐：
+
+```text
+/home/zaijia001/.cache/huggingface/lerobot/local/h2o_<TASK>_skeyp
+/home/zaijia001/.cache/huggingface/lerobot/local/h2o_<TASK>_skeyp_25ep
+/home/zaijia001/.cache/huggingface/lerobot/local/h2o_<TASK>_skeyp_piper0515_25ep
+```
+
+7. 本地 zip：
+
+```text
+/home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_piper0515_6task_25ep.zip
+```
+
+v1 已完成校验：
+
+```text
+Stage-2 final_repainted.mp4：6 task * 25 = 150 条
+zip 内 parquet：150
+zip 内 piper0515_world_to_base_conversion.json：6
+```
+
+手动上传命令（本环境不自动跑 rclone）：
+
+```bash
+rclone copy /home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_piper0515_6task_25ep.zip \
+  gdrive:piper/multi/6task/robot_skeyp_piper0515 \
+  -P --drive-chunk-size 64M --transfers 4
+```
+
+### SKEYP v2 待实现规划：reinit-style gripper-only / robot-only replay
+
+目标定义：和 reinit 对齐，不再使用 `plan_keyframes_human_replay.py` 的 planner-output 数据格式，也不再使用 object/Foundation replay 场景。视觉上保留真实原始物体；只把“由人手映射得到的机器人夹爪/末端执行器”贴到 hands-only 背景上。
+
+建议把 v2 命名为：
+
+```text
+skeyp_reinit_gripperonly
+```
+
+v2 推荐链路：
+
+1. 选取 id：继续复用 `l16_ours_review_first25` 中相同 25 条，保证和 `ours/oursv2/skeypv1/Mode N` 可比。
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/l16_ours_review_first25/selections/<TASK>/ours_review_selection.json
+```
+
+2. 夹爪-only replay 源：不要走 `plan_keyframes_human_replay.py`。应从 reinit/pure D435 retarget 体系出发，输出或复用类似下面的结构：
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure_d435/<TASK>/id<ID>_d435_z005/zed_replay_d435.mp4
+/home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure_d435/<TASK>/id<ID>_d435_z005/world_targets_and_status.npz
+/home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure_d435/<TASK>/id<ID>_d435_z005/left_wrist_replay.mp4
+/home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure_d435/<TASK>/id<ID>_d435_z005/right_wrist_replay.mp4
+```
+
+如果 `skeyp` 必须保持“只用关键帧+插值”的定义，则需要新增一个 reinit-compatible 生成器：输入人手关键帧，按关键帧之间插值得到夹爪轨迹，输出 `world_targets_and_status.npz`、`zed_replay_d435.mp4`、`left_wrist_replay.mp4`、`right_wrist_replay.mp4`；但渲染时不加载/不 replay 物体，也不使用 Foundation/AnyGrasp object pose 作为目标来源。
+
+3. Stage-1 背景：复用 reinit 的 hands-only inpainting，仍只消除人手/手臂/手腕/手表，不消除物体。这样真实物体留在背景里，避免物体 foundation replay 或仿真物体贴回。
+
+```text
+/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2/stage1/<TASK>/id_<ID>/stage1_human_inpaint/removed_w_mask_rgb_<ID>.mp4
+```
+
+若要放到新实验独立目录，可用 symlink 或复制到：
+
+```text
+/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_skeyp_reinit_gripperonly/stage1/<TASK>/id_<ID>/stage1_human_inpaint/removed_w_mask_rgb_<ID>.mp4
+```
+
+4. Stage-2 repaint：输入为 gripper-only / robot-only replay 视频，target 为 Stage-1 hands-only 背景。SAM prompt 应优先只检测夹爪，不检测整条机械臂：
+
+```text
+text_prompt="robotic gripper, gripper fingers, end effector, robot hand."
+```
+
+如果 strict gripper prompt 漏检，再做一个 debug 对照：
+
+```text
+text_prompt="robotic gripper, gripper fingers, robot wrist, end effector."
+```
+
+推荐新输出目录：
+
+```text
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_skeyp_reinit_gripperonly/e0_gripper/<TASK>/id_<ID>_skeyp_gripper/final_repainted.mp4
+```
+
+重点 debug 文件：
+
+```text
+w_box_zed_replay_d435.mp4     # 看 DINO 是否只框夹爪/末端
+w_mask_zed_replay_d435.mp4    # 看 SAM mask 是否只覆盖夹爪
+mask_zed_replay_d435.mp4      # 实际合成 mask 视频
+final_repainted.mp4           # 最终只贴夹爪后的 head
+visible_reinit_meta.json      # 每帧 tracking/reinit 状态
+```
+
+5. 转训练数据：v2 应走 reinit/D435 转换方式，而不是 planner-output 方式。也就是说使用 `process_repainted_headcam_with_wrist.py`，读取 Stage-2 gripper-only head，加上 `h2_pure_d435` 或新 skeyp reinit-compatible 目录里的 `world_targets_and_status.npz` 和左右 wrist。
+
+期望输出命名：
+
+```text
+/home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_<TASK>_skeyp_reinit_gripperonly-120
+/home/zaijia001/.cache/huggingface/lerobot/local/h2o_<TASK>_skeyp_reinit_gripperonly
+/home/zaijia001/.cache/huggingface/lerobot/local/h2o_<TASK>_skeyp_reinit_gripperonly_25ep
+/home/zaijia001/.cache/huggingface/lerobot/local/h2o_<TASK>_skeyp_reinit_gripperonly_piper0515_25ep
+/home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_reinit_gripperonly_piper0515_6task_25ep.zip
+```
+
+v1/v2 核心区别：
+
+| 环节 | skeyp v1 已跑完 | skeyp v2 应实现 |
+|---|---|---|
+| 运动/状态格式 | planner-output：`pose_debug.jsonl` | reinit-style：`world_targets_and_status.npz` |
+| replay 入口 | `plan_keyframes_human_replay.py -> plan_anygrasp_keyframes_piper.py` | reinit/pure D435 retarget 或新增 keyframe 插值到 reinit-compatible 输出 |
+| 物体/场景 | 带 object/scene/planner 上下文，容易混入 object foundation replay 语义 | 不 replay 物体，只保留真实背景里的物体 |
+| Stage-1 | hands-only，保留真实物体 | 同 v1/reinit：hands-only，保留真实物体 |
+| Stage-2 mask | v1 prompt robot arm/gripper/wrist/forearm，贴 robot | v2 prompt gripper/end-effector，尽量只贴夹爪 |
+| 数据转换 | `process_repainted_planner_outputs.py` / `run_l16_ours_selected_pipeline.sh` | `process_repainted_headcam_with_wrist.py` / L8.2 风格 |
+| 最终可比对象 | 更接近 ours/Mode M planner-output 消融 | 更接近 reinit，只隔离“关键帧/夹爪轨迹”因素 |
+
+### SKEYP v2 已实现入口：reinit-style gripper-only / robot-only replay
+
+本版目标：和 reinit/pinpointing 链路对齐，不使用 object/Foundation replay，不走 planner-output。Stage-1 只去人手/手腕/手表/手臂并保留真实物体；Stage-2 只检测并贴回夹爪/末端执行器；训练数据转换走 `process_repainted_headcam_with_wrist.py`，最终仍做 piper0515 坐标对齐。
+
+一键提交运行：
+
+```bash
+tmux new-session -d -s skeyp_v2_reinit_gripperonly_pipeline \
+  'bash /home/zaijia001/ssd/RoboTwin/code_painting/run_skeyp_v2_reinit_gripperonly_pipeline.sh'
+```
+
+监控：
+
+```bash
+tmux attach -t skeyp_v2_reinit_gripperonly_pipeline
+tail -f /home/zaijia001/tmp/skeyp_v2_reinit_gripperonly_20260708_logs/task_stack_cups.log
+```
+
+每个任务日志：
+
+```text
+/home/zaijia001/tmp/skeyp_v2_reinit_gripperonly_20260708_logs/task_<TASK>.log
+```
+
+中间结果路径：
+
+```text
+Stage-1 hands-only 背景：
+/home/zaijia001/ssd/inpainting_sam2_robot/results_repaint_piper_h2_skeyp/v2_reinit_gripperonly/stage1/<TASK>/id_<ID>/stage1_human_inpaint/removed_w_mask_rgb_<ID>.mp4
+
+reinit-style 轨迹软链接：
+/home/zaijia001/ssd/RoboTwin/code_painting/human_replay/skeyp_v2_reinit_gripperonly/h2_pure_d435_selected25/<TASK>/id<ID>_d435_z005/
+
+Stage-2 gripper-only 合成：
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_skeyp_visible_reinit/v2_reinit_gripperonly/e0_gripper/<TASK>/id_<ID>_skeyp_gripper/final_repainted.mp4
+
+Stage-2 debug：
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_skeyp_visible_reinit/v2_reinit_gripperonly/e0_gripper/<TASK>/id_<ID>_skeyp_gripper/w_box_zed_replay_d435.mp4
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_skeyp_visible_reinit/v2_reinit_gripperonly/e0_gripper/<TASK>/id_<ID>_skeyp_gripper/w_mask_zed_replay_d435.mp4
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_skeyp_visible_reinit/v2_reinit_gripperonly/e0_gripper/<TASK>/id_<ID>_skeyp_gripper/mask_zed_replay_d435.mp4
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_skeyp_visible_reinit/v2_reinit_gripperonly/e0_gripper/<TASK>/id_<ID>_skeyp_gripper/visible_reinit_meta.json
+
+中间 HDF5：
+/home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_<TASK>_skeyp_reinit_gripperonly-120
+
+piper0515 LeRobot：
+/home/zaijia001/.cache/huggingface/lerobot/local/h2o_<TASK>_skeyp_reinit_gripperonly_piper0515_25ep
+
+本地 zip：
+/home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_reinit_gripperonly_piper0515_6task_25ep.zip
+```
+
+手动上传命令：
+
+```bash
+rclone copy /home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_reinit_gripperonly_piper0515_6task_25ep.zip \
+  gdrive:piper/multi/6task/robot_skeyp_reinit_gripperonly_piper0515 \
+  -P --drive-chunk-size 64M --transfers 4
+```
+
+运行结果（2026-07-08 已完成）：
+
+```text
+Stage-2 final_repainted.mp4：6 task * 25 = 150
+processed HDF5：6 task * 25 = 150
+Piper0515 LeRobot parquet：6 task * 25 = 150
+zip：/home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_reinit_gripperonly_piper0515_6task_25ep.zip（约 130 MB）
+zip 校验：150 个 parquet，6 个 piper0515_world_to_base_conversion.json
+```
+
+### SKEYP v2 whitebg 修正版：白背景反选替代 gripper-only SAM
+
+用途：如果 `skeyp_reinit_gripperonly` 的 Stage-2 中夹爪没有被 repaint 回来，使用本路线。它不跑 DINO/SAM，而是仿照 `ours` 的 whitebg 方式，从 reinit `zed_replay_d435.mp4` 里按颜色检测白底，反选非白 foreground 后合成到 Stage-1 hands-only 背景。
+
+一键运行：
+
+```bash
+tmux new-session -d -s skeyp_v2_whitebg_pipeline \
+  'bash /home/zaijia001/ssd/RoboTwin/code_painting/run_skeyp_v2_whitebg_pipeline.sh'
+```
+
+监控：
+
+```bash
+tmux attach -t skeyp_v2_whitebg_pipeline
+tail -f /home/zaijia001/tmp/skeyp_v2_reinit_whitebg_20260708_logs/task_pick_diverse_bottles.log
+```
+
+输出路径：
+
+```text
+Stage-2 whitebg repaint：
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_skeyp_visible_reinit/v2_reinit_whitebg/e0_robot_color/<TASK>/id_<ID>_skeyp_whitebg/final_repainted.mp4
+
+Stage-2 debug：
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_skeyp_visible_reinit/v2_reinit_whitebg/e0_robot_color/<TASK>/id_<ID>_skeyp_whitebg/mask_zed_replay_d435.mp4
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_skeyp_visible_reinit/v2_reinit_whitebg/e0_robot_color/<TASK>/id_<ID>_skeyp_whitebg/w_mask_zed_replay_d435.mp4
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_skeyp_visible_reinit/v2_reinit_whitebg/e0_robot_color/<TASK>/id_<ID>_skeyp_whitebg/w_white_bg_mask_zed_replay_d435.mp4
+/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_skeyp_visible_reinit/v2_reinit_whitebg/e0_robot_color/<TASK>/id_<ID>_skeyp_whitebg/color_white_manifest.json
+
+中间 HDF5：
+/home/zaijia001/ssd/RoboTwin/policy/pi0/processed_data/h2o_<TASK>_skeyp_reinit_whitebg-120
+
+Piper0515 LeRobot：
+/home/zaijia001/.cache/huggingface/lerobot/local/h2o_<TASK>_skeyp_reinit_whitebg_piper0515_25ep
+
+本地 zip：
+/home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_reinit_whitebg_piper0515_6task_25ep.zip
+```
+
+手动上传命令：
+
+```bash
+rclone copy /home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_reinit_whitebg_piper0515_6task_25ep.zip \
+  gdrive:piper/multi/6task/robot_skeyp_reinit_whitebg_piper0515 \
+  -P --drive-chunk-size 64M --transfers 4
 ```
