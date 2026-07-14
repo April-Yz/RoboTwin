@@ -582,6 +582,12 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && for ID in $(seq 
 
 原因记录：当前默认 replay 只用了 D435 head 外参，但仍用 `640x360 + fovy_deg=90` 的虚拟广角内参，所以画面比真实 D435 更广，Piper 投影更小。
 
+##### E2.4-V1 历史 Dense Replay（保留，不删除）
+
+下面原有的 `render_hand_retarget_piper_dual_npz_urdfik_main.py -> h2_pure_d435` 命令定义为 Dense Replay V1。现有 D435 repaint、processed HDF5 和历史论文素材仍可能引用它，因此必须保留。V1 的关节顺序 `joint1..joint6` 本身正确，但旧输出存在四个已确认的问题：旧视频早于当前 `piper_pika_agx` IK URDF 修复；Curobo 与 SAPIEN `link6` 局部轴相差固定 `Ry(-90deg)` 却未适配；HaMeR 指尖中点 TCP 与 link6/12cm bias 语义混用；请求的 10 个 joint interpolation waypoint 会被继承构造覆盖为 2，并且执行只等待固定步数而不检查关节收敛。
+
+因此 V1 只用于历史复现。新生成的 Dense baseline 优先使用下方 E2.4-V2，但不要把 V2 输出直接混入仍引用 V1 replay 的 Stage-2 repaint/HDF5 目录。
+
 先跑一个正常 D435 id35 检查视角：
 
 ```bash
@@ -603,10 +609,74 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && GPU=3; FPS=5; MA
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && GPU=3; FPS=5; MAX_FRAMES=3000; RETREAT=0.05; for TASK in pick_diverse_bottles place_bread_basket stack_cups; do for ID in $(seq 90 120); do IN=/home/zaijia001/ssd/data/piper/hand/${TASK}/harmer_output/hand_detections_${ID}.npz; OUT=/home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure_d435/${TASK}/id${ID}_d435_z005; [[ -f "$IN" ]] || { echo "[skip] missing $IN"; continue; }; CUDA_VISIBLE_DEVICES=${GPU} conda run -n RoboTwin_bw python /home/zaijia001/ssd/RoboTwin/code_painting/render_hand_retarget_piper_dual_npz_urdfik_main.py --input_npz "$IN" --output_dir "$OUT" --image_width 640 --image_height 480 --fovy_deg 42.499880046655484 --fps ${FPS} --max_frames ${MAX_FRAMES} --arms both --piper_calibration_bundle /home/zaijia001/ssd/RoboTwin/calibration_bundle_piper_new_table_0515.json --camera_cv_axis_mode legacy_r1 --require_stored_gripper_pose 1 --pose_source gripper --orientation_remap_label identity --stored_orientation_post_rot_xyz_deg 0 0 0 --target_local_forward_retreat_m ${RETREAT} --target_world_offset_xyz 0 0.1 0.1 --execute_waypoint_scene_steps 5 --execute_settle_scene_steps 20 --urdfik_joint_interp_waypoints 10 --debug_mode 0 --debug_post_execute 0 --debug_frame_limit -1 --debug_visualize_targets 0 --debug_visualize_cameras 0 --clean_output 1 --overlay_text_enable 0 --save_png_frames 0 --lighting_mode front_no_shadow; rm -f "$OUT"/zed_depth.mp4 "$OUT"/left_wrist_replay.mp4 "$OUT"/right_wrist_replay.mp4 "$OUT"/smooth_*.mp4; rm -rf "$OUT"/frames; for V in zed_replay third_replay; do [[ -f "$OUT/${V}.mp4" ]] || continue; ffmpeg -y -i "$OUT/${V}.mp4" -an -c:v libx264 -pix_fmt yuv420p -movflags +faststart "$OUT/${V}_d435.tmp.mp4" && mv "$OUT/${V}_d435.tmp.mp4" "$OUT/${V}_d435.mp4"; done; done; done
 ```
 
-#### new 3 task
+#### E2.4-V1 new 3 task（历史命令保留）
 ```bash
 source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && GPU=1; FPS=5; MAX_FRAMES=3000; RETREAT=0.05; for TASK in pnp_tray pnp_bread handover_bottle; do for ID in $(seq 0 30); do IN=/home/zaijia001/ssd/data/piper/hand/${TASK}/harmer_output/hand_detections_${ID}.npz; OUT=/home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure_d435/${TASK}/id${ID}_d435_z005; [[ -f "$IN" ]] || { echo "[skip] missing $IN"; continue; }; CUDA_VISIBLE_DEVICES=${GPU} conda run -n RoboTwin_bw python /home/zaijia001/ssd/RoboTwin/code_painting/render_hand_retarget_piper_dual_npz_urdfik_main.py --input_npz "$IN" --output_dir "$OUT" --image_width 640 --image_height 480 --fovy_deg 42.499880046655484 --fps ${FPS} --max_frames ${MAX_FRAMES} --arms both --piper_calibration_bundle /home/zaijia001/ssd/RoboTwin/calibration_bundle_piper_new_table_0515.json --camera_cv_axis_mode legacy_r1 --require_stored_gripper_pose 1 --pose_source gripper --orientation_remap_label identity --stored_orientation_post_rot_xyz_deg 0 0 0 --target_local_forward_retreat_m ${RETREAT} --target_world_offset_xyz 0 0.1 0.1 --execute_waypoint_scene_steps 5 --execute_settle_scene_steps 20 --urdfik_joint_interp_waypoints 10 --debug_mode 0 --debug_post_execute 0 --debug_frame_limit -1 --debug_visualize_targets 0 --debug_visualize_cameras 0 --clean_output 1 --overlay_text_enable 0 --save_png_frames 0 --lighting_mode front_no_shadow; rm -f "$OUT"/zed_depth.mp4 "$OUT"/left_wrist_replay.mp4 "$OUT"/right_wrist_replay.mp4 "$OUT"/smooth_*.mp4; rm -rf "$OUT"/frames; for V in zed_replay third_replay; do [[ -f "$OUT/${V}.mp4" ]] || continue; ffmpeg -y -i "$OUT/${V}.mp4" -an -c:v libx264 -pix_fmt yuv420p -movflags +faststart "$OUT/${V}_d435.tmp.mp4" && mv "$OUT/${V}_d435.tmp.mp4" "$OUT/${V}_d435.mp4"; done; done; done
 ```
+
+#### E2.4-V2 Dense Replay URDF-match（当前推荐，新目录不覆盖 V1）
+
+V2 保持 Dense 的逐帧人手 retargeting baseline 定义，不加入 Ours v2 的 sparse interaction keyframes 或 robot-native grasp selection。它只修复规划与执行对应：IK/仿真统一 `piper_pika_agx`、显式加入 Curobo→SAPIEN `link6` 的固定 `Ry(-90deg)` adapter、严格反演 12cm TCP、恢复 10 个 joint waypoint，并按实测关节误差等待收敛。
+
+相邻目录关系：
+
+```text
+V1（历史保留）:
+code_painting/human_replay/h2_pure_d435/<TASK>/id<ID>_d435_z005/
+
+V2（当前推荐）:
+code_painting/human_replay/h2_pure_d435_urdfmatch_v2/<TASK>/id<ID>_d435_z005/
+```
+
+单 episode 命令模板（不可直接运行）：
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin
+TASK=<TASK> ID=<ID> GPU=<GPU> MAX_FRAMES=-1 \
+bash code_painting/run_dense_replay_urdfmatch_v2.sh
+```
+
+已验证的单 episode：
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin
+TASK=pick_diverse_bottles ID=0 GPU=3 MAX_FRAMES=-1 \
+bash code_painting/run_dense_replay_urdfmatch_v2.sh
+```
+
+该 episode 共 106 帧；成功的 168 个 arm plan 平均规划/执行 TCP 位置误差为 `4.44/4.70 mm`，Curobo FK 与 SAPIEN TCP 平均差为 `3.16e-7 m`。左/右成功目标为 `85/83`，缺失、NaN、越界或机器人不可达的人手目标继续记为 Dense baseline failure。
+
+六任务批量 dry-run：
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin
+GPU=3 DRY_RUN=1 SKIP_EXISTING=1 \
+bash code_painting/run_dense_replay_urdfmatch_v2_batch.sh
+```
+
+六任务 tmux 正式运行；会跳过已经完整存在的 V2 episode，不覆盖 V1：
+
+```bash
+tmux new-session -d -s dense_replay_urdfmatch_v2 \
+  "cd /home/zaijia001/ssd/RoboTwin && GPU=3 MAX_FRAMES=-1 SKIP_EXISTING=1 TRANSCODE_H264=1 bash code_painting/run_dense_replay_urdfmatch_v2_batch.sh 2>&1 | tee /home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure_d435_urdfmatch_v2/_batch_logs/tmux.log"
+```
+
+指定任务/ID 可用 `TASKS` 和 `IDS`，例如：
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin
+TASKS="handover_bottle pnp_tray" IDS="0-4,10" GPU=3 \
+bash code_painting/run_dense_replay_urdfmatch_v2_batch.sh
+```
+
+监控与输出检查：
+
+```bash
+tmux capture-pane -pt dense_replay_urdfmatch_v2:0 -S -60
+tail -n 30 /home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure_d435_urdfmatch_v2/_batch_logs/status.tsv
+find /home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure_d435_urdfmatch_v2 -mindepth 3 -maxdepth 3 -type f -name zed_replay.mp4 | wc -l
+```
+
 输出检查：
 
 ```bash
@@ -2972,6 +3042,8 @@ for TASK in handover_bottle pnp_bread pnp_tray; do ROOT=/home/zaijia001/ssd/Robo
 ```
 
 ### L8.2 六个任务 D435 robot replay：visible-reinit head + D435 action/wrist 转 processed HDF5
+
+版本注意：本节现有 `h2_pure_d435` action/wrist 和对应 Stage-2 head 均来自 E2.4-V1。E2.4-V2 的输出保存在 `h2_pure_d435_urdfmatch_v2`，不会自动替换本节训练数据；若后续要做 Dense-V2 训练集，必须使用 V2 replay 重新生成配套 Stage-2 repaint，并为 processed HDF5/LeRobot 使用新的 repo-id，不能只替换 action 或只替换 head。
 
 用途：这是 D435 robot replay 的六任务统一转换入口，输出：
 
@@ -6935,6 +7007,8 @@ done
 ---
 
 ## N. 消融实验：Foundation Pose 物体位置 + 人手朝向 [已实现]
+
+章节定位说明：N 是 FoundationPose 位置 + 人手朝向的稀疏消融，不是 Dense Replay。Dense Replay V1/V2 的生成入口在 E2.4；Dense replay 进入训练数据的历史 V1 链路在 L8/L8.2，V2 当前保持独立输出。
 
 ### 设计目的
 

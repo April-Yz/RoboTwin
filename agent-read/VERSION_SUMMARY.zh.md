@@ -24,6 +24,8 @@ Piper Cartesian IK 基础版。单次 IK 后使用线性关节插值。当前作
 
 2026-07-14 新增隔离的 Dense Replay v2。它不改变 Dense 的逐帧人手 retargeting 定义，只修复旧视频中的规划/执行对应错误：统一 `piper_pika_agx`、加入 Curobo→SAPIEN link6 固定 `Ry(-90 deg)` adapter、严格反演 0.12 m TCP、恢复 10 个插值 waypoint，并按实测关节收敛。旧代码和旧输出保留。详见 `agent-read/COMMANDS/dense_replay_urdfmatch_v2.zh.md`。
 
+同日增加六任务顺序批处理和独立论文扩展图。424 个输入写入 `h2_pure_d435_urdfmatch_v2`，V1 保持不变；当前仅 raw replay 是 V2，已有 Dense Stage-2 repaint/HDF5 仍属于 V1，不能作为匹配的 V2 下游结果。
+
 ## Selection Strategy Audit V4（只读审计线）
 
 2026-07-14 新增独立 V4 审计工具。它只读取现有 OursV2、人手关键帧 preview、Top-score plan summary、AnyGrasp JSON、Foundation replay 和 0515 标定，不调用 planner。V4 从 `selected_candidates_by_executed_arm` 获取真实 Top-score 候选，分别保留旧 raw/legacy 语义和 audit-only canonical 重建；Selection/Planner 双面板会把不同 resolved frame 的 Foundation 画面分栏显示。后续同日更新加入扁平 `id<ID>_keyframe_*` 文件、抗遮挡线型和独立 agreement/position/contribution 统计脚本。输出位于 `code_painting/selection_strategy_compare_v4/` 且不进入 Git。详见 `agent-read/SELECTION_STRATEGY_AUDIT_V4.zh.md`。

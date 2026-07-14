@@ -24,6 +24,16 @@
 - Cause: the remote shell did not load Conda initialization; this does not mean the environment is absent.
 - Handling: source `/home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh`, or call `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python3.10` directly.
 
+## A legacy Dense repaint still appears beside v2 raw replay
+
+- Cause: existing Stage-2 repaint/HDF5 artifacts were generated from v1 `h2_pure_d435`; fixing raw replay cannot silently turn them into v2.
+- Handling: the expanded paper grid labels that tile `LEGACY V1 SOURCE / NOT V2`. Do not present it as a matched pair. Regenerate Stage-2 from `h2_pure_d435_urdfmatch_v2` and use a new processed/LeRobot name when a matched v2 dataset is needed.
+
+## The active batch episode is unclear
+
+- Inspect `tmux capture-pane -pt dense_replay_urdfmatch_v2:0 -S -60` and `_batch_logs/status.tsv`.
+- A `started` row without `complete` means the episode is still running or was interrupted. On restart, an episode is skipped only when replay, targets, metadata, audit, and a valid frame count all exist.
+
 ## Audit V4 refuses an existing output root
 
 - Symptom: `Refusing to overwrite non-empty output root`.

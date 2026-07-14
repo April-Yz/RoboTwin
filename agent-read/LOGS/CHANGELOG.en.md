@@ -3223,3 +3223,13 @@ Validation: local and remote `RoboTwin_bw` `py_compile` passed; `handover_bottle
 - Moved the old nested artifacts to `selection_strategy_compare_v4_nested_backup_20260714_5c2788f`; the regenerated full result remains at `selection_strategy_compare_v4/`. Legacy strategy inputs remain unchanged.
 
 Validation: local and remote `py_compile` passed for both scripts; visually inspected overlapping pnp_tray id2/frame52 and separated id30/frame37 samples; assertions passed for flat paths/schema/image loading across 461 PNG, 461 metadata files, and 2192 records; the combined input-summary SHA-256 remains `345226256cadb99935a0af49e7a95fdc7f72889d21bcda354819e9def0002bd1`.
+
+## 2026-07-14 (Dense Replay URDF-match v2 six-task batch and expanded paper grid)
+
+- Preserved v1 in `COMMAND_LIBRARY.zh.md` E2.4 and documented the old model, fixed link6-axis difference, TCP semantics, and execution convergence causes before the v2 commands. L8.2 identifies the existing training chain as v1; N remains the sparse ablation.
+- Added `code_painting/run_dense_replay_urdfmatch_v2_batch.sh`: discovers 424 NPZ files over six tasks, supports `TASKS/IDS/DRY_RUN/SKIP_EXISTING`, checks replay+targets+metadata+audit+ffprobe completeness, records per-episode status, and continues after failures.
+- Started tmux session `dense_replay_urdfmatch_v2` on GPU 3. It writes only under `h2_pure_d435_urdfmatch_v2` and never overwrites v1.
+- Added separate paper asset `pipeline_grid_expanded_dense_urdfmatch_v2.mp4`. Dense raw uses v2; the existing repaint is explicitly labeled `LEGACY V1 SOURCE / NOT V2` and is not presented as a matched v2 repaint.
+- Updated aligned command, current summary, environment, troubleshooting, decision, README, version, and paper-pipeline documentation.
+
+Validation: shell syntax, a one-episode batch dry-run, JSON parsing, and compositor dry-run passed. The complete 106-frame id0 audit remains 85/83 left/right successes and 4.70 mm mean executed error over 168 successful plans. The new expanded grid is H.264/yuv420p, 1920x1350, 30 fps, 642 frames, 21.4 s, and passed full decode.

@@ -7,6 +7,8 @@
 - Keep joint order as `joint1..joint6`; fix the constant error with an explicit frame adapter, not joint swapping or manual joint offsets.
 - Interpret the HaMeR fingertip midpoint consistently as TCP; link6 is only an internal IK target frame.
 - Dense remains the dense-retargeting baseline. Human orientations unreachable by the robot are not presented as an Ours-v2 capability.
+- Six-task batch outputs remain under the same isolated v2 root, with episode-level completeness checks for safe resume; no v1 file is created or overwritten.
+- v2 raw replay must not be silently mixed with existing v1 Stage-2 repaint/HDF5 artifacts. A paper diagnostic may display them side by side only with an explicit `NOT V2` label; training-data promotion requires rebuilding the full downstream chain under a new identifier.
 
 ## 2026-07-14: keep Selection Strategy V4 read-only
 

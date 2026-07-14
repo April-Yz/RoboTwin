@@ -24,6 +24,16 @@
 - 原因：远端 shell 没有加载 Conda 初始化脚本，不代表环境不存在。
 - 处理：先 `source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh`，或直接调用 `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python3.10`。
 
+## V2 raw replay 旁边仍显示旧 Dense repaint
+
+- 原因：现有 Stage-2 repaint/HDF5 是从 V1 `h2_pure_d435` 生成的，不会因为 raw replay 修复而自动变成 V2。
+- 处理：论文扩展图把该格明确标为 `LEGACY V1 SOURCE / NOT V2`。不要静默配对；需要匹配版本时，从 `h2_pure_d435_urdfmatch_v2` 重新生成 Stage-2，并使用新的 processed/LeRobot 名称。
+
+## 批处理不知道正在跑哪一集
+
+- 查看 `tmux capture-pane -pt dense_replay_urdfmatch_v2:0 -S -60` 和 `_batch_logs/status.tsv`。
+- `started` 后没有 `complete` 表示当前仍在执行或异常中断；重启同一命令时，只有同时具备 replay、targets、metadata、audit 和有效帧数的 episode 才会跳过。
+
 ## Audit V4 拒绝已有输出目录
 
 - 症状：`Refusing to overwrite non-empty output root`。

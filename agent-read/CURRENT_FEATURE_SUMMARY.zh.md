@@ -14,6 +14,7 @@
 - 新增 `analyze_selection_strategy_agreement_v4.py`：左右手分开统计同 candidate 次数、canonical xyz 距离和 Fused 加权 contribution；当前 orientation 平均占 Fused score 的 91.75%。
 - 全量覆盖 6 个任务、150 个 episode、461 张关键帧图和 2192 条 arm-strategy 记录；详见 `SELECTION_STRATEGY_AUDIT_V4.zh.md`。
 - 上一条隔离修复线仍为 `Dense Replay URDF-match v2`，详见 `COMMANDS/dense_replay_urdfmatch_v2.zh.md`。
+- Dense Replay V2 六任务批处理已在 tmux `dense_replay_urdfmatch_v2` 中启动；424 个输入按 episode 顺序写入独立 `h2_pure_d435_urdfmatch_v2`，旧 V1 保留。论文素材新增独立 `pipeline_grid_expanded_dense_urdfmatch_v2.mp4`，其中 V2 raw 与现有 V1 repaint 被明确标为不匹配版本。
 
 ## 读取顺序
 

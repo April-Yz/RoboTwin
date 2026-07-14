@@ -7,6 +7,8 @@
 - 关节顺序保持 `joint1..joint6`；固定误差通过显式坐标 adapter 修复，不通过交换或手工偏置关节修复。
 - HaMeR 指尖中点统一解释为 TCP；link6 仅是 IK 的内部目标帧。
 - Dense 仍是 dense retargeting baseline。机器人不可达的人手姿态不由该修复伪装为 Ours v2 能力。
+- 六任务批量结果继续写入同一独立 V2 根目录，并以 episode 完整性检查支持安全续跑；不创建或覆盖 V1 文件。
+- V2 raw replay 不能与现有 V1 Stage-2 repaint/HDF5 静默混用。论文扩展图允许并排诊断，但必须显式标记 `NOT V2`；训练数据升级必须整条重建并使用新标识。
 
 ## 2026-07-14：Selection Strategy V4 仅作为只读审计
 

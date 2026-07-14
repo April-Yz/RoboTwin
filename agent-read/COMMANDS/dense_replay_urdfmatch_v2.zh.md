@@ -65,3 +65,36 @@ code_painting/human_replay/h2_pure_d435_urdfmatch_v2/
 完整 106 帧中，左/右臂分别有 `85/106` 和 `83/106` 个成功目标。168 个成功 arm plan 的平均规划/执行位置误差为 `4.44/4.70 mm`，FK/仿真 TCP 平均差为 `3.16e-7 m`。失败主要集中在缺失、无效或远离工作空间的人手目标；它们被如实保留为 Dense baseline 失败，不做伪造补帧。
 
 人手姿态对 Piper 经常不可达，抽样姿态误差仍约 38°。这属于 Dense Replay 的 action-level cross-embodiment gap；Ours v2 通过 robot-native grasp candidates 和 human-guided grasp selection 避免直接复制该稠密姿态。v2 修复固定坐标/执行误差，但不把 Dense baseline 改造成 Ours v2。
+
+## 六任务批处理（2026-07-14）
+
+批处理入口为 `code_painting/run_dense_replay_urdfmatch_v2_batch.sh`。它发现六任务下的 `hand_detections_<ID>.npz`，逐 episode 调用单集 wrapper，并把 V2 结果写入与 V1 相邻但独立的目录：
+
+```text
+V1: code_painting/human_replay/h2_pure_d435/
+V2: code_painting/human_replay/h2_pure_d435_urdfmatch_v2/
+```
+
+命令模板（不可直接运行）：
+
+```bash
+TASKS="<task_a task_b>" IDS="<id-or-range>" GPU=<gpu> DRY_RUN=<0-or-1> \
+bash code_painting/run_dense_replay_urdfmatch_v2_batch.sh
+```
+
+当前正式命令在 tmux `dense_replay_urdfmatch_v2` 中顺序运行：
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin
+GPU=3 MAX_FRAMES=-1 SKIP_EXISTING=1 TRANSCODE_H264=1 \
+bash code_painting/run_dense_replay_urdfmatch_v2_batch.sh
+```
+
+监控：
+
+```bash
+tmux capture-pane -pt dense_replay_urdfmatch_v2:0 -S -60
+tail -n 30 code_painting/human_replay/h2_pure_d435_urdfmatch_v2/_batch_logs/status.tsv
+```
+
+当前发现 424 个输入 episode：`102 + 92 + 47 + 51 + 81 + 51`。完整性判断同时要求 replay、world targets、metadata、audit 和有效视频帧；已完成的 V2 episode 会跳过，V1 永不覆盖。现有 V1 Stage-2 repaint/HDF5 不自动升级为 V2；要训练 Dense-V2，必须用 V2 replay 重新生成配套 repaint，并使用新的 processed/LeRobot 标识。

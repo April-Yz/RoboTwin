@@ -3221,3 +3221,13 @@ Validation: 本地和 `RoboTwin_bw` 远端 `py_compile` 通过；`handover_bottl
 - 旧嵌套结果移到 `selection_strategy_compare_v4_nested_backup_20260714_5c2788f`，新全量结果仍位于 `selection_strategy_compare_v4/`；旧策略输入未修改。
 
 Validation: 两个脚本本地/远端 `py_compile` 通过；pnp_tray id2/frame52 重叠样本和 id30/frame37 分离样本完成视觉检查；全量 461 PNG、461 metadata、2192 records 的 flat path/schema/图片读取断言通过；输入 summary 组合 SHA-256 仍为 `345226256cadb99935a0af49e7a95fdc7f72889d21bcda354819e9def0002bd1`。
+
+## 2026-07-14（Dense Replay URDF-match v2 六任务批处理与论文扩展图）
+
+- 在 `COMMAND_LIBRARY.zh.md` 的 E2.4 中保留 V1，并在 V2 命令前记录旧模型、link6 固定轴差、TCP 语义和执行收敛四类原因；L8.2 标明现有训练链仍为 V1，N 仅是稀疏消融。
+- 新增 `code_painting/run_dense_replay_urdfmatch_v2_batch.sh`：发现六任务共 424 个 NPZ，支持 `TASKS/IDS/DRY_RUN/SKIP_EXISTING`，以 replay+targets+metadata+audit+ffprobe 做完整性检查，逐 episode 记录状态并继续失败项。
+- tmux `dense_replay_urdfmatch_v2` 已在 GPU 3 启动；输出只写入 `h2_pure_d435_urdfmatch_v2`，不覆盖 V1。
+- 论文素材新增独立 `pipeline_grid_expanded_dense_urdfmatch_v2.mp4`。Dense raw 使用 V2；现有 repaint 明确标为 `LEGACY V1 SOURCE / NOT V2`，没有冒充配套 V2 repaint。
+- 更新双语命令、当前摘要、环境、故障排查、决策、README 和版本说明，以及论文素材流程文档。
+
+Validation: `bash -n`、批处理单集 dry-run、拼接配置 JSON/dry-run 通过；完整 id0 的 106 帧审计仍为左/右 `85/83` 成功、168 个成功计划平均执行误差 4.70 mm；新扩展图为 H.264/yuv420p、1920x1350、30 fps、642 帧、21.4 s，并完成全视频解码检查。

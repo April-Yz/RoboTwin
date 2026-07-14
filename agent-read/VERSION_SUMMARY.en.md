@@ -24,6 +24,8 @@ An isolated Piper TCP/EE IK V3 was added on 2026-07-13 to fix the non-reversible
 
 The isolated Dense Replay v2 was added on 2026-07-14. It retains Dense's frame-wise human retargeting definition and only fixes legacy planning/execution correspondence: matched `piper_pika_agx` models, the fixed Curobo-to-SAPIEN link6 `Ry(-90 deg)` adapter, exact 0.12 m TCP inversion, restoration of 10 interpolation waypoints, and measured joint convergence. Legacy code and outputs remain intact. See `agent-read/COMMANDS/dense_replay_urdfmatch_v2.en.md`.
 
+The same-day update adds a sequential six-task batch and a separate expanded paper grid. All 424 discovered inputs write under `h2_pure_d435_urdfmatch_v2`, leaving v1 intact. Only raw replay is currently v2; existing Dense Stage-2 repaint/HDF5 artifacts remain v1 and are not matched v2 downstream results.
+
 ## Selection Strategy Audit V4 (Read-only Audit)
 
 The independent V4 audit was added on 2026-07-14. It reads existing OursV2 data, hand-keyframe previews, Top-score plan summaries, AnyGrasp JSON, Foundation replay, and the 0515 calibration without invoking a planner. It obtains the actual Top-score candidate from `selected_candidates_by_executed_arm`, preserves historical raw/legacy semantics, and adds an audit-only canonical reconstruction. Its Selection/Planner panels display distinct resolved Foundation frames in separate columns. A same-day update adds flat `id<ID>_keyframe_*` files, overlap-safe line styles, and an independent agreement/position/contribution statistics script. Generated artifacts live under `code_painting/selection_strategy_compare_v4/` and are not versioned. See `agent-read/SELECTION_STRATEGY_AUDIT_V4.en.md`.

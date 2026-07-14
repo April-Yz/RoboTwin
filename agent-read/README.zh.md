@@ -10,7 +10,7 @@
 - Foundation OBJ 对比：使用 `pick_diverse_bottles_piper_ik_foundation` 与 `demo_piper_ik_foundation_v1..v4`。O.1 使用显式 frame，O.1.1 用第一标注关键帧建场，O.1.2 再用第二关键帧 EE 位置替代 lift/place。O.2 新增 `pnp_tray_piper_ik_foundation`，左手抓 `left_dark_red_cup`、右手抓 `right_bottle`，默认按第二关键帧 OBJ center 放置并打开夹爪。
 - 默认 IK：V1；V2 使用三次插值，V3 使用 MotionGen 并带 IK 插值回退，V4 使用多种子 IK。
 - 数据流程：Phase 1 找稳定且真实成功的 seed 并保存版本化轨迹；Phase 2 在相同 seed 场景中校验、回放并保存 HDF5/视频/instruction。
-- Dense Replay：旧结果保留不动；需要修复 Piper 规划/执行固定偏差时使用隔离的 `run_dense_replay_urdfmatch_v2.sh`。该版本修复 Curobo/SAPIEN link6 固定轴差和 TCP/执行收敛，不消除人手姿态对机器人的不可达性。
+- Dense Replay：旧结果保留不动；需要修复 Piper 规划/执行固定偏差时使用隔离的 `run_dense_replay_urdfmatch_v2.sh`。六任务批量入口为 `run_dense_replay_urdfmatch_v2_batch.sh`，独立写入 `h2_pure_d435_urdfmatch_v2` 并支持完整性检查续跑。该版本修复 Curobo/SAPIEN link6 固定轴差和 TCP/执行收敛，不消除人手姿态对机器人的不可达性，也不把 V1 repaint 自动升级为 V2。
 - Selection Strategy Audit V4：由脚本只读比较 OursV2、Orientation、Fused 与真实 Top-score 候选；扁平文件名、抗重叠颜色/线型和 agreement/xyz-distance 统计已纳入。当前 Fused 与 Orientation 同候选 93.75%，与 Top canonical 同候选 8.87%，详见 `SELECTION_STRATEGY_AUDIT_V4.zh.md`。
 - 相机：head、front、side、右侧 `third_camera`、对向俯视 `opposite_top_camera`、top-level `third_view`；Foundation 配置使用 0515 左右手眼标定、Pika 基础 adapter 和逐侧 wrist 前移/roll tuning 输出独立腕视频，并支持 viewer 实时双腕拼接。
 - Foundation 抓取默认使用底部 `support_proxy` 和 close 后几何状态门控；不会通过 `set_pose` 把倾倒物体瞬移回夹爪。

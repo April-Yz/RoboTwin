@@ -65,3 +65,36 @@ For the first 8 frames of `pick_diverse_bottles/id0`, all 16 arm records solved 
 Across all 106 frames, the left/right arms have `85/106` and `83/106` successful targets. For the 168 successful arm plans, mean planned/executed position errors are `4.44/4.70 mm`, and mean FK-versus-simulated-TCP discrepancy is `3.16e-7 m`. Failures are mainly missing, invalid, or far outside-workspace human targets. They remain explicit Dense-baseline failures and are not replaced with fabricated frames.
 
 Human orientations are frequently unreachable by Piper, and the sampled orientation error remains about 38 degrees. This is an action-level cross-embodiment gap of Dense Replay. Ours v2 avoids copying this dense orientation by using robot-native grasp candidates and human-guided grasp selection. v2 fixes the coordinate and execution offsets without turning the Dense baseline into Ours v2.
+
+## Six-task batch (2026-07-14)
+
+The batch entry is `code_painting/run_dense_replay_urdfmatch_v2_batch.sh`. It discovers `hand_detections_<ID>.npz` inputs for the six tasks, calls the single-episode wrapper sequentially, and writes v2 beside but separately from v1:
+
+```text
+v1: code_painting/human_replay/h2_pure_d435/
+v2: code_painting/human_replay/h2_pure_d435_urdfmatch_v2/
+```
+
+Command template (not directly runnable):
+
+```bash
+TASKS="<task_a task_b>" IDS="<id-or-range>" GPU=<gpu> DRY_RUN=<0-or-1> \
+bash code_painting/run_dense_replay_urdfmatch_v2_batch.sh
+```
+
+The production command currently runs sequentially in tmux session `dense_replay_urdfmatch_v2`:
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin
+GPU=3 MAX_FRAMES=-1 SKIP_EXISTING=1 TRANSCODE_H264=1 \
+bash code_painting/run_dense_replay_urdfmatch_v2_batch.sh
+```
+
+Monitor it with:
+
+```bash
+tmux capture-pane -pt dense_replay_urdfmatch_v2:0 -S -60
+tail -n 30 code_painting/human_replay/h2_pure_d435_urdfmatch_v2/_batch_logs/status.tsv
+```
+
+There are 424 discovered input episodes: `102 + 92 + 47 + 51 + 81 + 51`. Completion requires the replay, world targets, metadata, audit, and a probeable nonempty video; completed v2 episodes are skipped and v1 is never overwritten. Existing v1 Stage-2 repaints/HDF5 files are not silently promoted to v2. A Dense-v2 training set requires repainting from v2 replay and a new processed/LeRobot identifier.

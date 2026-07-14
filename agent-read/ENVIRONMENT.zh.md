@@ -16,4 +16,13 @@ cd /home/zaijia001/ssd/RoboTwin && TASK=pick_diverse_bottles ID=0 GPU=3 bash cod
 
 展开步骤：进入项目目录，确认 NPZ 存在，选择空闲 GPU，通过 wrapper 激活环境并运行，最后检查 metadata、audit 和 MP4。
 
+六任务批处理当前使用单个 GPU 3 进程，避免多个 SAPIEN/Curobo 实例争抢显存：
+
+```bash
+tmux capture-pane -pt dense_replay_urdfmatch_v2:0 -S -60
+tail -n 30 /home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure_d435_urdfmatch_v2/_batch_logs/status.tsv
+```
+
+不要在未确认归属前终止 pine2 上长期占用 GPU 的旧进程；批处理失败会写入状态表并继续下一个 episode。
+
 Selection Strategy Audit V4 只读取已有数据，不需要 GPU、SAPIEN 或 planner；需要 NumPy、SciPy 和 OpenCV。命令见 `COMMANDS/selection_strategy_audit_v4.zh.md`。

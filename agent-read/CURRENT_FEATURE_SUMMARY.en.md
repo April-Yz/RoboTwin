@@ -14,6 +14,7 @@
 - Added `analyze_selection_strategy_agreement_v4.py` for per-arm candidate agreement, canonical xyz distances, and weighted Fused contributions; orientation now contributes 91.75% of the selected Fused score on average.
 - The full audit covers 6 tasks, 150 episodes, 461 keyframe images, and 2192 arm-strategy records; see `SELECTION_STRATEGY_AUDIT_V4.en.md`.
 - The preceding isolated correction line remains `Dense Replay URDF-match v2`; see `COMMANDS/dense_replay_urdfmatch_v2.en.md`.
+- The six-task Dense Replay v2 batch is running in tmux session `dense_replay_urdfmatch_v2`; 424 inputs are processed sequentially into the isolated `h2_pure_d435_urdfmatch_v2` root while v1 remains intact. The paper assets now include a separate `pipeline_grid_expanded_dense_urdfmatch_v2.mp4`, explicitly labeling v2 raw replay and the existing v1 repaint as version-mismatched.
 
 ## Reading order
 
