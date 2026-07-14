@@ -10067,6 +10067,8 @@ python /home/zaijia001/ssd/RoboTwin/code_painting/recompose_l16_stack_redprotect
 /home/zaijia001/ssd/RoboTwin/code_painting/l16_ours_review_redprotect/montages/stack_cups/id_<ID>/compare_hamer_foundation_l16_repaint_stack_cups_id<ID>.mp4
 ```
 
+rclone copy gdrive:piper/multi/6task/robot_ours/repo/multi_piper_cartin_robot25_ours_human25_6tasks_300_repo.zip  /home/zaijia001/ssd/RoboTwin/piper_processed_data/ -P --drive-chunk-size 64M --transfers 4
+
 ### L11.2.7 ours -> Piper0515 base-frame 坐标转换（rclone 前）
 
 原因：前面检查发现，`ours/baseline/reinit` 的 state/action 里左右臂 `xyz/rpy` 是 Piper0515 标定场景下的 world frame；而当前真机器人 repo 的前 25 条 robot 数据更像每个机械臂自己的 base/cartesian frame。直接把两者合并会导致同一任务中 robot 与 ours 的操作空间不一致。新增这个专门脚本后，在 zip/rclone 前把 ours 的左右臂 pose 转成 Piper0515 左/右 base frame，并把 gripper 从 `[0,1]` 映射到约 `0.0967` 的真机器人开合尺度。
@@ -10212,6 +10214,61 @@ mask_head_cam_plan/*.jpg       # 实际用于合成的逐帧 foreground alpha
 final_repainted.mp4            # 最终 Stage-2 debug 合成结果
 ```
 
+```bash
+for TASK in pick_diverse_bottles place_bread_basket stack_cups handover_bottle pnp_bread pnp_tray; do
+  tmux new-session -d -s "l16_rightcam_${TASK}" "
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && cd /home/zaijia001/ssd/RoboTwin && \
+bash /home/zaijia001/ssd/RoboTwin/code_painting/run_plan_keyframes_human_replay_piper_d435.sh \
+  --gpu 2 --ids 0-2 --continue_on_error --tasks ${TASK} \
+  --target_retreat_m 0.14 \
+  --wrist_left_forward_offset_m -0.04 --wrist_right_forward_offset_m -0.03 \
+  --wrist_left_roll_deg 14.635 --wrist_right_roll_deg -44.649 \
+  --wrist_left_yaw_deg 0.182 --wrist_right_yaw_deg 0.840 \
+  --wrist_left_pitch_deg -90 --wrist_right_pitch_deg -90 \
+  --wrist_left_lateral_offset_m -0.0207 --wrist_right_lateral_offset_m 0.0274 \
+  --output_root /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_de_human_replay_clean_right_cam
+"
+done
+```
+
+## I debug. L16 wrist cam 转 VSCode 可预览 MP4
+
+用途：有些 `left_wrist_cam_plan.mp4` / `right_wrist_cam_plan.mp4` 在 VSCode 里打不开，多半是浏览器预览器不支持当前 mp4 的编码/像素格式。不要覆盖原视频，直接用 ffmpeg 生成同目录的 H.264 + `yuv420p` + `faststart` 预览副本：`left_wrist_cam_plan_vscode.mp4`、`right_wrist_cam_plan_vscode.mp4`。
+
+只处理当前 `L16_de_human_replay_clean` 六任务输出里的 wrist cam：
+
+```bash
+ROOT=/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_de_human_replay_clean
+find "$ROOT" -type f \( -name 'left_wrist_cam_plan.mp4' -o -name 'right_wrist_cam_plan.mp4' \) -print0 | while IFS= read -r -d '' SRC; do
+  DST="${SRC%.mp4}_vscode.mp4"
+  echo "[vscode-mp4] $SRC -> $DST"
+  ffmpeg -nostdin -y -hide_banner -loglevel error -i "$SRC" \
+    -an -c:v libx264 -pix_fmt yuv420p -profile:v baseline -level 3.0 \
+    -crf 22 -preset veryfast -movflags +faststart "$DST"
+done
+```
+
+如果你这次输出在右手相机调参的新目录，例如 `L16_de_human_replay_clean_right_cam`，只改 `ROOT`：
+
+```bash
+ROOT=/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_de_human_replay_clean_right_cam
+find "$ROOT" -type f \( -name 'left_wrist_cam_plan.mp4' -o -name 'right_wrist_cam_plan.mp4' \) -print0 | while IFS= read -r -d '' SRC; do
+  DST="${SRC%.mp4}_vscode.mp4"
+  echo "[vscode-mp4] $SRC -> $DST"
+  ffmpeg -nostdin -y -hide_banner -loglevel error -i "$SRC" \
+    -an -c:v libx264 -pix_fmt yuv420p -profile:v baseline -level 3.0 \
+    -crf 22 -preset veryfast -movflags +faststart "$DST"
+done
+```
+
+查看生成数量：
+
+```bash
+find /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_de_human_replay_clean -type f -name '*_wrist_cam_plan_vscode.mp4' | wc -l
+```
+
+说明：训练/后续转换仍然使用原始 `left_wrist_cam_plan.mp4` / `right_wrist_cam_plan.mp4`；`*_vscode.mp4` 只是为了 VSCode 预览。
+
 ### I debug 参数说明：SAM3/DINO3 白背景 prompt 路线
 
 当前 `run_l16_whitebg_repaint_task.sh` 用的是 `/home/zaijia001/ssd/inpainting_sam3_robot/remove_anything_video_sam3_robot.py`，在 `inpainting-sam3-dino3` 环境里优先加载 `SAM=sam3`、`DINO=dino3`；如果对应包/ckpt 不存在才会回退到 SAM2/DINO2。它不是直接按颜色去白，而是：`WHITE_PROMPT` 找白背景框 -> SAM 分割白背景 -> `--invert_mask` 得到 robot/object foreground alpha -> 合成到 Stage-1 背景。
@@ -10321,4 +10378,66 @@ w_mask_head_cam_plan.mp4            # 红色：反选后保留下来的 foregrou
 mask_head_cam_plan/*.jpg            # 实际用于合成的 foreground alpha
 final_repainted.mp4                 # 颜色去白最终合成
 color_white_manifest.json           # 参数与 foreground/white 面积比例
+```
+## I debug. L16 四相机拼接预览：head / third / left wrist / right wrist
+
+用途：把单个 episode 的 `head_cam_plan.mp4`、`third_cam_plan.mp4`、`left_wrist_cam_plan.mp4`、`right_wrist_cam_plan.mp4` 拼成 2x2 四宫格，方便一起检查右手相机前后偏移、腕部相机视角和第三视角执行。输出为 VSCode 友好的 H.264 + `yuv420p`：`four_cam_montage_vscode.mp4`。
+
+单个 task/id：
+
+```bash
+ROOT=/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_de_human_replay_clean_right_cam
+TASK=pick_diverse_bottles
+ID=0
+DIR="$ROOT/$TASK/foundation_input_$ID"
+OUT="$DIR/four_cam_montage_vscode.mp4"
+ffmpeg -nostdin -y -hide_banner -loglevel error \
+  -i "$DIR/head_cam_plan.mp4" \
+  -i "$DIR/third_cam_plan.mp4" \
+  -i "$DIR/left_wrist_cam_plan.mp4" \
+  -i "$DIR/right_wrist_cam_plan.mp4" \
+  -filter_complex "\
+[0:v]scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2,setsar=1,drawbox=x=0:y=0:w=145:h=30:color=black@0.65:t=fill,drawtext=text='head':x=8:y=8:fontsize=18:fontcolor=white[head];\
+[1:v]scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2,setsar=1,drawbox=x=0:y=0:w=145:h=30:color=black@0.65:t=fill,drawtext=text='third':x=8:y=8:fontsize=18:fontcolor=white[third];\
+[2:v]scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2,setsar=1,drawbox=x=0:y=0:w=175:h=30:color=black@0.65:t=fill,drawtext=text='left wrist':x=8:y=8:fontsize=18:fontcolor=white[left];\
+[3:v]scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2,setsar=1,drawbox=x=0:y=0:w=185:h=30:color=black@0.65:t=fill,drawtext=text='right wrist':x=8:y=8:fontsize=18:fontcolor=white[right];\
+[head][third]hstack=inputs=2:shortest=1[top];\
+[left][right]hstack=inputs=2:shortest=1[bot];\
+[top][bot]vstack=inputs=2:shortest=1[v]" \
+  -map "[v]" -an -c:v libx264 -pix_fmt yuv420p -profile:v baseline -level 3.1 \
+  -crf 22 -preset veryfast -movflags +faststart "$OUT"
+echo "$OUT"
+```
+
+批量处理某个 `ROOT` 下所有有四路视频的 episode：
+
+```bash
+ROOT=/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_de_human_replay_clean_right_cam
+find "$ROOT" -type f -name 'head_cam_plan.mp4' -print0 | while IFS= read -r -d '' HEAD; do
+  DIR=$(dirname "$HEAD")
+  THIRD="$DIR/third_cam_plan.mp4"
+  LEFT="$DIR/left_wrist_cam_plan.mp4"
+  RIGHT="$DIR/right_wrist_cam_plan.mp4"
+  OUT="$DIR/four_cam_montage_vscode.mp4"
+  [[ -f "$THIRD" && -f "$LEFT" && -f "$RIGHT" ]] || { echo "[skip] missing one camera under $DIR"; continue; }
+  echo "[four-cam] $OUT"
+  ffmpeg -nostdin -y -hide_banner -loglevel error \
+    -i "$HEAD" -i "$THIRD" -i "$LEFT" -i "$RIGHT" \
+    -filter_complex "\
+[0:v]scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2,setsar=1,drawbox=x=0:y=0:w=145:h=30:color=black@0.65:t=fill,drawtext=text='head':x=8:y=8:fontsize=18:fontcolor=white[head];\
+[1:v]scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2,setsar=1,drawbox=x=0:y=0:w=145:h=30:color=black@0.65:t=fill,drawtext=text='third':x=8:y=8:fontsize=18:fontcolor=white[third];\
+[2:v]scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2,setsar=1,drawbox=x=0:y=0:w=175:h=30:color=black@0.65:t=fill,drawtext=text='left wrist':x=8:y=8:fontsize=18:fontcolor=white[left];\
+[3:v]scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2,setsar=1,drawbox=x=0:y=0:w=185:h=30:color=black@0.65:t=fill,drawtext=text='right wrist':x=8:y=8:fontsize=18:fontcolor=white[right];\
+[head][third]hstack=inputs=2:shortest=1[top];\
+[left][right]hstack=inputs=2:shortest=1[bot];\
+[top][bot]vstack=inputs=2:shortest=1[v]" \
+    -map "[v]" -an -c:v libx264 -pix_fmt yuv420p -profile:v baseline -level 3.1 \
+    -crf 22 -preset veryfast -movflags +faststart "$OUT"
+done
+```
+
+查看输出数量：
+
+```bash
+find /home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_de_human_replay_clean_right_cam -type f -name 'four_cam_montage_vscode.mp4' | wc -l
 ```

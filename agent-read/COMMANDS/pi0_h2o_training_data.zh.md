@@ -483,6 +483,18 @@ Piper0515 坐标转换说明：`process_repainted_planner_outputs.py` 写出的 
 STEPS="piper0515 zip" TASKS="pick_diverse_bottles place_bread_basket handover_bottle pnp_bread pnp_tray stack_cups" TASK_GROUP=6task REVIEW_ROOT=/home/zaijia001/ssd/RoboTwin/code_painting/l16_ours_review_first25 DRY_RUN=1 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_ours_selected_pipeline.sh
 ```
 
+### L16 wrist cam VSCode preview transcode
+
+如果 L16 replay 输出的 `left_wrist_cam_plan.mp4` / `right_wrist_cam_plan.mp4` 不能在 VSCode 里预览，可以生成同目录的 H.264/yuv420p 预览副本。训练和后续转换仍使用原始 wrist 视频；`*_vscode.mp4` 只用于人工查看。
+
+```bash
+ROOT=/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_de_human_replay_clean
+find "$ROOT" -type f \( -name 'left_wrist_cam_plan.mp4' -o -name 'right_wrist_cam_plan.mp4' \) -print0 | while IFS= read -r -d '' SRC; do
+  DST="${SRC%.mp4}_vscode.mp4"
+  ffmpeg -nostdin -y -hide_banner -loglevel error -i "$SRC" -an -c:v libx264 -pix_fmt yuv420p -profile:v baseline -level 3.0 -crf 22 -preset veryfast -movflags +faststart "$DST"
+done
+```
+
 ### L16 Stage-2 SAM 参数化与颜色去白 debug
 
 `run_l16_whitebg_repaint_task.sh` 走 `inpainting_sam3_robot/remove_anything_video_sam3_robot.py`，在 `inpainting-sam3-dino3` 环境中优先使用 SAM3/DINO3。Stage-2 现在可通过环境变量指定 `WHITE_PROMPT`、`MASK_IDX`、`BOX_THRESHOLD`、`TEXT_THRESHOLD`、`MAX_MASK_AREA_RATIO`、`EXCLUDE_BOTTOM_RATIO`、`DILATE_KERNEL_SIZE`、`ERODE_KERNEL_SIZE`、`COMPOSITE_ERODE`、`BLEND_ALPHA_SIGMA`。
@@ -496,3 +508,6 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate R
 ```
 
 颜色路线全量输出默认跟随 L16 robot 视频帧数；Stage-1 背景按比例采样对齐，和原 Stage-2 compose 一致。
+### L16 four-camera montage preview
+
+用于把 L16 planner 输出目录中的 `head_cam_plan.mp4`、`third_cam_plan.mp4`、`left_wrist_cam_plan.mp4`、`right_wrist_cam_plan.mp4` 拼成 `four_cam_montage_vscode.mp4`。完整命令记录在 `COMMAND_LIBRARY.zh.md` 末尾的 `I debug. L16 四相机拼接预览`；输出只用于人工检查，不参与训练转换。

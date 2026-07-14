@@ -483,6 +483,18 @@ Convert and package only:
 STEPS="piper0515 zip" TASKS="pick_diverse_bottles place_bread_basket handover_bottle pnp_bread pnp_tray stack_cups" TASK_GROUP=6task REVIEW_ROOT=/home/zaijia001/ssd/RoboTwin/code_painting/l16_ours_review_first25 DRY_RUN=1 bash /home/zaijia001/ssd/RoboTwin/code_painting/run_l16_ours_selected_pipeline.sh
 ```
 
+### L16 wrist cam VSCode preview transcode
+
+If L16 replay `left_wrist_cam_plan.mp4` / `right_wrist_cam_plan.mp4` files cannot be previewed in VSCode, create sibling H.264/yuv420p preview copies. Training and later conversion still use the original wrist videos; `*_vscode.mp4` is only for manual inspection.
+
+```bash
+ROOT=/home/zaijia001/ssd/RoboTwin/code_painting/anygrasp_plan_keyframes_piper_d435_replay_axes/L16_de_human_replay_clean
+find "$ROOT" -type f \( -name 'left_wrist_cam_plan.mp4' -o -name 'right_wrist_cam_plan.mp4' \) -print0 | while IFS= read -r -d '' SRC; do
+  DST="${SRC%.mp4}_vscode.mp4"
+  ffmpeg -nostdin -y -hide_banner -loglevel error -i "$SRC" -an -c:v libx264 -pix_fmt yuv420p -profile:v baseline -level 3.0 -crf 22 -preset veryfast -movflags +faststart "$DST"
+done
+```
+
 ### L16 Stage-2 SAM parameterization and color-white debug
 
 `run_l16_whitebg_repaint_task.sh` runs `inpainting_sam3_robot/remove_anything_video_sam3_robot.py`; in the `inpainting-sam3-dino3` environment it prefers SAM3/DINO3. Stage-2 now accepts `WHITE_PROMPT`, `MASK_IDX`, `BOX_THRESHOLD`, `TEXT_THRESHOLD`, `MAX_MASK_AREA_RATIO`, `EXCLUDE_BOTTOM_RATIO`, `DILATE_KERNEL_SIZE`, `ERODE_KERNEL_SIZE`, `COMPOSITE_ERODE`, and `BLEND_ALPHA_SIGMA` as environment variables.
@@ -496,3 +508,6 @@ source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate R
 ```
 
 Full color-route outputs follow the L16 robot video frame count. The Stage-1 background is sampled proportionally, matching the original Stage-2 compose behavior.
+### L16 four-camera montage preview
+
+Combines `head_cam_plan.mp4`, `third_cam_plan.mp4`, `left_wrist_cam_plan.mp4`, and `right_wrist_cam_plan.mp4` from an L16 planner output episode into `four_cam_montage_vscode.mp4`. The full command is recorded at the tail of `COMMAND_LIBRARY.zh.md` under `I debug. L16 four-camera montage preview`; the output is for manual inspection only and is not used by training conversion.

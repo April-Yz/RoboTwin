@@ -2352,6 +2352,16 @@ tmux new-session -d -s l16_stack_debug_variants_gpu1 'GPU=1 IDS="0 1 2 3 4" MAX_
 - 在 `COMMAND_LIBRARY.zh.md` 末尾新增 `I debug` 模块：六个任务各取 5 个代表 id，其中 `stack_cups` 使用 `B_points_negative` Stage-1，使用 `run_l16_whitebg_repaint_task.sh` 只重跑 Stage-2 白背景 SAM + 反选合成。
 - 默认 debug 输出根目录：常规任务使用 `/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_debug/e0_robot_object`，`stack_cups` 使用 `/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_debug/e0_robot_object_b_points_negative`。
 
+## 2026-06-26（L16 wrist cam VSCode 预览转码命令）
+
+- 在 `COMMAND_LIBRARY.zh.md` 末尾新增 wrist cam 预览转码命令：批量把 `left_wrist_cam_plan.mp4` / `right_wrist_cam_plan.mp4` 转成同目录 `*_vscode.mp4`。
+- 使用 `ffmpeg -c:v libx264 -pix_fmt yuv420p -profile:v baseline -movflags +faststart`，只用于 VSCode 人工预览，不替换训练用原始视频。
+
+## 2026-06-26（L16 wrist cam VSCode 转码命令补充 -nostdin）
+
+- 修正 `COMMAND_LIBRARY.zh.md` 和 `agent-read/COMMANDS/pi0_h2o_training_data.*.md` 中的 wrist cam 批量转码命令：`ffmpeg` 增加 `-nostdin`。
+- 原因：命令使用 `find -print0 | while read -d ''`，如果不加 `-nostdin`，`ffmpeg` 会从同一个管道读取 stdin，导致后续路径开头字符被吞掉，出现 `home/...`、`ome/...` 这类错误路径。
+
 ## 2026-06-26（L16 Stage-2 SAM 参数化与颜色去白 debug）
 
 - `code_painting/run_l16_whitebg_repaint_task.sh` 新增可指定环境变量：`DILATE_KERNEL_SIZE`、`ERODE_KERNEL_SIZE`、`BOX_THRESHOLD`、`TEXT_THRESHOLD`、`MAX_MASK_AREA_RATIO`、`EXCLUDE_BOTTOM_RATIO`，用于调 Stage-2 SAM3/DINO3 白背景路线。
@@ -2360,6 +2370,10 @@ tmux new-session -d -s l16_stack_debug_variants_gpu1 'GPU=1 IDS="0 1 2 3 4" MAX_
 ## 2026-06-26（L16 color debug 帧对齐说明）
 
 - 更新 `COMMAND_LIBRARY.zh.md` 与 `agent-read/COMMANDS/pi0_h2o_training_data.*.md`：明确 `repaint_l16_white_color_debug.py` 默认按 L16 robot 视频帧数输出，Stage-1 背景按比例采样；`--max-frames` 只是快速预览截断参数。
+## 2026-06-26（L16 四相机拼接预览命令）
+
+- 在 `COMMAND_LIBRARY.zh.md` 末尾新增四相机 2x2 montage 命令：输入 `head_cam_plan.mp4`、`third_cam_plan.mp4`、`left_wrist_cam_plan.mp4`、`right_wrist_cam_plan.mp4`，输出 `four_cam_montage_vscode.mp4`。
+- 使用 `ffmpeg -nostdin`、H.264/yuv420p/faststart，便于 VSCode 预览；输出仅用于人工检查，不参与训练数据转换。
 
 ## 2026-06-30（Mode N keyframe debug 输出迁移）
 

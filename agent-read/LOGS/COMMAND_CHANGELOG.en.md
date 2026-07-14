@@ -2354,6 +2354,16 @@ tmux new-session -d -s l16_stack_debug_variants_gpu1 'GPU=1 IDS="0 1 2 3 4" MAX_
 - Added an `I debug` module to the tail of `COMMAND_LIBRARY.zh.md`: all six tasks, five representative ids each, with `stack_cups` using the `B_points_negative` Stage-1, using `run_l16_whitebg_repaint_task.sh` to rerun only Stage-2 white-background SAM plus inverted-mask composition.
 - Default debug output roots: regular tasks use `/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_debug/e0_robot_object`; `stack_cups` uses `/home/zaijia001/ssd/inpainting_sam3_robot/results_repaint_piper_h2_l16_whitebg_invert/stage2_debug/e0_robot_object_b_points_negative`.
 
+## 2026-06-26 (L16 wrist cam VSCode preview transcode command)
+
+- Added a wrist-cam preview transcode command to the tail of `COMMAND_LIBRARY.zh.md`: batch-convert `left_wrist_cam_plan.mp4` / `right_wrist_cam_plan.mp4` into sibling `*_vscode.mp4` files.
+- Uses `ffmpeg -c:v libx264 -pix_fmt yuv420p -profile:v baseline -movflags +faststart`; these copies are for VSCode/manual preview only and do not replace the original training videos.
+
+## 2026-06-26 (L16 wrist cam VSCode transcode command -nostdin fix)
+
+- Fixed the wrist-cam batch transcode command in `COMMAND_LIBRARY.zh.md` and `agent-read/COMMANDS/pi0_h2o_training_data.*.md`: added `ffmpeg -nostdin`.
+- Reason: the command uses `find -print0 | while read -d ''`; without `-nostdin`, `ffmpeg` reads from the same pipe and consumes bytes from later paths, producing broken paths such as `home/...` or `ome/...`.
+
 ## 2026-06-26 (L16 Stage-2 SAM parameterization and color-white debug)
 
 - `code_painting/run_l16_whitebg_repaint_task.sh` now exposes `DILATE_KERNEL_SIZE`, `ERODE_KERNEL_SIZE`, `BOX_THRESHOLD`, `TEXT_THRESHOLD`, `MAX_MASK_AREA_RATIO`, and `EXCLUDE_BOTTOM_RATIO` as environment variables for tuning the Stage-2 SAM3/DINO3 white-background route.
@@ -2362,6 +2372,10 @@ tmux new-session -d -s l16_stack_debug_variants_gpu1 'GPU=1 IDS="0 1 2 3 4" MAX_
 ## 2026-06-26 (L16 color debug frame-alignment note)
 
 - Updated `COMMAND_LIBRARY.zh.md` and `agent-read/COMMANDS/pi0_h2o_training_data.*.md`: clarified that `repaint_l16_white_color_debug.py` outputs the L16 robot video frame count by default and samples Stage-1 backgrounds proportionally; `--max-frames` is only a quick-preview truncation option.
+## 2026-06-26 (L16 four-camera montage preview command)
+
+- Added a 2x2 four-camera montage command to the tail of `COMMAND_LIBRARY.zh.md`: inputs are `head_cam_plan.mp4`, `third_cam_plan.mp4`, `left_wrist_cam_plan.mp4`, and `right_wrist_cam_plan.mp4`; output is `four_cam_montage_vscode.mp4`.
+- Uses `ffmpeg -nostdin` with H.264/yuv420p/faststart for VSCode preview. The output is for manual inspection only and is not used by training conversion.
 
 ## 2026-06-30 (Mode N keyframe debug output relocation)
 
