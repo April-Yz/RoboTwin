@@ -3192,3 +3192,12 @@ Validation: 300 random round-trip unit checks passed; max position/rotation roun
 - Fixed the AnyGrasp wrapper to invoke the absolute conda executable under env CUDA_VISIBLE_DEVICES; the shell-function form caused all graspnet Stage-1 jobs to exit before Python.
 - Top-score preview reuse now reads per-arm keyframe numbers only, resolves empty keyframes to nearest non-empty grasp frames, recomputes raw AnyGrasp candidates, and supports disabling the distance threshold.
 - Top-score summaries now record selection_source=top_score_auto_from_preview_frames and the resolved per-arm keyframes for auditability.
+
+## 2026-07-14 (Isolated Dense Replay URDF-match v2)
+
+- Added `render_hand_retarget_piper_dual_npz_urdfmatch_v2.py`, its main entry point, and runner; legacy Dense files and outputs remain unchanged.
+- Confirmed that the `joint1..joint6` order is correct. The fixed offset comes from the Curobo/SAPIEN link6 local-axis `Ry(-90 deg)` difference, which combines with the 0.12 m TCP offset to produce about 0.1697 m translation.
+- v2 matches IK/simulation URDFs, exactly inverts the TCP transform, restores 10 interpolation waypoints, and waits for measured convergence to 0.01 rad.
+- Added metadata and per-frame execution audit, plus aligned Chinese/English command, environment, troubleshooting, and decision documentation.
+
+Validation: `python -m py_compile` passed; `bash -n` passed; an 8-frame dual-arm probe achieved `16/16` IK successes, mean planned/executed TCP position errors of `5.48/4.72 mm`, maximum executed error of `14.50 mm`, all joint errors `<0.01 rad`, and about `2.65e-7 m` mean Curobo-FK/SAPIEN-TCP discrepancy. Across all 106 frames, left/right success counts are `85/83`; the 168 successful plans have 4.70 mm mean executed error, while missing, invalid, and unreachable human targets remain baseline failures.

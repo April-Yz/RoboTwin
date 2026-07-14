@@ -20,6 +20,10 @@ Piper Cartesian IK 基础版。单次 IK 后使用线性关节插值。当前作
 
 2026-07-13 新增隔离的 Piper TCP/EE IK V3，用于修复 current OursV2 中“字段名是 EE、内容实际是带 12 cm 的 TCP”所导致的 pose->link6 IK 不可逆问题。该 V3 与上面的 MotionGen V3 不是同一条版本线；它使用新 renderer/planner/runner，默认 `ours_tcp` 语义和 `human_replay_v3/` 输出，不修改现有 OursV2。详见 `agent-read/PIPER_IK_V3.zh.md`。
 
+## Dense Replay URDF-match v2（隔离 baseline 修复线）
+
+2026-07-14 新增隔离的 Dense Replay v2。它不改变 Dense 的逐帧人手 retargeting 定义，只修复旧视频中的规划/执行对应错误：统一 `piper_pika_agx`、加入 Curobo→SAPIEN link6 固定 `Ry(-90 deg)` adapter、严格反演 0.12 m TCP、恢复 10 个插值 waypoint，并按实测关节收敛。旧代码和旧输出保留。详见 `agent-read/COMMANDS/dense_replay_urdfmatch_v2.zh.md`。
+
 ## O.1 Foundation 变体
 
 `demo_piper_ik_foundation_v1..v4` 保留相同 IK 版本语义，但把随机 RoboTwin bottle 替换为 Foundation NPZ 的位置和原始 OBJ。O.1 使用显式 frame；O.1.1 用第一标注关键帧建场；O.1.2 使用第二关键帧 EE xyz 替代 lift/place；O.1.2.1 增加不改原始 0515 文件的逐侧 wrist 前移/roll tuning。推荐从 V1 开始；默认使用底部 `support_proxy` 和无瞬移抓取状态门控。pickle 要求 Foundation mode/source/keyframes/action/几何上下文完全匹配。批采集使用 run tag 隔离输出、每 ID 一个 episode 和有限 seed 重试；视频可再按 Foundation ID 索引为 `episode<ID>`。

@@ -3190,3 +3190,12 @@ Validation: 300 个随机 round-trip 单元测试通过；12 个 V5 episode 共 
 - Fixed the AnyGrasp wrapper to invoke the absolute conda executable under env CUDA_VISIBLE_DEVICES; the shell-function form caused all graspnet Stage-1 jobs to exit before Python.
 - Top-score preview reuse now reads per-arm keyframe numbers only, resolves empty keyframes to nearest non-empty grasp frames, recomputes raw AnyGrasp candidates, and supports disabling the distance threshold.
 - Top-score summaries now record selection_source=top_score_auto_from_preview_frames and the resolved per-arm keyframes for auditability.
+
+## 2026-07-14（隔离的 Dense Replay URDF-match v2）
+
+- 新增 `render_hand_retarget_piper_dual_npz_urdfmatch_v2.py`、对应 main 与 runner；旧 Dense 文件和旧输出未修改。
+- 确认 `joint1..joint6` 顺序正确；固定偏差来自 Curobo/SAPIEN link6 局部轴的 `Ry(-90 deg)` 差异。它与 0.12 m TCP offset 组合后产生约 0.1697 m 偏移。
+- v2 统一 IK/仿真 URDF、严格反演 TCP、恢复 10 个 interpolation waypoints，并按 0.01 rad 关节阈值等待收敛。
+- 新增 metadata 与逐帧 execution audit，以及中英文命令、环境、故障排查和决策文档。
+
+Validation: `python -m py_compile` 通过；`bash -n` 通过；8 帧双臂 probe 为 `16/16` IK 成功，平均规划/执行 TCP 位置误差 `5.48/4.72 mm`，最大执行误差 `14.50 mm`，全部关节误差 `<0.01 rad`，Curobo FK/SAPIEN TCP 平均差约 `2.65e-7 m`。完整 106 帧左/右成功数为 `85/83`，168 个成功计划平均执行误差 `4.70 mm`；缺失、无效和不可达人手目标仍记为 baseline failure。
