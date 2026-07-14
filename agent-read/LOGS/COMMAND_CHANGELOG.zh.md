@@ -2428,3 +2428,8 @@ tmux new-session -d -s l16_stack_debug_variants_gpu1 'GPU=1 IDS="0 1 2 3 4" MAX_
 - 新增入口：`python code_painting/analyze_vr_hamer_cross_episode_transform_patterns.py --episode-substr 20260708 --overwrite --out-dir /home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/cross_episode_transform_patterns_20260708`。
 - 新增命令文档位置：`agent-read/COMMANDS/vr_hand_data.zh.md` 的 Q.9。
 - 输出包括：`cross_episode_transform_patterns_20260708.json/md`、`episode_transform_table_20260708.csv`、`cluster_transform_table_20260708.csv`、transform scatter、cluster、lag、axis heatmap、self/cluster/global 对比和 transform similarity 图。
+
+## 2026-07-10: R/S ablation commands
+- Added run_oursv2_49ep_pipeline.sh and run_graspnet_selected25_pipeline.sh.
+- Added prepare_oursv2_49ep_selection.py with source provenance manifests.
+- Added optional --allow-duplicates to subset_lerobot_episodes.py.

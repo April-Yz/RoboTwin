@@ -2430,3 +2430,8 @@ tmux new-session -d -s l16_stack_debug_variants_gpu1 'GPU=1 IDS="0 1 2 3 4" MAX_
 - Added entrypoint: `python code_painting/analyze_vr_hamer_cross_episode_transform_patterns.py --episode-substr 20260708 --overwrite --out-dir /home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/cross_episode_transform_patterns_20260708`.
 - Added command documentation under Q.9 in `agent-read/COMMANDS/vr_hand_data.en.md`.
 - Outputs include `cross_episode_transform_patterns_20260708.json/md`, `episode_transform_table_20260708.csv`, `cluster_transform_table_20260708.csv`, transform scatter, cluster, lag, axis heatmap, self/cluster/global comparison, and transform similarity plots.
+
+## 2026-07-10: R/S ablation commands
+- Added run_oursv2_49ep_pipeline.sh and run_graspnet_selected25_pipeline.sh.
+- Added prepare_oursv2_49ep_selection.py with source provenance manifests.
+- Added optional --allow-duplicates to subset_lerobot_episodes.py.
