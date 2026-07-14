@@ -10743,3 +10743,261 @@ rclone copy /home/zaijia001/.cache/huggingface/lerobot/local/robot_skeyp_reinit_
   gdrive:piper/multi/6task/robot_skeyp_reinit_whitebg_piper0515 \
   -P --drive-chunk-size 64M --transfers 4
 ```
+
+## Q. VR 人手数据处理流程（Meta Quest 3 hand tracking）
+
+### Q.1 VR JPG + 手部关节诊断可视化
+
+数据位置：
+
+```text
+/home/zaijia001/ssd/data/piper/vr
+/home/zaijia001/ssd/data/piper/vr/data
+/home/zaijia001/ssd/data/piper/vr/data_vr_0708.zip
+```
+
+每个 episode 目录形如：
+
+```text
+/home/zaijia001/ssd/data/piper/vr/data/NTU-PINE_20260708_145454/
+  NTU-PINE_20260708_145454.json
+  NTU-PINE_20260708_145454_metadata.json
+  camera_real/
+    real_frame_000000.jpg ...
+    NTU-PINE_20260708_145454_video.json
+```
+
+当前可视化脚本：
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/visualize_vr_hand_data.py
+```
+
+一键生成所有 episode 的 VSCode 可播放视频和统计：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && \
+cd /home/zaijia001/ssd/RoboTwin && \
+python code_painting/visualize_vr_hand_data.py \
+  --overwrite \
+  --output-root /home/zaijia001/ssd/RoboTwin/code_painting/vr_hand_visualization
+```
+
+快速只跑一个 episode 的前 30 帧：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && \
+cd /home/zaijia001/ssd/RoboTwin && \
+python code_painting/visualize_vr_hand_data.py \
+  --episodes NTU-PINE_20260708_145454 \
+  --max-frames 30 \
+  --overwrite \
+  --output-root /home/zaijia001/ssd/RoboTwin/code_painting/vr_hand_visualization_smoke
+```
+
+输出位置：
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/vr_hand_visualization/<EPISODE>/<EPISODE>_hand_overlay_vscode.mp4
+/home/zaijia001/ssd/RoboTwin/code_painting/vr_hand_visualization/vr_data_stats.md
+/home/zaijia001/ssd/RoboTwin/code_painting/vr_hand_visualization/vr_data_stats.json
+```
+
+本次已生成：15 个 `*_hand_overlay_vscode.mp4`。`NTU-PINE_20260703_211357` 有 JSON 但没有 JPG，因此没有视频。
+
+注意：当前 `camera_real/*_video.json` 没有记录可用相机外参，不能做严格的 3D joint 到 JPG 的标定投影。脚本中的骨架叠加是 episode 内 3D joint `x/z` 范围归一化到图像上的诊断可视化，用来检查时间同步、手指关节序列和 tracking/validation 状态，不代表真实像素投影。
+
+颜色约定：
+
+```text
+左手：cyan/yellow 系
+右手：red/magenta 系
+灰色：untracked pose fallback
+```
+
+VR 数据字段结论：
+
+```text
+主 JSON（<EPISODE>.json）：
+- format_version: 2.0
+- format_type: real_world
+- metadata: recording_mode, hands, quaternion_convention, timestamp, source, device_name, device_id
+- frames: timestamp_seconds, left_hand, right_hand, center_eye_pose, left_eye_pose, right_eye_pose, left_validation, right_validation
+- left_hand/right_hand: is_tracked, joint_names, poses
+- poses: 26 个 hand joints，每个 joint 为 [x, y, z, qx, qy, qz, qw]
+- joint_names: palm, wrist, thumb/index/middle/ring/little 各级关节和 tip
+- validation: is_valid, workspace_valid, joint_workspace_valid, joint_velocity_valid, errors
+
+metadata JSON（<EPISODE>_metadata.json）：
+- env_info.env_id: NTU-PINE-v1
+- env_info.env_kwargs: recording_start_realtime, recording_start_unix_timestamp, device_name, device_id, coordinate_frame=RUF, quaternion_convention=xyzw_scalar_last, joint_capture_mode=FullJointPoses, camera_enabled, camera_capture_fps, camera_save_format=JPEG
+- episodes: episode_id, elapsed_steps, success, completion_time, final_reward, tracking_method=hand_tracking
+- source_type: teleop
+- source_desc: Quest 3 hand tracking, 30 FPS
+
+camera_real/*_video.json：
+- episode_id, task_name, camera_key, video_relative_path, video_fps, num_frames, frame_stride
+- width/height/captured_width/captured_height: 1280x1280
+- capture_quality, frames_directory
+- camera_intrinsics: 13/16 episode 有 focal_length=[640,640], principal_point=[640,640], sensor_resolution=[1280,1280]
+- cameras: 全部为空；当前没有外参/相机位姿记录
+- frame_integrity: 记录 IMG_MISSING / IMG_STATIC 等帧完整性标记
+```
+
+本次统计：
+
+```text
+episodes: 16
+可视化视频: 15
+JSON frames: 3772
+JPG frames: 3231
+有 camera intrinsics 的 episode: 13/16
+有 camera extrinsics/cameras 的 episode: 0/16
+left_hand is_tracked 总帧数: 1998
+right_hand is_tracked 总帧数: 1905
+left_validation is_valid 总帧数: 995
+right_validation is_valid 总帧数: 1160
+无 JPG 的 episode: NTU-PINE_20260703_211357
+```
+
+
+### Q.2 本轮 VR 可视化结果复制与坐标轴投影 debug
+
+旧版 VR JSON 关节诊断可视化已复制到数据目录，方便直接在 VSCode 打开：
+
+```text
+/home/zaijia001/ssd/data/piper/vr/0vis/datav1/<EPISODE>/<EPISODE>_hand_overlay_vscode.mp4
+/home/zaijia001/ssd/data/piper/vr/0vis/datav1/vr_data_stats.md
+```
+
+因为原始叠加偏移明显，新增了 `--projection-mode` 参数做坐标轴诊断。可选值：
+
+```text
+norm_xz     默认旧逻辑：episode 内 x/z 归一化
+norm_xy     x/y 归一化
+norm_yz     y/z 归一化
+norm_zx     z/x 归一化
+eye_center  使用 center_eye_pose + intrinsics 的近似投影；不是外部相机标定投影
+```
+
+全量生成四种 debug 投影：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && \
+cd /home/zaijia001/ssd/RoboTwin && \
+for MODE in norm_xy norm_yz norm_zx eye_center; do
+  python code_painting/visualize_vr_hand_data.py \
+    --overwrite \
+    --projection-mode "$MODE" \
+    --output-suffix "_${MODE}" \
+    --output-root "/home/zaijia001/ssd/data/piper/vr/0vis/datav1_axis_debug/${MODE}"
+done
+```
+
+查看结果：
+
+```text
+/home/zaijia001/ssd/data/piper/vr/0vis/datav1_axis_debug/norm_xy/<EPISODE>/<EPISODE>_norm_xy_hand_overlay_vscode.mp4
+/home/zaijia001/ssd/data/piper/vr/0vis/datav1_axis_debug/norm_yz/<EPISODE>/<EPISODE>_norm_yz_hand_overlay_vscode.mp4
+/home/zaijia001/ssd/data/piper/vr/0vis/datav1_axis_debug/norm_zx/<EPISODE>/<EPISODE>_norm_zx_hand_overlay_vscode.mp4
+/home/zaijia001/ssd/data/piper/vr/0vis/datav1_axis_debug/eye_center/<EPISODE>/<EPISODE>_eye_center_hand_overlay_vscode.mp4
+```
+
+结论：这些投影只能检查坐标轴/时间同步趋势。`camera_real/*_video.json` 没有外部相机相对 VR tracking/world 的外参，所以单纯交换 `x/y/z` 不能把 3D hand joints 精确贴到 JPG 像素上。
+
+### Q.3 VR JPG 复用 HaMeR 检测
+
+新增 VR -> HaMeR 输入转换脚本：
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/prepare_vr_hamer_input.py
+```
+
+生成 HaMeR flat input：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && \
+cd /home/zaijia001/ssd/RoboTwin && \
+python code_painting/prepare_vr_hamer_input.py \
+  --overwrite \
+  --output-root /home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1
+```
+
+输出：
+
+```text
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/input/rgb_<ID>.mp4
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/input/params_<ID>.json
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/vr_hamer_input_manifest.md
+```
+
+运行 HaMeR（VR 数据没有 depth，所以必须加 `--no_depth`）：
+
+```bash
+unset LD_LIBRARY_PATH && source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && \
+cd /home/zaijia001/ssd/RoboTwin && \
+CUDA_VISIBLE_DEVICES=2 conda run -n hamer-r1-gpu python /home/zaijia001/ssd/hamer_r1/detect_hands_realr1.py \
+  --data_dir /home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/input \
+  --output_dir /home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/output \
+  --video_ids 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 \
+  --no_depth \
+  --device cuda
+```
+
+查看 HaMeR 输出：
+
+```text
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/output/hand_detections_<ID>.npz
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/output/hand_vis_<ID>.mp4
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/output/hand_vis_gripper_<ID>.mp4
+```
+
+本轮已生成 15 个 `hand_detections_*.npz` 和 15 个 `hand_vis_gripper_*.mp4`。`NTU-PINE_20260703_211357` 没有 JPG，因此没有 HaMeR 视频 id。
+
+### Q.4 VR JSON 关节 vs HaMeR 对比
+
+新增对比脚本：
+
+```text
+/home/zaijia001/ssd/RoboTwin/code_painting/compare_vr_hamer_results.py
+```
+
+生成统计和横向视频：
+
+```bash
+source /home/zaijia001/ssd/miniconda3/etc/profile.d/conda.sh && conda activate RoboTwin_bw && \
+cd /home/zaijia001/ssd/RoboTwin && \
+python code_painting/compare_vr_hamer_results.py \
+  --overwrite \
+  --hamer-root /home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1 \
+  --vr-vis-root /home/zaijia001/ssd/data/piper/vr/0vis/datav1
+```
+
+查看结果：
+
+```text
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/compare/compare_vr_hamer_stats.md
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/compare/compare_vr_hamer_stats.json
+/home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/compare/id_<ID>_<EPISODE>_vr_vs_hamer_vscode.mp4
+```
+
+对比结论：
+
+```text
+VR JSON joints: 记录在 VR tracking/world 坐标系，metadata 写 coordinate_frame=RUF。
+HaMeR joints: 从 RGB 图像直接检测手，再由 HaMeR 管线提升到 camera-space keypoints。
+因此二者不是同一坐标系；HaMeR overlay 应该贴合图像，人手 JSON overlay 在缺 camera extrinsic 时只能做诊断，不能当作准确像素投影。
+```
+
+### Q.5 Quest 相机参数结论
+
+本地文件结论：
+
+```text
+metadata 里 device_name/source_desc 写的是 Quest 3；你口头说明是 Meta Quest 2，需要后续确认采集端是否写错 metadata。
+camera_real/*_video.json: 13/16 episode 有 intrinsics，典型为 focal_length=[640,640]、principal_point=[640,640]、sensor_resolution=[1280,1280]。
+camera_real/*_video.json: cameras 全部为空，没有外参/相机 pose。
+主 JSON 有 center_eye_pose/left_eye_pose/right_eye_pose，但这不是 camera_real JPG 的外部相机 pose。
+```
+
+官方资料结论：Meta 官方 Passthrough Camera API 文档说明当前 PCA 面向 Quest 3 / Quest 3S，且 Unity `PassthroughCameraAccess` 可返回 intrinsics、extrinsics、timestamp、`GetCameraPose()`、`WorldToViewportPoint()` 等数据。也就是说，正确做法不是套一个固定官方内参，而是在采集时把 API 返回的每帧/每相机 intrinsics、extrinsics 或 camera pose 一起保存下来；否则无法从 VR hand tracking/world 坐标严格投影到导出的 JPG 像素坐标。

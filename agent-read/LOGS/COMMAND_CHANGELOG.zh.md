@@ -2407,6 +2407,22 @@ tmux new-session -d -s l16_stack_debug_variants_gpu1 'GPU=1 IDS="0 1 2 3 4" MAX_
 - 新增入口：`bash /home/zaijia001/ssd/RoboTwin/code_painting/run_skeyp_v2_whitebg_pipeline.sh`。
 - 推荐 tmux：`tmux new-session -d -s skeyp_v2_whitebg_pipeline 'bash /home/zaijia001/ssd/RoboTwin/code_painting/run_skeyp_v2_whitebg_pipeline.sh'`。
 - 输出后缀：`skeyp_reinit_whitebg`；本地 zip：`robot_skeyp_reinit_whitebg_piper0515_6task_25ep.zip`；手动上传目标：`gdrive:piper/multi/6task/robot_skeyp_reinit_whitebg_piper0515`。
+
+## 2026-07-08（Q.1 VR 人手数据可视化命令）
+
+- `COMMAND_LIBRARY.zh.md` 末尾新增 `Q. VR 人手数据处理流程` 和 `Q.1 VR JPG + 手部关节诊断可视化`。
+- 新增命令文档：`agent-read/COMMANDS/vr_hand_data.zh.md` / `agent-read/COMMANDS/vr_hand_data.en.md`。
+- 新增入口：`python code_painting/visualize_vr_hand_data.py --overwrite --output-root /home/zaijia001/ssd/RoboTwin/code_painting/vr_hand_visualization`。
+- 重要限制：当前数据缺相机外参，脚本输出的是诊断叠加，不是几何标定投影。
+
+
+## 2026-07-08（Q.2-Q.4 VR axis debug / HaMeR 命令）
+
+- `COMMAND_LIBRARY.zh.md` 和 `agent-read/COMMANDS/vr_hand_data.*.md` 新增 VR axis debug、VR->HaMeR 输入转换、HaMeR 检测和 VR-vs-HaMeR 对比命令。
+- 新增入口：`code_painting/prepare_vr_hamer_input.py --output-root /home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1`。
+- 新增入口：`code_painting/compare_vr_hamer_results.py --hamer-root /home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1 --vr-vis-root /home/zaijia001/ssd/data/piper/vr/0vis/datav1`。
+- HaMeR 命令必须使用 `--no_depth`，因为 VR JPG 数据没有 depth 视频。
+
 ## 2026-07-09（Q.9 VR-HaMeR cross-episode transform 聚合命令）
 
 - 新增入口：`python code_painting/analyze_vr_hamer_cross_episode_transform_patterns.py --episode-substr 20260708 --overwrite --out-dir /home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/cross_episode_transform_patterns_20260708`。

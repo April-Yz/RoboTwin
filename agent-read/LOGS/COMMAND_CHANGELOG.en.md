@@ -2409,6 +2409,22 @@ tmux new-session -d -s l16_stack_debug_variants_gpu1 'GPU=1 IDS="0 1 2 3 4" MAX_
 - Added entrypoint: `bash /home/zaijia001/ssd/RoboTwin/code_painting/run_skeyp_v2_whitebg_pipeline.sh`.
 - Recommended tmux: `tmux new-session -d -s skeyp_v2_whitebg_pipeline 'bash /home/zaijia001/ssd/RoboTwin/code_painting/run_skeyp_v2_whitebg_pipeline.sh'`.
 - Output suffix: `skeyp_reinit_whitebg`; local zip: `robot_skeyp_reinit_whitebg_piper0515_6task_25ep.zip`; manual upload target: `gdrive:piper/multi/6task/robot_skeyp_reinit_whitebg_piper0515`.
+
+## 2026-07-08 (Q.1 VR hand-data visualization command)
+
+- Added `Q. VR 人手数据处理流程` and `Q.1 VR JPG + 手部关节诊断可视化` to the tail of `COMMAND_LIBRARY.zh.md`.
+- Added command docs: `agent-read/COMMANDS/vr_hand_data.zh.md` / `agent-read/COMMANDS/vr_hand_data.en.md`.
+- Added entrypoint: `python code_painting/visualize_vr_hand_data.py --overwrite --output-root /home/zaijia001/ssd/RoboTwin/code_painting/vr_hand_visualization`.
+- Important limitation: the current data has no camera extrinsics, so the script writes diagnostic overlays rather than geometrically calibrated projections.
+
+
+## 2026-07-08 (Q.2-Q.4 VR Axis Debug / HaMeR Commands)
+
+- Added VR axis debug, VR-to-HaMeR input conversion, HaMeR detection, and VR-vs-HaMeR comparison commands to `COMMAND_LIBRARY.zh.md` and `agent-read/COMMANDS/vr_hand_data.*.md`.
+- New entrypoint: `code_painting/prepare_vr_hamer_input.py --output-root /home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1`.
+- New entrypoint: `code_painting/compare_vr_hamer_results.py --hamer-root /home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1 --vr-vis-root /home/zaijia001/ssd/data/piper/vr/0vis/datav1`.
+- The HaMeR command must use `--no_depth` because the VR JPG data does not include depth videos.
+
 ## 2026-07-09 (Q.9 VR-HaMeR Cross-Episode Transform Aggregation Command)
 
 - Added entrypoint: `python code_painting/analyze_vr_hamer_cross_episode_transform_patterns.py --episode-substr 20260708 --overwrite --out-dir /home/zaijia001/ssd/data/piper/vr/0_1harmer/datav1/cross_episode_transform_patterns_20260708`.
