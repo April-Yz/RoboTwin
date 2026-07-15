@@ -25,4 +25,4 @@
 - 任务：`envs/pick_diverse_bottles_piper_ik.py`
 - IK：`envs/robot/piper_ik.py`
 
-命令详见 `agent-read/COMMANDS/piper_ik_cartesian.zh.md`、`piper_ik_foundation.zh.md` 和 `selection_strategy_audit_v4.zh.md`，版本关系详见 `agent-read/VERSION_SUMMARY.zh.md`。
+命令详见 `agent-read/COMMANDS/piper_ik_cartesian.zh.md`、`piper_ik_foundation.zh.md`、`piper_canonical_tcp_v1.zh.md` 和 `selection_strategy_audit_v4.zh.md`。Real-Piper-TCP frame contract 见 `agent-read/PIPER_CANONICAL_TCP_V1.zh.md`，版本关系见 `agent-read/VERSION_SUMMARY.zh.md`。

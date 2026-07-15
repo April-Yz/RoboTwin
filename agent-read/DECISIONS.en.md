@@ -19,3 +19,12 @@
 - Do not displace identical Orientation/Fused poses for visualization. Use thick-solid/thin-dashed lines and distinct markers at the same pose so data semantics remain unchanged.
 - Use `<TASK>/id<ID>_keyframe_<FRAME>_*` task outputs without an episode directory; keep the old nested output as a separate rollback backup.
 - Keep batch PNG/JSON/reports ignored by Git, and version only the two scripts and bilingual documentation.
+
+## 2026-07-15: PiperCanonicalTCP-v1
+
+- Keep OursV2 fully independent; new Real-TCP semantics live only in `piper_canonical_tcp_v1/`.
+- Frame names must distinguish `L6_SIM`, `L6_URDF`, `RTCP`, and `CGRASP`, with explicit world/local axis labels.
+- Use the runtime same-q exact signed-axis matrix for `T_L6SIM_L6URDF`. Keep literal server `-1.57` and `0.19` instead of substituting an ideal angle.
+- Orientation/Fused convert canonical preview axes back to raw/RTCP; Top-score raw source uses identity. The two numerically identical 90-degree matrices retain separate semantics.
+- Continue the batch after a strategy IK miss and record failure. Videos may be composed, but no failed strategy receives a SUCCESS marker.
+- Version code and tests; keep smoke, batch videos, logs, and large artifacts ignored.

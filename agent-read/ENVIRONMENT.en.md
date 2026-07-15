@@ -26,3 +26,10 @@ tail -n 30 /home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure_d435_
 Do not terminate long-lived GPU processes on pine2 without confirming ownership. Per-episode batch failures are recorded in the status table and processing continues.
 
 Selection Strategy Audit V4 only reads existing data and needs no GPU, SAPIEN, or planner. It requires NumPy, SciPy, and OpenCV. See `COMMANDS/selection_strategy_audit_v4.en.md`.
+
+## PiperCanonicalTCP-v1
+
+- Use `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python3.10`; pine2's default Python may lack SciPy/NumPy.
+- The EE-pose runner requires SAPIEN, CuRobo, and a GPU; the current batch uses GPU0. Joint-control comparison only needs Python/OpenCV and an existing OursV2 `pose_debug.jsonl`.
+- The 0515 calibration is `calibration_bundle_piper_new_table_0515.json`; robot config is `robot_config_PiperPika_agx_dual_table_0515.json`.
+- The 2026-07-15 batch uses new `code_painting/piper_canonical_tcp_v1/outputs_canonical_20260715/`; old dry-run files under default `outputs/` are preserved. See `COMMANDS/piper_canonical_tcp_v1.en.md` for tmux and commands.

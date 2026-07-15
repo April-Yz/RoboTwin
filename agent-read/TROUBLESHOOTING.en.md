@@ -39,3 +39,19 @@
 - Symptom: `Refusing to overwrite non-empty output root`.
 - Cause: V4 protects existing PNG, metadata, and reports by default.
 - Handling: choose a new `--output-root`. Use `--overwrite` only when deliberately rebuilding V4-owned artifacts; it never authorizes changes to legacy strategy directories.
+
+## PiperCanonicalTCP-v1: same-q position matches but rotation differs by 90 degrees
+
+- Symptom: `fk-contract-check` reports near-zero raw SIM/URDF position error but about 90-degree rotation error.
+- Cause: SAPIEN `L6_SIM` and CuRobo/server `L6_URDF` are different local-axis frames.
+- Handling: ensure readback includes `T_L6SIM_L6URDF=Ry(+pi/2)`; adapted rotation error should be near `0.00001 deg`. Never merge this with server `Ry(-1.57)`.
+
+## Top-score IK fails while Orientation/Fused succeed
+
+- Symptom: Top target rotation is near 180 degrees; position is close but strict rotation IK does not converge.
+- Cause: maximum raw score has no orientation constraint and may be flipped around the approach axis.
+- Handling: preserve the failure video and `eepose_failures.tsv`. Do not force-flip or relax rotation acceptance to pi. Compose the strategy comparison whenever all three head videos exist.
+
+## Non-empty output directory without SUCCESS
+
+- The runner refuses to overwrite it. Use a new `--output-root`, or retain the audited failure result; never delete/overwrite an old smoke to manufacture a pass.

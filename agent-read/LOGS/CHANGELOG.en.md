@@ -3242,3 +3242,14 @@ Validation: shell syntax, a one-episode batch dry-run, JSON parsing, and composi
 - Corrected the documentation semantics: the earlier 2.979 mm value is the Fused-to-Orientation inter-strategy difference, not the AnyGrasp-candidate-to-original-hand-replay difference.
 
 Validation: local and remote `RoboTwin_bw` `py_compile` passed. The analyzer read 461 metadata files, 600 OursV2, 496 Orientation/Fused, and 600 Top records and generated agreement-schema-v2 JSON plus bilingual Markdown. Remote default `python3` lacked NumPy; rerunning with the documented `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python3.10` succeeded.
+
+## 2026-07-15 (PiperCanonicalTCP-v1)
+
+- Added isolated Real-TCP frame contract, renderer/planner, same-q joint comparison, three-strategy compositor, 6x5 manifest/batch, and unit tests. OursV2 is unchanged.
+- Initial Orientation smoke exposed preview `CGRASP` axis semantics. Orientation/Fused now use `swap_red_blue_keep_green`; raw Top uses identity.
+- Runtime same-q FK then identified fixed `Ry(+pi/2)` between SAPIEN `L6_SIM` and CuRobo/server `L6_URDF`. Omitting it produces 90-degree rotation error; adapted error is below `0.000016 deg`.
+- Server conversion uses exact `Ry(-1.57) @ Tx(0.19)`. Corrected same-q OursV2/Real TCP distance is about `70.0001 mm` on both arms, replacing the invalid 224.6 mm result.
+- Orientation, Fused, Top-score, and joint-control comparison all pass on `pnp_bread/id8/left`. The stack_cups Top 178.79-degree flipped failure is retained as a strategy-difference example.
+- Batch composition now runs whenever all three head videos exist, while strict IK misses remain in the failures TSV and never receive fake SUCCESS markers.
+
+Validation: six unit tests, Python `py_compile`, shell `bash -n`, strategy-remap dry run, single-episode three-strategy and joint SUCCESS markers, ffprobe, and visual frame inspection all passed.

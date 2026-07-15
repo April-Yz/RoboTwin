@@ -19,3 +19,12 @@
 - 同 pose 的 Orientation/Fused 不做人为位置偏移；使用粗实线/细虚线和不同 marker 同址显示，避免改变数据语义。
 - 任务输出采用 `<TASK>/id<ID>_keyframe_<FRAME>_*`，不再创建 episode 中间目录；旧嵌套版保存在独立可回滚备份。
 - 批量 PNG/JSON/报告保持 Git ignore；只版本化两个脚本和双语说明。
+
+## 2026-07-15：PiperCanonicalTCP-v1
+
+- 保持 OursV2 完全独立；新 Real-TCP 语义只进入 `piper_canonical_tcp_v1/`。
+- frame 名必须区分 `L6_SIM`、`L6_URDF`、`RTCP` 与 `CGRASP`，并区分 world/local 轴标签。
+- `T_L6SIM_L6URDF` 使用运行时同-q 验证的精确 signed-axis matrix；服务器工具保持字面量 `-1.57` 和 `0.19`，不替换为理想角。
+- Orientation/Fused 从 canonical preview 转回 raw/RTCP；Top-score raw source 使用 identity。两条数值相同的 90° 矩阵保持独立语义。
+- batch 遇到策略 IK miss 后继续并记录失败；视频可合成，但失败策略不创建 SUCCESS。
+- 代码与测试进入 Git；smoke、batch 视频、日志和大文件继续 ignore。

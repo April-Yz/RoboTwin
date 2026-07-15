@@ -2,24 +2,24 @@
 
 ## 当前主线
 
-- 仓库默认版本仍按最新 v1.x 迭代管理；已有 Foundation、AnyGrasp、Ours v2、Dense Replay、Piper IK V3 等独立实验线。
-- Piper/0515 定性链路和近期数据状态见 `README.zh.md`、`VERSION_SUMMARY.zh.md` 与 `ACTIVE_MEMORY.zh.md`。
+- 仓库默认版本仍按最新 v1.x 迭代管理；Foundation、AnyGrasp、OursV2、Dense Replay、Piper IK V3 和 PiperCanonicalTCP-v1 是独立实验线。
+- 当前 Real-Piper-TCP 对比入口是 `PiperCanonicalTCP-v1`；它不修改 OursV2。
 
 ## 本轮新增
 
-- 新增只读 `Selection Strategy Audit V4`；不调用 planner，不修改 OursV2、Orientation、Fused、Top-score 或旧输出。
-- 从 `selected_candidates_by_executed_arm` 恢复真实 Top-score 候选，同时显示旧 raw/legacy 语义和 canonical 重建。
-- 每个关键帧输出 Selection Pose 与 Planner Target 双面板；不同 resolved frame 使用各自 Foundation 图并横向拼接。
-- 输出改为 `<TASK>/id<ID>_keyframe_<FRAME>_*` 扁平文件；粗品红 Orientation、黄虚线 Fused 与黑/橙/蓝 Top 语义避免重叠遮挡。
-- `analyze_selection_strategy_agreement_v4.py` 除策略间一致率外，现会直接比较 AnyGrasp candidate Selection Pose 与 OursV2 人手回放 Selection Pose；Orientation/Fused 同帧平均距离约 97.17/97.11 mm，左右手、signed world ΔXYZ 和 Top 跨帧污染单独统计。当前 orientation 平均占 Fused score 的 91.75%。
-- 全量覆盖 6 个任务、150 个 episode、461 张关键帧图和 2192 条 arm-strategy 记录；详见 `SELECTION_STRATEGY_AUDIT_V4.zh.md`。
-- 上一条隔离修复线仍为 `Dense Replay URDF-match v2`，详见 `COMMANDS/dense_replay_urdfmatch_v2.zh.md`。
-- Dense Replay V2 六任务批处理已在 tmux `dense_replay_urdfmatch_v2` 中启动；424 个输入按 episode 顺序写入独立 `h2_pure_d435_urdfmatch_v2`，旧 V1 保留。论文素材新增独立 `pipeline_grid_expanded_dense_urdfmatch_v2.mp4`，其中 V2 raw 与现有 V1 repaint 被明确标为不匹配版本。
+- planner target、current readback、reach check 和可视化统一为 `T_W_RTCP`。
+- SAPIEN `L6_SIM` 与 CuRobo/server `L6_URDF` 原点一致、局部轴固定差精确 `Ry(+pi/2)`；适配后同-q FK 误差小于 `7.5e-8 m / 0.000016 deg`。
+- 服务器工具保持字面量 `T_L6URDF_RTCP = Ry(-1.57) @ Tx(0.19)`。preview 的 `CGRASP -> RTCP` remap 是另一层独立变换。
+- corrected same-q OursV2 TCP 与 Real TCP 左右 mean/max distance 都约 `70.0001 mm`，对应统一前进轴上的 12 cm 与 19 cm 差；旧 224.6 mm 结论无效。
+- EE-pose 支持 Orientation、Fused、Top-score。`pnp_bread/id8/left` 三策略与 corrected joint 对比全部通过媒体/ffprobe/视觉 QA。
+- 6 tasks × 5 episodes manifest、独立 batch orchestrator 和 tmux 命令已准备。策略 IK miss 保留视频与 failures TSV，不伪造 SUCCESS。
+- Selection Strategy Audit V4 与 Dense Replay URDF-match v2 仍为独立历史线。
 
 ## 读取顺序
 
 1. `README.zh.md`
 2. `CURRENT_FEATURE_SUMMARY.zh.md`
 3. `VERSION_SUMMARY.zh.md`
-4. `SELECTION_STRATEGY_AUDIT_V4.zh.md`
-5. 与任务对应的 `COMMANDS/*.zh.md`
+4. `PIPER_CANONICAL_TCP_V1.zh.md`
+5. `COMMANDS/piper_canonical_tcp_v1.zh.md`
+6. `SELECTION_STRATEGY_AUDIT_V4.zh.md`

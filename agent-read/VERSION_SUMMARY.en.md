@@ -65,3 +65,7 @@ Update: the verified grasp/wrist v2 command explicitly includes `foundation_capt
 O.2 is a task extension of O.1.2 Foundation IK and does not change V1-V4 IK semantics. The new `pnp_tray_piper_ik_foundation` maps Foundation NPZ objects to left `left_dark_red_cup` and right `right_bottle`, using pnp_tray manual keyframes. The default action target source is the Foundation second-keyframe OBJ center rather than the `h2_pure_d435` EE target. The action order is `pregrasp -> grasp -> close -> object-keyframe action -> open_gripper`.
 
 Start O.2 validation from V1. `pnp_tray` uses `foundation_grasp_standoff=0.105`, because the pick_diverse verified-v2 value `0.14` pushes the left cup on ID0. Optional `foundation_pregrasp_clearance=0.06` can be used for lifted-pregrasp avoidance trials, while it is disabled by default. Formal collection uses `collect_foundation_piper_ik_verified.sh pnp_tray ...` and still saves head and both wrist videos.
+
+## 2026-07-15: PiperCanonicalTCP-v1 (isolated Real-TCP line)
+
+Added isolated `code_painting/piper_canonical_tcp_v1/` without modifying OursV2 or Piper IK V3. It names `L6_SIM`, `L6_URDF`, `RTCP`, and `CGRASP` separately; runtime validation establishes `T_L6SIM_L6URDF=Ry(+pi/2)`, while the server tool remains exactly `T_L6URDF_RTCP=Ry(-1.57)@Tx(0.19)`. It supports corrected same-q joint comparison and Orientation/Fused/Top-score EE-pose comparison. See `PIPER_CANONICAL_TCP_V1.en.md`.

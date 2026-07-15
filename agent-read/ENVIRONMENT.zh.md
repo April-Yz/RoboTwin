@@ -26,3 +26,10 @@ tail -n 30 /home/zaijia001/ssd/RoboTwin/code_painting/human_replay/h2_pure_d435_
 不要在未确认归属前终止 pine2 上长期占用 GPU 的旧进程；批处理失败会写入状态表并继续下一个 episode。
 
 Selection Strategy Audit V4 只读取已有数据，不需要 GPU、SAPIEN 或 planner；需要 NumPy、SciPy 和 OpenCV。命令见 `COMMANDS/selection_strategy_audit_v4.zh.md`。
+
+## PiperCanonicalTCP-v1
+
+- 必须使用 `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python3.10`；pine2 默认 Python 可能没有 SciPy/NumPy。
+- EE-pose runner 需要 SAPIEN、CuRobo 和 GPU；当前 batch 使用 GPU0。joint-control 对比只需 Python/OpenCV 和已有 OursV2 `pose_debug.jsonl`。
+- 0515 标定为 `calibration_bundle_piper_new_table_0515.json`，机器人配置为 `robot_config_PiperPika_agx_dual_table_0515.json`。
+- 2026-07-15 batch 输出只写全新 `code_painting/piper_canonical_tcp_v1/outputs_canonical_20260715/`；默认 `outputs/` 的旧 dry-run 文件保留。tmux 与命令见 `COMMANDS/piper_canonical_tcp_v1.zh.md`。

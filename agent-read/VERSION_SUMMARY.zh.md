@@ -65,3 +65,7 @@ Foundation Piper IK viewer 新增 wrist 相机 `parent_pitch_deg` 与 `parent_la
 O.2 是 O.1.2 Foundation IK 的任务扩展，不改变 V1-V4 IK 语义。新增 `pnp_tray_piper_ik_foundation`，将 Foundation NPZ 对象映射为左 `left_dark_red_cup`、右 `right_bottle`，使用 pnp_tray 的手工关键帧。默认 action target 来源为 Foundation 第二关键帧 OBJ center，而不是 `h2_pure_d435` EE target。动作顺序为 `pregrasp -> grasp -> close -> object-keyframe action -> open_gripper`。
 
 推荐 O.2 从 V1 开始验证；pnp_tray 使用 `foundation_grasp_standoff=0.105`，因为 pick_diverse verified v2 的 `0.14` 会在 ID0 上推偏左杯。可选 `foundation_pregrasp_clearance=0.06` 可用于抬高 pregrasp 的避障试验，默认不启用。正式采集使用 `collect_foundation_piper_ik_verified.sh pnp_tray ...`，仍保存 head 和左右 wrist 视频。
+
+## 2026-07-15：PiperCanonicalTCP-v1（独立 Real-TCP 链）
+
+新增独立链路 `code_painting/piper_canonical_tcp_v1/`，不修改 OursV2 或 Piper IK V3。它把 `L6_SIM`、`L6_URDF`、`RTCP` 和 `CGRASP` 分开命名；运行时验证 `T_L6SIM_L6URDF=Ry(+pi/2)`，服务器工具严格保持 `T_L6URDF_RTCP=Ry(-1.57)@Tx(0.19)`。支持 corrected same-q joint 对比及 Orientation/Fused/Top-score EE-pose 对比。详见 `PIPER_CANONICAL_TCP_V1.zh.md`。

@@ -39,3 +39,19 @@
 - 症状：`Refusing to overwrite non-empty output root`。
 - 原因：V4 默认保护已有 PNG、metadata 和报告。
 - 处理：使用新的 `--output-root`。只有明确要重建 V4 自身产物时才使用 `--overwrite`；该选项也不会授权修改旧策略目录。
+
+## PiperCanonicalTCP-v1：同-q 位置对但旋转固定差 90°
+
+- 症状：`fk-contract-check` 的 raw SIM/URDF position error 接近零，但 rotation error 约 90°。
+- 原因：SAPIEN `L6_SIM` 与 CuRobo/server `L6_URDF` 不是同一个局部轴 frame。
+- 处理：确认 readback 包含 `T_L6SIM_L6URDF=Ry(+pi/2)`；适配后 rotation error 应接近 `0.00001°`。不能把这层和服务器 `Ry(-1.57)` 合并。
+
+## Top-score IK 失败但 Orientation/Fused 成功
+
+- 症状：Top target rotation 接近 180°，position 可以接近但严格 rotation IK 不收敛。
+- 原因：raw-score 最大候选没有 orientation 约束，可能绕 approach 轴翻转。
+- 处理：保留失败视频与 `eepose_failures.tsv`；不要强制翻转、不要把 rotation threshold 放宽到 pi。三种 head video 存在时仍合成策略对比。
+
+## 输出目录非空但没有 SUCCESS
+
+- runner 会拒绝覆盖该目录。使用新的 `--output-root`，或人工审计后保留失败结果；不要删除/覆盖旧 smoke 来伪造通过。
