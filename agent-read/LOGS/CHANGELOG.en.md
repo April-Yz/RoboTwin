@@ -3261,3 +3261,17 @@ Validation: local and remote `RoboTwin_bw` `py_compile` passed. The analyzer rea
 - Batch composition now runs whenever all three head videos exist, while strict IK misses remain in the failures TSV and never receive fake SUCCESS markers.
 
 Validation: six unit tests, Python `py_compile`, shell `bash -n`, strategy-remap dry run, single-episode three-strategy and joint SUCCESS markers, ffprobe, and visual frame inspection all passed.
+
+## 2026-07-16 (OursV2 / Canonical / Piper-real control-effect comparison)
+
+- Added `real_control_contract.py`, `plan_real_control_compare.py`, and `compose_real_control_compare.py` without modifying OursV2 or the legacy Canonical planner.
+- Joint control compares measured endPose, OursV2 TCP, and Canonical RTCP under the same real q. EE-pose control runs OursV2 legacy IK and Canonical server-semantic IK under the same real `T_B_RTCP`, then evaluates both as physical RTCP.
+- Added a single-episode runner, a six-tasks-by-five-raw-episodes manifest/batch runner, and aligned command/version/environment/troubleshooting/decision documentation. Outputs are isolated from `outputs_canonical_20260715` and V1-V5.
+- Added branch-specific simulated-frame manifest provenance. It retains the generic renderer's original label while recording the actual OursV2/Canonical qpos semantics. The batch records started/complete/failed rows in `status.tsv`, continues after a per-episode failure, and writes `EXIT_CODE` in failed output directories.
+- The new runner reuses existing `.sim_source` direct-q frames when available. For newly copied raw episodes without a cache, it creates `sim_direct` only inside the isolated output and never writes back to the legacy cache.
+
+Validation: nine unit tests passed in pine2 RoboTwin_bw; Python `py_compile`, shell `bash -n`, and dry-run passed. Both IK branches had 100% left/right success in the eight-frame `handover_bottle/episode0` smoke. Canonical EE-pose physical-RTCP error was `0.0111/0.0039 mm` left/right versus `195.08/195.41 mm` for legacy OursV2. Joint Canonical error was `9.7748/9.5863 mm`. Both 1920x1080 H.264/yuv420p MP4s passed full decode and middle-frame visual QA.
+
+Data validation: copied only the 18 missing raw episodes from the Piper server and preserved the existing 12. The final 30 episodes contain 1,597,329,900 bytes. Per-episode D435, both wrist cameras, both jointState streams, and both endPose streams are nonempty with zero failures; source/destination file counts and byte totals match for every newly copied episode.
+
+Fallback validation: the four-frame `pick_diverse_bottles/episode3` smoke, newly copied and without legacy `.sim_source`, automatically generated `sim_direct`. Both IK branches had 100% left/right success and both MP4s were compatible. Canonical EE-pose physical-RTCP error was `0.0113/0.0097 mm` left/right versus `194.42/196.35 mm` for legacy OursV2.

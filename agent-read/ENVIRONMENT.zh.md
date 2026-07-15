@@ -34,3 +34,5 @@ Selection Strategy Audit V4 只读取已有数据，不需要 GPU、SAPIEN 或 p
 - 0515 标定为 `calibration_bundle_piper_new_table_0515.json`，机器人配置为 `robot_config_PiperPika_agx_dual_table_0515.json`。
 - 2026-07-15 batch 输出只写全新 `code_painting/piper_canonical_tcp_v1/outputs_canonical_20260715/`；默认 `outputs/` 的旧 dry-run 文件保留。tmux 与命令见 `COMMANDS/piper_canonical_tcp_v1.zh.md`。
 - VSCode 兼容视频后处理要求系统 `ffmpeg`/`ffprobe`，且 FFmpeg 提供 `libx264`。标准输出契约为 H.264、`yuv420p`、`+faststart`；转码不需要 GPU。
+- Real control compare 还需要同步 raw episode：`camera/color/myD435`、左右 `arm/jointState`、左右 `arm/endPose`。当前入口从 `/home/zaijia001/ssd/data/piper/hand/vis/.pos_source/<TASK>/<EPISODE>` 读取，不使用 foundation replay 当作真实机器人状态。
+- 双 IK 和 SAPIEN 渲染需要 RoboTwin_bw/CUDA；本机系统 Python 缺少 SciPy 时只能做语法检查，数学测试必须在 RoboTwin_bw 中运行。

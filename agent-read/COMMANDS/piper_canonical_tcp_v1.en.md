@@ -123,3 +123,34 @@ cd /home/zaijia001/ssd/RoboTwin
 ```
 
 The tool converts only non-`h264/yuv420p` MP4 files. A temporary H.264 file must pass ffprobe, geometry/frame-count checks, and full-frame decode before it atomically replaces the original path. The manifest records before/after formats, sizes, and SHA-256 values.
+
+## Real control compare
+
+Parameter template (documentation only; replace placeholders):
+
+```bash
+code_painting/piper_canonical_tcp_v1/run_real_control_compare.sh \
+  --task <RAW_TASK> --episode <episodeN> --gpu <GPU_ID> \
+  --max-frames <0_FOR_FULL_EPISODE> --output-root <NEW_OUTPUT_ROOT>
+```
+
+Passing eight-frame smoke:
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin
+code_painting/piper_canonical_tcp_v1/run_real_control_compare.sh \
+  --task handover_bottle --episode episode0 --gpu 2 --max-frames 8 \
+  --output-root code_painting/piper_canonical_tcp_v1/outputs_real_control_smoke_20260716
+```
+
+Start an isolated tmux for the 30 audited raw episodes (six tasks x five). Each episode automatically produces both joint and EE-pose videos:
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin
+mkdir -p code_painting/piper_canonical_tcp_v1/outputs_real_control_compare_20260716/_batch_logs
+tmux new-session -d -s pcan_realctrl_30 \
+  "cd /home/zaijia001/ssd/RoboTwin && \
+   code_painting/piper_canonical_tcp_v1/run_real_control_compare_batch.sh --gpu 2 \
+     --output-root code_painting/piper_canonical_tcp_v1/outputs_real_control_compare_20260716 \
+   2>&1 | tee code_painting/piper_canonical_tcp_v1/outputs_real_control_compare_20260716/_batch_logs/tmux.log"
+```

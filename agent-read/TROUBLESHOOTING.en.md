@@ -68,3 +68,17 @@
 ## Non-empty output directory without SUCCESS
 
 - The runner refuses to overwrite it. Use a new `--output-root`, or retain the audited failure result; never delete/overwrite an old smoke to manufacture a pass.
+
+## OursV2 IK is absent under `outputs_canonical_20260715/eepose`
+
+- Cause: those three entries are Orientation/Fused/Top-score candidate strategies, and all three feed Canonical IK.
+- Handling: run `run_real_control_compare.sh`. Its `eepose_control.mp4` contains the Piper-real reference, OursV2 legacy EE-pose IK, and Canonical server-semantic IK.
+
+## Real-control OursV2 EE-pose is about 19.5 cm away
+
+- Cause: the common input is server `T_B_RTCP`, while the legacy OursV2 default sends the numeric pose unchanged as a `T_B_L6URDF` target without removing `Ry(-1.57)@Tx(0.19)`. This is not caused by a relaxed IK position threshold.
+- Handling: inspect branch semantics in `summary.json`. Evaluate both q traces through Canonical physical-RTCP FK. Quietly adding the server tool to the OursV2 branch would stop being a legacy-chain comparison.
+
+## A simulated gripper is offscreen
+
+- Early frames may show only an `offscreen` arrow because of the calibrated 0515 head-camera field of view. This does not mean FK or curves are missing. Inspect later frames in the full episode and use world-XYZ curves plus IK success masks for numerical conclusions.

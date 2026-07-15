@@ -30,3 +30,11 @@
 - Version code and tests; keep smoke, batch videos, logs, and large artifacts ignored.
 - Canonical generated videos use the VS Code/Chromium-decodable contract: H.264, `yuv420p`, and faststart. OpenCV-readable does not imply browser-compatible; validate temporary format, geometry/frame count, and full decode before replacement.
 - Video provenance must distinguish raw/preview D435 input, a simulated head camera driven by D435 calibration, and simulated third/wrist/composed views. A `d435` path component alone does not make every MP4 raw D435 footage.
+
+## 2026-07-16: keep the three-chain real-control comparison isolated
+
+- Do not modify OursV2. Its branch must faithfully preserve the legacy numeric-pose-to-link6-IK semantics.
+- Joint and EE-pose comparisons use common real q and common real `T_B_RTCP`, respectively. A foundation candidate strategy must never be presented as a controller comparison.
+- Do not evaluate an IK q trace with OursV2's own TCP definition. Convert both q traces to physical Canonical RTCP before comparing against measured endPose.
+- Preserve failed-arm masks and exclude failures from curves; never present the reference-q fallback as a successful result.
+- Write only to isolated `outputs_real_control_compare_20260716`; preserve the existing Canonical candidate batch and V1-V5 videos.

@@ -69,3 +69,7 @@ O.2 是 O.1.2 Foundation IK 的任务扩展，不改变 V1-V4 IK 语义。新增
 ## 2026-07-15：PiperCanonicalTCP-v1（独立 Real-TCP 链）
 
 新增独立链路 `code_painting/piper_canonical_tcp_v1/`，不修改 OursV2 或 Piper IK V3。它把 `L6_SIM`、`L6_URDF`、`RTCP` 和 `CGRASP` 分开命名；运行时验证 `T_L6SIM_L6URDF=Ry(+pi/2)`，服务器工具严格保持 `T_L6URDF_RTCP=Ry(-1.57)@Tx(0.19)`。支持 corrected same-q joint 对比及 Orientation/Fused/Top-score EE-pose 对比。详见 `PIPER_CANONICAL_TCP_V1.zh.md`。
+
+### 2026-07-16：Real control compare v1.x 增量
+
+在同一隔离目录中新增 `real_control_compare.v1`，不提升 major version、不修改 OursV2。它用 Piper raw episode 的同步 q/endPose 做 Joint 与 EE-pose 两类三链路对比，输出与 2026-07-15 候选策略批次分离。Joint/EE-pose 两支视频均以 0515 world XYZ 作图，局部 TCP 轴继续用红/绿/蓝表示 +X/+Y/+Z。

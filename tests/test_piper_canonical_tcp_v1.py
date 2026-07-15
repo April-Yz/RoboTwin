@@ -31,6 +31,13 @@ from frame_contract import (  # noqa: E402
     urdf_link6_pose_to_real_tcp_pose,
     world_real_tcp_to_base_urdf_link6_pose,
 )
+from real_control_contract import (  # noqa: E402
+    OURS_V2_DEFAULT_GLOBAL_TRANSFORM,
+    canonical_link6_target_from_real_tcp,
+    canonical_rtcp_from_urdf_link6,
+    oursv2_legacy_link6_target_from_real_tcp_numeric,
+    oursv2_tcp_from_urdf_link6,
+)
 
 
 def random_pose(rng: np.random.Generator) -> np.ndarray:
@@ -140,6 +147,40 @@ class PiperCanonicalTCPV1Test(unittest.TestCase):
             "approach/forward",
         )
         self.assertEqual(contract["axes"]["world_+Z"]["physical_role"], "vertical/up")
+
+    def test_real_control_canonical_target_and_fk_are_inverse(self) -> None:
+        rng = np.random.default_rng(19019)
+        for _ in range(100):
+            real_tcp = random_pose(rng)
+            real_matrix = pose_wxyz_to_matrix(real_tcp)
+            link_position, link_rotation = canonical_link6_target_from_real_tcp(
+                real_matrix[:3, 3], real_matrix[:3, :3]
+            )
+            recovered_position, recovered_rotation = canonical_rtcp_from_urdf_link6(
+                link_position, link_rotation
+            )
+            np.testing.assert_allclose(recovered_position, real_matrix[:3, 3], atol=1e-12)
+            np.testing.assert_allclose(recovered_rotation, real_matrix[:3, :3], atol=1e-12)
+
+    def test_real_control_oursv2_q_to_tcp_formula(self) -> None:
+        rng = np.random.default_rng(120)
+        link6 = pose_wxyz_to_matrix(random_pose(rng))
+        position, rotation = oursv2_tcp_from_urdf_link6(
+            link6[:3, 3], link6[:3, :3]
+        )
+        expected_rotation = link6[:3, :3] @ OURS_V2_DEFAULT_GLOBAL_TRANSFORM
+        expected_position = link6[:3, 3] + expected_rotation @ np.array([0.12, 0.0, 0.0])
+        np.testing.assert_allclose(rotation, expected_rotation, atol=1e-15)
+        np.testing.assert_allclose(position, expected_position, atol=1e-15)
+
+    def test_real_control_oursv2_legacy_target_is_numeric_passthrough(self) -> None:
+        rng = np.random.default_rng(314)
+        real_tcp = pose_wxyz_to_matrix(random_pose(rng))
+        position, rotation = oursv2_legacy_link6_target_from_real_tcp_numeric(
+            real_tcp[:3, 3], real_tcp[:3, :3]
+        )
+        np.testing.assert_array_equal(position, real_tcp[:3, 3])
+        np.testing.assert_array_equal(rotation, real_tcp[:3, :3])
 
 
 if __name__ == "__main__":

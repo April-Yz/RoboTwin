@@ -34,3 +34,5 @@ Selection Strategy Audit V4 only reads existing data and needs no GPU, SAPIEN, o
 - The 0515 calibration is `calibration_bundle_piper_new_table_0515.json`; robot config is `robot_config_PiperPika_agx_dual_table_0515.json`.
 - The 2026-07-15 batch uses new `code_painting/piper_canonical_tcp_v1/outputs_canonical_20260715/`; old dry-run files under default `outputs/` are preserved. See `COMMANDS/piper_canonical_tcp_v1.en.md` for tmux and commands.
 - VS Code-compatible video post-processing requires system `ffmpeg`/`ffprobe` with `libx264`. The output contract is H.264, `yuv420p`, and `+faststart`; transcoding does not require a GPU.
+- Real control compare also requires synchronized raw-episode `camera/color/myD435`, left/right `arm/jointState`, and left/right `arm/endPose`. The entry reads `/home/zaijia001/ssd/data/piper/hand/vis/.pos_source/<TASK>/<EPISODE>` and never treats foundation replay as measured robot state.
+- Dual IK and SAPIEN rendering require RoboTwin_bw/CUDA. If the local system Python lacks SciPy, it can only run syntax checks; mathematical tests must run inside RoboTwin_bw.

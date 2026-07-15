@@ -123,3 +123,34 @@ cd /home/zaijia001/ssd/RoboTwin
 ```
 
 工具只转换非 `h264/yuv420p` MP4。临时 H.264 文件必须通过 ffprobe、尺寸/帧数检查与逐帧解码后，才会原子替换原路径；清单记录转换前后格式、大小和 SHA-256。
+
+## Real control compare
+
+参数模板（说明参数，不可直接运行）：
+
+```bash
+code_painting/piper_canonical_tcp_v1/run_real_control_compare.sh \
+  --task <RAW_TASK> --episode <episodeN> --gpu <GPU_ID> \
+  --max-frames <0_FOR_FULL_EPISODE> --output-root <NEW_OUTPUT_ROOT>
+```
+
+已通过的 8 帧 smoke：
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin
+code_painting/piper_canonical_tcp_v1/run_real_control_compare.sh \
+  --task handover_bottle --episode episode0 --gpu 2 --max-frames 8 \
+  --output-root code_painting/piper_canonical_tcp_v1/outputs_real_control_smoke_20260716
+```
+
+对已审计的 30 个 raw episode（6 tasks × 5）启动独立 tmux（脚本按 episode 自动生成 joint/eepose 两支视频）：
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin
+mkdir -p code_painting/piper_canonical_tcp_v1/outputs_real_control_compare_20260716/_batch_logs
+tmux new-session -d -s pcan_realctrl_30 \
+  "cd /home/zaijia001/ssd/RoboTwin && \
+   code_painting/piper_canonical_tcp_v1/run_real_control_compare_batch.sh --gpu 2 \
+     --output-root code_painting/piper_canonical_tcp_v1/outputs_real_control_compare_20260716 \
+   2>&1 | tee code_painting/piper_canonical_tcp_v1/outputs_real_control_compare_20260716/_batch_logs/tmux.log"
+```

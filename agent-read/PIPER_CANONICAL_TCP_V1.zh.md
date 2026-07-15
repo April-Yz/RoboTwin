@@ -104,3 +104,18 @@ EE batch 在单策略 IK miss 后继续，记录到 `outputs_canonical_20260715/
 - Python `py_compile` 与 shell `bash -n` 通过。
 - dry-run 验证 Orientation/Fused remap 为 `swap_red_blue_keep_green`，Top-score 为 `identity`。
 - single-episode 三策略、joint control、ffprobe 与抽帧视觉 QA 通过。
+
+## OursV2 / Canonical / Piper real 三链路控制对比
+
+`outputs_canonical_20260715/eepose/<strategy>` 的“三种”仅指 Orientation、Fused、Top-score 候选选择，全部使用 Canonical IK；它不包含 OursV2 IK，也不是三控制器效果对比。
+
+新入口 `run_real_control_compare.sh` 使用 Piper raw episode 的同步 D435、`jointState` 与 `endPose`：
+
+- Joint control：共同输入为 real q1-q6。Real 曲线读取服务器 endPose；OursV2 曲线使用 `R_B_OTCP=R_B_L6URDF@diag(1,-1,-1)` 并沿局部 +X 加 0.12 m；Canonical 使用 `T_B_RTCP=T_B_L6URDF@Ry(-1.57)@Tx(0.19)`。
+- EE-pose control：共同输入为 real `T_B_RTCP`。OursV2 分支忠实复现旧默认，把该数值不经 server inverse-tool 直接当 `T_B_L6URDF` IK 目标，最大旋转阈值 3.14 rad；Canonical 先执行 `T_B_L6URDF=T_B_RTCP@inv(Ry(-1.57)@Tx(0.19))`，最大旋转阈值 0.12 rad。
+- 两个 IK 结果都重新按 Canonical 物理 RTCP FK 评价；失败臂只在仿真面板显示红色 direct-q fallback，并从曲线/误差统计排除。
+- 图表全部是共享 Piper0515 world XYZ。画面里的红/绿/蓝坐标轴是各 TCP 的局部 +X/+Y/+Z，不是 world 曲线颜色。
+
+8 帧 smoke 位于 `outputs_real_control_smoke_20260716/handover_bottle/episode0/`。Joint Canonical 对 real 左右平均位置误差为 `9.7748/9.5863 mm`，OursV2 为 `215.84/218.77 mm`。EE-pose 两分支均 100% IK 成功；Canonical 物理 RTCP 误差为 `0.0111/0.0039 mm`，OursV2 为 `195.08/195.41 mm`。两支 1920×1080 MP4 均为 H.264/yuv420p/faststart，并完成视觉 QA。
+
+`real_control_manifest.tsv` 固定 30 个已审计 raw episode（6 tasks × 5）。它与 `batch_manifest.tsv` 的 30 个 AnyGrasp foundation IDs 数量相同，但样本语义不同：前者是 Piper raw episode，后者是 foundation input ID，不能按 slot 静默配对。

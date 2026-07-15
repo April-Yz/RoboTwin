@@ -30,3 +30,11 @@
 - 代码与测试进入 Git；smoke、batch 视频、日志和大文件继续 ignore。
 - canonical 生成视频统一使用 VSCode/Chromium 可解码契约：H.264、`yuv420p`、faststart。OpenCV 可读不等于浏览器兼容；替换前必须对临时文件做格式、几何/帧数和完整解码验证。
 - 视频来源语义必须区分“D435 原始/预览输入”“D435 标定驱动的仿真 head camera”与“仿真 third/wrist/合成画面”，不能仅因路径含 `d435` 就把所有 MP4 称为 D435 视频。
+
+## 2026-07-16：三链路 real control compare 保持隔离
+
+- 不修改 OursV2；OursV2 branch 必须忠实保留旧 numeric pose -> link6 IK 语义。
+- Joint 与 EE-pose 必须分别使用共同 real q 与共同 real `T_B_RTCP`，不能把 foundation candidate strategy 当作控制器对比。
+- 不以 OursV2 自己的 TCP 定义评价 IK 后 q；两套 q 统一转换为物理 Canonical RTCP 后再和 real endPose 比较。
+- 失败臂保留失败标记并排除曲线，不以 reference q fallback 伪造成功数值。
+- 新结果使用独立 `outputs_real_control_compare_20260716`；现有 Canonical candidate batch 和 V1–V5 视频不覆盖。

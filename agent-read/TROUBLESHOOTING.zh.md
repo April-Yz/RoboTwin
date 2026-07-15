@@ -68,3 +68,17 @@
 ## 输出目录非空但没有 SUCCESS
 
 - runner 会拒绝覆盖该目录。使用新的 `--output-root`，或人工审计后保留失败结果；不要删除/覆盖旧 smoke 来伪造通过。
+
+## `outputs_canonical_20260715/eepose` 看不到 OursV2 IK
+
+- 原因：该目录的三项是 Orientation/Fused/Top-score 候选策略，三项都进入 Canonical IK。
+- 处理：使用 `run_real_control_compare.sh`；`eepose_control.mp4` 才包含 Piper real reference、OursV2 legacy EE-pose IK 和 Canonical server-semantic IK。
+
+## Real control compare 的 OursV2 EE-pose 约差 19.5 cm
+
+- 原因：共同输入是服务器 `T_B_RTCP`，旧 OursV2 默认把数值原样当 `T_B_L6URDF` 目标，没有撤掉 `Ry(-1.57)@Tx(0.19)`。这不是 IK position threshold 放宽造成的。
+- 处理：检查 `summary.json` 的 branch semantics；最终比较必须把两套 q 都按 Canonical RTCP FK 评价。不要在 OursV2 分支偷偷补 server tool，否则不再是旧链路对比。
+
+## 仿真视图里夹爪在画外
+
+- 前若干帧可能因 0515 标定 head camera 的视野而只显示 `offscreen` 箭头；这不代表 FK/曲线缺失。用完整 episode 检查后续帧，并以 world XYZ 曲线和 IK success mask 为数值依据。

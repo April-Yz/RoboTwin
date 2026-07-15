@@ -104,3 +104,18 @@ The EE batch continues after a strategy IK miss and records it in `outputs_canon
 - Python `py_compile` and shell `bash -n` pass.
 - Dry runs confirm `swap_red_blue_keep_green` for Orientation/Fused and `identity` for Top-score.
 - Single-episode three-strategy planning, joint control, ffprobe, and visual frame QA pass.
+
+## OursV2 / Canonical / Piper-real three-chain control comparison
+
+The three entries under `outputs_canonical_20260715/eepose/<strategy>` are only Orientation, Fused, and Top-score candidate-selection strategies, all executed through Canonical IK. They do not include OursV2 IK and are not a three-controller effect comparison.
+
+The new `run_real_control_compare.sh` consumes synchronized D435, `jointState`, and `endPose` data from a Piper raw episode:
+
+- Joint control: the common input is real q1-q6. The Real curve reads server endPose; OursV2 uses `R_B_OTCP=R_B_L6URDF@diag(1,-1,-1)` plus 0.12 m along local +X; Canonical uses `T_B_RTCP=T_B_L6URDF@Ry(-1.57)@Tx(0.19)`.
+- EE-pose control: the common input is real `T_B_RTCP`. The OursV2 branch faithfully preserves the legacy default by sending those numeric values directly as the `T_B_L6URDF` IK target without the server inverse tool, using a 3.14-rad maximum rotation threshold. Canonical first applies `T_B_L6URDF=T_B_RTCP@inv(Ry(-1.57)@Tx(0.19))` and uses 0.12 rad.
+- Both planned-q results are re-evaluated as physical Canonical RTCP. A failed arm shows a red direct-q visual fallback and is excluded from curves and error statistics.
+- Every chart uses shared Piper0515 world XYZ. Red/green/blue pose axes in the image are local TCP +X/+Y/+Z and are not the world-curve colors.
+
+The eight-frame smoke is under `outputs_real_control_smoke_20260716/handover_bottle/episode0/`. Joint Canonical mean position error versus real is `9.7748/9.5863 mm` left/right, while OursV2 is `215.84/218.77 mm`. Both EE-pose branches achieve 100% IK success; Canonical physical-RTCP error is `0.0111/0.0039 mm`, versus `195.08/195.41 mm` for OursV2. Both 1920x1080 MP4s are H.264/yuv420p/faststart and pass visual QA.
+
+`real_control_manifest.tsv` fixes 30 audited raw episodes (six tasks x five). It has the same count as the 30 AnyGrasp foundation IDs in `batch_manifest.tsv`, but not the same sample semantics: one is a Piper raw episode and the other is a foundation input ID. Slots must not be silently paired.

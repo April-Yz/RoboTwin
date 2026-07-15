@@ -69,3 +69,7 @@ Start O.2 validation from V1. `pnp_tray` uses `foundation_grasp_standoff=0.105`,
 ## 2026-07-15: PiperCanonicalTCP-v1 (isolated Real-TCP line)
 
 Added isolated `code_painting/piper_canonical_tcp_v1/` without modifying OursV2 or Piper IK V3. It names `L6_SIM`, `L6_URDF`, `RTCP`, and `CGRASP` separately; runtime validation establishes `T_L6SIM_L6URDF=Ry(+pi/2)`, while the server tool remains exactly `T_L6URDF_RTCP=Ry(-1.57)@Tx(0.19)`. It supports corrected same-q joint comparison and Orientation/Fused/Top-score EE-pose comparison. See `PIPER_CANONICAL_TCP_V1.en.md`.
+
+### 2026-07-16: real-control-compare v1.x increment
+
+Added `real_control_compare.v1` under the same isolated directory without promoting a major version or modifying OursV2. It uses synchronized q/endPose from Piper raw episodes for three-chain Joint and EE-pose comparisons and keeps outputs separate from the 2026-07-15 candidate-strategy batch. Both videos plot 0515 world XYZ; local TCP +X/+Y/+Z remain red/green/blue.
