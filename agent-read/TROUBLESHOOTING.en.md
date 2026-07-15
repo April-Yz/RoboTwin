@@ -1,5 +1,18 @@
 # Troubleshooting
 
+## PiperCanonicalTCP-v1: ffmpeg reads an MP4 but VS Code cannot play it
+
+- Symptom: OpenCV/ffmpeg decodes the complete video, while VS Code preview is blank, unsupported, or never starts.
+- Diagnosis: run `ffprobe -v error -select_streams v:0 -show_entries stream=codec_name,pix_fmt <VIDEO>`. An `mpeg4`/`mp4v` file may be structurally valid even though Chromium lacks the decoder.
+- Cause: the legacy planner transcoded only head/third videos to H.264. Wrist, debug, joint-comparison, and strategy-comparison files remained OpenCV `mp4v` outputs.
+- Fix: run `vscode_video.py --apply` from `COMMANDS/piper_canonical_tcp_v1.en.md`. It validates a temporary file before atomic replacement; renaming the extension is not a fix.
+
+## PiperCanonicalTCP-v1: which videos are D435
+
+- `foundation_replay_d435`, AnyGrasp D435 preview, and `source_preview_compare/*d435*.png` use physical D435 data/calibration.
+- `head_cam_plan.mp4` is a SAPIEN head-camera render driven by the D435 calibration, not raw D435 footage.
+- `third_cam_plan.mp4`, left/right wrist MP4 files, and debug/comparison MP4 files are simulated or composed views and must not be labeled as raw D435 video.
+
 ## Dense Replay has an approximately 17 cm fixed offset
 
 - Symptom: planned and executed trends look similar, but the entire actual TCP curve is translated; orientation may also differ by about 90 degrees.

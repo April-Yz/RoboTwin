@@ -9,6 +9,8 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+from vscode_video import ensure_vscode_mp4
+
 
 STRATEGIES = (("orientation", "Orientation"), ("fused", "Fused 0.25 score + 0.75 rot"), ("top_score", "Top AnyGrasp score"))
 
@@ -53,6 +55,7 @@ def main() -> int:
         writer.write(canvas)
     writer.release()
     for cap in caps: cap.release()
+    ensure_vscode_mp4(args.output)
     print(args.output)
     return 0
 

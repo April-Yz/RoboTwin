@@ -99,3 +99,27 @@ tmux list-sessions | grep 'pcan_v1_'
 tmux capture-pane -pt pcan_v1_joint_6x5 -S -30
 tmux capture-pane -pt pcan_v1_eepose_6x5 -S -30
 ```
+
+## VS Code-compatible MP4 audit and transcode
+
+Parameter template (read-only dry run; documentation only):
+
+```bash
+/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python3.10 \
+  code_painting/piper_canonical_tcp_v1/vscode_video.py \
+  --root <OUTPUT_ROOT> --workers <WORKER_COUNT> \
+  --manifest <MANIFEST_JSON>
+```
+
+Atomically convert the 2026-07-15 canonical outputs:
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin
+/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python3.10 \
+  code_painting/piper_canonical_tcp_v1/vscode_video.py \
+  --root code_painting/piper_canonical_tcp_v1/outputs_canonical_20260715 \
+  --apply --workers 4 \
+  --manifest code_painting/piper_canonical_tcp_v1/outputs_canonical_20260715/_batch_logs/vscode_transcode_manifest.json
+```
+
+The tool converts only non-`h264/yuv420p` MP4 files. A temporary H.264 file must pass ffprobe, geometry/frame-count checks, and full-frame decode before it atomically replaces the original path. The manifest records before/after formats, sizes, and SHA-256 values.

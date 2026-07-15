@@ -33,3 +33,4 @@ Selection Strategy Audit V4 only reads existing data and needs no GPU, SAPIEN, o
 - The EE-pose runner requires SAPIEN, CuRobo, and a GPU; the current batch uses GPU0. Joint-control comparison only needs Python/OpenCV and an existing OursV2 `pose_debug.jsonl`.
 - The 0515 calibration is `calibration_bundle_piper_new_table_0515.json`; robot config is `robot_config_PiperPika_agx_dual_table_0515.json`.
 - The 2026-07-15 batch uses new `code_painting/piper_canonical_tcp_v1/outputs_canonical_20260715/`; old dry-run files under default `outputs/` are preserved. See `COMMANDS/piper_canonical_tcp_v1.en.md` for tmux and commands.
+- VS Code-compatible video post-processing requires system `ffmpeg`/`ffprobe` with `libx264`. The output contract is H.264, `yuv420p`, and `+faststart`; transcoding does not require a GPU.

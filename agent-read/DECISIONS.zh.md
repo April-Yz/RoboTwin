@@ -28,3 +28,5 @@
 - Orientation/Fused 从 canonical preview 转回 raw/RTCP；Top-score raw source 使用 identity。两条数值相同的 90° 矩阵保持独立语义。
 - batch 遇到策略 IK miss 后继续并记录失败；视频可合成，但失败策略不创建 SUCCESS。
 - 代码与测试进入 Git；smoke、batch 视频、日志和大文件继续 ignore。
+- canonical 生成视频统一使用 VSCode/Chromium 可解码契约：H.264、`yuv420p`、faststart。OpenCV 可读不等于浏览器兼容；替换前必须对临时文件做格式、几何/帧数和完整解码验证。
+- 视频来源语义必须区分“D435 原始/预览输入”“D435 标定驱动的仿真 head camera”与“仿真 third/wrist/合成画面”，不能仅因路径含 `d435` 就把所有 MP4 称为 D435 视频。

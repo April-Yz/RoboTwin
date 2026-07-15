@@ -18,6 +18,7 @@ from frame_contract import (
     sim_link6_pose_to_real_tcp_pose,
     write_frame_contract,
 )
+from vscode_video import ensure_vscode_mp4
 
 
 LINE_COLORS = {"ours": (255, 255, 0), "real": (0, 140, 255)}
@@ -140,6 +141,7 @@ def render_video(rows: list[dict], source_video: Path | None, output: Path) -> N
         writer.write(canvas)
     writer.release()
     if cap: cap.release()
+    ensure_vscode_mp4(output)
 
 
 def main() -> int:
@@ -165,7 +167,18 @@ def main() -> int:
         delta = np.asarray([row[arm]["p_W_delta_RTCP_minus_OursTCP_m"] for row in rows])
         dist = np.linalg.norm(delta, axis=1)
         stats[arm] = {"mean_distance_m": float(dist.mean()), "max_distance_m": float(dist.max()), "mean_delta_world_m": delta.mean(axis=0).tolist()}
-    (args.output_dir / "summary.json").write_text(json.dumps({"schema":"piper_canonical_tcp_v1.joint_compare.v2","task":args.task,"episode_id":args.episode_id,"records":len(rows),"stats":stats}, indent=2)+"\n")
+    summary = {
+        "schema": "piper_canonical_tcp_v1.joint_compare.v3",
+        "task": args.task,
+        "episode_id": args.episode_id,
+        "records": len(rows),
+        "source_pose_debug": str(args.pose_debug.resolve()),
+        "source_pose_semantics": "OursV2 human-replay same-q trajectory",
+        "source_video": str(args.source_video.resolve()) if args.source_video else None,
+        "source_video_kind": "OursV2 simulated head camera; D435-derived replay/calibration, not raw D435 footage",
+        "stats": stats,
+    }
+    (args.output_dir / "summary.json").write_text(json.dumps(summary, indent=2)+"\n")
     write_frame_contract(args.output_dir / "frame_contract.json", {"task":args.task,"episode_id":args.episode_id,"comparison":"same_q_ours_tcp_vs_real_tcp"})
     render_video(rows, args.source_video, args.output_dir / "joint_tcp_comparison.mp4")
     (args.output_dir / "SUCCESS").touch()

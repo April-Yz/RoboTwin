@@ -60,6 +60,11 @@ while IFS=$'\t' read -r TASK ID ARM; do
         printf 'compose\t%s\t%s\t%s\n' "$TASK" "$ID" "$ARM" >>"$FAILURES"
     fi
   fi
+  if ! "$PY" "$SCRIPT_DIR/vscode_video.py" \
+    --root "$EP_ROOT" --apply --workers 2 \
+    --manifest "$EP_ROOT/vscode_transcode_manifest.json"; then
+    printf 'video_transcode\t%s\t%s\t%s\n' "$TASK" "$ID" "$ARM" >>"$FAILURES"
+  fi
 done <"$MANIFEST"
 
 if [[ -s "$FAILURES" ]]; then

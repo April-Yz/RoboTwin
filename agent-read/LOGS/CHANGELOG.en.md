@@ -1,5 +1,13 @@
 # CHANGELOG.en
 
+## 2026-07-15 (PiperCanonicalTCP-v1 VS Code video compatibility and provenance semantics)
+
+- Added `code_painting/piper_canonical_tcp_v1/vscode_video.py` to audit MP4 codec/pixel format and convert non-H.264 files to H.264, `yuv420p`, and faststart. A temporary file must pass ffprobe, geometry/frame-count, and full-decode checks before atomic replacement; the manifest records before/after SHA-256 values.
+- `compare_joint_control.py` and `compose_strategy_video.py` now run strict transcoding after generation. `run_batch.sh` performs an episode-wide MP4 fallback scan, so wrist/debug files no longer remain OpenCV `mp4v`. Joint summary v3 explicitly records the OursV2 human-replay `pose_debug.jsonl` and simulated head-camera source video.
+- Provenance conclusion: the EE-pose directory contains Orientation/Fused/Top-score only, with no direct OursV2 human-replay fourth item; the OursV2 same-q comparison lives in sibling `joint_control/`. Every EE-pose run uses `foundation_replay_d435`/D435 preview input, but head is a simulated render driven by D435 calibration, while third/wrist/debug/comparison files are not raw physical-D435 footage.
+- The 2026-07-15 production-batch audit covered 258 MP4 files: originally 72 H.264 and 186 `mpeg4`, with zero corrupt files or full-decode failures. All 186 were atomically converted. Final state is 258/258 H.264 High + `yuv420p`, zero ffprobe/full-decode failures, zero missing hashes, and zero temporary-file residue. Manifest: `outputs_canonical_20260715/_batch_logs/vscode_transcode_manifest.json`.
+- Validation: `git diff --check`, Python `py_compile` for three files, `bash -n` for `run_batch.sh`, and all six `tests/test_piper_canonical_tcp_v1.py` tests passed. Isolated joint/compositor smoke runs produced 224-frame and 14-frame H.264 videos respectively.
+
 ## 2026-07-09 (20260708 VR-HaMeR Both-Hands v2 Local Alignment Validation)
 
 - Added `code_painting/validate_vr_hamer_local_hand_alignment_bothhands.py`: it builds on Q.7 hand-local validation, separately reports `left_only`, `right_only`, and `both_hands`, and explicitly compares identity/swapped mappings plus `none/mirror_x/mirror_y/mirror_xy` variants.

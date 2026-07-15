@@ -1,5 +1,18 @@
 # 故障排查
 
+## PiperCanonicalTCP-v1：MP4 能被 ffmpeg 读取，但 VSCode 无法播放
+
+- 症状：OpenCV/ffmpeg 能完整读取视频，VSCode 预览却黑屏、报不支持或无法开始播放。
+- 诊断：运行 `ffprobe -v error -select_streams v:0 -show_entries stream=codec_name,pix_fmt <VIDEO>`；`mpeg4`/`mp4v` 容器本身正常，但 Chromium 通常没有该解码器。
+- 原因：旧 planner 只把 head/third 转成 H.264；wrist、debug、joint comparison 和 strategy comparison 仍由 OpenCV 直接写 `mp4v`。
+- 修复：运行 `COMMANDS/piper_canonical_tcp_v1.zh.md` 中的 `vscode_video.py --apply`。工具先验证临时文件，再原子替换；不要仅修改扩展名。
+
+## PiperCanonicalTCP-v1：哪些视频是 D435
+
+- `foundation_replay_d435`、AnyGrasp D435 preview 和 `source_preview_compare/*d435*.png` 使用实体 D435 数据/标定。
+- `head_cam_plan.mp4` 是用 D435 标定驱动的 SAPIEN head-camera 渲染，不是 D435 原始录像。
+- `third_cam_plan.mp4`、左右 wrist MP4 与 debug/comparison MP4 都是仿真或合成画面，不应标作原始 D435 视频。
+
 ## Dense Replay 出现约 17 cm 固定偏差
 
 - 症状：规划轨迹趋势相似，但整条实际 TCP 曲线固定平移；方向还可能相差约 90°。

@@ -99,3 +99,27 @@ tmux list-sessions | grep 'pcan_v1_'
 tmux capture-pane -pt pcan_v1_joint_6x5 -S -30
 tmux capture-pane -pt pcan_v1_eepose_6x5 -S -30
 ```
+
+## VSCode 兼容 MP4 审计与转码
+
+参数模板（只读 dry-run；不可直接运行）：
+
+```bash
+/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python3.10 \
+  code_painting/piper_canonical_tcp_v1/vscode_video.py \
+  --root <OUTPUT_ROOT> --workers <WORKER_COUNT> \
+  --manifest <MANIFEST_JSON>
+```
+
+对 2026-07-15 canonical 输出执行原子转换：
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin
+/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python3.10 \
+  code_painting/piper_canonical_tcp_v1/vscode_video.py \
+  --root code_painting/piper_canonical_tcp_v1/outputs_canonical_20260715 \
+  --apply --workers 4 \
+  --manifest code_painting/piper_canonical_tcp_v1/outputs_canonical_20260715/_batch_logs/vscode_transcode_manifest.json
+```
+
+工具只转换非 `h264/yuv420p` MP4。临时 H.264 文件必须通过 ffprobe、尺寸/帧数检查与逐帧解码后，才会原子替换原路径；清单记录转换前后格式、大小和 SHA-256。

@@ -1,5 +1,13 @@
 # CHANGELOG.zh
 
+## 2026-07-15（PiperCanonicalTCP-v1 VSCode 视频兼容性与来源语义）
+
+- 新增 `code_painting/piper_canonical_tcp_v1/vscode_video.py`：审计 MP4 codec/pix_fmt，并把非 H.264 文件转换为 H.264、`yuv420p`、faststart；临时文件必须通过 ffprobe、尺寸/帧数和完整解码检查后才原子替换，manifest 记录转换前后 SHA-256。
+- `compare_joint_control.py` 与 `compose_strategy_video.py` 生成后立即执行严格转码；`run_batch.sh` 对 episode 全部 MP4 做兜底扫描，因此 wrist/debug 也不会再保留 OpenCV `mp4v`。joint summary v3 显式记录 OursV2 human-replay `pose_debug.jsonl` 和仿真 head-camera 源视频。
+- 来源结论：EE-pose 目录只有 Orientation/Fused/Top-score，没有 direct OursV2 human replay 第四项；OursV2 same-q 对比在同级 `joint_control/`。所有 EE-pose 输入使用 `foundation_replay_d435`/D435 preview，但 head 是 D435 标定驱动的仿真渲染，third/wrist/debug/comparison 不是实体 D435 原始录像。
+- 2026-07-15 正式 batch 审计 258 个 MP4：原始 72 个 H.264、186 个 `mpeg4`，文件损坏/完整解码失败均为 0。已原子转换 186 个；终态 258/258 均为 H.264 High + `yuv420p`，ffprobe/完整解码失败 0，SHA 缺失 0，临时文件残留 0。清单：`outputs_canonical_20260715/_batch_logs/vscode_transcode_manifest.json`。
+- 验证：`git diff --check`、3 个 Python `py_compile`、`run_batch.sh` 的 `bash -n`、6 个 `tests/test_piper_canonical_tcp_v1.py` 测试全部通过；隔离 joint/compositor 烟测分别输出 224 帧与 14 帧 H.264 视频。
+
 ## 2026-07-09（20260708 VR-HaMeR both-hands v2 local alignment validation）
 
 - 新增 `code_painting/validate_vr_hamer_local_hand_alignment_bothhands.py`：在 Q.7 hand-local 验证基础上分别输出 `left_only`、`right_only`、`both_hands`，并显式比较 identity/swapped mapping 和 `none/mirror_x/mirror_y/mirror_xy` 变体。
