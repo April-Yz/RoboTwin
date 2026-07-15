@@ -86,7 +86,7 @@ cd /home/zaijia001/ssd/RoboTwin
   --audit-root /home/zaijia001/ssd/RoboTwin/code_painting/selection_strategy_compare_v4
 ```
 
-This writes `strategy_agreement_stats.json`, `.zh.md`, and `.en.md`. Left and right count separately; results include Fused–Orientation and Fused–canonical-Top candidate agreement, xyz distances, and weighted Fused-score contributions.
+This writes `strategy_agreement_stats.json`, `.zh.md`, and `.en.md`. Left and right count separately; results include Fused–Orientation and Fused–canonical-Top candidate agreement, xyz distances, and weighted Fused-score contributions. It also pairs Orientation, Fused, and canonical Top Selection Poses with the OursV2 direct hand-replay Selection Pose, reporting Euclidean world-xyz distance, signed `AnyGrasp - OursV2` components, and separate same-frame versus cross-frame Top results.
 
 ### Syntax and output validation
 

@@ -3231,3 +3231,12 @@ Validation: 两个脚本本地/远端 `py_compile` 通过；pnp_tray id2/frame52
 - 更新双语命令、当前摘要、环境、故障排查、决策、README 和版本说明，以及论文素材流程文档。
 
 Validation: `bash -n`、批处理单集 dry-run、拼接配置 JSON/dry-run 通过；完整 id0 的 106 帧审计仍为左/右 `85/83` 成功、168 个成功计划平均执行误差 4.70 mm；新扩展图为 H.264/yuv420p、1920x1350、30 fps、642 帧、21.4 s，并完成全视频解码检查。
+
+## 2026-07-15（AnyGrasp 候选与 OursV2 人手位置统计）
+
+- 扩展 `analyze_selection_strategy_agreement_v4.py`，把 Orientation、Fused 和 Top canonical Selection Pose 与相同 task/episode/arm/event/requested-frame 的 OursV2 直接人手回放 Selection Pose 配对。
+- 新增 world xyz 欧氏距离、`AnyGrasp - OursV2` 有符号 XYZ、左右手、同帧/跨帧以及最大差异样本统计；不把 retreat、pre-grasp、task adjustment 或 TCP planner target 混入 Selection Pose 对比。
+- Orientation/Fused 的 496 个同帧样本平均距离分别为 97.165/97.105 mm；Top canonical 全部 600 个样本平均 99.191 mm，557 个同帧样本平均 97.113 mm。
+- 修正文档口径：此前 2.979 mm 是 Fused–Orientation 的策略间差异，不是 AnyGrasp 候选相对原始人手回放点的差异。
+
+Validation: 本地与远端 `RoboTwin_bw` `py_compile` 通过；脚本成功读取 461 个 metadata、600 条 OursV2、496 条 Orientation/Fused 和 600 条 Top record，并生成 agreement schema v2 JSON 及双语 Markdown。远端默认 `python3` 因缺少 NumPy 失败，随后按环境文档改用 `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python3.10` 成功。

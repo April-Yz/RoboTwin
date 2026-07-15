@@ -216,6 +216,26 @@ F=0.25s_{AG}+0.75o.
 
 在本批 496 个 Fused 候选上，平均加权 raw-score contribution 为 0.050557，平均 orientation contribution 为 0.559351；orientation 在最终 Fused score 中平均占 91.75%，而且 496/496 个样本都是 orientation contribution 更大。结合 93.75% 与 Orientation 相同、只有 8.87% 与 Top 相同，当前 Fused 明显偏向 rotation，而且由于 raw AnyGrasp score 未归一化，实际偏向比名义 75% 更强。
 
+## AnyGrasp 候选位置与 OursV2 人手回放位置
+
+这组统计修正了一个容易混淆的口径：比较对象是每种 AnyGrasp 策略选出的 canonical Selection Pose 和同一 task/episode/arm/event/requested-frame 的 OursV2 直接人手回放 Selection Pose，不再是 AnyGrasp 策略彼此比较。差向量统一定义为：
+
+\[
+\Delta \mathbf p^W=\mathbf p^W_{\mathrm{AnyGrasp}}-\mathbf p^W_{\mathrm{OursV2\ hand}}.
+\]
+
+这里没有使用 retreat、pre-grasp、task adjustment 或 TCP 补偿后的 planner target。
+
+| 候选策略 | 配对数 | 同帧数 | 距离均值 | 中位数 | P95 | 左手均值 | 右手均值 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Orientation | 496 | 496 | 97.165 mm | 78.068 mm | 201.858 mm | 101.979 mm | 92.466 mm |
+| Fused | 496 | 496 | 97.105 mm | 78.112 mm | 203.515 mm | 102.068 mm | 92.261 mm |
+| Top canonical | 600 | 557 | 99.191 mm | 75.078 mm | 213.860 mm | 103.037 mm | 95.344 mm |
+
+Top canonical 的 43 个跨帧配对会混入手和物体随时间的运动；557 个严格同帧样本的平均距离为 97.113 mm。三个策略的平均有符号 world `ΔXYZ` 分别为：Orientation `[+11.000, -37.202, +64.930] mm`，Fused `[+10.736, -37.147, +65.059] mm`，Top canonical 全部样本 `[+12.569, -35.501, +45.012] mm`。
+
+因此，约 97 mm 是 AnyGrasp 物体抓取点与 HaMeR/OursV2 手中心回放点之间的空间差，不是 Fused 与 Orientation 的策略差。后者平均只有 2.979 mm。上述 `ΔXYZ` 是 world 分量，不能直接解释成沿夹爪 approach/opening/side 某一根局部轴的 TCP 偏移。Top 的 `stack_cups/id17/right/frame36` 和 `id29/left/frame39` 仍包含历史 world-Z 异常，所以判断典型差异应同时看中位数与 P95。
+
 共有 208 条 record gap，全部来自 requested frame 上旧 Orientation/Fused preview 候选为空：各 104 条。任务分布为：
 
 ```text

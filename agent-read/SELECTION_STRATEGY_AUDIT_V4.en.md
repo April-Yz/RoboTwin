@@ -216,6 +216,26 @@ F=0.25s_{AG}+0.75o.
 
 Across the 496 selected Fused candidates, the mean weighted raw-score contribution is 0.050557 and the mean orientation contribution is 0.559351. Orientation contributes 91.75% of the final Fused score on average, and its contribution is larger in 496/496 cases. Together with 93.75% agreement with Orientation and only 8.87% with Top, this shows a strong rotation bias; because raw AnyGrasp scores are not normalized, the empirical bias is stronger than the nominal 75% weight.
 
+## AnyGrasp candidate position versus OursV2 hand replay
+
+This statistic corrects an easily confused comparison. Each strategy's selected canonical AnyGrasp Selection Pose is paired with the OursV2 direct hand-replay Selection Pose at the same task, episode, arm, event, and requested frame. It is not another AnyGrasp-to-AnyGrasp comparison. The signed delta is
+
+\[
+\Delta \mathbf p^W=\mathbf p^W_{\mathrm{AnyGrasp}}-\mathbf p^W_{\mathrm{OursV2\ hand}}.
+\]
+
+Retreat, pre-grasp, task adjustment, and TCP-adjusted planner targets are excluded.
+
+| Candidate strategy | Pairs | Same frame | Mean distance | Median | P95 | Left mean | Right mean |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Orientation | 496 | 496 | 97.165 mm | 78.068 mm | 201.858 mm | 101.979 mm | 92.466 mm |
+| Fused | 496 | 496 | 97.105 mm | 78.112 mm | 203.515 mm | 102.068 mm | 92.261 mm |
+| Top canonical | 600 | 557 | 99.191 mm | 75.078 mm | 213.860 mm | 103.037 mm | 95.344 mm |
+
+The 43 cross-frame Top canonical pairs include hand/object motion over time. The strict same-frame mean over 557 Top samples is 97.113 mm. Mean signed world `ΔXYZ` is `[+11.000, -37.202, +64.930] mm` for Orientation, `[+10.736, -37.147, +65.059] mm` for Fused, and `[+12.569, -35.501, +45.012] mm` for all Top canonical samples.
+
+The roughly 97 mm value is therefore the spatial difference between an AnyGrasp object grasp point and the HaMeR/OursV2 replayed hand center, not the Fused-to-Orientation strategy difference. The latter averages only 2.979 mm. These signed `ΔXYZ` values are world components and cannot by themselves be interpreted as a TCP offset along the gripper's local approach, opening, or side axis. The historical Top records at `stack_cups/id17/right/frame36` and `id29/left/frame39` still contain abnormal world-Z values, so median and p95 should accompany the mean.
+
 There are 208 record gaps, all caused by an empty historical Orientation/Fused candidate list at the requested frame: 104 each. Counts by task are:
 
 ```text

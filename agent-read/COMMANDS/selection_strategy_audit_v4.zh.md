@@ -86,7 +86,7 @@ cd /home/zaijia001/ssd/RoboTwin
   --audit-root /home/zaijia001/ssd/RoboTwin/code_painting/selection_strategy_compare_v4
 ```
 
-该命令生成 `strategy_agreement_stats.json`、`.zh.md` 和 `.en.md`；左右手分别计数，并输出 Fused–Orientation、Fused–Top canonical 的同 candidate 次数、xyz 距离以及 Fused 加权 contribution。
+该命令生成 `strategy_agreement_stats.json`、`.zh.md` 和 `.en.md`；左右手分别计数，并输出 Fused–Orientation、Fused–Top canonical 的同 candidate 次数、xyz 距离以及 Fused 加权 contribution。它还会把 Orientation、Fused、Top canonical 的候选 Selection Pose 分别与 OursV2 直接人手回放 Selection Pose 配对，统计 world xyz 欧氏距离、有符号 `AnyGrasp - OursV2` 分量，并将 Top 拆成同帧与跨帧结果。
 
 ### 语法和输出校验
 

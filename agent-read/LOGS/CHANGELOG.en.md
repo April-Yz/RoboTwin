@@ -3233,3 +3233,12 @@ Validation: local and remote `py_compile` passed for both scripts; visually insp
 - Updated aligned command, current summary, environment, troubleshooting, decision, README, version, and paper-pipeline documentation.
 
 Validation: shell syntax, a one-episode batch dry-run, JSON parsing, and compositor dry-run passed. The complete 106-frame id0 audit remains 85/83 left/right successes and 4.70 mm mean executed error over 168 successful plans. The new expanded grid is H.264/yuv420p, 1920x1350, 30 fps, 642 frames, 21.4 s, and passed full decode.
+
+## 2026-07-15 (AnyGrasp candidate versus OursV2 hand-position statistics)
+
+- Extended `analyze_selection_strategy_agreement_v4.py` to pair Orientation, Fused, and canonical Top Selection Poses with the OursV2 direct hand-replay Selection Pose at the same task, episode, arm, event, and requested frame.
+- Added Euclidean world-xyz distance, signed `AnyGrasp - OursV2` XYZ components, arm-specific, same/cross-frame, and largest-gap statistics. Retreat, pre-grasp, task adjustment, and TCP planner targets are excluded from this Selection Pose comparison.
+- The 496 same-frame Orientation/Fused samples have mean distances of 97.165/97.105 mm. Canonical Top has a 99.191 mm all-pairs mean over 600 samples and a 97.113 mm same-frame mean over 557 samples.
+- Corrected the documentation semantics: the earlier 2.979 mm value is the Fused-to-Orientation inter-strategy difference, not the AnyGrasp-candidate-to-original-hand-replay difference.
+
+Validation: local and remote `RoboTwin_bw` `py_compile` passed. The analyzer read 461 metadata files, 600 OursV2, 496 Orientation/Fused, and 600 Top records and generated agreement-schema-v2 JSON plus bilingual Markdown. Remote default `python3` lacked NumPy; rerunning with the documented `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python3.10` succeeded.
