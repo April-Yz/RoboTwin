@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Write the explicit shared-input contract for one IK-logic grid cell."""
+"""Write the semantic-source and row-specific target contract for one grid cell."""
 
 from __future__ import annotations
 
@@ -23,6 +23,9 @@ def main() -> int:
     parser.add_argument("--source-semantics", required=True)
     parser.add_argument("--orientation-remap", required=True)
     parser.add_argument("--planner-entry", type=Path, required=True)
+    parser.add_argument("--target-local-z-offset-m", type=float, default=0.0)
+    parser.add_argument("--target-retreat-m", type=float, default=0.0)
+    parser.add_argument("--approach-axis", choices=("local_x", "local_z"), required=True)
     args = parser.parse_args()
 
     if args.ik_logic == "canonical":
@@ -32,33 +35,35 @@ def main() -> int:
         renderer = "HandRetargetPiperDualURDFIKRenderer"
         target_to_link6 = "robot._trans_from_gripper_to_endlink; Legacy/OursV2 semantics"
     payload = {
-        "schema": "piper_canonical_tcp_v1.ik_logic_grid_input.v1",
+        "schema": "piper_canonical_tcp_v1.ik_semantic_grid_input.v2",
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
         "task": args.task,
         "episode_id": str(args.episode_id),
         "ik_logic": args.ik_logic,
         "strategy": args.strategy,
-        "shared_input_contract": {
+        "semantic_source_contract": {
             "source": args.source_semantics,
-            "direct_selection_pose": True,
-            "planner_input_pose": "T_W_RTCP",
+            "same_candidate_or_hand_center_across_rows": True,
             "position_frame": "WORLD",
-            "orientation_frame": "local_RTCP",
-            "orientation_remap": args.orientation_remap,
-            "final_target_retreat_m": 0.0,
-            "candidate_target_local_x_offset_m": 0.0,
-            "candidate_target_local_z_offset_m": 0.0,
-            "pregrasp": {
-                "derived_after_selection": True,
-                "axis": "local_RTCP_+X",
-                "offset_m": 0.12,
-            },
+            "note": (
+                "The two rows share a semantic grasp/hand center, not an identical "
+                "numeric planner target. Each row applies its native pose semantics."
+            ),
             "explicitly_not_used_as_input": (
-                "selection_strategy_compare_v4 lower Planner Target, because it already "
-                "contains historical offsets/retreat/pregrasp/TCP-to-link6 semantics"
+                "selection_strategy_compare_v4 lower Planner Target as a common pose; "
+                "it already embeds Legacy offsets/retreat semantics"
             ),
         },
-        "row_specific_conversion": {
+        "row_specific_target_contract": {
+            "orientation_remap": args.orientation_remap,
+            "target_retreat_m": args.target_retreat_m,
+            "candidate_target_local_x_offset_m": 0.0,
+            "candidate_target_local_z_offset_m": args.target_local_z_offset_m,
+            "pregrasp": {
+                "derived_after_selection": True,
+                "axis": args.approach_axis,
+                "offset_m": 0.12,
+            },
             "planner_entry": str(args.planner_entry),
             "renderer": renderer,
             "T_W_RTCP_to_urdf_link6": target_to_link6,

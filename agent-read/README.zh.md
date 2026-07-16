@@ -30,4 +30,4 @@
 
 Real-control 输出速查见 `OUTPUTS_REAL_CONTROL_COMPARE_GUIDE.zh.md`。Canonical Orientation/Fused/Top-score/Human Replay 四方法与 Legacy retreat 基线见 `PIPER_CANONICAL_REPLAY_METHOD_COMPARE.zh.md`；入口为 `run_replay_method_compare.sh`，不修改 OursV2。
 
-需要把同一组四种直接 `T_W_RTCP` 目标分别送入 Legacy/OursV2 IK 和 Canonical IK 时，使用 `run_ik_logic_grid.sh`；它输出 2×4 D435 视频并在合成前验证上下行候选数值完全一致。语义见 `PIPER_IK_LOGIC_GRID_COMPARE.zh.md`，命令见 `COMMANDS/piper_ik_logic_grid.zh.md`。
+需要比较同一个 AnyGrasp/Human 语义源经过“原 Legacy/OursV2 输入适配”和“Canonical RTCP 输入适配”的效果时，使用 `run_ik_logic_grid.sh`。V2 输出 2×4 D435 视频，并审计源点、轴关系、每行 target contract 与 Canonical 19 cm link6 逆变换。旧 `outputs_ik_logic_grid_20260716` 的“同一数值 T_W_RTCP”V1 已确认输入语义错误，仅保留作反例。详见 `PIPER_IK_LOGIC_GRID_COMPARE.zh.md` 与 `COMMANDS/piper_ik_logic_grid.zh.md`。

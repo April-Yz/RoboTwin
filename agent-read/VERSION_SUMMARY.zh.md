@@ -78,6 +78,6 @@ O.2 是 O.1.2 Foundation IK 的任务扩展，不改变 V1-V4 IK 语义。新增
 
 新增隔离 Canonical Human Replay wrapper，把人手/CGRASP 轴映射到 RTCP、强制最终 retreat 为 0，并复用 Canonical planner。四方法视频比较 Orientation/Fused/Top-score/Human Replay；五路视频再加入显式 12 cm Legacy retreat 基线。旧 OursV2 与 2026-07-15 输出不修改。
 
-### 2026-07-16：Legacy / Canonical IK grid v1.x 增量
+### 2026-07-16：Legacy / Canonical IK semantic grid v2（v1.x 增量）
 
-新增隔离 2×4 IK 语义消融，不提升 major version、不修改 OursV2。四列共享直接 `T_W_RTCP` 选择目标、0 final retreat 和 12 cm local RTCP +X pregrasp；上行仅使用 Legacy `robot._trans_from_gripper_to_endlink`，下行仅使用 Canonical 服务器 19 cm 工具逆变换。合成前要求候选 arm/frame/index/pose 数值完全一致。
+不修改 OursV2。旧 same-numeric-target V1 因遗漏 Legacy candidate offset/Human retreat 且 Human remap 未物化而失效。V2 共享同一个 AnyGrasp/Human 语义源：上行完整走原 Legacy target 适配与 EE reach，下行转成 Canonical RTCP 并反演服务器 19 cm 工具。合成前审计源点、轴关系、行特有 contract 和 `link6-RTCP=[-0.19,0,0]`，而不是要求两行 planner target 数值相等。

@@ -1,70 +1,74 @@
-# Piper Legacy / Canonical IK 2x4 Comparison
+# Piper Legacy-original / Canonical-RTCP 2x4 Semantic Comparison
 
-## Purpose
+## Conclusion
 
-This comparison answers one isolated question: with identical candidate targets, does the Legacy/OursV2 versus PiperCanonicalTCP-v1 `T_W_RTCP -> URDF link6` conversion produce different IK and execution results?
+The V1 comparison under `outputs_ik_logic_grid_20260716/` is invalid. It sent the same numeric `T_W_RTCP` to both rows while labeling the top row “original OursV2.” Original OursV2 also applies a `-0.05 m` target offset on candidate local `+Z`; Human Replay uses a `0.14 m @ local human +Z` retreat. Dropping those adapters made the Legacy EE/link6 origin visibly align with the object.
 
-The output is a two-row-by-four-column D435-calibrated simulated view:
+V1 had a second independent error. Human uses `reuse_plan_summary_json`, and that path does not execute `candidate_orientation_remap_label`. The configured `CGRASP_HUMAN -> RTCP` remap was therefore only a label and never changed the stored pose.
+
+V2 does not modify OursV2. It starts from the same semantic candidate/hand center and then applies the correct native adapter for each row:
 
 | | Orientation | Fused | Top-score | Human Replay |
 |---|---|---|---|---|
-| Top row | Legacy IK | Legacy IK | Legacy IK | Legacy IK |
-| Bottom row | Canonical IK | Canonical IK | Canonical IK | Canonical IK |
+| Top | Legacy original | Legacy original | Legacy original | Legacy original |
+| Bottom | Canonical RTCP | Canonical RTCP | Canonical RTCP | Canonical RTCP |
 
-The earlier `canonical_vs_legacy_five_method_d435.mp4` is not this full ablation. It contains four Canonical methods plus only one Legacy Human Replay panel, with no Legacy Orientation/Fused/Top-score panels.
+## Actual Input
 
-## Actual IK Input
+The shared input is not an identical numeric planner target. It is the same semantic AnyGrasp candidate center or Human hand/gripper center. Numeric planner targets are expected to differ between rows.
 
-All eight cells use the direct `Selection Pose`, normalized to Real TCP in world coordinates: `T_W_RTCP`.
+### Legacy original (top)
 
-- Orientation: direct Orientation candidate from the robot-frame preview, with one `CGRASP -> RTCP` axis mapping.
-- Fused: direct candidate selected by `0.25 x AnyGrasp score + 0.75 x orientation score`, with the same axis mapping.
-- Top-score: direct native highest-score AnyGrasp candidate transformed D435 camera -> world; native axes are interpreted as RTCP without the CGRASP mapping.
-- Human Replay: direct human-gripper pose transformed D435 camera -> world, followed by one `CGRASP_HUMAN -> RTCP` axis mapping.
+- Orientation/Fused keep CGRASP local axes, apply `-0.05 m @ local +Z` to the target, and derive a `0.12 m @ local +Z` pregrasp.
+- Top-score keeps native AnyGrasp axes and uses the same local-Z target offset and pregrasp convention.
+- Human Replay exactly restores the original `0.14 m @ local human +Z` retreat recipe. This value also participates in the handover-keyframe adjustment; it is not merely a removable final translation.
+- Renderer: `HandRetargetPiperDualURDFIKRenderer` / `robot._trans_from_gripper_to_endlink(...)`.
+- Native solver settings: `3.14 rad` rotation threshold, one seed, and EE reach/readback.
 
-Every method forces:
+### Canonical RTCP (bottom)
 
-- final target retreat: `0 m`;
-- candidate local X/Z offsets: `0 m`;
-- pregrasp: derived only after selection, `0.12 m` backward on local RTCP `+X`;
-- reach/readback frame: physical TCP;
-- position frame: 0515 `WORLD`; orientation axes: local `RTCP`.
+- Orientation/Fused preserve the candidate-center origin and apply `R_W_RTCP = R_W_CGRASP @ R_CGRASP_RTCP` once.
+- Top-score preserves the candidate-center origin and interprets native axes directly as RTCP.
+- Human Replay first uses the same original 0.14 m recipe to construct the same semantic source, then removes the retreat and materializes the CGRASP_HUMAN rotation as RTCP. The final Canonical target retreat is zero.
+- Pregrasp: `0.12 m @ local_RTCP +X`.
+- Renderer: `PiperCanonicalTCPRenderer`, using the exact inverse of server `T_L6URDF_RTCP = Ry(-1.57) @ Tx(0.19)`.
+- The link6 origin derived from an RTCP target obeys `p_L6 = p_RTCP - 0.19 * local_RTCP_X`.
+- Native solver settings: `0.12 rad` rotation threshold, 20 seeds, and TCP reach/readback.
 
-The upper `Selection Pose` in `selection_strategy_compare_v4` is the direct-input source. The lower `Planner Target` already includes historical offset, retreat, pregrasp, world/base, and TCP/link6 processing. It is deliberately excluded to prevent duplicate compensation.
+V2 is therefore a comparison of two complete native pipelines under a shared semantic source, not a one-variable link6-conversion ablation.
 
-## Only Row-specific Semantic Difference
+## Audit
 
-- Legacy row: `HandRetargetPiperDualURDFIKRenderer` using `robot._trans_from_gripper_to_endlink(...)`.
-- Canonical row: `PiperCanonicalTCPRenderer` using the exact inverse of Piper server `T_L6URDF_RTCP = Ry(-1.57) @ Tx(0.19)`.
+`semantic_source_audit.json` checks:
 
-Candidate selection, numeric target, pregrasp, IK thresholds, seeds, trajectory, and reach gates are identical between the two cells of each column. Before composition, `audit_ik_logic_inputs.py` compares candidate arm, frame, index, and `pose_world_wxyz`; any mismatch blocks the grid video.
+- arm/frame/candidate identity;
+- cross-row semantic-source world xyz;
+- Orientation/Fused/Human `CGRASP -> RTCP` rotation relations;
+- native Top-score axes;
+- every cell's target contract;
+- Canonical `link6 - RTCP = [-0.19, 0, 0]` in local RTCP coordinates.
 
-## Legacy Human Replay 12/14 cm Note
-
-The formal old Human Replay `plan_summary_human_replay.json` records `target_retreat=0.14 m @ local human +Z`. The earlier five-way comparison used `0.12 m` as an explicit ablation and is therefore not an exact parameter replay of the formal old result. Both rows of the new 2x4 force `target_retreat=0`, preventing historical retreat from stacking with renderer TCP/link6 conversion.
+Any failure blocks composition.
 
 ## Outputs
 
 Default root:
 
-`code_painting/piper_canonical_tcp_v1/outputs_ik_logic_grid_20260716/`
+`code_painting/piper_canonical_tcp_v1/outputs_ik_semantic_grid_v2_20260716/`
 
 Important per-episode files:
 
-- `legacy_vs_canonical_ik_logic_2x4_d435.mp4`: main 2x4 video;
-- `input_equality_audit.json`: cross-row input equality audit;
-- `legacy_vs_canonical_ik_logic_2x4_d435.manifest.json`: source videos, execution status, media properties, and input contract;
-- `_sources/legacy/...` and `_sources/canonical/...`: eight independent method directories;
-- per-method `input_target_contract.json`: cell input and row-specific conversion.
+- `legacy_original_vs_canonical_rtcp_2x4_d435.mp4`: final 2x4 video;
+- `semantic_source_audit.json`: source, axes, target-contract, and 19 cm link6 audit;
+- `legacy_original_vs_canonical_rtcp_2x4_d435.manifest.json`: source videos, execution state, and media properties;
+- `_sources/legacy_original/...` and `_sources/canonical_rtcp/...`: eight cells;
+- `_superseded/canonical_human_before_shared_source_fix_20260716/`: preserved intermediate bad sample, excluded from the final video.
 
-An IK/reach miss is not itself a runner failure. If a diagnostic video exists, the grid runner preserves that cell and continues. A real pipeline error means no video, failed input audit, or failed composition.
+## handover_bottle / foundation_input_1 Validation
 
-## handover_bottle id1 Smoke Result
+- All four strategies pass the semantic audit. Every source-position delta is `0.0 m`; rotation-matrix errors range from zero to `4.2e-16`.
+- V2 Legacy Orientation versus historical `viewer_gripper`, and V2 Legacy Top-score versus historical `S_graspnet_topscore...`, have zero maximum delta in candidate identity, raw pose, and planner target. The top row now reproduces original input logic.
+- Canonical Human completes the internal handover (`[handover] SUCCESS`). The generic summary still returns failure because of an earlier left-arm action miss, so final `execution_success` alone does not represent the handover state machine.
+- Final MP4: `1920x648`, H.264 High, `yuv420p`, 5 fps, 265 frames/53 s. Full decode and middle-frame visual QA pass.
 
-- Each column has two targets per row. Arm/frame/candidate index match exactly and every maximum absolute `pose_world_wxyz` delta is `0.0`.
-- Orientation and Fused select the same targets on this ID. Neither IK row finds an executable strict solution; left/right q and TCP change are both zero.
-- Legacy Top-score moves, with about `434/367 mm` maximum left/right TCP displacement, but minimum grasp position errors remain about `169/168 mm`. Canonical Top-score finds no executable solution and does not move.
-- Legacy Human Replay moves, with about `516/613 mm` maximum left/right TCP displacement, but retains about `120 mm` target residual. This directly exposes the legacy 12 cm end-definition mismatch rather than arrival at the same physical RTCP.
-- Canonical Human Replay changes only about `19.4 mm`, while target position errors remain hundreds of millimeters. The direct human RTCP orientation is not executable under the strict `0.12 rad` rotation threshold and dual-arm all-plan gate.
-- All eight cells finish with `execution_failed=true`; the video remains a failure-mode/frame-semantics diagnostic, not a successful behavior showcase.
-- The main video is `1920x648`, H.264, `yuv420p`, 5 fps, 644 frames/128.8 s. Full decode and middle-frame visual inspection pass.
+IK misses can still arise from unreachable candidate orientations, the strict rotation threshold, or dual-arm gates. Those are independent from the input-semantics wiring error fixed here.

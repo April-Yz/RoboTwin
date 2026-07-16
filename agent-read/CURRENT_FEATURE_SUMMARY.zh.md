@@ -32,7 +32,8 @@
 
 - Canonical Human Replay 将人手/CGRASP 局部轴显式映射到 RTCP，最终 `target_retreat=0`，只保留 local RTCP +X 的 0.12 m pregrasp。
 - `canonical_four_method_d435.mp4` 比较四个 Canonical 方法；`canonical_vs_legacy_five_method_d435.mp4` 再加入显式 0.12 m Legacy retreat 基线。源语义和视频属性均写入 manifest。
-- 新增 `run_ik_logic_grid.sh` 的 2×4 严格消融：上行 Legacy/OursV2 IK，下行 Canonical IK；四列为 Orientation/Fused/Top-score/Human Replay。每列共享直接 `T_W_RTCP`，最终 retreat=0、pregrasp=0.12 m@local RTCP +X；合成前逐候选审计输入一致性。
+- `run_ik_logic_grid.sh` 已升级为 2×4 语义源 V2：上行完整复现 Legacy 原 candidate offset/Human retreat/EE reach，下行把同一 candidate 或 Human center 转为 Canonical RTCP。它不是单一 link6 变量消融；两行保持各自原生求解设置。
 - 旧五路不是完整 Legacy/Canonical 2×4，且旧正式 Human Replay 记录 retreat=0.14 m，五路中的 0.12 m 只是显式 ablation。
-- `handover_bottle/id1` 八格输入最大差为 0。Legacy Top/Human 有明显运动但最终误差分别约 168–169 mm/120 mm；Canonical Top 不动，Canonical Human 仅约 19.4 mm 小幅变化。八格均失败，定位为严格 IK/坐标语义诊断而非成功演示。
+- 旧 `outputs_ik_logic_grid_20260716` V1 因移除 Legacy `-0.05 m @ local +Z`/Human 0.14 m 适配，并误以为 Human remap 标签会作用于 reuse-plan-summary，结论撤销。新结果写入 `outputs_ik_semantic_grid_v2_20260716`。
+- `handover_bottle/id1` 的 V2 审计中，所有语义源 world xyz 差为 0，轴关系误差不超过 `4.2e-16`；Legacy Orientation/Top 与历史原结果 target 差为 0。Canonical Human 内部完成完整 handover，但通用 summary 仍因早期 action miss 返回失败。最终 1920×648、265 帧视频通过完整解码与视觉 QA。
 - 快速阅读：`OUTPUTS_REAL_CONTROL_COMPARE_GUIDE.zh.md`、`PIPER_CANONICAL_REPLAY_METHOD_COMPARE.zh.md`。

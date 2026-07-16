@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PY=/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python3.10
 TASK=""; ID=""; ARM=auto; GPU=0
-OUTPUT_ROOT="$SCRIPT_DIR/outputs_ik_logic_grid_20260716"
+OUTPUT_ROOT="$SCRIPT_DIR/outputs_ik_semantic_grid_v2_20260716"
 DRY_RUN=0
 
 while (($#)); do
@@ -21,11 +21,11 @@ while (($#)); do
 done
 [[ -n "$TASK" && -n "$ID" ]] || { echo "[error] --task and --id are required" >&2; exit 2; }
 
-LEGACY_ROOT="$OUTPUT_ROOT/_sources/legacy"
-CANONICAL_ROOT="$OUTPUT_ROOT/_sources/canonical"
+LEGACY_ROOT="$OUTPUT_ROOT/_sources/legacy_original"
+CANONICAL_ROOT="$OUTPUT_ROOT/_sources/canonical_rtcp"
 EP_OUT="$OUTPUT_ROOT/$TASK/foundation_input_${ID}"
-VIDEO_OUT="$EP_OUT/legacy_vs_canonical_ik_logic_2x4_d435.mp4"
-AUDIT_OUT="$EP_OUT/input_equality_audit.json"
+VIDEO_OUT="$EP_OUT/legacy_original_vs_canonical_rtcp_2x4_d435.mp4"
+AUDIT_OUT="$EP_OUT/semantic_source_audit.json"
 
 run_cell() {
   local logic="$1" strategy="$2" root="$3"

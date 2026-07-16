@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compose a 2x4 D435 video: Legacy IK row over Canonical IK row."""
+"""Compose a 2x4 D435 video: original Legacy semantics over Canonical RTCP."""
 
 from __future__ import annotations
 
@@ -60,9 +60,13 @@ def annotate(panel: np.ndarray, row: str, method: str) -> np.ndarray:
     overlay = image.copy()
     cv2.rectangle(overlay, (0, 0), (CELL_W, 54), (12, 15, 20), -1)
     cv2.addWeighted(overlay, 0.84, image, 0.16, 0, image)
-    color = (113, 204, 255) if row == "LEGACY IK" else (134, 239, 172)
+    color = (113, 204, 255) if row == "LEGACY ORIGINAL" else (134, 239, 172)
     cv2.putText(image, f"{row} | {method}", (12, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.56, color, 2, cv2.LINE_AA)
-    cv2.putText(image, "same direct T_W_RTCP target", (12, 46), cv2.FONT_HERSHEY_SIMPLEX, 0.41, (225, 229, 235), 1, cv2.LINE_AA)
+    if row == "LEGACY ORIGINAL":
+        detail = "native OursV2 target adapter"
+    else:
+        detail = "source center -> Piper RTCP"
+    cv2.putText(image, detail, (12, 46), cv2.FONT_HERSHEY_SIMPLEX, 0.41, (225, 229, 235), 1, cv2.LINE_AA)
     return image
 
 
@@ -104,14 +108,14 @@ def main() -> int:
     args = parser.parse_args()
 
     audit = json.loads(args.input_audit.read_text(encoding="utf-8"))
-    if not audit.get("all_inputs_identical"):
-        raise ValueError(f"Input audit failed; refusing misleading grid: {args.input_audit}")
+    if not audit.get("all_ok"):
+        raise ValueError(f"Semantic-source audit failed; refusing misleading grid: {args.input_audit}")
     if args.output.exists() and not args.force:
         print(f"[skip-existing] {args.output}")
         return 0
 
     sources: list[tuple[str, str, Path]] = []
-    for logic, root in (("LEGACY IK", args.legacy_root), ("CANONICAL IK", args.canonical_root)):
+    for logic, root in (("LEGACY ORIGINAL", args.legacy_root), ("CANONICAL RTCP", args.canonical_root)):
         for key, label in STRATEGIES:
             path = root / args.task / f"foundation_input_{args.id}" / "eepose" / key / "head_cam_plan.mp4"
             if not path.is_file():
@@ -141,8 +145,8 @@ def main() -> int:
                 panel = annotate(letterbox(frame), logic, label)
                 canvas[row * CELL_H : (row + 1) * CELL_H, col * CELL_W : (col + 1) * CELL_W] = panel
             footer_y = CELL_H * 2
-            cv2.putText(canvas, "D435-calibrated simulated head view | input: direct Selection Pose -> WORLD T_W_RTCP", (18, footer_y + 34), cv2.FONT_HERSHEY_SIMPLEX, 0.56, (235, 238, 242), 1, cv2.LINE_AA)
-            cv2.putText(canvas, "final retreat=0 | pregrasp=0.12m @ local RTCP +X | only T_W_RTCP -> URDF link6 conversion differs by row", (18, footer_y + 68), cv2.FONT_HERSHEY_SIMPLEX, 0.53, (205, 216, 228), 1, cv2.LINE_AA)
+            cv2.putText(canvas, "D435 simulated view | shared semantic source: same AnyGrasp / human grasp center", (18, footer_y + 34), cv2.FONT_HERSHEY_SIMPLEX, 0.56, (235, 238, 242), 1, cv2.LINE_AA)
+            cv2.putText(canvas, "top: native Legacy offsets/retreat | bottom: source center = RTCP; link6 = RTCP - 0.19m @ local +X", (18, footer_y + 68), cv2.FONT_HERSHEY_SIMPLEX, 0.53, (205, 216, 228), 1, cv2.LINE_AA)
             cv2.putText(canvas, f"frame {frame_index + 1}/{output_frames}", (OUTPUT_SIZE[0] - 210, footer_y + 98), cv2.FONT_HERSHEY_SIMPLEX, 0.48, (178, 190, 204), 1, cv2.LINE_AA)
             writer.write(canvas)
         writer.release()
@@ -153,19 +157,20 @@ def main() -> int:
     ensure_vscode_mp4(args.output)
     manifest_path = args.manifest or args.output.with_suffix(".manifest.json")
     manifest = {
-        "schema": "piper_canonical_tcp_v1.ik_logic_grid.v1",
+        "schema": "piper_canonical_tcp_v1.ik_semantic_grid.v2",
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
         "layout": "2 rows x 4 columns",
         "rows": {
-            "top": "Legacy/OursV2 IK target-to-link6 conversion",
-            "bottom": "PiperCanonicalTCP-v1 server-semantic target-to-link6 conversion",
+            "top": "Original Legacy/OursV2 candidate-to-planner-target semantics",
+            "bottom": "PiperCanonicalTCP-v1: semantic grasp center interpreted as server RTCP",
         },
         "columns": [key for key, _ in STRATEGIES],
-        "shared_input": {
-            "planner_input": "direct Selection Pose expressed as WORLD T_W_RTCP",
-            "final_retreat_m": 0.0,
-            "pregrasp": "0.12m @ local RTCP +X, derived after target selection",
-            "excluded_input": "V4 lower historical Planner Target",
+        "shared_semantic_source": {
+            "input": "same AnyGrasp candidate or Human hand/gripper center",
+            "not_identical_numeric_target": True,
+            "legacy_adapter": "Orientation/Fused/Top: -0.05m local +Z; Human: 0.14m local +Z retreat",
+            "canonical_adapter": "origin preserved as RTCP; CGRASP axes remapped once where required; no final retreat",
+            "canonical_link6": "RTCP - 0.19m along local RTCP +X after inverse Ry(-1.57) @ Tx(0.19)",
         },
         "input_audit": audit,
         "sources": [

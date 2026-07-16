@@ -48,17 +48,37 @@ case "$TASK" in
   *) echo "[error] unsupported task=$TASK" >&2; exit 2 ;;
 esac
 
-if [[ "$IK_LOGIC" == canonical ]]; then PLANNER="$SCRIPT_DIR/planner.py"; else PLANNER="$REPO/code_painting/plan_anygrasp_keyframes_piper.py"; fi
+if [[ "$IK_LOGIC" == canonical ]]; then
+  PLANNER="$SCRIPT_DIR/planner.py"
+  MAX_ROTATION_THRESHOLD=0.12
+  NUM_SEEDS=20
+  SEED_PERTURBATIONS=6
+  REACH_POS_TOL=0.03
+  REACH_ROT_TOL=10
+  RETREAT_M=0
+  APPROACH_AXIS=local_x
+  ORIENTATION_ADAPTER="materialized CGRASP_HUMAN to RTCP"
+else
+  PLANNER="$REPO/code_painting/plan_anygrasp_keyframes_piper.py"
+  MAX_ROTATION_THRESHOLD=3.14
+  NUM_SEEDS=1
+  SEED_PERTURBATIONS=0
+  REACH_POS_TOL=0.04
+  REACH_ROT_TOL=180
+  RETREAT_M=0.14
+  APPROACH_AXIS=local_z
+  ORIENTATION_ADAPTER=identity
+fi
 
 CMD=(
   env CUDA_VISIBLE_DEVICES="$GPU" "$PY" -u "$SCRIPT_DIR/plan_human_replay_ik_logic.py"
   --ik-logic "$IK_LOGIC" --anygrasp_dir "$ANY" --replay_dir "$REPLAY" --hand_npz "$HAND"
   --output_dir "$OUT" --hand_keyframes_json "$KEYFRAMES" --video_id "$ID" --task "$TASK" --gpu "$GPU"
   --planner_backend urdfik --urdfik_trajectory_mode joint_interp --urdfik_joint_interp_waypoints 40
-  --urdfik_num_seeds 20 --urdfik_solution_selection joint_continuity
-  --urdfik_seed_perturbations 6 --urdfik_seed_perturbation_scale 0.05
-  --urdfik_max_position_threshold_m 0.02 --urdfik_max_rotation_threshold_rad 0.12
-  --approach_offset_m 0.12 --reach_pos_tol_m 0.03 --reach_rot_tol_deg 10
+  --urdfik_num_seeds "$NUM_SEEDS" --urdfik_solution_selection joint_continuity
+  --urdfik_seed_perturbations "$SEED_PERTURBATIONS" --urdfik_seed_perturbation_scale 0.05
+  --urdfik_max_position_threshold_m 0.02 --urdfik_max_rotation_threshold_rad "$MAX_ROTATION_THRESHOLD"
+  --approach_offset_m 0.12 --reach_pos_tol_m "$REACH_POS_TOL" --reach_rot_tol_deg "$REACH_ROT_TOL"
   --replan_until_reached_max_attempts 3 --fail_on_execution_failure 1
   --action_orientation_source grasp --execute_interp_steps 24 --joint_command_scene_steps 10 --settle_steps 30
   --joint_target_wait_steps 25 --joint_target_wait_tol_rad 0.01 --hold_frames_after_stage 8
@@ -76,8 +96,9 @@ mkdir -p "$OUT"
 "$PY" "$SCRIPT_DIR/write_ik_logic_contract.py" \
   --output "$OUT/input_target_contract.json" --task "$TASK" --episode-id "$ID" \
   --ik-logic "$IK_LOGIC" --strategy human_replay \
-  --source-semantics "direct human gripper Selection Pose T_W_CGRASP_HUMAN; remap once to T_W_RTCP" \
-  --orientation-remap swap_red_blue_keep_green --planner-entry "$PLANNER"
+  --source-semantics "human hand/gripper center T_W_CGRASP_HUMAN" \
+  --orientation-remap "$ORIENTATION_ADAPTER" --planner-entry "$PLANNER" \
+  --target-retreat-m "$RETREAT_M" --approach-axis "$APPROACH_AXIS"
 printf '%q ' "${CMD[@]}" >"$OUT/command.sh.txt"; printf '\n' >>"$OUT/command.sh.txt"
 if "${CMD[@]}" > >(tee "$OUT/stdout.log") 2> >(tee "$OUT/stderr.log" >&2); then
   touch "$OUT/SUCCESS"; echo "[success] $OUT"

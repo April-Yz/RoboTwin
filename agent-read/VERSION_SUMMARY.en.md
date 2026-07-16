@@ -78,6 +78,6 @@ Added `real_control_compare.v1` under the same isolated directory without promot
 
 An isolated Canonical Human Replay wrapper maps human/CGRASP axes to RTCP, forces final retreat to zero, and reuses the Canonical planner. The four-method video compares Orientation/Fused/Top-score/Human Replay; the five-way video appends an explicit 12 cm Legacy retreat baseline. OursV2 and 2026-07-15 outputs remain unchanged.
 
-### 2026-07-16: Legacy / Canonical IK grid v1.x increment
+### 2026-07-16: Legacy / Canonical IK semantic grid v2 (v1.x increment)
 
-Added an isolated 2x4 IK-semantics ablation without promoting a major version or modifying OursV2. The four columns share direct `T_W_RTCP` selection targets, zero final retreat, and a 12 cm local-RTCP-+X pregrasp. The top row uses only Legacy `robot._trans_from_gripper_to_endlink`; the bottom row uses only the Canonical inverse of the server 19 cm tool transform. Composition requires exact candidate arm/frame/index/pose equality.
+OursV2 remains unchanged. The old same-numeric-target V1 is invalid because it omitted Legacy candidate offsets/Human retreat and did not materialize the Human remap. V2 shares one AnyGrasp/Human semantic source: the top row applies the complete original Legacy target adapter and EE reach, while the bottom row converts to Canonical RTCP and inverts the server 19 cm tool. Composition audits source positions, axes, row-specific contracts, and `link6-RTCP=[-0.19,0,0]` instead of requiring numerically identical planner targets.

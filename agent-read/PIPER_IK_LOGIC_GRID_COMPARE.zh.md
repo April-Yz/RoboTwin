@@ -1,70 +1,74 @@
-# Piper Legacy / Canonical IK 2×4 对比
+# Piper Legacy-original / Canonical-RTCP 2×4 语义对比
 
-## 目的
+## 结论
 
-该对比用于回答一个单一问题：在候选目标完全相同的情况下，Legacy/OursV2 与 PiperCanonicalTCP-v1 的 `T_W_RTCP -> URDF link6` 转换是否导致不同的 IK 和执行结果。
+旧目录 `outputs_ik_logic_grid_20260716/` 的 V1 对比无效：它把同一数值 `T_W_RTCP` 同时送给两行，却把 Legacy 行标成“原 OursV2”。原 OursV2 实际还包含候选局部 `+Z` 的 `-0.05 m` target offset；Human Replay 则用 `0.14 m @ local human +Z` retreat。V1 丢掉这些输入适配，因此出现“Legacy EE/link6 原点直接对到物体”的现象。
 
-输出是 2 行 × 4 列的 D435 标定仿真视角：
+V1 还有一个独立错误：Human 使用 `reuse_plan_summary_json`，该路径不会执行 `candidate_orientation_remap_label`。所以即使参数写了 `CGRASP_HUMAN -> RTCP`，存储位姿也没有真正变轴。
+
+V2 不改 OursV2 源码。它从同一个语义候选/人手中心出发，再分别走两行的正确原生适配：
 
 | | Orientation | Fused | Top-score | Human Replay |
 |---|---|---|---|---|
-| 第一行 | Legacy IK | Legacy IK | Legacy IK | Legacy IK |
-| 第二行 | Canonical IK | Canonical IK | Canonical IK | Canonical IK |
+| 上行 | Legacy original | Legacy original | Legacy original | Legacy original |
+| 下行 | Canonical RTCP | Canonical RTCP | Canonical RTCP | Canonical RTCP |
 
-旧的 `canonical_vs_legacy_five_method_d435.mp4` 不是这个完整消融。旧视频包含四个 Canonical 方法和一个 Legacy Human Replay，没有 Legacy Orientation/Fused/Top-score。
+## 输入到底是什么
 
-## IK 的实际输入
+共同输入不是“相同数值 planner target”，而是相同的语义源：同一个 AnyGrasp candidate center，或同一个 Human hand/gripper center。两行的数值 planner target 本来就应该不同。
 
-八个格子都使用直接 `Selection Pose`，并统一表达为世界坐标中的 Real TCP：`T_W_RTCP`。
+### Legacy original（上行）
 
-- Orientation：直接使用 robot-frame preview 选出的 Orientation candidate，做一次 `CGRASP -> RTCP` 轴映射。
-- Fused：直接使用 `0.25 × AnyGrasp score + 0.75 × orientation score` 选出的 candidate，做一次相同轴映射。
-- Top-score：直接使用 AnyGrasp 原生最高分 candidate，经 D435 camera -> world；原生轴按 RTCP 解释，不做 CGRASP 映射。
-- Human Replay：直接使用人手夹爪姿态，经 D435 camera -> world，再做一次 `CGRASP_HUMAN -> RTCP` 轴映射。
+- Orientation/Fused：保留原 CGRASP 局部轴，target 沿局部 `+Z` 加 `-0.05 m`；pregrasp 沿局部 `+Z` 为 `0.12 m`。
+- Top-score：保留 AnyGrasp 原生轴，同样使用 `-0.05 m @ local +Z` target offset 和 `0.12 m @ local +Z` pregrasp。
+- Human Replay：完整复现原 `0.14 m @ local human +Z` retreat 规则；这个参数也参与 handover 关键帧修正，不是可在最后随意删掉的一次平移。
+- renderer：`HandRetargetPiperDualURDFIKRenderer` / `robot._trans_from_gripper_to_endlink(...)`。
+- 原生求解设置：宽松旋转阈值 `3.14 rad`、单 seed、EE reach/readback。
 
-所有方法都强制：
+### Canonical RTCP（下行）
 
-- 最终目标 retreat：`0 m`；
-- candidate local X/Z offset：`0 m`；
-- pregrasp：目标选定后单独生成，沿局部 RTCP `+X` 后退 `0.12 m`；
-- reach/readback：物理 TCP；
-- 位置坐标系：0515 `WORLD`；姿态轴：局部 `RTCP`。
+- Orientation/Fused：candidate center 原点不变，做一次 `R_W_RTCP = R_W_CGRASP @ R_CGRASP_RTCP`。
+- Top-score：candidate center 原点不变，原生轴直接按 RTCP 解释。
+- Human Replay：先使用与 Legacy 相同的 `0.14 m` Human recipe 生成同一语义源，再撤销 retreat，并把 CGRASP_HUMAN 旋转真正物化为 RTCP；最终 Canonical target retreat 为 `0`。
+- pregrasp：`0.12 m @ local_RTCP +X`。
+- renderer：`PiperCanonicalTCPRenderer`，严格反演服务器 `T_L6URDF_RTCP = Ry(-1.57) @ Tx(0.19)`。
+- RTCP target 对应的 link6 原点满足 `p_L6 = p_RTCP - 0.19 * local_RTCP_X`。
+- 原生求解设置：严格旋转阈值 `0.12 rad`、20 seeds、TCP reach/readback。
 
-`selection_strategy_compare_v4` 上方的 `Selection Pose` 是这里的直接输入来源。下方 `Planner Target` 已包含历史 offset、retreat、pregrasp、world/base 和 TCP/link6 处理，不作为本 2×4 的输入，否则会发生重复补偿。
+因此 V2 是“同一语义源经过两套完整原生链路”的效果比较，不是只改变一个 link6 转换的单变量消融。
 
-## 两行唯一的语义差异
+## 审计
 
-- Legacy 行：`HandRetargetPiperDualURDFIKRenderer`，使用 `robot._trans_from_gripper_to_endlink(...)`。
-- Canonical 行：`PiperCanonicalTCPRenderer`，严格反演 Piper 服务器 `T_L6URDF_RTCP = Ry(-1.57) @ Tx(0.19)`。
+`semantic_source_audit.json` 同时检查：
 
-候选选择、数值目标、pregrasp、IK 阈值、种子、轨迹和到达门控在同一列上下两格保持一致。合成前，`audit_ik_logic_inputs.py` 会比较候选 arm、frame、index 和 `pose_world_wxyz`；任何差异都会阻止视频合成。
+- arm/frame/candidate 身份；
+- 两行语义源的 world xyz；
+- Orientation/Fused/Human 的 `CGRASP -> RTCP` 旋转关系；
+- Top-score 的原生轴关系；
+- 每格 target contract；
+- Canonical `link6 - RTCP = [-0.19, 0, 0]`（局部 RTCP）。
 
-## 旧 Human Replay 的 12/14 cm 说明
-
-旧正式 Human Replay 的 `plan_summary_human_replay.json` 记录 `target_retreat=0.14 m @ local human +Z`。旧五路比较视频为了做显式 ablation 使用了 `0.12 m`，因此它不是旧正式结果的逐参数复现。新的 2×4 两行都使用 `target_retreat=0`，避免把历史 retreat 与 renderer 的 TCP/link6 转换叠加。
+任何检查失败都会阻止 2×4 合成。
 
 ## 输出
 
 默认根目录：
 
-`code_painting/piper_canonical_tcp_v1/outputs_ik_logic_grid_20260716/`
+`code_painting/piper_canonical_tcp_v1/outputs_ik_semantic_grid_v2_20260716/`
 
 单集重要文件：
 
-- `legacy_vs_canonical_ik_logic_2x4_d435.mp4`：2×4 主视频；
-- `input_equality_audit.json`：上下行输入一致性审计；
-- `legacy_vs_canonical_ik_logic_2x4_d435.manifest.json`：源视频、执行状态、媒体属性与输入契约；
-- `_sources/legacy/...`、`_sources/canonical/...`：八个独立方法目录；
-- 每个方法的 `input_target_contract.json`：该格的输入与行特有转换。
+- `legacy_original_vs_canonical_rtcp_2x4_d435.mp4`：最终 2×4 视频；
+- `semantic_source_audit.json`：语义源、轴变换、target contract 与 19 cm link6 审计；
+- `legacy_original_vs_canonical_rtcp_2x4_d435.manifest.json`：源视频、执行状态和媒体属性；
+- `_sources/legacy_original/...`、`_sources/canonical_rtcp/...`：8 个单元；
+- `_superseded/canonical_human_before_shared_source_fix_20260716/`：保留的中间错误样本，不参与最终视频。
 
-IK/到达失败并不代表 runner 出错。只要生成了诊断视频，grid runner 会保留该格并继续；真正的链路错误会表现为没有视频、输入审计失败或合成失败。
+## handover_bottle / foundation_input_1 验证
 
-## handover_bottle id1 单测结果
+- 4 种策略全部通过语义审计；所有源点位置差为 `0.0 m`，旋转矩阵误差为 `0` 到 `4.2e-16`。
+- V2 Legacy Orientation 与历史 `viewer_gripper`、V2 Legacy Top-score 与历史 `S_graspnet_topscore...` 的 candidate identity、raw pose、planner target 最大差均为 `0.0`，证明上行已恢复原输入逻辑。
+- Canonical Human 完成日志内部完整 handover（`[handover] SUCCESS`）；通用 summary 仍因左臂早期 action miss 返回失败状态，因此不能只看最终 `execution_success` 判断 handover 流程。
+- 最终 MP4 为 `1920×648`、H.264 High、`yuv420p`、5 fps、265 帧/53 s；完整解码与中间帧视觉检查通过。
 
-- 四列上下行各有 2 个目标，arm/frame/candidate index 完全一致，`pose_world_wxyz` 最大绝对差均为 `0.0`。
-- Orientation 与 Fused 在该 id 选中相同目标；两种 IK 均无可执行严格解，左右臂 q/TCP 变化均为 0。
-- Legacy Top-score 有实际运动，左右 TCP 最大位移约 `434/367 mm`，但 grasp 阶段最小位置误差仍约 `169/168 mm`；Canonical Top-score 无可执行解且不动。
-- Legacy Human Replay 有实际运动，左右 TCP 最大位移约 `516/613 mm`，但目标残差长期约 `120 mm`，直接暴露旧 12 cm 末端定义并未到达同一个物理 RTCP。
-- Canonical Human Replay 仅约 `19.4 mm` 小幅变化，目标位置误差仍为数百毫米；直接 human RTCP 姿态在严格 `0.12 rad` 旋转阈值和双臂 all-plan gate 下不可执行。
-- 八格最终都 `execution_failed=true`，因此该视频仍是失败方式/坐标语义诊断，而不是成功效果展示。
-- 主视频为 `1920×648`、H.264、`yuv420p`、5 fps、644 帧/128.8 s；全视频解码和中间帧视觉检查通过。
+IK miss 仍可能由候选姿态不可达、严格旋转阈值或双臂 gate 导致。它与本次已修复的“输入语义错接”是两个独立问题。

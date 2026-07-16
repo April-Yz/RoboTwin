@@ -60,16 +60,44 @@ case "$TASK" in
 esac
 
 if [[ "$ARM" == auto ]]; then EXECUTE_BOTH=1; else EXECUTE_BOTH=0; fi
-GROUP="$STRATEGY"; SELECTION_MODE=planner; ORIENTATION_REMAP=swap_red_blue_keep_green
-SOURCE_SEMANTICS="robot-frame preview direct Selection Pose T_W_CGRASP; remap once to T_W_RTCP"
+GROUP="$STRATEGY"; SELECTION_MODE=planner
 if [[ "$STRATEGY" == top_score ]]; then
-  GROUP=orientation; SELECTION_MODE=top_score_auto; ORIENTATION_REMAP=identity
-  SOURCE_SEMANTICS="direct native top-score AnyGrasp pose transformed D435 camera to WORLD; raw axes are RTCP"
+  GROUP=orientation; SELECTION_MODE=top_score_auto
 fi
+
 if [[ "$IK_LOGIC" == canonical ]]; then
   PLANNER="$SCRIPT_DIR/planner.py"
+  ORIENTATION_REMAP=swap_red_blue_keep_green
+  [[ "$STRATEGY" == top_score ]] && ORIENTATION_REMAP=identity
+  SOURCE_SEMANTICS="AnyGrasp/CGRASP selection center preserved as RTCP origin; axes adapted once to local_RTCP"
+  TARGET_LOCAL_Z=0
+  APPROACH_AXIS=local_x
+  TRAJECTORY_MODE=joint_interp
+  MAX_ROTATION_THRESHOLD=0.12
+  NUM_SEEDS=20
+  SOLUTION_SELECTION=joint_continuity
+  SEED_PERTURBATIONS=6
+  REACH_SOURCE=tcp
+  REACH_POS_TOL=0.03
+  REACH_ROT_TOL=10
+  DUAL_REQUIRE_ALL=1
 else
   PLANNER="$REPO/code_painting/plan_anygrasp_keyframes_piper.py"
+  ORIENTATION_REMAP=identity
+  SOURCE_SEMANTICS="original OursV2 candidate pose; planner target is shifted -0.05m on local candidate +Z"
+  TARGET_LOCAL_Z=-0.05
+  APPROACH_AXIS=local_z
+  TRAJECTORY_MODE=cartesian_interp_ik
+  [[ "$STRATEGY" == top_score ]] && TRAJECTORY_MODE=joint_interp
+  MAX_ROTATION_THRESHOLD=3.14
+  NUM_SEEDS=1
+  SOLUTION_SELECTION=pose_error
+  SEED_PERTURBATIONS=0
+  REACH_SOURCE=ee
+  REACH_POS_TOL=0.03
+  REACH_ROT_TOL=180
+  DUAL_REQUIRE_ALL=0
+  [[ "$STRATEGY" == top_score ]] && DUAL_REQUIRE_ALL=1
 fi
 
 CMD=(
@@ -78,28 +106,28 @@ CMD=(
   --reuse_preview_summary_json "$PREVIEW" --reuse_preview_frame_mode annotated_json_keyframes
   --reuse_preview_candidate_group "$GROUP" --reuse_preview_top_rank 1
   --candidate_selection_mode "$SELECTION_MODE" --candidate_orientation_remap_label "$ORIENTATION_REMAP"
-  --candidate_post_rot_xyz_deg 0 0 0 --candidate_target_local_x_offset_m 0 --candidate_target_local_z_offset_m 0
+  --candidate_post_rot_xyz_deg 0 0 0 --candidate_target_local_x_offset_m 0 --candidate_target_local_z_offset_m "$TARGET_LOCAL_Z"
   --candidate_keep_camera_up 0 --candidate_max_rotation_distance_deg -1
   --enforce_target_object_constraint 1 --enforce_candidate_distance_constraint 0
   --left_target_object "$LEFT_OBJ" --right_target_object "$RIGHT_OBJ"
-  --arm "$ARM" --execute_both_arms "$EXECUTE_BOTH" --dual_stage_require_all_plans 1
+  --arm "$ARM" --execute_both_arms "$EXECUTE_BOTH" --dual_stage_require_all_plans "$DUAL_REQUIRE_ALL"
   --dual_stage_freeze_reached_arms_on_replan 1 --require_keyframe1_reached_before_close 1
   --require_keyframe1_reached_before_action 1 --planner_backend urdfik
-  --urdfik_trajectory_mode joint_interp --urdfik_joint_interp_waypoints 40
+  --urdfik_trajectory_mode "$TRAJECTORY_MODE" --urdfik_joint_interp_waypoints 40
   --urdfik_position_threshold_m 0.001 --urdfik_rotation_threshold_rad 0.02
-  --urdfik_max_position_threshold_m 0.02 --urdfik_max_rotation_threshold_rad 0.12
-  --urdfik_num_seeds 20 --urdfik_solution_selection joint_continuity
-  --urdfik_seed_perturbations 6 --urdfik_seed_perturbation_scale 0.05
-  --piper_urdfik_apply_global_trans_to_ik 0 --reach_error_pose_source tcp
-  --reach_pos_tol_m 0.03 --reach_rot_tol_deg 10 --replan_until_reached 1
+  --urdfik_max_position_threshold_m 0.02 --urdfik_max_rotation_threshold_rad "$MAX_ROTATION_THRESHOLD"
+  --urdfik_num_seeds "$NUM_SEEDS" --urdfik_solution_selection "$SOLUTION_SELECTION"
+  --urdfik_seed_perturbations "$SEED_PERTURBATIONS" --urdfik_seed_perturbation_scale 0.05
+  --piper_urdfik_apply_global_trans_to_ik 0 --reach_error_pose_source "$REACH_SOURCE"
+  --reach_pos_tol_m "$REACH_POS_TOL" --reach_rot_tol_deg "$REACH_ROT_TOL" --replan_until_reached 1
   --replan_until_reached_max_attempts 3 --fail_on_execution_failure 1
-  --approach_axis local_x --approach_offset_m 0.12
+  --approach_axis "$APPROACH_AXIS" --approach_offset_m 0.12
   --execute_interp_steps 24 --joint_command_scene_steps 10 --settle_steps 30
   --joint_target_wait_steps 25 --joint_target_wait_tol_rad 0.01 --hold_frames_after_stage 8
   --save_debug_preview 1 --save_debug_execution_preview 1 --save_pose_debug 1
   --debug_visualize_targets 1 --debug_candidate_top_k 0 --debug_common_candidate_top_k 0
   --debug_visualize_selected_keyframe_axes 1 --debug_visualize_ik_waypoints 1
-  --debug_gripper_actor_forward_axis local_x --debug_target_axis_length 0.06
+  --debug_gripper_actor_forward_axis "$APPROACH_AXIS" --debug_target_axis_length 0.06
   --pure_scene_output 0 --overlay_text 1 --head_only 0 --third_person_view 1
   --vscode_compatible_video 1 --enable_viewer 0 --viewer_wait_at_end 0
   --enable_grasp_action_object_collision 0 --disable_table 1 --lighting_mode front_no_shadow
@@ -116,7 +144,8 @@ mkdir -p "$OUT"
 "$PY" "$SCRIPT_DIR/write_ik_logic_contract.py" \
   --output "$OUT/input_target_contract.json" --task "$TASK" --episode-id "$ID" \
   --ik-logic "$IK_LOGIC" --strategy "$STRATEGY" --source-semantics "$SOURCE_SEMANTICS" \
-  --orientation-remap "$ORIENTATION_REMAP" --planner-entry "$PLANNER"
+  --orientation-remap "$ORIENTATION_REMAP" --planner-entry "$PLANNER" \
+  --target-local-z-offset-m "$TARGET_LOCAL_Z" --approach-axis "$APPROACH_AXIS"
 printf '%q ' "${CMD[@]}" >"$OUT/command.sh.txt"; printf '\n' >>"$OUT/command.sh.txt"
 if "${CMD[@]}" > >(tee "$OUT/stdout.log") 2> >(tee "$OUT/stderr.log" >&2); then
   touch "$OUT/SUCCESS"; echo "[success] $OUT"
