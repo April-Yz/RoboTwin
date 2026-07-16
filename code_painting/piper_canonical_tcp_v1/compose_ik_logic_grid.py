@@ -101,6 +101,7 @@ def main() -> int:
     parser.add_argument("--canonical-root", type=Path, required=True)
     parser.add_argument("--task", required=True)
     parser.add_argument("--id", required=True)
+    parser.add_argument("--camera-profile", choices=("d435", "wide"), required=True)
     parser.add_argument("--input-audit", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--manifest", type=Path)
@@ -110,6 +111,10 @@ def main() -> int:
     audit = json.loads(args.input_audit.read_text(encoding="utf-8"))
     if not audit.get("all_ok"):
         raise ValueError(f"Semantic-source audit failed; refusing misleading grid: {args.input_audit}")
+    if audit.get("camera_profile") != args.camera_profile:
+        raise ValueError(
+            f"Camera profile mismatch: audit={audit.get('camera_profile')} requested={args.camera_profile}"
+        )
     if args.output.exists() and not args.force:
         print(f"[skip-existing] {args.output}")
         return 0
@@ -128,6 +133,16 @@ def main() -> int:
         for _, _, source in sources:
             cap, info = open_video(source)
             caps.append(cap); infos.append(info)
+        expected = (
+            {"width": 640, "height": 480, "fps": 5.0, "fovy_deg": 42.499880046655484}
+            if args.camera_profile == "d435"
+            else {"width": 640, "height": 360, "fps": 10.0, "fovy_deg": 90.0}
+        )
+        for info in infos:
+            if info["width"] != expected["width"] or info["height"] != expected["height"]:
+                raise ValueError(f"Mixed camera resolution for {args.camera_profile}: {info}")
+            if abs(info["fps"] - expected["fps"]) > 1e-6:
+                raise ValueError(f"Mixed camera fps for {args.camera_profile}: {info}")
         output_fps = min(info["fps"] for info in infos)
         duration_s = max(info["duration_s"] for info in infos)
         output_frames = max(1, math.ceil(duration_s * output_fps))
@@ -145,7 +160,12 @@ def main() -> int:
                 panel = annotate(letterbox(frame), logic, label)
                 canvas[row * CELL_H : (row + 1) * CELL_H, col * CELL_W : (col + 1) * CELL_W] = panel
             footer_y = CELL_H * 2
-            cv2.putText(canvas, "D435 simulated view | shared semantic source: same AnyGrasp / human grasp center", (18, footer_y + 34), cv2.FONT_HERSHEY_SIMPLEX, 0.56, (235, 238, 242), 1, cv2.LINE_AA)
+            camera_label = (
+                "D435 CALIBRATED | 640x480 | fovy=42.50deg"
+                if args.camera_profile == "d435"
+                else "WIDE DIAGNOSTIC | 640x360 | fovy=90.00deg"
+            )
+            cv2.putText(canvas, f"{camera_label} | shared semantic source: same AnyGrasp / human grasp center", (18, footer_y + 34), cv2.FONT_HERSHEY_SIMPLEX, 0.56, (235, 238, 242), 1, cv2.LINE_AA)
             cv2.putText(canvas, "top: native Legacy offsets/retreat | bottom: source center = RTCP; link6 = RTCP - 0.19m @ local +X", (18, footer_y + 68), cv2.FONT_HERSHEY_SIMPLEX, 0.53, (205, 216, 228), 1, cv2.LINE_AA)
             cv2.putText(canvas, f"frame {frame_index + 1}/{output_frames}", (OUTPUT_SIZE[0] - 210, footer_y + 98), cv2.FONT_HERSHEY_SIMPLEX, 0.48, (178, 190, 204), 1, cv2.LINE_AA)
             writer.write(canvas)
@@ -160,6 +180,14 @@ def main() -> int:
         "schema": "piper_canonical_tcp_v1.ik_semantic_grid.v2",
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
         "layout": "2 rows x 4 columns",
+        "camera": {
+            "profile": args.camera_profile,
+            "image_width": expected["width"],
+            "image_height": expected["height"],
+            "fps": expected["fps"],
+            "fovy_deg": expected["fovy_deg"],
+            "all_eight_sources_verified_same_profile": True,
+        },
         "rows": {
             "top": "Original Legacy/OursV2 candidate-to-planner-target semantics",
             "bottom": "PiperCanonicalTCP-v1: semantic grasp center interpreted as server RTCP",

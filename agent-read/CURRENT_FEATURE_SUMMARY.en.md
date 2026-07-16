@@ -36,10 +36,7 @@
 - The earlier five-way video is not a complete Legacy/Canonical 2x4. The formal old Human Replay records 0.14 m retreat; the five-way 0.12 m value is an explicit ablation.
 - Conclusions from the old `outputs_ik_logic_grid_20260716` V1 are withdrawn. V1 removed the Legacy `-0.05 m @ local +Z`/Human 0.14 m adapters and incorrectly assumed the Human remap label affected reuse-plan-summary. Corrected output is under `outputs_ik_semantic_grid_v2_20260716`.
 - The `handover_bottle/id1` V2 audit has zero world-xyz delta for every semantic source and at most `4.2e-16` axis error. Legacy Orientation/Top targets exactly match historical outputs. Canonical Human completes the internal handover, although the generic summary still returns failure for an earlier action miss. The final 1920x648, 265-frame video passes full decode and visual QA.
+- An older V2 sample rendered the first three AnyGrasp panels as `640x360/fovy 90deg/10 fps` wide while Human used `640x480/fovy 42.499880046655484deg/5 fps` D435. The grid now uses `--camera-profile d435|wide` for all eight panels; contracts, audit, and compositor reject any profile, resolution, or fps mismatch.
+- New `run_ik_semantic_camera_batch.sh` fixes six tasks x one episode x D435/wide and writes only flat `<task>_id<id>_vd435.mp4` and `<task>_id<id>_vwide.mp4` files under `outputs_ik_semantic_grid_v2_20260716/vis/`. The D435 `handover_bottle/id1` smoke verifies all eight sources as 640x480@5 fps, and the final H.264/yuv420p video passes full decode and visual QA. The full two-profile batch is submitted in tmux `pcanonical_camprofiles_6x1x2`.
+- Canonical Orientation/Fused being static on `handover_bottle/id1` is primarily a strict dual-arm gate: the right plan succeeds, the left fails, and `dual_stage_require_all_plans=1` skips the stage. Legacy motion comes from different target/EE semantics, loose rotation tolerances, and partial-arm execution; it does not prove arrival at the same physical RTCP.
 - Quick references: `OUTPUTS_REAL_CONTROL_COMPARE_GUIDE.en.md` and `PIPER_CANONICAL_REPLAY_METHOD_COMPARE.en.md`.
-
-## 2026-07-16 paper qualitative asset addendum
-
-- The Dense URDF-match-v2 4x5 grid now places titles in separate 38 px headers. Video content remains 480x270 per cell, making the final output 1920x1540; the former title-overlay version is preserved separately.
-- Interaction keyframes 38/78 of `pick_diverse_bottles/id0` now have eight left/right split images across Orientation, Fused, Top-score, and OursV2, plus two contact sheets. OursV2 is a `HUMAN TARGET`, not an AnyGrasp candidate.
-- See `COMMANDS/paper_qualitative_assets.en.md` for reproduction and validation.

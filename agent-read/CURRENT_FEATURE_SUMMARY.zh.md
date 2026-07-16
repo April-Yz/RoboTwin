@@ -36,10 +36,7 @@
 - 旧五路不是完整 Legacy/Canonical 2×4，且旧正式 Human Replay 记录 retreat=0.14 m，五路中的 0.12 m 只是显式 ablation。
 - 旧 `outputs_ik_logic_grid_20260716` V1 因移除 Legacy `-0.05 m @ local +Z`/Human 0.14 m 适配，并误以为 Human remap 标签会作用于 reuse-plan-summary，结论撤销。新结果写入 `outputs_ik_semantic_grid_v2_20260716`。
 - `handover_bottle/id1` 的 V2 审计中，所有语义源 world xyz 差为 0，轴关系误差不超过 `4.2e-16`；Legacy Orientation/Top 与历史原结果 target 差为 0。Canonical Human 内部完成完整 handover，但通用 summary 仍因早期 action miss 返回失败。最终 1920×648、265 帧视频通过完整解码与视觉 QA。
+- 旧 V2 单集曾把前三个 AnyGrasp 格渲染为 `640×360/fovy 90°/10 fps` 广角，而 Human 为 `640×480/fovy 42.499880046655484°/5 fps` D435。当前 grid 用 `--camera-profile d435|wide` 对 8 格统一配置，contract/audit/compositor 会拒绝相机 profile、分辨率或 fps 不一致的源。
+- 新 `run_ik_semantic_camera_batch.sh` 固定运行 6 tasks × 1 episode × D435/wide，最终只在 `outputs_ik_semantic_grid_v2_20260716/vis/` 扁平保存 `<task>_id<id>_vd435.mp4` 与 `<task>_id<id>_vwide.mp4`。D435 `handover_bottle/id1` smoke 的 8 个源均为 640×480@5 fps，最终 H.264/yuv420p 视频通过完整解码与视觉检查；完整双 profile batch 已提交到 tmux `pcanonical_camprofiles_6x1x2`。
+- `handover_bottle/id1` 的 Canonical Orientation/Fused 静止主要是严格双臂 gate：右计划成功、左计划失败后，`dual_stage_require_all_plans=1` 跳过整个 stage。Legacy 可运动源于不同 target/EE 语义、宽松旋转容差和可执行单臂计划，不代表它到达同一物理 RTCP。
 - 快速阅读：`OUTPUTS_REAL_CONTROL_COMPARE_GUIDE.zh.md`、`PIPER_CANONICAL_REPLAY_METHOD_COMPARE.zh.md`。
-
-## 2026-07-16 论文定性素材补充
-
-- Dense URDF-match v2 的 4x5 网格已把标题移到每格独立的 38 px 顶栏；视频内容仍为 480x270，最终输出为 1920x1540，旧标题叠加版另行保留。
-- `pick_diverse_bottles/id0` 的交互关键帧 38/78 已导出 Orientation、Fused、Top-score、OursV2 共 8 张左右手分栏图和 2 张 contact sheet。OursV2 是 `HUMAN TARGET`，不是 AnyGrasp candidate。
-- 复现与验证命令见 `COMMANDS/paper_qualitative_assets.zh.md`。

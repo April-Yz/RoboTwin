@@ -26,6 +26,11 @@ def main() -> int:
     parser.add_argument("--target-local-z-offset-m", type=float, default=0.0)
     parser.add_argument("--target-retreat-m", type=float, default=0.0)
     parser.add_argument("--approach-axis", choices=("local_x", "local_z"), required=True)
+    parser.add_argument("--camera-profile", choices=("d435", "wide"), required=True)
+    parser.add_argument("--image-width", type=int, required=True)
+    parser.add_argument("--image-height", type=int, required=True)
+    parser.add_argument("--fovy-deg", type=float, required=True)
+    parser.add_argument("--fps", type=float, required=True)
     args = parser.parse_args()
 
     if args.ik_logic == "canonical":
@@ -41,6 +46,14 @@ def main() -> int:
         "episode_id": str(args.episode_id),
         "ik_logic": args.ik_logic,
         "strategy": args.strategy,
+        "camera_contract": {
+            "profile": args.camera_profile,
+            "image_width": args.image_width,
+            "image_height": args.image_height,
+            "fovy_deg": args.fovy_deg,
+            "fps": args.fps,
+            "head_pose": "0515 calibrated simulated D435 pose",
+        },
         "semantic_source_contract": {
             "source": args.source_semantics,
             "same_candidate_or_hand_center_across_rows": True,

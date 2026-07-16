@@ -8,7 +8,7 @@ DATA=/home/zaijia001/ssd/data/piper/hand
 KEYFRAMES_ROOT="$REPO/code_painting/h2o_manual_review"
 CALIBRATION="$REPO/calibration_bundle_piper_new_table_0515.json"
 
-TASK=""; ID=""; IK_LOGIC=""; GPU=0; OUTPUT_ROOT=""; DRY_RUN=0
+TASK=""; ID=""; IK_LOGIC=""; GPU=0; OUTPUT_ROOT=""; CAMERA_PROFILE=d435; DRY_RUN=0
 while (($#)); do
   case "$1" in
     --task) TASK="$2"; shift 2 ;;
@@ -16,13 +16,21 @@ while (($#)); do
     --ik-logic) IK_LOGIC="$2"; shift 2 ;;
     --gpu) GPU="$2"; shift 2 ;;
     --output-root) OUTPUT_ROOT="$2"; shift 2 ;;
+    --camera-profile) CAMERA_PROFILE="$2"; shift 2 ;;
     --dry-run) DRY_RUN=1; shift ;;
-    -h|--help) echo "Usage: $0 --task TASK --id ID --ik-logic legacy|canonical --output-root PATH [--gpu N] [--dry-run]"; exit 0 ;;
+    -h|--help) echo "Usage: $0 --task TASK --id ID --ik-logic legacy|canonical --output-root PATH [--camera-profile d435|wide] [--gpu N] [--dry-run]"; exit 0 ;;
     *) echo "[error] unknown argument: $1" >&2; exit 2 ;;
   esac
 done
 [[ -n "$TASK" && -n "$ID" && -n "$IK_LOGIC" && -n "$OUTPUT_ROOT" ]] || { echo "[error] required: --task --id --ik-logic --output-root" >&2; exit 2; }
 [[ "$IK_LOGIC" =~ ^(legacy|canonical)$ ]] || { echo "[error] invalid ik-logic=$IK_LOGIC" >&2; exit 2; }
+[[ "$CAMERA_PROFILE" =~ ^(d435|wide)$ ]] || { echo "[error] invalid camera-profile=$CAMERA_PROFILE" >&2; exit 2; }
+
+if [[ "$CAMERA_PROFILE" == d435 ]]; then
+  IMAGE_WIDTH=640; IMAGE_HEIGHT=480; FOVY_DEG=42.499880046655484; FPS=5
+else
+  IMAGE_WIDTH=640; IMAGE_HEIGHT=360; FOVY_DEG=90.0; FPS=10
+fi
 
 ANY="$DATA/$TASK/${TASK}_output/foundation_input_${ID}"
 [[ -d "$ANY" ]] || ANY="$DATA/$TASK/${TASK}_output_old_cam/foundation_input_${ID}"
@@ -85,12 +93,13 @@ CMD=(
   --debug_visualize_targets 1 --debug_visualize_selected_keyframe_axes 1 --debug_visualize_ik_waypoints 1
   --pure_scene_output 0 --third_person_view 1 --head_only 0 --lighting_mode front_no_shadow
   --piper_calibration_bundle "$CALIBRATION" --camera_cv_axis_mode legacy_r1
+  --image_width "$IMAGE_WIDTH" --image_height "$IMAGE_HEIGHT" --fovy_deg "$FOVY_DEG" --fps "$FPS"
   --head_camera_local_pos 0.11210396690038413 -0.39189397826604927 0.4753892624100325
   --head_camera_local_quat_wxyz 0.8524694864910365 -0.0011011947849308937 0.5226654778798345 0.010740586780925399
   "${MESH_ARGS[@]}"
 )
 
-printf '[run] ik_logic=%s strategy=human_replay task=%s id=%s output=%s\n' "$IK_LOGIC" "$TASK" "$ID" "$OUT"
+printf '[run] ik_logic=%s strategy=human_replay camera=%s task=%s id=%s output=%s\n' "$IK_LOGIC" "$CAMERA_PROFILE" "$TASK" "$ID" "$OUT"
 if ((DRY_RUN)); then printf '%q ' "${CMD[@]}"; printf '\n'; exit 0; fi
 mkdir -p "$OUT"
 "$PY" "$SCRIPT_DIR/write_ik_logic_contract.py" \
@@ -98,7 +107,9 @@ mkdir -p "$OUT"
   --ik-logic "$IK_LOGIC" --strategy human_replay \
   --source-semantics "human hand/gripper center T_W_CGRASP_HUMAN" \
   --orientation-remap "$ORIENTATION_ADAPTER" --planner-entry "$PLANNER" \
-  --target-retreat-m "$RETREAT_M" --approach-axis "$APPROACH_AXIS"
+  --target-retreat-m "$RETREAT_M" --approach-axis "$APPROACH_AXIS" \
+  --camera-profile "$CAMERA_PROFILE" --image-width "$IMAGE_WIDTH" --image-height "$IMAGE_HEIGHT" \
+  --fovy-deg "$FOVY_DEG" --fps "$FPS"
 printf '%q ' "${CMD[@]}" >"$OUT/command.sh.txt"; printf '\n' >>"$OUT/command.sh.txt"
 if "${CMD[@]}" > >(tee "$OUT/stdout.log") 2> >(tee "$OUT/stderr.log" >&2); then
   touch "$OUT/SUCCESS"; echo "[success] $OUT"

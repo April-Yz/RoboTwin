@@ -138,7 +138,7 @@ def compare_strategy(
     return ok, {"candidate_count": len(rows), "entries": rows}
 
 
-def contract_ok(path: Path, logic: str, strategy: str) -> tuple[bool, dict[str, Any]]:
+def contract_ok(path: Path, logic: str, strategy: str, camera_profile: str) -> tuple[bool, dict[str, Any]]:
     if not path.is_file():
         return False, {"reason": "missing_contract", "path": str(path)}
     data = load_json(path)
@@ -161,13 +161,32 @@ def contract_ok(path: Path, logic: str, strategy: str) -> tuple[bool, dict[str, 
             "candidate_target_local_z_offset_m": -0.05,
             "approach_axis": "local_z",
         }
-    actual = {
+    actual_target = {
         "target_retreat_m": float(target.get("target_retreat_m", 0.0)),
         "candidate_target_local_z_offset_m": float(target.get("candidate_target_local_z_offset_m", 0.0)),
         "approach_axis": target.get("pregrasp", {}).get("axis"),
     }
-    ok = actual == expected
-    return ok, {"expected": expected, "actual": actual, "path": str(path.resolve())}
+    expected_camera = (
+        {"profile": "d435", "image_width": 640, "image_height": 480, "fovy_deg": 42.499880046655484, "fps": 5.0}
+        if camera_profile == "d435"
+        else {"profile": "wide", "image_width": 640, "image_height": 360, "fovy_deg": 90.0, "fps": 10.0}
+    )
+    camera = data.get("camera_contract", {})
+    actual_camera = {
+        "profile": camera.get("profile"),
+        "image_width": int(camera.get("image_width", -1)),
+        "image_height": int(camera.get("image_height", -1)),
+        "fovy_deg": float(camera.get("fovy_deg", -1.0)),
+        "fps": float(camera.get("fps", -1.0)),
+    }
+    ok = actual_target == expected and actual_camera == expected_camera
+    return ok, {
+        "expected_target": expected,
+        "actual_target": actual_target,
+        "expected_camera": expected_camera,
+        "actual_camera": actual_camera,
+        "path": str(path.resolve()),
+    }
 
 
 def main() -> int:
@@ -176,6 +195,7 @@ def main() -> int:
     parser.add_argument("--canonical-root", type=Path, required=True)
     parser.add_argument("--task", required=True)
     parser.add_argument("--id", required=True)
+    parser.add_argument("--camera-profile", choices=("d435", "wide"), required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
 
@@ -184,6 +204,7 @@ def main() -> int:
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
         "task": args.task,
         "episode_id": str(args.id),
+        "camera_profile": args.camera_profile,
         "contract": (
             "same semantic AnyGrasp/human center; Legacy keeps native historical target "
             "adaptation while Canonical interprets that center as Piper RTCP"
@@ -213,10 +234,10 @@ def main() -> int:
             )
             source_detail["ok"] = source_ok
         legacy_contract_ok, legacy_contract = contract_ok(
-            args.legacy_root / rel / "input_target_contract.json", "legacy", strategy
+            args.legacy_root / rel / "input_target_contract.json", "legacy", strategy, args.camera_profile
         )
         canonical_contract_ok, canonical_contract = contract_ok(
-            args.canonical_root / rel / "input_target_contract.json", "canonical", strategy
+            args.canonical_root / rel / "input_target_contract.json", "canonical", strategy, args.camera_profile
         )
         result["strategies"][strategy] = {
             "semantic_source": source_detail,

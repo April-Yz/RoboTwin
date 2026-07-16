@@ -50,19 +50,33 @@ V2 is therefore a comparison of two complete native pipelines under a shared sem
 
 Any failure blocks composition.
 
+## Camera Profiles
+
+An older V2 sample mixed two render profiles. The first three AnyGrasp strategies used the `640x360`, `fovy=90deg`, 10 fps wide diagnostic view, while Human Replay used the calibrated-D435 `640x480`, `fovy=42.499880046655484deg`, 5 fps view. Both used the same head pose, but the FOV/resolution mismatch made the first three panels look wider with a smaller robot and invalidated direct projection comparison.
+
+The runner now requires `--camera-profile d435|wide`:
+
+- `d435`: `640x480`, `fovy=42.499880046655484deg`, 5 fps;
+- `wide`: `640x360`, `fovy=90deg`, 10 fps.
+
+The compositor verifies profile, width, height, and fps for all eight sources and refuses to compose any mixed set. Wide is retained as a diagnostic view and does not represent physical D435 intrinsics.
+
 ## Outputs
 
 Default root:
 
 `code_painting/piper_canonical_tcp_v1/outputs_ik_semantic_grid_v2_20260716/`
 
-Important per-episode files:
+Source files and audit metadata are isolated by camera profile. Final videos are flat under `vis/`:
 
-- `legacy_original_vs_canonical_rtcp_2x4_d435.mp4`: final 2x4 video;
-- `semantic_source_audit.json`: source, axes, target-contract, and 19 cm link6 audit;
-- `legacy_original_vs_canonical_rtcp_2x4_d435.manifest.json`: source videos, execution state, and media properties;
-- `_sources/legacy_original/...` and `_sources/canonical_rtcp/...`: eight cells;
+- `vis/<task>_id<id>_vd435.mp4`: all eight panels use D435;
+- `vis/<task>_id<id>_vwide.mp4`: all eight panels use wide;
+- `_grid_meta/<profile>/<task>/foundation_input_<id>/semantic_source_audit.json`: semantic source, axes, camera profile, target contract, and 19 cm link6 audit;
+- `_grid_meta/<profile>/<task>/foundation_input_<id>/legacy_original_vs_canonical_rtcp_2x4_<profile>.manifest.json`: source videos, execution state, and media properties;
+- `_sources/<profile>/legacy_original/...` and `_sources/<profile>/canonical_rtcp/...`: eight cells;
 - `_superseded/canonical_human_before_shared_source_fix_20260716/`: preserved intermediate bad sample, excluded from the final video.
+
+The current 6x1x2 batch fixes these samples: `pick_diverse_bottles/id0`, `place_bread_basket/id0`, `stack_cups/id0`, `handover_bottle/id1`, `pnp_bread/id7`, and `pnp_tray/id0`. `pnp_bread/id1` lacks the complete input intersection, so the first complete sample, `id7`, is used.
 
 ## handover_bottle / foundation_input_1 Validation
 
@@ -70,5 +84,13 @@ Important per-episode files:
 - V2 Legacy Orientation versus historical `viewer_gripper`, and V2 Legacy Top-score versus historical `S_graspnet_topscore...`, have zero maximum delta in candidate identity, raw pose, and planner target. The top row now reproduces original input logic.
 - Canonical Human completes the internal handover (`[handover] SUCCESS`). The generic summary still returns failure because of an earlier left-arm action miss, so final `execution_success` alone does not represent the handover state machine.
 - Final MP4: `1920x648`, H.264 High, `yuv420p`, 5 fps, 265 frames/53 s. Full decode and middle-frame visual QA pass.
+
+After the D435-profile rerun, all eight sources verify as `640x480 @ 5 fps`. The flat final video is `vis/handover_bottle_id1_vd435.mp4` and passes H.264 High, `yuv420p`, full-decode, and visual checks.
+
+## Why Canonical AnyGrasp Can Look Static
+
+For `handover_bottle/id1` Orientation/Fused, Canonical did not have zero IK solutions: the right plan succeeded and the left plan failed. Canonical uses `dual_stage_require_all_plans=1`, and the log then explicitly skips the entire stage, leaving a static video. It also uses a `0.12 rad` IK rotation threshold, 20 seeds, physical-RTCP reach, and a 10-degree reach rotation tolerance.
+
+Legacy motion does not prove arrival at the same physical RTCP. Legacy AnyGrasp uses its old `-0.05 m @ local +Z` target, old gripper/endlink semantics, a `3.14 rad` IK rotation threshold, 180-degree reach rotation tolerance, and EE reach. Orientation/Fused also allow `dual_stage_require_all_plans=0`. It can therefore execute a partial/loose solution under a different target and acceptance contract. Canonical Human and Legacy Human look more similar because they share the Human semantic source; the Canonical Human handover state machine actually completes.
 
 IK misses can still arise from unreachable candidate orientations, the strict rotation threshold, or dual-arm gates. Those are independent from the input-semantics wiring error fixed here.

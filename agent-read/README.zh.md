@@ -30,6 +30,4 @@
 
 Real-control 输出速查见 `OUTPUTS_REAL_CONTROL_COMPARE_GUIDE.zh.md`。Canonical Orientation/Fused/Top-score/Human Replay 四方法与 Legacy retreat 基线见 `PIPER_CANONICAL_REPLAY_METHOD_COMPARE.zh.md`；入口为 `run_replay_method_compare.sh`，不修改 OursV2。
 
-需要比较同一个 AnyGrasp/Human 语义源经过“原 Legacy/OursV2 输入适配”和“Canonical RTCP 输入适配”的效果时，使用 `run_ik_logic_grid.sh`。V2 输出 2×4 D435 视频，并审计源点、轴关系、每行 target contract 与 Canonical 19 cm link6 逆变换。旧 `outputs_ik_logic_grid_20260716` 的“同一数值 T_W_RTCP”V1 已确认输入语义错误，仅保留作反例。详见 `PIPER_IK_LOGIC_GRID_COMPARE.zh.md` 与 `COMMANDS/piper_ik_logic_grid.zh.md`。
-
-论文定性素材位于 `/home/zaijia001/ssd/data/piper/paper_qualitative_assets`。当前包含独立标题栏的 Dense-v2 4x5 网格，以及 `pick_diverse_bottles/id0` 第 38/78 帧的四策略左右手候选图；复现命令见 `agent-read/COMMANDS/paper_qualitative_assets.zh.md`。
+需要比较同一个 AnyGrasp/Human 语义源经过“原 Legacy/OursV2 输入适配”和“Canonical RTCP 输入适配”的效果时，使用 `run_ik_logic_grid.sh`。V2 支持严格一致的 `d435`（640×480/42.50°/5 fps）和 `wide`（640×360/90°/10 fps）两套 2×4 profile，并审计 8 格相机参数、源点、轴关系、每行 target contract 与 Canonical 19 cm link6 逆变换；`run_ik_semantic_camera_batch.sh` 生成 6 tasks × 1 episode × 2 profiles 的扁平 `vis/<task>_id<id>_v<profile>.mp4`。旧 `outputs_ik_logic_grid_20260716` 的“同一数值 T_W_RTCP”V1 已确认输入语义错误，仅保留作反例。详见 `PIPER_IK_LOGIC_GRID_COMPARE.zh.md` 与 `COMMANDS/piper_ik_logic_grid.zh.md`。
