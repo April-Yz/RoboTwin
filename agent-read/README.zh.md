@@ -29,3 +29,5 @@
 命令详见 `agent-read/COMMANDS/piper_ik_cartesian.zh.md`、`piper_ik_foundation.zh.md`、`piper_canonical_tcp_v1.zh.md` 和 `selection_strategy_audit_v4.zh.md`。Real-Piper-TCP frame contract 见 `agent-read/PIPER_CANONICAL_TCP_V1.zh.md`，版本关系见 `agent-read/VERSION_SUMMARY.zh.md`。
 
 Real-control 输出速查见 `OUTPUTS_REAL_CONTROL_COMPARE_GUIDE.zh.md`。Canonical Orientation/Fused/Top-score/Human Replay 四方法与 Legacy retreat 基线见 `PIPER_CANONICAL_REPLAY_METHOD_COMPARE.zh.md`；入口为 `run_replay_method_compare.sh`，不修改 OursV2。
+
+需要把同一组四种直接 `T_W_RTCP` 目标分别送入 Legacy/OursV2 IK 和 Canonical IK 时，使用 `run_ik_logic_grid.sh`；它输出 2×4 D435 视频并在合成前验证上下行候选数值完全一致。语义见 `PIPER_IK_LOGIC_GRID_COMPARE.zh.md`，命令见 `COMMANDS/piper_ik_logic_grid.zh.md`。

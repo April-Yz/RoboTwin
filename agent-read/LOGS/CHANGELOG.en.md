@@ -3283,3 +3283,13 @@ Fallback validation: the four-frame `pick_diverse_bottles/episode3` smoke, newly
 - Added four-method Canonical and five-way Legacy-baseline videos, per-sample manifests, and single/batch runners. Legacy retreat is explicit; old code/outputs are preserved.
 
 Validation: ten unit tests, `py_compile`, `bash -n`, and runner dry-runs passed in pine2 `RoboTwin_bw`; a dedicated probe confirmed dry-run creates no directory. The `handover_bottle/id1` smoke produced a 1280x812 four-way and 1920x812 five-way video, both H.264/yuv420p, 5 fps, 224 frames, full-decode clean, and visually checked at a middle frame. The manifest confirms Canonical retreat zero and Legacy retreat 0.12. All five methods have `execution_failed=true` on this sample, so the videos are failure-behavior comparisons rather than successful demonstrations. The first dry-run exposed a `command.sh.txt` side effect; it was fixed and its only residue removed.
+
+## 2026-07-16 (Legacy / Canonical IK 2x4 Same-input Ablation)
+
+- Added `plan_human_replay_ik_logic.py`, `run_ik_logic_strategy.sh`, `run_ik_logic_human_replay.sh`, and `run_ik_logic_grid.sh` without modifying legacy OursV2/Canonical entries or outputs.
+- The 2x4 top row uses Legacy `robot._trans_from_gripper_to_endlink`; the bottom row uses the Canonical inverse of server `Ry(-1.57) @ Tx(0.19)`. Columns are Orientation/Fused/Top-score/Human Replay.
+- All eight cells share direct `T_W_RTCP`, zero final retreat, zero candidate offset, and a 0.12 m local-RTCP-+X pregrasp. The V4 lower Planner Target with historical transforms is explicitly excluded.
+- Added per-cell `input_target_contract.json`, per-candidate `audit_ik_logic_inputs.py`, a 2x4 D435 compositor, and aligned semantic/command documentation. Input mismatch blocks composition.
+- On `handover_bottle/id1`, each column has two targets and every cross-row arm/frame/index/pose delta is zero. Legacy Orientation/Fused are static. Legacy Top/Human reach about 434/367 mm and 516/613 mm maximum left/right TCP motion but still miss by about 168-169 mm and 120 mm. Canonical Orientation/Fused/Top are static and Canonical Human changes only about 19.4 mm. All eight have `execution_failed=true`.
+
+Validation: local and pine2 `py_compile`, `bash -n`, and all-eight-cell dry-run passed. After fixing temporary dry-run directory writes, a fresh `/tmp` path asserted no side effect. The single runner, zero-delta input audit, H.264/yuv420p ffprobe, full 644-frame decode, and middle-frame 2x4 visual inspection pass. Output is 1920x648, 5 fps, and 128.8 seconds with no traceback/OOM/import error.

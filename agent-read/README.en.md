@@ -29,3 +29,5 @@ For current session context and recent data status, read `agent-read/ACTIVE_MEMO
 See `agent-read/COMMANDS/piper_ik_cartesian.en.md`, `piper_ik_foundation.en.md`, `piper_canonical_tcp_v1.en.md`, and `selection_strategy_audit_v4.en.md` for commands. See `agent-read/PIPER_CANONICAL_TCP_V1.en.md` for the Real-Piper-TCP frame contract and `agent-read/VERSION_SUMMARY.en.md` for version relationships.
 
 Use `OUTPUTS_REAL_CONTROL_COMPARE_GUIDE.en.md` for real-control outputs. See `PIPER_CANONICAL_REPLAY_METHOD_COMPARE.en.md` for Canonical Orientation/Fused/Top-score/Human Replay plus the Legacy retreat baseline; `run_replay_method_compare.sh` leaves OursV2 unchanged.
+
+Use `run_ik_logic_grid.sh` to send the same four direct `T_W_RTCP` target sets through Legacy/OursV2 IK and Canonical IK. It produces a 2x4 D435 video and verifies exact cross-row candidate equality before composition. See `PIPER_IK_LOGIC_GRID_COMPARE.en.md` for semantics and `COMMANDS/piper_ik_logic_grid.en.md` for commands.

@@ -32,4 +32,7 @@
 
 - Canonical Human Replay maps human/CGRASP local axes explicitly to RTCP, forces final `target_retreat=0`, and retains only the 0.12 m pregrasp on local RTCP +X.
 - `canonical_four_method_d435.mp4` compares four Canonical methods; `canonical_vs_legacy_five_method_d435.mp4` appends an explicit 0.12 m Legacy retreat baseline. The manifest records source semantics and video properties.
+- `run_ik_logic_grid.sh` adds a strict 2x4 ablation: Legacy/OursV2 IK on the top row and Canonical IK on the bottom, with Orientation/Fused/Top-score/Human Replay columns. Each column shares direct `T_W_RTCP`, final retreat zero, and a 0.12 m pregrasp on local RTCP +X; per-candidate input equality is audited before composition.
+- The earlier five-way video is not a complete Legacy/Canonical 2x4. The formal old Human Replay records 0.14 m retreat; the five-way 0.12 m value is an explicit ablation.
+- On `handover_bottle/id1`, every cross-row input delta is zero. Legacy Top/Human move substantially but retain about 168-169 mm/120 mm error; Canonical Top is static and Canonical Human changes only about 19.4 mm. All eight fail, so this is a strict-IK/frame-semantics diagnostic rather than a success demo.
 - Quick references: `OUTPUTS_REAL_CONTROL_COMPARE_GUIDE.en.md` and `PIPER_CANONICAL_REPLAY_METHOD_COMPARE.en.md`.

@@ -3281,3 +3281,13 @@ Fallback validation: 新复制且无旧 `.sim_source` 的 `pick_diverse_bottles/
 - 新增四方法 Canonical 视频、附加 Legacy retreat 的五路视频、逐样本 manifest 和单集/batch runner；Legacy retreat 必须显式给出，旧代码/输出不覆盖。
 
 Validation: pine2 `RoboTwin_bw` 10 个单元测试、`py_compile`、`bash -n` 和 runner dry-run 通过；额外探针确认 dry-run 不创建目录。`handover_bottle/id1` smoke 生成 1280×812 四路和 1920×812 五路视频，均为 H.264/yuv420p、5 fps、224 帧并通过完整解码与中间帧视觉 QA；manifest 验证 Canonical retreat=0、Legacy retreat=0.12。该样本五种方法均 `execution_failed=true`，视频定位为失败行为对比，不伪装为成功演示。首次 dry-run 暴露写入 `command.sh.txt` 的副作用，已修复并清理唯一残留。
+
+## 2026-07-16（Legacy / Canonical IK 2×4 同输入消融）
+
+- 新增 `plan_human_replay_ik_logic.py`、`run_ik_logic_strategy.sh`、`run_ik_logic_human_replay.sh` 和 `run_ik_logic_grid.sh`，不修改旧 OursV2/Canonical 入口和输出。
+- 2×4 上行使用 Legacy `robot._trans_from_gripper_to_endlink`，下行使用 Canonical 服务器 `Ry(-1.57) @ Tx(0.19)` 逆工具变换；四列为 Orientation/Fused/Top-score/Human Replay。
+- 八格统一直接 `T_W_RTCP`、final retreat=0、candidate offset=0 和 0.12 m@local RTCP +X pregrasp。明确排除 V4 下方已混入历史转换的 Planner Target。
+- 新增 `input_target_contract.json`、逐候选 `audit_ik_logic_inputs.py`、2×4 D435 compositor 和双语语义/命令说明。输入不一致会阻止合成。
+- `handover_bottle/id1` 四列各 2 个目标，上下行 arm/frame/index/pose 最大差均为 0。Legacy Orientation/Fused 不动；Legacy Top/Human TCP 最大位移约 434/367 mm 与 516/613 mm，但仍分别 miss 约 168–169 mm 和 120 mm。Canonical Orientation/Fused/Top 不动，Canonical Human 仅约 19.4 mm 变化。八格均 `execution_failed=true`。
+
+Validation: 本地和 pine2 `py_compile`、`bash -n`、全 8 格 dry-run 通过；修复 dry-run 临时写目录后，用新 `/tmp` 路径断言无副作用。单集 runner、输入零差审计、H.264/yuv420p ffprobe、644 帧完整解码和中间帧 2×4 视觉检查通过。输出为 1920×648、5 fps、128.8 s；无 traceback/OOM/import error。

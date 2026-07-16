@@ -32,4 +32,7 @@
 
 - Canonical Human Replay 将人手/CGRASP 局部轴显式映射到 RTCP，最终 `target_retreat=0`，只保留 local RTCP +X 的 0.12 m pregrasp。
 - `canonical_four_method_d435.mp4` 比较四个 Canonical 方法；`canonical_vs_legacy_five_method_d435.mp4` 再加入显式 0.12 m Legacy retreat 基线。源语义和视频属性均写入 manifest。
+- 新增 `run_ik_logic_grid.sh` 的 2×4 严格消融：上行 Legacy/OursV2 IK，下行 Canonical IK；四列为 Orientation/Fused/Top-score/Human Replay。每列共享直接 `T_W_RTCP`，最终 retreat=0、pregrasp=0.12 m@local RTCP +X；合成前逐候选审计输入一致性。
+- 旧五路不是完整 Legacy/Canonical 2×4，且旧正式 Human Replay 记录 retreat=0.14 m，五路中的 0.12 m 只是显式 ablation。
+- `handover_bottle/id1` 八格输入最大差为 0。Legacy Top/Human 有明显运动但最终误差分别约 168–169 mm/120 mm；Canonical Top 不动，Canonical Human 仅约 19.4 mm 小幅变化。八格均失败，定位为严格 IK/坐标语义诊断而非成功演示。
 - 快速阅读：`OUTPUTS_REAL_CONTROL_COMPARE_GUIDE.zh.md`、`PIPER_CANONICAL_REPLAY_METHOD_COMPARE.zh.md`。
