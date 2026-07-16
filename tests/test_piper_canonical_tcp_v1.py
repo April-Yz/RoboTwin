@@ -38,6 +38,7 @@ from real_control_contract import (  # noqa: E402
     oursv2_legacy_link6_target_from_real_tcp_numeric,
     oursv2_tcp_from_urdf_link6,
 )
+from compose_replay_method_compare import method_semantics  # noqa: E402
 
 
 def random_pose(rng: np.random.Generator) -> np.ndarray:
@@ -181,6 +182,22 @@ class PiperCanonicalTCPV1Test(unittest.TestCase):
         )
         np.testing.assert_array_equal(position, real_tcp[:3, 3])
         np.testing.assert_array_equal(rotation, real_tcp[:3, :3])
+
+    def test_replay_method_compare_keeps_canonical_and_legacy_semantics_separate(self) -> None:
+        methods = method_semantics(0.12, 0.12, 0.12)
+        self.assertEqual([method["key"] for method in methods], [
+            "orientation", "fused", "top_score", "canonical_human_replay",
+            "legacy_human_replay"
+        ])
+        for method in methods[:4]:
+            self.assertEqual(method["planner_target"], "T_W_RTCP")
+            self.assertEqual(method["position_frame"], "world")
+            self.assertEqual(method["final_target_position_offset_m"], 0.0)
+            self.assertEqual(method["pregrasp_axis"], "local_RTCP_+X")
+        self.assertEqual(
+            methods[4]["final_target_offset_axis"], "local_human_gripper_+Z"
+        )
+        self.assertEqual(methods[4]["final_target_position_offset_m"], -0.12)
 
 
 if __name__ == "__main__":

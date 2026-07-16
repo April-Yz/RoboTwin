@@ -27,3 +27,9 @@
 4. `PIPER_CANONICAL_TCP_V1.en.md`
 5. `COMMANDS/piper_canonical_tcp_v1.en.md`
 6. `SELECTION_STRATEGY_AUDIT_V4.en.md`
+
+## 2026-07-16 addendum
+
+- Canonical Human Replay maps human/CGRASP local axes explicitly to RTCP, forces final `target_retreat=0`, and retains only the 0.12 m pregrasp on local RTCP +X.
+- `canonical_four_method_d435.mp4` compares four Canonical methods; `canonical_vs_legacy_five_method_d435.mp4` appends an explicit 0.12 m Legacy retreat baseline. The manifest records source semantics and video properties.
+- Quick references: `OUTPUTS_REAL_CONTROL_COMPARE_GUIDE.en.md` and `PIPER_CANONICAL_REPLAY_METHOD_COMPARE.en.md`.

@@ -3275,3 +3275,11 @@ Validation: nine unit tests passed in pine2 RoboTwin_bw; Python `py_compile`, sh
 Data validation: copied only the 18 missing raw episodes from the Piper server and preserved the existing 12. The final 30 episodes contain 1,597,329,900 bytes. Per-episode D435, both wrist cameras, both jointState streams, and both endPose streams are nonempty with zero failures; source/destination file counts and byte totals match for every newly copied episode.
 
 Fallback validation: the four-frame `pick_diverse_bottles/episode3` smoke, newly copied and without legacy `.sim_source`, automatically generated `sim_direct`. Both IK branches had 100% left/right success and both MP4s were compatible. Canonical EE-pose physical-RTCP error was `0.0113/0.0097 mm` left/right versus `194.42/196.35 mm` for legacy OursV2.
+
+## 2026-07-16 (Canonical Four-method + Legacy Human Replay)
+
+- Added aligned Chinese/English real-control output guides covering files, four panels, black/cyan/magenta curves, world XYZ, local RGB axes, and curve occlusion.
+- Added isolated Canonical Human Replay: explicit Human/CGRASP-to-RTCP mapping, forced zero final retreat, and retained 0.12 m pregrasp.
+- Added four-method Canonical and five-way Legacy-baseline videos, per-sample manifests, and single/batch runners. Legacy retreat is explicit; old code/outputs are preserved.
+
+Validation: ten unit tests, `py_compile`, `bash -n`, and runner dry-runs passed in pine2 `RoboTwin_bw`; a dedicated probe confirmed dry-run creates no directory. The `handover_bottle/id1` smoke produced a 1280x812 four-way and 1920x812 five-way video, both H.264/yuv420p, 5 fps, 224 frames, full-decode clean, and visually checked at a middle frame. The manifest confirms Canonical retreat zero and Legacy retreat 0.12. All five methods have `execution_failed=true` on this sample, so the videos are failure-behavior comparisons rather than successful demonstrations. The first dry-run exposed a `command.sh.txt` side effect; it was fixed and its only residue removed.

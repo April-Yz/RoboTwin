@@ -82,3 +82,10 @@
 ## A simulated gripper is offscreen
 
 - Early frames may show only an `offscreen` arrow because of the calibrated 0515 head-camera field of view. This does not mean FK or curves are missing. Inspect later frames in the full episode and use world-XYZ curves plus IK success masks for numerical conclusions.
+
+## An AnyGrasp / Human Replay position appears retreated by 12 cm
+
+- Raw AnyGrasp translation is D435-camera coordinates and must be transformed to world; the Canonical runner does this.
+- Separate `approach_offset_m` (pregrasp only) from `target_retreat_m` (final target). Canonical Human Replay forces the latter to zero; a Legacy 12 cm experiment must be explicit and appears in the manifest.
+- If Canonical Human Replay is missing, inspect `_sources/canonical_human_replay/.../head_cam_plan.mp4`, `EXIT_CODE`, and `stderr.log`. The compositor never substitutes Legacy for the fourth Canonical method.
+- On `handover_bottle/id1`, Human/CGRASP-to-RTCP conversion leaves about a 100-degree target-orientation delta, so strict `urdfik_max_rotation_threshold_rad=0.12` misses every plan. This is Canonical Human Replay IK/reachability failure and must not be “fixed” by restoring a 12 cm final retreat. The failure video and manifest remain useful diagnostics.

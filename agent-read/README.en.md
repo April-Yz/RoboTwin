@@ -27,3 +27,5 @@ For current session context and recent data status, read `agent-read/ACTIVE_MEMO
 - IK: `envs/robot/piper_ik.py`
 
 See `agent-read/COMMANDS/piper_ik_cartesian.en.md`, `piper_ik_foundation.en.md`, `piper_canonical_tcp_v1.en.md`, and `selection_strategy_audit_v4.en.md` for commands. See `agent-read/PIPER_CANONICAL_TCP_V1.en.md` for the Real-Piper-TCP frame contract and `agent-read/VERSION_SUMMARY.en.md` for version relationships.
+
+Use `OUTPUTS_REAL_CONTROL_COMPARE_GUIDE.en.md` for real-control outputs. See `PIPER_CANONICAL_REPLAY_METHOD_COMPARE.en.md` for Canonical Orientation/Fused/Top-score/Human Replay plus the Legacy retreat baseline; `run_replay_method_compare.sh` leaves OursV2 unchanged.

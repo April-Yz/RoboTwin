@@ -154,3 +154,34 @@ tmux new-session -d -s pcan_realctrl_30 \
      --output-root code_painting/piper_canonical_tcp_v1/outputs_real_control_compare_20260716 \
    2>&1 | tee code_painting/piper_canonical_tcp_v1/outputs_real_control_compare_20260716/_batch_logs/tmux.log"
 ```
+
+## Canonical 四方法 + Legacy Human Replay
+
+参数模板（不可直接运行；retreat 必须显式写）：
+
+```bash
+code_painting/piper_canonical_tcp_v1/run_replay_method_compare.sh \
+  --task <TASK> --id <FOUNDATION_ID> --arm <auto|left|right> --gpu <GPU> \
+  --canonical-root <EXISTING_CANONICAL_ROOT> --output-root <NEW_OUTPUT_ROOT> \
+  --legacy-target-retreat-m <0_OR_0.12>
+```
+
+可直接运行的单样本历史 12 cm retreat 对比：
+
+```bash
+cd /home/zaijia001/ssd/RoboTwin
+code_painting/piper_canonical_tcp_v1/run_replay_method_compare.sh \
+  --task handover_bottle --id 1 --arm auto --gpu 2 \
+  --canonical-root code_painting/piper_canonical_tcp_v1/outputs_canonical_20260715 \
+  --output-root code_painting/piper_canonical_tcp_v1/outputs_replay_method_compare_20260716 \
+  --legacy-target-retreat-m 0.12
+```
+
+批量模板：
+
+```bash
+code_painting/piper_canonical_tcp_v1/run_replay_method_compare_batch.sh \
+  --manifest <TASK_ID_ARM_TSV> --gpu <GPU> \
+  --canonical-root <EXISTING_CANONICAL_ROOT> --output-root <NEW_OUTPUT_ROOT> \
+  --legacy-target-retreat-m <0_OR_0.12>
+```

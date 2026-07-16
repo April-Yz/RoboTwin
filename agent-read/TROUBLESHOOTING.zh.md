@@ -82,3 +82,10 @@
 ## 仿真视图里夹爪在画外
 
 - 前若干帧可能因 0515 标定 head camera 的视野而只显示 `offscreen` 箭头；这不代表 FK/曲线缺失。用完整 episode 检查后续帧，并以 world XYZ 曲线和 IK success mask 为数值依据。
+
+## AnyGrasp / Human Replay 位置像被退了 12 cm
+
+- AnyGrasp 原始 translation 是 D435 camera 坐标，必须先转 world；Canonical runner 已执行该变换。
+- 区分 `approach_offset_m`（只构造 pregrasp）与 `target_retreat_m`（移动最终目标）。Canonical Human Replay 强制后者为 0；Legacy 12 cm 实验必须显式传入并记录在 manifest。
+- 若缺 Canonical Human Replay，检查 `_sources/canonical_human_replay/.../head_cam_plan.mp4`、`EXIT_CODE` 和 `stderr.log`；合成器不会用 Legacy 冒充第四种 Canonical 方法。
+- `handover_bottle/id1` 中 Human/CGRASP→RTCP 转换后约有 100° 目标朝向差，严格 `urdfik_max_rotation_threshold_rad=0.12` 会全部 miss；这是 Canonical Human Replay IK/可达性失败，不能通过重新加入 12 cm 最终 retreat 来修复。失败视频和 manifest 仍可用于观察差异。

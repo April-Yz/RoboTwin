@@ -38,3 +38,5 @@
 - Do not evaluate an IK q trace with OursV2's own TCP definition. Convert both q traces to physical Canonical RTCP before comparing against measured endPose.
 - Preserve failed-arm masks and exclude failures from curves; never present the reference-q fallback as a successful result.
 - Write only to isolated `outputs_real_control_compare_20260716`; preserve the existing Canonical candidate batch and V1-V5 videos.
+- Define the requested four methods as four Canonical methods (Orientation/Fused/Top-score/Human Replay). Legacy OursV2 retreat is only a fifth baseline.
+- Canonical Human Replay fixes final `target_retreat_m` at zero while retaining the 0.12 m pregrasp. The Legacy runner requires an explicit retreat so the current zero default and historical 12 cm experiment cannot be confused.

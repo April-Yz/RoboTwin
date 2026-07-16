@@ -49,3 +49,5 @@ The O.2 action order is `pregrasp -> grasp -> close -> action -> open_gripper`. 
 ## Real Piper TCP model boundary
 
 The SAPIEN actor named `link6` and the CuRobo URDF link6 share an origin but not local axes. The Real Piper server tool acts on `L6_URDF`, not raw `L6_SIM`. Simulator readback must therefore apply the exact `Ry(+pi/2)` adapter before server `Ry(-1.57) @ Tx(0.19)`. The near cancellation is only numerical and must not be simplified away. Preview grasp 90-degree canonicalization is a third, independent source transform.
+
+Canonical comparison also separates target-source selection from TCP/IK semantics. Orientation/Fused/Top-score select AnyGrasp candidates; Human Replay uses the human origin. All four become `T_W_RTCP`. Legacy retreat is a fifth old-semantic branch, not a selector.

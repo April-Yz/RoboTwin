@@ -73,3 +73,7 @@ Added isolated `code_painting/piper_canonical_tcp_v1/` without modifying OursV2 
 ### 2026-07-16: real-control-compare v1.x increment
 
 Added `real_control_compare.v1` under the same isolated directory without promoting a major version or modifying OursV2. It uses synchronized q/endPose from Piper raw episodes for three-chain Joint and EE-pose comparisons and keeps outputs separate from the 2026-07-15 candidate-strategy batch. Both videos plot 0515 world XYZ; local TCP +X/+Y/+Z remain red/green/blue.
+
+### 2026-07-16: Canonical replay-method compare v1.x increment
+
+An isolated Canonical Human Replay wrapper maps human/CGRASP axes to RTCP, forces final retreat to zero, and reuses the Canonical planner. The four-method video compares Orientation/Fused/Top-score/Human Replay; the five-way video appends an explicit 12 cm Legacy retreat baseline. OursV2 and 2026-07-15 outputs remain unchanged.

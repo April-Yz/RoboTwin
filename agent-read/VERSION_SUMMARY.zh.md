@@ -73,3 +73,7 @@ O.2 是 O.1.2 Foundation IK 的任务扩展，不改变 V1-V4 IK 语义。新增
 ### 2026-07-16：Real control compare v1.x 增量
 
 在同一隔离目录中新增 `real_control_compare.v1`，不提升 major version、不修改 OursV2。它用 Piper raw episode 的同步 q/endPose 做 Joint 与 EE-pose 两类三链路对比，输出与 2026-07-15 候选策略批次分离。Joint/EE-pose 两支视频均以 0515 world XYZ 作图，局部 TCP 轴继续用红/绿/蓝表示 +X/+Y/+Z。
+
+### 2026-07-16：Canonical replay-method compare v1.x 增量
+
+新增隔离 Canonical Human Replay wrapper，把人手/CGRASP 轴映射到 RTCP、强制最终 retreat 为 0，并复用 Canonical planner。四方法视频比较 Orientation/Fused/Top-score/Human Replay；五路视频再加入显式 12 cm Legacy retreat 基线。旧 OursV2 与 2026-07-15 输出不修改。

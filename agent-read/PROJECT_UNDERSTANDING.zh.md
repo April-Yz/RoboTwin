@@ -49,3 +49,5 @@ O.2 的动作顺序为 `pregrasp -> grasp -> close -> action -> open_gripper`，
 ## Real Piper TCP 模型边界
 
 RoboTwin 中名为 `link6` 的 SAPIEN actor 与 CuRobo URDF link6 共享原点但不共享局部轴。Real Piper server tool 作用在 `L6_URDF`，不是 raw `L6_SIM`。因此 simulator readback 必须先经过精确 `Ry(+pi/2)` adapter，再应用服务器 `Ry(-1.57) @ Tx(0.19)`。两角接近抵消只是数值现象，不允许在代码中约掉；preview grasp 的 90° canonicalization 又是第三个独立来源变换。
+
+Canonical 方法比较还分“目标来源选择”和“TCP/IK 语义”两层。Orientation/Fused/Top-score 选择 AnyGrasp 候选，Human Replay 使用人手原点；四者最终都转成 `T_W_RTCP`。Legacy retreat 是第五条旧语义支路，不属于候选策略。

@@ -3273,3 +3273,11 @@ Validation: pine2 RoboTwin_bw 9 个单元测试通过；Python `py_compile`、sh
 Data validation: 从 Piper 服务器只补齐 18 个缺失 raw episode；现有 12 集不覆盖。最终 30 集共 1,597,329,900 bytes，逐集检查 D435、左右 wrist、左右 jointState 和左右 endPose 均非空，0 个失败；每个新复制 episode 的源/目标文件数与字节数一致。
 
 Fallback validation: 新复制且无旧 `.sim_source` 的 `pick_diverse_bottles/episode3` 4 帧 smoke 自动生成 `sim_direct`，两套 IK 均左右 100% 成功，两支 MP4 均兼容。Canonical EE-pose RTCP 误差左/右 `0.0113/0.0097 mm`，OursV2 legacy 为 `194.42/196.35 mm`。
+
+## 2026-07-16（Canonical 四方法 + Legacy Human Replay）
+
+- 新增 real-control 输出中文速查及英文对应稿，解释目录、四画面、黑/青/紫曲线、world XYZ、局部 RGB 轴与曲线覆盖。
+- 新增隔离 Canonical Human Replay：Human/CGRASP 轴显式转 RTCP，最终 retreat 强制 0，pregrasp 保留 0.12 m。
+- 新增四方法 Canonical 视频、附加 Legacy retreat 的五路视频、逐样本 manifest 和单集/batch runner；Legacy retreat 必须显式给出，旧代码/输出不覆盖。
+
+Validation: pine2 `RoboTwin_bw` 10 个单元测试、`py_compile`、`bash -n` 和 runner dry-run 通过；额外探针确认 dry-run 不创建目录。`handover_bottle/id1` smoke 生成 1280×812 四路和 1920×812 五路视频，均为 H.264/yuv420p、5 fps、224 帧并通过完整解码与中间帧视觉 QA；manifest 验证 Canonical retreat=0、Legacy retreat=0.12。该样本五种方法均 `execution_failed=true`，视频定位为失败行为对比，不伪装为成功演示。首次 dry-run 暴露写入 `command.sh.txt` 的副作用，已修复并清理唯一残留。

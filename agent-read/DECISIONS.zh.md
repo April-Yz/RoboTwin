@@ -38,3 +38,5 @@
 - 不以 OursV2 自己的 TCP 定义评价 IK 后 q；两套 q 统一转换为物理 Canonical RTCP 后再和 real endPose 比较。
 - 失败臂保留失败标记并排除曲线，不以 reference q fallback 伪造成功数值。
 - 新结果使用独立 `outputs_real_control_compare_20260716`；现有 Canonical candidate batch 和 V1–V5 视频不覆盖。
+- 用户所说“四种方式”定义为四个 Canonical 方法（Orientation/Fused/Top-score/Human Replay）；Legacy OursV2 retreat 只作为第五个基线。
+- Canonical Human Replay 最终 `target_retreat_m` 固定为 0，保留 0.12 m pregrasp；Legacy retreat 在 runner 中必填，避免当前默认 0 与历史 12 cm 混淆。

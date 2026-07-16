@@ -36,3 +36,5 @@ Selection Strategy Audit V4 只读取已有数据，不需要 GPU、SAPIEN 或 p
 - VSCode 兼容视频后处理要求系统 `ffmpeg`/`ffprobe`，且 FFmpeg 提供 `libx264`。标准输出契约为 H.264、`yuv420p`、`+faststart`；转码不需要 GPU。
 - Real control compare 还需要同步 raw episode：`camera/color/myD435`、左右 `arm/jointState`、左右 `arm/endPose`。当前入口从 `/home/zaijia001/ssd/data/piper/hand/vis/.pos_source/<TASK>/<EPISODE>` 读取，不使用 foundation replay 当作真实机器人状态。
 - 双 IK 和 SAPIEN 渲染需要 RoboTwin_bw/CUDA；本机系统 Python 缺少 SciPy 时只能做语法检查，数学测试必须在 RoboTwin_bw 中运行。
+- Replay 四/五路对比也必须使用 `RoboTwin_bw`（NumPy、SciPy、OpenCV）和系统 `ffmpeg`/`ffprobe`；本机系统 Python 不保证有 OpenCV。
+- Canonical Human Replay 读取 `foundation_replay_d435/`、`harmer_output/`、AnyGrasp 目录和 `code_painting/h2o_manual_review/<task>/hand_keyframes_all.json`。

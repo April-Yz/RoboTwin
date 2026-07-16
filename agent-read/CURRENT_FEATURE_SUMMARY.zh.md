@@ -27,3 +27,9 @@
 4. `PIPER_CANONICAL_TCP_V1.zh.md`
 5. `COMMANDS/piper_canonical_tcp_v1.zh.md`
 6. `SELECTION_STRATEGY_AUDIT_V4.zh.md`
+
+## 2026-07-16 补充
+
+- Canonical Human Replay 将人手/CGRASP 局部轴显式映射到 RTCP，最终 `target_retreat=0`，只保留 local RTCP +X 的 0.12 m pregrasp。
+- `canonical_four_method_d435.mp4` 比较四个 Canonical 方法；`canonical_vs_legacy_five_method_d435.mp4` 再加入显式 0.12 m Legacy retreat 基线。源语义和视频属性均写入 manifest。
+- 快速阅读：`OUTPUTS_REAL_CONTROL_COMPARE_GUIDE.zh.md`、`PIPER_CANONICAL_REPLAY_METHOD_COMPARE.zh.md`。

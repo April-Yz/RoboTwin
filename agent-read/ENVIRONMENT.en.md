@@ -36,3 +36,5 @@ Selection Strategy Audit V4 only reads existing data and needs no GPU, SAPIEN, o
 - VS Code-compatible video post-processing requires system `ffmpeg`/`ffprobe` with `libx264`. The output contract is H.264, `yuv420p`, and `+faststart`; transcoding does not require a GPU.
 - Real control compare also requires synchronized raw-episode `camera/color/myD435`, left/right `arm/jointState`, and left/right `arm/endPose`. The entry reads `/home/zaijia001/ssd/data/piper/hand/vis/.pos_source/<TASK>/<EPISODE>` and never treats foundation replay as measured robot state.
 - Dual IK and SAPIEN rendering require RoboTwin_bw/CUDA. If the local system Python lacks SciPy, it can only run syntax checks; mathematical tests must run inside RoboTwin_bw.
+- The four/five-way replay comparison also requires `RoboTwin_bw` (NumPy, SciPy, OpenCV) plus system `ffmpeg`/`ffprobe`; the host system Python is not expected to include OpenCV.
+- Canonical Human Replay reads `foundation_replay_d435/`, `harmer_output/`, the AnyGrasp directory, and `code_painting/h2o_manual_review/<task>/hand_keyframes_all.json`.
