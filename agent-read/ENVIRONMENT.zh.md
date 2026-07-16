@@ -38,3 +38,9 @@ Selection Strategy Audit V4 只读取已有数据，不需要 GPU、SAPIEN 或 p
 - 双 IK 和 SAPIEN 渲染需要 RoboTwin_bw/CUDA；本机系统 Python 缺少 SciPy 时只能做语法检查，数学测试必须在 RoboTwin_bw 中运行。
 - Replay 四/五路对比也必须使用 `RoboTwin_bw`（NumPy、SciPy、OpenCV）和系统 `ffmpeg`/`ffprobe`；本机系统 Python 不保证有 OpenCV。
 - Canonical Human Replay 读取 `foundation_replay_d435/`、`harmer_output/`、AnyGrasp 目录和 `code_painting/h2o_manual_review/<task>/hand_keyframes_all.json`。
+
+## 论文定性素材
+
+- 网格合成器使用 pine2 系统 Python，以及系统 `ffmpeg`/`ffprobe`；输出要求 H.264、`yuv420p`。
+- 关键帧候选图导出器需要 NumPy、SciPy 和 OpenCV，必须使用 `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python3.10`。pine2 默认 `python3` 缺少 `cv2`。
+- 素材根目录为 `/home/zaijia001/ssd/data/piper/paper_qualitative_assets`，命令见 `COMMANDS/paper_qualitative_assets.zh.md`。

@@ -81,3 +81,7 @@ O.2 是 O.1.2 Foundation IK 的任务扩展，不改变 V1-V4 IK 语义。新增
 ### 2026-07-16：Legacy / Canonical IK semantic grid v2（v1.x 增量）
 
 不修改 OursV2。旧 same-numeric-target V1 因遗漏 Legacy candidate offset/Human retreat 且 Human remap 未物化而失效。V2 共享同一个 AnyGrasp/Human 语义源：上行完整走原 Legacy target 适配与 EE reach，下行转成 Canonical RTCP 并反演服务器 19 cm 工具。合成前审计源点、轴关系、行特有 contract 和 `link6-RTCP=[-0.19,0,0]`，而不是要求两行 planner target 数值相等。
+
+### 2026-07-16：Paper qualitative assets v1.x 增量
+
+不改变任何方法或 IK 版本。Dense-v2 论文网格把标题从视频画面内移到 38 px 独立顶栏，旧版保留；新增通用 JSON 驱动的关键帧候选图导出器，当前为 `pick_diverse_bottles/id0` 的 38/78 帧输出四策略、左右手分栏的 8 张单图和 2 张 contact sheet。

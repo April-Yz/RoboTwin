@@ -21,3 +21,5 @@ python some_script.py --some-flag
 - 对于用户可能直接复制的命令，优先写绝对路径。
 - 注释尽量短、直接、面向动作。
 - 按任务/主题分组整理。
+
+论文定性视频网格和关键帧候选图命令见 `paper_qualitative_assets.zh.md`。

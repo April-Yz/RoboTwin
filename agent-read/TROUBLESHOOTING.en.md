@@ -89,3 +89,13 @@
 - Separate `approach_offset_m` (pregrasp only) from `target_retreat_m` (final target). Canonical Human Replay forces the latter to zero; a Legacy 12 cm experiment must be explicit and appears in the manifest.
 - If Canonical Human Replay is missing, inspect `_sources/canonical_human_replay/.../head_cam_plan.mp4`, `EXIT_CODE`, and `stderr.log`. The compositor never substitutes Legacy for the fourth Canonical method.
 - On `handover_bottle/id1`, Human/CGRASP-to-RTCP conversion leaves about a 100-degree target-orientation delta, so strict `urdfik_max_rotation_threshold_rad=0.12` misses every plan. This is Canonical Human Replay IK/reachability failure and must not be “fixed” by restoring a 12 cm final retreat. The failure video and manifest remain useful diagnostics.
+
+## Candidate-image export reports `No module named 'cv2'`
+
+- Cause: the default `python3` on pine2 has no OpenCV. This does not indicate corrupt generated PNGs.
+- Handling: run export and validation with `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python3.10`.
+
+## A very wide contact sheet shows black blocks in the app preview
+
+- First measure strict-black pixels with OpenCV, then fully decode each individual image and contact sheet with FFmpeg.
+- In this run, the frame-78 source, all four individual images, and the contact sheet had a zero strict-black-pixel ratio and decoded successfully. The blocks are an app preview artifact for the wide PNG, not file corruption.

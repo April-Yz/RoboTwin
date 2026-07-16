@@ -81,3 +81,7 @@ An isolated Canonical Human Replay wrapper maps human/CGRASP axes to RTCP, force
 ### 2026-07-16: Legacy / Canonical IK semantic grid v2 (v1.x increment)
 
 OursV2 remains unchanged. The old same-numeric-target V1 is invalid because it omitted Legacy candidate offsets/Human retreat and did not materialize the Human remap. V2 shares one AnyGrasp/Human semantic source: the top row applies the complete original Legacy target adapter and EE reach, while the bottom row converts to Canonical RTCP and inverts the server 19 cm tool. Composition audits source positions, axes, row-specific contracts, and `link6-RTCP=[-0.19,0,0]` instead of requiring numerically identical planner targets.
+
+### 2026-07-16: paper qualitative assets v1.x increment
+
+No method or IK version changes. The Dense-v2 paper grid moves titles out of video content into separate 38 px headers and preserves the former version. A reusable JSON-driven keyframe-candidate exporter now produces eight four-strategy left/right split images and two contact sheets for frames 38/78 of `pick_diverse_bottles/id0`.

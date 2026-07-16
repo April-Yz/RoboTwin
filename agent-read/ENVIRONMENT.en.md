@@ -38,3 +38,9 @@ Selection Strategy Audit V4 only reads existing data and needs no GPU, SAPIEN, o
 - Dual IK and SAPIEN rendering require RoboTwin_bw/CUDA. If the local system Python lacks SciPy, it can only run syntax checks; mathematical tests must run inside RoboTwin_bw.
 - The four/five-way replay comparison also requires `RoboTwin_bw` (NumPy, SciPy, OpenCV) plus system `ffmpeg`/`ffprobe`; the host system Python is not expected to include OpenCV.
 - Canonical Human Replay reads `foundation_replay_d435/`, `harmer_output/`, the AnyGrasp directory, and `code_painting/h2o_manual_review/<task>/hand_keyframes_all.json`.
+
+## Paper qualitative assets
+
+- The grid compositor uses pine2's system Python plus system `ffmpeg`/`ffprobe`; output must be H.264/`yuv420p`.
+- The keyframe-candidate exporter needs NumPy, SciPy, and OpenCV and must use `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python3.10`. The default `python3` on pine2 lacks `cv2`.
+- The asset root is `/home/zaijia001/ssd/data/piper/paper_qualitative_assets`; see `COMMANDS/paper_qualitative_assets.en.md`.

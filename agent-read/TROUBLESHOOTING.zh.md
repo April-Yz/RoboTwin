@@ -89,3 +89,13 @@
 - 区分 `approach_offset_m`（只构造 pregrasp）与 `target_retreat_m`（移动最终目标）。Canonical Human Replay 强制后者为 0；Legacy 12 cm 实验必须显式传入并记录在 manifest。
 - 若缺 Canonical Human Replay，检查 `_sources/canonical_human_replay/.../head_cam_plan.mp4`、`EXIT_CODE` 和 `stderr.log`；合成器不会用 Legacy 冒充第四种 Canonical 方法。
 - `handover_bottle/id1` 中 Human/CGRASP→RTCP 转换后约有 100° 目标朝向差，严格 `urdfik_max_rotation_threshold_rad=0.12` 会全部 miss；这是 Canonical Human Replay IK/可达性失败，不能通过重新加入 12 cm 最终 retreat 来修复。失败视频和 manifest 仍可用于观察差异。
+
+## 论文候选图导出时报 `No module named 'cv2'`
+
+- 原因：pine2 默认 `python3` 没有 OpenCV；这不表示生成的 PNG 损坏。
+- 处理：改用 `/home/zaijia001/ssd/miniconda3/envs/RoboTwin_bw/bin/python3.10` 执行导出与验证。
+
+## 超宽 contact sheet 在应用预览中出现黑块
+
+- 先用 OpenCV 统计严格黑色像素，再用 FFmpeg 完整解码各单图和 contact sheet。
+- 本轮 frame 78 的源图、4 张单图和 contact sheet 严格黑色像素比例均为 0，且解码通过；黑块属于应用对超宽 PNG 的预览伪影，不是文件内容损坏。

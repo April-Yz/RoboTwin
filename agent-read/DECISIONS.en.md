@@ -40,3 +40,10 @@
 - Write only to isolated `outputs_real_control_compare_20260716`; preserve the existing Canonical candidate batch and V1-V5 videos.
 - Define the requested four methods as four Canonical methods (Orientation/Fused/Top-score/Human Replay). Legacy OursV2 retreat is only a fifth baseline.
 - Canonical Human Replay fixes final `target_retreat_m` at zero while retaining the 0.12 m pregrasp. The Legacy runner requires an explicit retreat so the current zero default and historical 12 cm experiment cannot be confused.
+
+## 2026-07-16: paper-grid headers and keyframe-candidate images
+
+- Preserve all 480x270 video content and add a separate 38 px header above each cell, making the 4x5 grid 1920x1540. Preserve the former title-overlay version as a separate backup.
+- Paper candidate images draw only the Selection Pose recorded by V4 metadata. Planner offset, retreat, pregrasp, and TCP compensation are excluded so strategy selection is not conflated with downstream planning.
+- Draw left and right arms in separate panels and mark a dual-arm keyframe `BOTH` in the global title. Local axes remain X red, Y green, Z blue.
+- The OursV2 point is a synthetic human-retarget target and must be labeled `HUMAN TARGET`; only Orientation/Fused/Top-score are AnyGrasp candidates.

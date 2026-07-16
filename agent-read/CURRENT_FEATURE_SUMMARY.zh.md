@@ -37,3 +37,9 @@
 - 旧 `outputs_ik_logic_grid_20260716` V1 因移除 Legacy `-0.05 m @ local +Z`/Human 0.14 m 适配，并误以为 Human remap 标签会作用于 reuse-plan-summary，结论撤销。新结果写入 `outputs_ik_semantic_grid_v2_20260716`。
 - `handover_bottle/id1` 的 V2 审计中，所有语义源 world xyz 差为 0，轴关系误差不超过 `4.2e-16`；Legacy Orientation/Top 与历史原结果 target 差为 0。Canonical Human 内部完成完整 handover，但通用 summary 仍因早期 action miss 返回失败。最终 1920×648、265 帧视频通过完整解码与视觉 QA。
 - 快速阅读：`OUTPUTS_REAL_CONTROL_COMPARE_GUIDE.zh.md`、`PIPER_CANONICAL_REPLAY_METHOD_COMPARE.zh.md`。
+
+## 2026-07-16 论文定性素材补充
+
+- Dense URDF-match v2 的 4x5 网格已把标题移到每格独立的 38 px 顶栏；视频内容仍为 480x270，最终输出为 1920x1540，旧标题叠加版另行保留。
+- `pick_diverse_bottles/id0` 的交互关键帧 38/78 已导出 Orientation、Fused、Top-score、OursV2 共 8 张左右手分栏图和 2 张 contact sheet。OursV2 是 `HUMAN TARGET`，不是 AnyGrasp candidate。
+- 复现与验证命令见 `COMMANDS/paper_qualitative_assets.zh.md`。

@@ -40,3 +40,10 @@
 - 新结果使用独立 `outputs_real_control_compare_20260716`；现有 Canonical candidate batch 和 V1–V5 视频不覆盖。
 - 用户所说“四种方式”定义为四个 Canonical 方法（Orientation/Fused/Top-score/Human Replay）；Legacy OursV2 retreat 只作为第五个基线。
 - Canonical Human Replay 最终 `target_retreat_m` 固定为 0，保留 0.12 m pregrasp；Legacy retreat 在 runner 中必填，避免当前默认 0 与历史 12 cm 混淆。
+
+## 2026-07-16：论文网格标题与关键帧候选图
+
+- 不缩小或遮盖原有 480x270 视频内容；在每格上方增加独立 38 px 标题栏，使 4x5 网格变为 1920x1540。旧标题叠加版保留为独立备份。
+- 论文候选图只画 V4 metadata 中的 Selection Pose，排除 planner offset、retreat、pregrasp 和 TCP compensation，避免把选择策略与后续规划混在一起。
+- 左右手分栏独立画轴；双手关键帧在总标题标为 `BOTH`。局部轴固定使用 X 红、Y 绿、Z 蓝。
+- OursV2 的点来自 synthetic human-retarget target，必须标为 `HUMAN TARGET`；Orientation/Fused/Top-score 才标 AnyGrasp candidate。

@@ -21,3 +21,5 @@ python some_script.py --some-flag
 - Prefer absolute paths for commands that the user is likely to copy directly.
 - Keep comments short and action-oriented.
 - Group commands by task/topic.
+
+See `paper_qualitative_assets.en.md` for the paper video-grid and keyframe-candidate commands.
